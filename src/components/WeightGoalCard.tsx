@@ -11,7 +11,7 @@ import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
 import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb, Brain, Shield } from 'lucide-react';
-import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition, MetaRule, ProductizationPlan, SkillAcquisitionPlan, CoreSkill, AbandonmentLog } from '@/types/workout';
+import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition, MetaRule, ProductizationPlan, SkillAcquisitionPlan, CoreSkill } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO, isAfter, startOfToday, isBefore } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from './ui/label';
@@ -23,7 +23,7 @@ import { ScrollArea } from './ui/scroll-area';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 
@@ -47,6 +47,7 @@ interface WeightGoalCardProps {
   productizationPlans: Record<string, ProductizationPlan>;
   offerizationPlans: Record<string, ProductizationPlan>;
   projects: any[];
+  onOpenExcuseModal: (planId: string, planName: string) => void;
 }
 
 const weightChartConfig = {
@@ -89,21 +90,18 @@ export function WeightGoalCard({
     metaRules,
     productizationPlans,
     offerizationPlans,
-    projects
+    projects,
+    onOpenExcuseModal,
 }: WeightGoalCardProps) {
     const { toast } = useToast();
     const router = useRouter();
-    const { openRuleDetailPopup, skillAcquisitionPlans, coreSkills, offerizationPlans: offerizationPlansFromAuth, abandonmentLogs, setAbandonmentLogs } = useAuth();
+    const { openRuleDetailPopup, skillAcquisitionPlans, coreSkills, offerizationPlans: offerizationPlansFromAuth } = useAuth();
     const [newWeight, setNewWeight] = useState('');
     const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
     const [showLogForm, setShowLogForm] = useState(false);
     const [weightView, setWeightView] = useState<'chart' | 'details'>('details');
     const [mainView, setMainView] = useState<'projects' | 'weight' | 'diet' | 'rules'>('projects');
     
-    const [excuseModalState, setExcuseModalState] = useState<{ isOpen: boolean; planId: string | null; planName: string | null }>({ isOpen: false, planId: null, planName: null });
-    const [newExcuse, setNewExcuse] = useState('');
-
-
     const [heightInput, setHeightInput] = useState('');
     const [dobInput, setDobInput] = useState<Date | undefined>();
     const [genderInput, setGenderInput] = useState<Gender | null>(null);
@@ -383,32 +381,6 @@ export function WeightGoalCard({
         onOpenIntentionPopup(intention.id);
     };
 
-    const handleOpenExcuseModal = (planId: string, planName: string) => {
-        setExcuseModalState({ isOpen: true, planId, planName });
-    };
-
-    const handleSaveExcuse = () => {
-        if (!excuseModalState.planId || !newExcuse.trim()) {
-            toast({ title: 'Error', description: 'Excuse cannot be empty.', variant: 'destructive' });
-            return;
-        }
-        const newLogEntry: AbandonmentLog = {
-            id: `log_${Date.now()}`,
-            timestamp: Date.now(),
-            reason: newExcuse.trim()
-        };
-        setAbandonmentLogs(prev => {
-            const existingLogs = prev[excuseModalState.planId!] || [];
-            return {
-                ...prev,
-                [excuseModalState.planId!]: [...existingLogs, newLogEntry]
-            };
-        });
-        setNewExcuse('');
-        setExcuseModalState({ isOpen: false, planId: null, planName: null });
-        toast({ title: 'Excuse Logged', description: 'Your reason has been saved for future review.' });
-    };
-
     const renderProjectsContent = () => {
         const plannedSpecializations = Object.entries(offerizationPlans || {})
             .filter(([, plan]) => plan.learningPlan && ((plan.learningPlan.audioVideoResources?.length || 0) > 0 || (plan.learningPlan.bookWebpageResources?.length || 0) > 0))
@@ -463,7 +435,7 @@ export function WeightGoalCard({
                                     <CardHeader className="p-3">
                                         <div className="flex justify-between items-start">
                                             <CardTitle className="text-base">{spec.name}</CardTitle>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => handleOpenExcuseModal(spec.id, spec.name)}>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => onOpenExcuseModal(spec.id, spec.name)}>
                                                 <Shield className="h-4 w-4" />
                                             </Button>
                                         </div>
@@ -850,29 +822,6 @@ export function WeightGoalCard({
                         </div>
                     </CardContent>
                 </>
-            )}
-             {excuseModalState.isOpen && (
-                <Dialog open={excuseModalState.isOpen} onOpenChange={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Log Abandonment Reason</DialogTitle>
-                            <CardDescription>
-                                Why did you stop pursuing the plan for "{excuseModalState.planName}"?
-                            </CardDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                            <Textarea
-                                value={newExcuse}
-                                onChange={(e) => setNewExcuse(e.target.value)}
-                                placeholder="e.g., Lost interest, found a better approach, project priorities changed..."
-                            />
-                        </div>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>Cancel</Button>
-                            <Button onClick={handleSaveExcuse}>Log Reason</Button>
-                        </DialogFooter>
-                    </DialogContent>
-                </Dialog>
             )}
         </Card>
     );

@@ -57,9 +57,8 @@ const activityColorMapping: Record<string, string> = {
     'Deep Work': 'hsl(var(--chart-1))',
     'Learning': 'hsl(var(--chart-2))',
     'Workout': 'hsl(var(--chart-3))',
-    'Mindset': 'hsl(var(--chart-4))',
-    'Branding': 'hsl(var(--chart-5))',
-    'Lead Gen': 'hsl(27, 87%, 67%)',
+    'Branding': 'hsl(var(--chart-4))',
+    'Lead Gen': 'hsl(var(--chart-5))',
     'Essentials': 'hsl(173, 58%, 39%)',
     'Planning': 'hsl(197, 37%, 24%)',
     'Tracking': 'hsl(43, 74%, 66%)',
@@ -1489,42 +1488,42 @@ function MyPlatePageContent() {
               </div>
           </DialogContent>
       </Dialog>
-        <Dialog open={excuseModalState.isOpen} onOpenChange={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Log Abandonment Reason</DialogTitle>
-                    <DialogDescription>
-                        Why did you stop pursuing the plan for "{excuseModalState.planName}"?
-                    </DialogDescription>
-                </DialogHeader>
-                <div className="py-4 space-y-4">
-                    <Textarea
-                        value={newExcuse}
-                        onChange={(e) => setNewExcuse(e.target.value)}
-                        placeholder="e.g., Lost interest, found a better approach..."
-                    />
-                    {abandonmentLogs[excuseModalState.planId!] && abandonmentLogs[excuseModalState.planId!].length > 0 && (
-                        <div className="space-y-2">
-                            <h4 className="font-semibold text-sm">Previous Reasons:</h4>
-                            <ScrollArea className="h-32 border rounded-md p-2">
-                                <ul className="space-y-2 text-sm">
-                                    {abandonmentLogs[excuseModalState.planId!].map(log => (
-                                        <li key={log.id} className="p-2 bg-muted/50 rounded-md">
-                                            <p className="text-muted-foreground">{log.reason}</p>
-                                            <p className="text-xs text-muted-foreground/70 mt-1">{format(new Date(log.timestamp), 'PPP')}</p>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </ScrollArea>
-                        </div>
-                    )}
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>Cancel</Button>
-                    <Button onClick={handleSaveExcuse}>Log Reason</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+      <Dialog open={excuseModalState.isOpen} onOpenChange={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Log Abandonment Reason</DialogTitle>
+                <DialogDescription>
+                    Why did you stop pursuing the plan for "{excuseModalState.planName}"?
+                </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+                <Textarea
+                    value={newExcuse}
+                    onChange={(e) => setNewExcuse(e.target.value)}
+                    placeholder="e.g., Lost interest, found a better approach..."
+                />
+                {abandonmentLogs[excuseModalState.planId!] && abandonmentLogs[excuseModalState.planId!].length > 0 && (
+                    <div className="space-y-2">
+                        <h4 className="font-semibold text-sm">Previous Reasons:</h4>
+                        <ScrollArea className="h-32 border rounded-md p-2">
+                            <ul className="space-y-2 text-sm">
+                                {abandonmentLogs[excuseModalState.planId!].map(log => (
+                                    <li key={log.id} className="p-2 bg-muted/50 rounded-md">
+                                        <p className="text-muted-foreground">{log.reason}</p>
+                                        <p className="text-xs text-muted-foreground/70 mt-1">{format(new Date(log.timestamp), 'PPP')}</p>
+                                    </li>
+                                ))}
+                            </ul>
+                        </ScrollArea>
+                    </div>
+                )}
+            </div>
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>Cancel</Button>
+                <Button onClick={handleSaveExcuse}>Log Reason</Button>
+            </DialogFooter>
+        </DialogContent>
+    </Dialog>
     </>
   );
 }
