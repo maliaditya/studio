@@ -290,16 +290,9 @@ function MyPlatePageContent() {
                 const mainLogInstanceId = activity.taskIds[0];
                 let mainDefId: string | undefined;
 
-                const upskillLog = allUpskillLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
-                if (upskillLog) mainDefId = upskillLog.definitionId;
-                else {
-                    const deepWorkLog = allDeepWorkLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
-                    if (deepWorkLog) mainDefId = deepWorkLog.definitionId;
-                    else {
-                         const brandingLog = brandingLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId);
-                         if(brandingLog) mainDefId = brandingLog.definitionId;
-                    }
-                }
+                const allLogs = activity.type === 'upskill' ? allUpskillLogs : activity.type === 'branding' ? brandingLogs : allDeepWorkLogs;
+                mainDefId = allLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId)?.definitionId;
+                
                 if (mainDefId) {
                   definition = allDefs.get(mainDefId);
                 }
@@ -842,10 +835,10 @@ function MyPlatePageContent() {
     });
 
     return {
-      todayUpskillHours: todayUpskillMinutes / 60,
-      upskillChange: calculateChange(todayUpskillMinutes, yesterdayUpskillMinutes),
       todayDeepWorkHours: todayDeepWorkMinutes / 60,
       deepWorkChange: calculateChange(todayDeepWorkMinutes, yesterdayDeepWorkMinutes),
+      todayUpskillHours: todayUpskillMinutes / 60,
+      upskillChange: calculateChange(todayUpskillMinutes, yesterdayUpskillMinutes),
       totalProductiveHours: totalTodayMinutes / 60,
       avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
       learningStats,
@@ -1522,22 +1515,22 @@ function MyPlatePageContent() {
         setIsLoggingNewExcuse(false);
         setNewExcuse('');
       }}>
-        <DialogContent className="sm:max-w-7xl">
+        <DialogContent className="sm:max-w-7xl h-[90vh] flex flex-col">
             <DialogHeader>
                 <DialogTitle>Log Abandonment Reason</DialogTitle>
                 <DialogDescription>
                     Why did you stop pursuing the plan for "{excuseModalState.planName}"?
                 </DialogDescription>
             </DialogHeader>
-            <div className="py-4 space-y-4">
-                 <div className="space-y-2">
+            <div className="flex-grow py-4 space-y-4 min-h-0 flex flex-col">
+                 <div className="space-y-2 flex-grow min-h-0">
                     <h4 className="font-semibold text-sm">Previous Reasons:</h4>
-                    <ScrollArea className="h-40">
-                        <div className="space-y-3">
+                    <ScrollArea className="h-full">
+                        <div className="space-y-3 pr-4">
                             {(abandonmentLogs[excuseModalState.planId!] || []).length > 0 ? (
                                 (abandonmentLogs[excuseModalState.planId!] || []).map(log => {
                                     const plan = skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId);
-                                    const startDate = plan?.targetDate ? format(parseISO(plan.targetDate), 'PPP') : 'N/A';
+                                    
                                     const allRuleEquations = Object.values(pillarEquations).flat();
                                     const linkedRuleEquations = (plan?.linkedRuleEquationIds || [])
                                     .map(id => allRuleEquations.find(eq => eq.id === id))
@@ -1551,8 +1544,19 @@ function MyPlatePageContent() {
                                                 setEditedHandlingStrategy(log.handlingStrategy || '');
                                             }}
                                         >
-                                            <p className="font-medium text-foreground">{log.reason}</p>
-                                            <div className="text-xs text-muted-foreground mt-1 flex justify-between">
+                                           <div className="grid grid-cols-3 gap-4">
+                                                <div>
+                                                    <p className="font-medium text-xs text-muted-foreground">Why you started</p>
+                                                    <ul className="list-disc list-inside mt-1">
+                                                        {linkedRuleEquations.map(eq => <li key={eq.id}>{eq.outcome}</li>)}
+                                                    </ul>
+                                                </div>
+                                                <div className="col-span-2">
+                                                     <p className="font-medium text-xs text-muted-foreground">Why you stopped</p>
+                                                    <p className="font-medium text-foreground mt-1">{log.reason}</p>
+                                                </div>
+                                           </div>
+                                            <div className="text-xs text-muted-foreground mt-2 pt-2 border-t flex justify-between">
                                               <span>Abandoned: {format(new Date(log.timestamp), 'PPP')}</span>
                                             </div>
                                              {editingExcuseLogId === log.id ? (
@@ -1586,7 +1590,7 @@ function MyPlatePageContent() {
                     </ScrollArea>
                 </div>
                 {isLoggingNewExcuse && (
-                    <div className="space-y-2">
+                    <div className="space-y-2 flex-shrink-0">
                          <Label htmlFor="excuse-textarea">New Reason:</Label>
                          <Textarea
                             id="excuse-textarea"
@@ -1600,17 +1604,19 @@ function MyPlatePageContent() {
                 )}
             </div>
             <DialogFooter className="flex justify-between w-full">
-                 <Button variant="secondary" size="sm" onClick={() => setIsLoggingNewExcuse(true)}>
-                    Log New Excuse
-                </Button>
+                <div/>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={() => {
                         setExcuseModalState({isOpen: false, planId: null, planName: null});
                         setIsLoggingNewExcuse(false);
                         setNewExcuse('');
                     }}>Cancel</Button>
-                    {isLoggingNewExcuse && (
+                    {isLoggingNewExcuse ? (
                         <Button onClick={handleSaveExcuse}>Save Reason</Button>
+                    ) : (
+                        <Button variant="secondary" size="sm" onClick={() => setIsLoggingNewExcuse(true)}>
+                           Log New Excuse
+                       </Button>
                     )}
                 </div>
             </DialogFooter>
@@ -1624,3 +1630,5 @@ export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
 
+
+```
