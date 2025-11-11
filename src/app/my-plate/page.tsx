@@ -1126,7 +1126,6 @@ function MyPlatePageContent() {
     });
     setNewExcuse('');
     setIsLoggingNewExcuse(false);
-    setExcuseModalState({ isOpen: false, planId: null, planName: null });
     toast({ title: 'Excuse Logged', description: 'Your reason has been saved for future review.' });
   };
   
@@ -1528,59 +1527,40 @@ function MyPlatePageContent() {
                     <ScrollArea className="h-full">
                         <div className="space-y-3 pr-4">
                             {(abandonmentLogs[excuseModalState.planId!] || []).length > 0 ? (
-                                (abandonmentLogs[excuseModalState.planId!] || []).map(log => {
-                                    const plan = skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId);
-                                    
-                                    const allRuleEquations = Object.values(pillarEquations).flat();
-                                    const linkedRuleEquations = (plan?.linkedRuleEquationIds || [])
-                                    .map(id => allRuleEquations.find(eq => eq.id === id))
-                                    .filter(eq => !!eq) as HabitEquation[];
-
-                                    return (
-                                        <div key={log.id} 
-                                            className="text-sm p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted"
-                                            onClick={() => {
-                                                setEditingExcuseLogId(log.id);
-                                                setEditedHandlingStrategy(log.handlingStrategy || '');
-                                            }}
-                                        >
-                                           <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <p className="font-medium text-xs text-muted-foreground">Why you started</p>
-                                                    <ul className="list-disc list-inside mt-1">
-                                                        {linkedRuleEquations.map(eq => <li key={eq.id}>{eq.outcome}</li>)}
-                                                    </ul>
-                                                </div>
-                                                <div className="border-l pl-4">
-                                                     <p className="font-medium text-xs text-muted-foreground">Why you stopped</p>
-                                                    <p className="font-medium text-foreground mt-1">{log.reason}</p>
-                                                </div>
-                                           </div>
-                                            <div className="text-xs text-muted-foreground mt-2 pt-2 border-t flex justify-between">
-                                              <span>Abandoned: {format(new Date(log.timestamp), 'PPP')}</span>
-                                            </div>
-                                             {editingExcuseLogId === log.id ? (
-                                                <div className="mt-2 space-y-2">
-                                                    <Textarea
-                                                        value={editedHandlingStrategy}
-                                                        onChange={(e) => setEditedHandlingStrategy(e.target.value)}
-                                                        placeholder="How will you handle this next time?"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        autoFocus
-                                                    />
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditingExcuseLogId(null); }}>Cancel</Button>
-                                                        <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExcuse(log.id); }}>Save Strategy</Button>
-                                                    </div>
-                                                </div>
-                                            ) : log.handlingStrategy ? (
-                                                <p className="text-xs mt-2 pt-2 border-t border-muted-foreground/20 text-green-600 dark:text-green-400 italic">
-                                                    Strategy: {log.handlingStrategy}
-                                                </p>
-                                            ) : null}
+                                (abandonmentLogs[excuseModalState.planId!] || []).map(log => (
+                                    <div
+                                        key={log.id}
+                                        className="text-sm p-3 rounded-lg cursor-pointer bg-muted/50 hover:bg-muted"
+                                        onClick={() => {
+                                            setEditingExcuseLogId(log.id);
+                                            setEditedHandlingStrategy(log.handlingStrategy || '');
+                                        }}
+                                    >
+                                        <div className="flex justify-between items-start">
+                                            <p className="font-medium text-foreground">{log.reason}</p>
+                                            <p className="text-xs text-muted-foreground flex-shrink-0 ml-4">{format(new Date(log.timestamp), 'PPP')}</p>
                                         </div>
-                                    )
-                                })
+                                        {editingExcuseLogId === log.id ? (
+                                            <div className="mt-2 space-y-2">
+                                                <Textarea
+                                                    value={editedHandlingStrategy}
+                                                    onChange={(e) => setEditedHandlingStrategy(e.target.value)}
+                                                    placeholder="How will you handle this next time?"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    autoFocus
+                                                />
+                                                <div className="flex justify-end gap-2">
+                                                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditingExcuseLogId(null); }}>Cancel</Button>
+                                                    <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExcuse(log.id); }}>Save Strategy</Button>
+                                                </div>
+                                            </div>
+                                        ) : log.handlingStrategy ? (
+                                            <p className="text-xs mt-2 pt-2 border-t border-muted-foreground/20 text-green-600 dark:text-green-400 italic">
+                                                Strategy: {log.handlingStrategy}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                ))
                             ) : (
                                 <div className="flex items-center justify-center h-24 border rounded-md">
                                     <p className="text-sm text-muted-foreground">No reasons logged for this plan yet.</p>
@@ -1604,7 +1584,7 @@ function MyPlatePageContent() {
                 )}
             </div>
             <DialogFooter className="flex justify-between w-full">
-                 <Button variant="secondary" size="sm" onClick={() => setIsLoggingNewExcuse(true)} className={isLoggingNewExcuse ? 'invisible' : ''}>
+                <Button variant="secondary" size="sm" onClick={() => setIsLoggingNewExcuse(true)} className={isLoggingNewExcuse ? 'invisible' : 'absolute bottom-6 left-6'}>
                     Log New Excuse
                 </Button>
                 <div className="flex gap-2">
@@ -1629,3 +1609,6 @@ export default function MyPlatePage() {
 }
 
 
+
+
+    
