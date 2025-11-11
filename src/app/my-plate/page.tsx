@@ -181,6 +181,7 @@ function MyPlatePageContent() {
   const [essentialLinkedHabitId, setEssentialLinkedHabitId] = useState<string | null>(null);
   const [excuseModalState, setExcuseModalState] = useState<{ isOpen: boolean; planId: string | null; planName: string | null }>({ isOpen: false, planId: null, planName: null });
   const [newExcuse, setNewExcuse] = useState('');
+  const [isLoggingNewExcuse, setIsLoggingNewExcuse] = useState(false);
 
   
   // Meal selection modal
@@ -1126,6 +1127,7 @@ function MyPlatePageContent() {
         };
     });
     setNewExcuse('');
+    setIsLoggingNewExcuse(false);
     setExcuseModalState({ isOpen: false, planId: null, planName: null });
     toast({ title: 'Excuse Logged', description: 'Your reason has been saved for future review.' });
   };
@@ -1489,8 +1491,12 @@ function MyPlatePageContent() {
               </div>
           </DialogContent>
       </Dialog>
-      <Dialog open={excuseModalState.isOpen} onOpenChange={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>
-        <DialogContent>
+      <Dialog open={excuseModalState.isOpen} onOpenChange={() => {
+        setExcuseModalState({isOpen: false, planId: null, planName: null});
+        setIsLoggingNewExcuse(false);
+        setNewExcuse('');
+      }}>
+        <DialogContent className="sm:max-w-xl">
             <DialogHeader>
                 <DialogTitle>Log Abandonment Reason</DialogTitle>
                 <DialogDescription>
@@ -1498,12 +1504,6 @@ function MyPlatePageContent() {
                 </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
-                <Textarea
-                    value={newExcuse}
-                    onChange={(e) => setNewExcuse(e.target.value)}
-                    placeholder="e.g., Lost interest, found a better approach..."
-                    className="min-h-[120px]"
-                />
                 {excuseModalState.planId && abandonmentLogs[excuseModalState.planId] && abandonmentLogs[excuseModalState.planId].length > 0 && (
                     <div className="space-y-2">
                         <h4 className="font-semibold text-sm">Previous Reasons:</h4>
@@ -1532,10 +1532,34 @@ function MyPlatePageContent() {
                         </ScrollArea>
                     </div>
                 )}
+
+                {isLoggingNewExcuse ? (
+                    <div className="space-y-2">
+                         <Label htmlFor="excuse-textarea">New Reason:</Label>
+                         <Textarea
+                            id="excuse-textarea"
+                            value={newExcuse}
+                            onChange={(e) => setNewExcuse(e.target.value)}
+                            placeholder="e.g., Lost interest, found a better approach..."
+                            className="min-h-[120px]"
+                            autoFocus
+                        />
+                    </div>
+                ) : (
+                    <Button variant="outline" className="w-full" onClick={() => setIsLoggingNewExcuse(true)}>
+                        Log New Excuse
+                    </Button>
+                )}
             </div>
             <DialogFooter>
-                <Button variant="outline" onClick={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>Cancel</Button>
-                <Button onClick={handleSaveExcuse}>Log Reason</Button>
+                <Button variant="outline" onClick={() => {
+                    setExcuseModalState({isOpen: false, planId: null, planName: null});
+                    setIsLoggingNewExcuse(false);
+                    setNewExcuse('');
+                }}>Cancel</Button>
+                {isLoggingNewExcuse && (
+                    <Button onClick={handleSaveExcuse}>Save Reason</Button>
+                )}
             </DialogFooter>
         </DialogContent>
     </Dialog>
