@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart as PieChartIcon, Link as LinkIconLucide, Expand, LayoutDashboard, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart as PieChartIcon, Link as LinkIconLucide, Expand, LayoutDashboard, ChevronLeft, ChevronRight, Shield } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { TaskContextModal } from '@/components/TaskContextModal';
@@ -35,7 +35,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -148,6 +148,8 @@ function MyPlatePageContent() {
     onOpenFocusModal,
     toggleRoutine,
     activeProjectIds,
+    abandonmentLogs, 
+    setAbandonmentLogs,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
@@ -177,6 +179,8 @@ function MyPlatePageContent() {
   const [essentialDetails, setEssentialDetails] = useState('');
   const [essentialDuration, setEssentialDuration] = useState('');
   const [essentialLinkedHabitId, setEssentialLinkedHabitId] = useState<string | null>(null);
+  const [excuseModalState, setExcuseModalState] = useState<{ isOpen: boolean; planId: string | null; planName: string | null }>({ isOpen: false, planId: null, planName: null });
+  const [newExcuse, setNewExcuse] = useState('');
 
   
   // Meal selection modal
@@ -724,6 +728,7 @@ function MyPlatePageContent() {
           loggedSets: [],
           targetSets: 1,
           targetReps: pageType === 'branding' ? '4 stages' : '25',
+          focusAreaIds: def.focusAreaIds,
       }));
 
     const finalExercisesForDay = [...(logForDay?.exercises || []), ...newExercises];
@@ -967,10 +972,10 @@ function MyPlatePageContent() {
         if (mappedName) {
           const isCompletedOrLogged = activity.completed || ['interrupt', 'distraction', 'planning', 'tracking', 'essentials', 'nutrition'].includes(activity.type);
           if (isCompletedOrLogged) {
+            const duration = parseDurationToMinutes(activityDurations[activity.id]);
             if (!totals[mappedName]) {
               totals[mappedName] = { time: 0, activities: [] };
             }
-            const duration = parseDurationToMinutes(activityDurations[activity.id]);
             totals[mappedName].time += duration;
             totals[mappedName].activities.push({ name: activity.details, duration });
           }
@@ -1103,6 +1108,28 @@ function MyPlatePageContent() {
     });
   };
 
+  const handleSaveExcuse = () => {
+    if (!excuseModalState.planId || !newExcuse.trim()) {
+        toast({ title: 'Error', description: 'Excuse cannot be empty.', variant: 'destructive' });
+        return;
+    }
+    const newLogEntry: AbandonmentLog = {
+        id: `log_${Date.now()}`,
+        timestamp: Date.now(),
+        reason: newExcuse.trim()
+    };
+    setAbandonmentLogs(prev => {
+        const existingLogs = prev[excuseModalState.planId!] || [];
+        return {
+            ...prev,
+            [excuseModalState.planId!]: [...existingLogs, newLogEntry]
+        };
+    });
+    setNewExcuse('');
+    setExcuseModalState({ isOpen: false, planId: null, planName: null });
+    toast({ title: 'Excuse Logged', description: 'Your reason has been saved for future review.' });
+  };
+
   const activityInfo = editingActivity?.activity;
 
   const availableTasksForModal = useMemo(() => {
@@ -1221,6 +1248,7 @@ function MyPlatePageContent() {
                     offerizationPlans={offerizationPlans}
                     productizationPlans={productizationPlans}
                     projects={projects}
+                    onOpenExcuseModal={(planId, planName) => setExcuseModalState({ isOpen: true, planId, planName })}
                   />
                 </div>
               </div>
@@ -1461,6 +1489,42 @@ function MyPlatePageContent() {
               </div>
           </DialogContent>
       </Dialog>
+        <Dialog open={excuseModalState.isOpen} onOpenChange={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Log Abandonment Reason</DialogTitle>
+                    <DialogDescription>
+                        Why did you stop pursuing the plan for "{excuseModalState.planName}"?
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <Textarea
+                        value={newExcuse}
+                        onChange={(e) => setNewExcuse(e.target.value)}
+                        placeholder="e.g., Lost interest, found a better approach..."
+                    />
+                    {abandonmentLogs[excuseModalState.planId!] && abandonmentLogs[excuseModalState.planId!].length > 0 && (
+                        <div className="space-y-2">
+                            <h4 className="font-semibold text-sm">Previous Reasons:</h4>
+                            <ScrollArea className="h-32 border rounded-md p-2">
+                                <ul className="space-y-2 text-sm">
+                                    {abandonmentLogs[excuseModalState.planId!].map(log => (
+                                        <li key={log.id} className="p-2 bg-muted/50 rounded-md">
+                                            <p className="text-muted-foreground">{log.reason}</p>
+                                            <p className="text-xs text-muted-foreground/70 mt-1">{format(new Date(log.timestamp), 'PPP')}</p>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </ScrollArea>
+                        </div>
+                    )}
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>Cancel</Button>
+                    <Button onClick={handleSaveExcuse}>Log Reason</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </>
   );
 }
