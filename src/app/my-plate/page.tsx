@@ -36,7 +36,7 @@ import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog, SkillAcquisitionPlan } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog, SkillAcquisitionPlan, HabitEquation } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -151,6 +151,7 @@ function MyPlatePageContent() {
     abandonmentLogs, 
     setAbandonmentLogs,
     skillAcquisitionPlans,
+    pillarEquations,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
@@ -1532,43 +1533,51 @@ function MyPlatePageContent() {
                 {excuseModalState.planId && abandonmentLogs[excuseModalState.planId] && abandonmentLogs[excuseModalState.planId].length > 0 && (
                     <div className="space-y-2">
                         <h4 className="font-semibold text-sm">Previous Reasons:</h4>
-                        <ScrollArea className="max-h-72 border rounded-md p-2">
-                            <ul className="space-y-3">
-                                {abandonmentLogs[excuseModalState.planId].map(log => (
-                                    <li key={log.id} 
-                                        className="text-sm p-2 bg-muted/50 rounded-md cursor-pointer hover:bg-muted"
-                                        onClick={() => {
-                                            setEditingExcuseLogId(log.id);
-                                            setEditedHandlingStrategy(log.handlingStrategy || '');
-                                        }}
-                                    >
-                                        <p className="text-muted-foreground">{log.reason}</p>
-                                        <div className="flex justify-between items-center mt-1">
-                                            <p className="text-xs text-muted-foreground/70">
-                                                Logged: {format(new Date(log.timestamp), 'PPP')}
-                                            </p>
-                                        </div>
-                                        {editingExcuseLogId === log.id ? (
-                                            <div className="mt-2 space-y-2">
-                                                <Textarea
-                                                    value={editedHandlingStrategy}
-                                                    onChange={(e) => setEditedHandlingStrategy(e.target.value)}
-                                                    placeholder="How will you handle this next time?"
-                                                    onClick={(e) => e.stopPropagation()} // Prevent click from bubbling up
-                                                />
-                                                <div className="flex justify-end gap-2">
-                                                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditingExcuseLogId(null); }}>Cancel</Button>
-                                                    <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExcuse(log.id); }}>Save Strategy</Button>
-                                                </div>
-                                            </div>
-                                        ) : log.handlingStrategy ? (
-                                            <p className="text-xs mt-2 pt-2 border-t border-muted-foreground/20 text-green-600 dark:text-green-400 italic">
-                                                Strategy: {log.handlingStrategy}
-                                            </p>
-                                        ) : null}
-                                    </li>
-                                ))}
-                            </ul>
+                        <ScrollArea className="h-32 border rounded-md p-2">
+                          <ul className="space-y-3">
+                              {abandonmentLogs[excuseModalState.planId].map(log => {
+                                  const plan = skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId);
+                                  const startDate = plan?.targetDate ? format(parseISO(plan.targetDate), 'PPP') : 'N/A'; // This is targetDate, maybe need startDate
+                                  const allRuleEquations = Object.values(pillarEquations).flat();
+                                  const linkedRuleEquations = (plan?.linkedRuleEquationIds || [])
+                                    .map(id => allRuleEquations.find(eq => eq.id === id))
+                                    .filter(eq => !!eq) as HabitEquation[];
+
+                                  return (
+                                  <li key={log.id} 
+                                      className="text-sm p-2 bg-muted/50 rounded-md cursor-pointer hover:bg-muted"
+                                      onClick={() => {
+                                          setEditingExcuseLogId(log.id);
+                                          setEditedHandlingStrategy(log.handlingStrategy || '');
+                                      }}
+                                  >
+                                      <p className="text-muted-foreground">{log.reason}</p>
+                                      <div className="flex justify-between items-center mt-1">
+                                          <p className="text-xs text-muted-foreground/70">
+                                              Abandoned: {format(new Date(log.timestamp), 'PPP')}
+                                          </p>
+                                      </div>
+                                      {editingExcuseLogId === log.id ? (
+                                          <div className="mt-2 space-y-2">
+                                              <Textarea
+                                                  value={editedHandlingStrategy}
+                                                  onChange={(e) => setEditedHandlingStrategy(e.target.value)}
+                                                  placeholder="How will you handle this next time?"
+                                                  onClick={(e) => e.stopPropagation()} // Prevent click from bubbling up
+                                              />
+                                              <div className="flex justify-end gap-2">
+                                                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditingExcuseLogId(null); }}>Cancel</Button>
+                                                  <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExcuse(log.id); }}>Save Strategy</Button>
+                                              </div>
+                                          </div>
+                                      ) : log.handlingStrategy ? (
+                                          <p className="text-xs mt-2 pt-2 border-t border-muted-foreground/20 text-green-600 dark:text-green-400 italic">
+                                              Strategy: {log.handlingStrategy}
+                                          </p>
+                                      ) : null}
+                                  </li>
+                                )})}
+                          </ul>
                         </ScrollArea>
                     </div>
                 )}
@@ -1612,188 +1621,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-
-
-    
-```
-- src/hooks/use-local-storage-state.ts:
-```ts
-
-
-"use client";
-
-import { useState, useEffect, useCallback, SetStateAction, Dispatch } from 'react';
-
-type SetValue<T> = Dispatch<SetStateAction<T>>;
-
-export function useLocalStorageState<T>(
-    key: string,
-    initialValue: T
-): [T, SetValue<T>] {
-    const [storedValue, setStoredValue] = useState<T>(initialValue);
-    const [isInitialized, setIsInitialized] = useState(false);
-
-    useEffect(() => {
-        try {
-            if (typeof window !== 'undefined') {
-                const item = window.localStorage.getItem(key);
-                if (item) {
-                    setStoredValue(JSON.parse(item));
-                } else {
-                    setStoredValue(initialValue);
-                    window.localStorage.setItem(key, JSON.stringify(initialValue));
-                }
-            }
-        } catch (error) {
-            console.log(error);
-            setStoredValue(initialValue);
-        }
-        setIsInitialized(true);
-    }, [key, initialValue]);
-
-    const setValue: SetValue<T> = useCallback(
-        (value) => {
-            if (!isInitialized) return; // Don't save to localStorage until initialization is complete
-            try {
-                const valueToStore =
-                    value instanceof Function ? value(storedValue) : value;
-                setStoredValue(valueToStore);
-                if (typeof window !== 'undefined') {
-                    window.localStorage.setItem(key, JSON.stringify(valueToStore));
-                }
-            } catch (error) {
-                console.log(error);
-            }
-        },
-        [key, storedValue, isInitialized]
-    );
-
-    return [storedValue, setValue];
-}
-
-```
-- src/hooks/use-require-auth.ts:
-```ts
-
-
-"use client";
-
-import { useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
-
-export const useRequireAuth = (redirectUrl = '/login') => {
-  const { currentUser, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    // If auth is not loading and there's no user, redirect
-    if (!loading && !currentUser) {
-      router.push(redirectUrl);
-    }
-  }, [currentUser, loading, router, redirectUrl]);
-
-  return { currentUser, loading };
-};
-
-```
-- src/hooks/use-undo-stack.ts:
-```ts
-
-import { useState, useCallback } from 'react';
-
-interface UndoStack<T> {
-  stack: T[];
-  presentIndex: number;
-}
-
-export const useUndoStack = <T>(initialState: T) => {
-  const [state, setState] = useState<UndoStack<T>>({
-    stack: [initialState],
-    presentIndex: 0,
-  });
-
-  const canUndo = state.presentIndex > 0;
-  const canRedo = state.presentIndex < state.stack.length - 1;
-
-  const set = useCallback((newState: T) => {
-    setState((prevState) => {
-      const newStack = prevState.stack.slice(0, prevState.presentIndex + 1);
-      newStack.push(newState);
-      return {
-        stack: newStack,
-        presentIndex: newStack.length - 1,
-      };
-    });
-  }, []);
-
-  const undo = useCallback(() => {
-    setState((prevState) => ({
-      ...prevState,
-      presentIndex: Math.max(0, prevState.presentIndex - 1),
-    }));
-  }, []);
-
-  const redo = useCallback(() => {
-    setState((prevState) => ({
-      ...prevState,
-      presentIndex: Math.min(
-        prevState.stack.length - 1,
-        prevState.presentIndex + 1
-      ),
-    }));
-  }, []);
-
-  return {
-    state: state.stack[state.presentIndex],
-    set,
-    canUndo,
-    canRedo,
-    undo,
-    redo,
-  };
-};
-
-```
-- next-env.d.ts:
-```ts
-/// <reference types="next" />
-/// <reference types="next/image-types/global" />
-
-// NOTE: This file should not be edited
-// see https://nextjs.org/docs/basic-features/typescript for more information.
-
-```
-- tailwind.config.js:
-```js
-/** @type {import('tailwindcss').Config} */
-module.exports = {
-  content: [
-    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
-  ],
-  theme: {
-    extend: {
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'gradient-conic':
-          'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
-      },
-    },
-  },
-  plugins: [],
-}
-
-```
-- postcss.config.js:
-```js
-module.exports = {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-}
-
-```
