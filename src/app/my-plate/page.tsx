@@ -32,6 +32,7 @@ import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { TaskContextModal } from '@/components/TaskContextModal';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog, SkillAcquisitionPlan } from '@/types/workout';
@@ -1501,7 +1502,7 @@ function MyPlatePageContent() {
                     value={newExcuse}
                     onChange={(e) => setNewExcuse(e.target.value)}
                     placeholder="e.g., Lost interest, found a better approach..."
-                    className="min-h-[100px]"
+                    className="min-h-[120px]"
                 />
                 {excuseModalState.planId && abandonmentLogs[excuseModalState.planId] && abandonmentLogs[excuseModalState.planId].length > 0 && (
                     <div className="space-y-2">
@@ -1545,4 +1546,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
