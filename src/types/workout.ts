@@ -490,6 +490,12 @@ export interface SkillAcquisitionPlan {
     linkedRuleEquationIds: string[];
 }
 
+export interface AbandonmentLog {
+  id: string;
+  timestamp: number;
+  reason: string;
+}
+
 export interface SkillDomain {
   id: string;
   name: string;
