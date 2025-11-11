@@ -1544,14 +1544,14 @@ function MyPlatePageContent() {
                                                 setEditedHandlingStrategy(log.handlingStrategy || '');
                                             }}
                                         >
-                                           <div className="grid grid-cols-3 gap-4">
+                                           <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <p className="font-medium text-xs text-muted-foreground">Why you started</p>
                                                     <ul className="list-disc list-inside mt-1">
                                                         {linkedRuleEquations.map(eq => <li key={eq.id}>{eq.outcome}</li>)}
                                                     </ul>
                                                 </div>
-                                                <div className="col-span-2">
+                                                <div className="border-l pl-4">
                                                      <p className="font-medium text-xs text-muted-foreground">Why you stopped</p>
                                                     <p className="font-medium text-foreground mt-1">{log.reason}</p>
                                                 </div>
@@ -1604,19 +1604,17 @@ function MyPlatePageContent() {
                 )}
             </div>
             <DialogFooter className="flex justify-between w-full">
-                <div/>
+                 <Button variant="secondary" size="sm" onClick={() => setIsLoggingNewExcuse(true)} className={isLoggingNewExcuse ? 'invisible' : ''}>
+                    Log New Excuse
+                </Button>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={() => {
                         setExcuseModalState({isOpen: false, planId: null, planName: null});
                         setIsLoggingNewExcuse(false);
                         setNewExcuse('');
                     }}>Cancel</Button>
-                    {isLoggingNewExcuse ? (
+                    {isLoggingNewExcuse && (
                         <Button onClick={handleSaveExcuse}>Save Reason</Button>
-                    ) : (
-                        <Button variant="secondary" size="sm" onClick={() => setIsLoggingNewExcuse(true)}>
-                           Log New Excuse
-                       </Button>
                     )}
                 </div>
             </DialogFooter>
@@ -1631,4 +1629,3 @@ export default function MyPlatePage() {
 }
 
 
-```
