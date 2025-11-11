@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -609,7 +610,7 @@ export function TimeSlots({
     />
      {optionsModalSlot && (
         <Dialog open={!!optionsModalSlot} onOpenChange={() => setOptionsModalSlot(null)}>
-            <DialogContent className="grid grid-cols-[2fr_1fr] max-w-4xl h-[90vh] gap-6 p-0">
+            <DialogContent className="grid grid-cols-[2fr_1fr] max-w-7xl h-[90vh] gap-6 p-0">
                 <div className="col-span-1 flex flex-col gap-6 pl-6 py-6 min-h-0">
                     <DialogHeader>
                       <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
