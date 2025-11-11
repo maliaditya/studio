@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -9,8 +10,8 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb, Brain } from 'lucide-react';
-import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition, MetaRule, ProductizationPlan, SkillAcquisitionPlan, CoreSkill } from '@/types/workout';
+import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb, Brain, Shield } from 'lucide-react';
+import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition, MetaRule, ProductizationPlan, SkillAcquisitionPlan, CoreSkill, AbandonmentLog } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO, isAfter, startOfToday, isBefore } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from './ui/label';
@@ -22,6 +23,9 @@ import { ScrollArea } from './ui/scroll-area';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Textarea } from './ui/textarea';
+import { Badge } from './ui/badge';
 
 interface WeightGoalCardProps {
   weightLogs: WeightLog[];
@@ -89,12 +93,15 @@ export function WeightGoalCard({
 }: WeightGoalCardProps) {
     const { toast } = useToast();
     const router = useRouter();
-    const { openRuleDetailPopup, skillAcquisitionPlans, coreSkills, offerizationPlans: offerizationPlansFromAuth } = useAuth();
+    const { openRuleDetailPopup, skillAcquisitionPlans, coreSkills, offerizationPlans: offerizationPlansFromAuth, abandonmentLogs, setAbandonmentLogs } = useAuth();
     const [newWeight, setNewWeight] = useState('');
     const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
     const [showLogForm, setShowLogForm] = useState(false);
     const [weightView, setWeightView] = useState<'chart' | 'details'>('details');
     const [mainView, setMainView] = useState<'projects' | 'weight' | 'diet' | 'rules'>('projects');
+    
+    const [excuseModalState, setExcuseModalState] = useState<{ isOpen: boolean; planId: string | null; planName: string | null }>({ isOpen: false, planId: null, planName: null });
+    const [newExcuse, setNewExcuse] = useState('');
 
 
     const [heightInput, setHeightInput] = useState('');
@@ -376,6 +383,32 @@ export function WeightGoalCard({
         onOpenIntentionPopup(intention.id);
     };
 
+    const handleOpenExcuseModal = (planId: string, planName: string) => {
+        setExcuseModalState({ isOpen: true, planId, planName });
+    };
+
+    const handleSaveExcuse = () => {
+        if (!excuseModalState.planId || !newExcuse.trim()) {
+            toast({ title: 'Error', description: 'Excuse cannot be empty.', variant: 'destructive' });
+            return;
+        }
+        const newLogEntry: AbandonmentLog = {
+            id: `log_${Date.now()}`,
+            timestamp: Date.now(),
+            reason: newExcuse.trim()
+        };
+        setAbandonmentLogs(prev => {
+            const existingLogs = prev[excuseModalState.planId!] || [];
+            return {
+                ...prev,
+                [excuseModalState.planId!]: [...existingLogs, newLogEntry]
+            };
+        });
+        setNewExcuse('');
+        setExcuseModalState({ isOpen: false, planId: null, planName: null });
+        toast({ title: 'Excuse Logged', description: 'Your reason has been saved for future review.' });
+    };
+
     const renderProjectsContent = () => {
         const plannedSpecializations = Object.entries(offerizationPlans || {})
             .filter(([, plan]) => plan.learningPlan && ((plan.learningPlan.audioVideoResources?.length || 0) > 0 || (plan.learningPlan.bookWebpageResources?.length || 0) > 0))
@@ -400,16 +433,12 @@ export function WeightGoalCard({
                         const plan = offerizationPlansFromAuth[spec.id]?.learningPlan;
                         if (!plan) return null;
     
-                        const allMicroSkills = spec.skillAreas.flatMap(sa => sa.microSkills);
-                        
-                        const completed = allMicroSkills
-                            .filter(ms => ms.isReadyForRepetition)
-                            .reduce((acc, ms) => {
-                                acc.items += ms.completedItems || 0;
-                                acc.hours += ms.completedHours || 0;
-                                acc.pages += ms.completedPages || 0;
-                                return acc;
-                            }, { items: 0, hours: 0, pages: 0 });
+                        const completed = spec.skillAreas.flatMap(sa => sa.microSkills).reduce((acc, ms) => {
+                            acc.items += ms.completedItems || 0;
+                            acc.hours += ms.completedHours || 0;
+                            acc.pages += ms.completedPages || 0;
+                            return acc;
+                        }, { items: 0, hours: 0, pages: 0 });
 
                         const calculateDailyTarget = (total: number | null, completed: number, start: string | null | undefined, end: string | null | undefined) => {
                             if (!total || !start || !end) return null;
@@ -432,7 +461,12 @@ export function WeightGoalCard({
                             <li key={spec.id}>
                                 <Card>
                                     <CardHeader className="p-3">
-                                        <CardTitle className="text-base">{spec.name}</CardTitle>
+                                        <div className="flex justify-between items-start">
+                                            <CardTitle className="text-base">{spec.name}</CardTitle>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => handleOpenExcuseModal(spec.id, spec.name)}>
+                                                <Shield className="h-4 w-4" />
+                                            </Button>
+                                        </div>
                                     </CardHeader>
                                     <CardContent className="p-3 pt-0 text-xs">
                                         <ul className="space-y-2">
@@ -816,6 +850,29 @@ export function WeightGoalCard({
                         </div>
                     </CardContent>
                 </>
+            )}
+             {excuseModalState.isOpen && (
+                <Dialog open={excuseModalState.isOpen} onOpenChange={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Log Abandonment Reason</DialogTitle>
+                            <CardDescription>
+                                Why did you stop pursuing the plan for "{excuseModalState.planName}"?
+                            </CardDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                            <Textarea
+                                value={newExcuse}
+                                onChange={(e) => setNewExcuse(e.target.value)}
+                                placeholder="e.g., Lost interest, found a better approach, project priorities changed..."
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>Cancel</Button>
+                            <Button onClick={handleSaveExcuse}>Log Reason</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             )}
         </Card>
     );
