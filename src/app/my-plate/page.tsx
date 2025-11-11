@@ -1512,29 +1512,23 @@ function MyPlatePageContent() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Start Date</TableHead>
                                         <TableHead>Abandon Date</TableHead>
                                         <TableHead>Reason</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {abandonmentLogs[excuseModalState.planId].map(log => {
-                                        const planStartDate = skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.targetDate;
-                                        return (
-                                            <TableRow key={log.id}>
-                                                <TableCell className="text-xs">{planStartDate ? format(parseISO(planStartDate), 'PPP') : 'N/A'}</TableCell>
-                                                <TableCell className="text-xs">{format(new Date(log.timestamp), 'PPP')}</TableCell>
-                                                <TableCell className="text-xs text-muted-foreground">{log.reason}</TableCell>
-                                            </TableRow>
-                                        )
-                                    })}
+                                    {abandonmentLogs[excuseModalState.planId].map(log => (
+                                        <TableRow key={log.id}>
+                                            <TableCell className="text-xs">{format(new Date(log.timestamp), 'PPP')}</TableCell>
+                                            <TableCell className="text-xs text-muted-foreground">{log.reason}</TableCell>
+                                        </TableRow>
+                                    ))}
                                 </TableBody>
                             </Table>
                         </ScrollArea>
                     </div>
                 )}
-
-                {isLoggingNewExcuse ? (
+                {isLoggingNewExcuse && (
                     <div className="space-y-2">
                          <Label htmlFor="excuse-textarea">New Reason:</Label>
                          <Textarea
@@ -1546,20 +1540,19 @@ function MyPlatePageContent() {
                             autoFocus
                         />
                     </div>
-                ) : (
-                    <div className="flex justify-end">
-                      <Button variant="outline" size="sm" onClick={() => setIsLoggingNewExcuse(true)}>
-                          Log New Excuse
-                      </Button>
-                    </div>
                 )}
             </div>
-            <DialogFooter>
+            <DialogFooter className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => {
                     setExcuseModalState({isOpen: false, planId: null, planName: null});
                     setIsLoggingNewExcuse(false);
                     setNewExcuse('');
                 }}>Cancel</Button>
+                {!isLoggingNewExcuse && (
+                  <Button variant="secondary" size="sm" onClick={() => setIsLoggingNewExcuse(true)}>
+                      Log New Excuse
+                  </Button>
+                )}
                 {isLoggingNewExcuse && (
                     <Button onClick={handleSaveExcuse}>Save Reason</Button>
                 )}
@@ -1573,4 +1566,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
