@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -35,7 +34,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog, SkillAcquisitionPlan } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -149,6 +148,7 @@ function MyPlatePageContent() {
     activeProjectIds,
     abandonmentLogs, 
     setAbandonmentLogs,
+    skillAcquisitionPlans,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
@@ -1501,19 +1501,33 @@ function MyPlatePageContent() {
                     value={newExcuse}
                     onChange={(e) => setNewExcuse(e.target.value)}
                     placeholder="e.g., Lost interest, found a better approach..."
+                    className="min-h-[100px]"
                 />
-                {abandonmentLogs[excuseModalState.planId!] && abandonmentLogs[excuseModalState.planId!].length > 0 && (
+                {excuseModalState.planId && abandonmentLogs[excuseModalState.planId] && abandonmentLogs[excuseModalState.planId].length > 0 && (
                     <div className="space-y-2">
                         <h4 className="font-semibold text-sm">Previous Reasons:</h4>
                         <ScrollArea className="h-32 border rounded-md p-2">
-                            <ul className="space-y-2 text-sm">
-                                {abandonmentLogs[excuseModalState.planId!].map(log => (
-                                    <li key={log.id} className="p-2 bg-muted/50 rounded-md">
-                                        <p className="text-muted-foreground">{log.reason}</p>
-                                        <p className="text-xs text-muted-foreground/70 mt-1">{format(new Date(log.timestamp), 'PPP')}</p>
-                                    </li>
-                                ))}
-                            </ul>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Start Date</TableHead>
+                                        <TableHead>Abandon Date</TableHead>
+                                        <TableHead>Reason</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {abandonmentLogs[excuseModalState.planId].map(log => {
+                                        const planStartDate = skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.targetDate;
+                                        return (
+                                            <TableRow key={log.id}>
+                                                <TableCell className="text-xs">{planStartDate ? format(parseISO(planStartDate), 'PPP') : 'N/A'}</TableCell>
+                                                <TableCell className="text-xs">{format(new Date(log.timestamp), 'PPP')}</TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">{log.reason}</TableCell>
+                                            </TableRow>
+                                        )
+                                    })}
+                                </TableBody>
+                            </Table>
                         </ScrollArea>
                     </div>
                 )}
@@ -1531,3 +1545,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
