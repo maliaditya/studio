@@ -1505,26 +1505,18 @@ function MyPlatePageContent() {
                 </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
-                {excuseModalState.planId && abandonmentLogs[excuseModalState.planId] && abandonmentLogs[excuseModalState.planId].length > 0 && (
+                 {excuseModalState.planId && abandonmentLogs[excuseModalState.planId] && abandonmentLogs[excuseModalState.planId].length > 0 && (
                     <div className="space-y-2">
                         <h4 className="font-semibold text-sm">Previous Reasons:</h4>
                         <ScrollArea className="h-32 border rounded-md p-2">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Abandon Date</TableHead>
-                                        <TableHead>Reason</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {abandonmentLogs[excuseModalState.planId].map(log => (
-                                        <TableRow key={log.id}>
-                                            <TableCell className="text-xs">{format(new Date(log.timestamp), 'PPP')}</TableCell>
-                                            <TableCell className="text-xs text-muted-foreground">{log.reason}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                            <ul className="space-y-2">
+                                {abandonmentLogs[excuseModalState.planId].map(log => (
+                                    <li key={log.id} className="text-sm p-2 bg-muted/50 rounded-md">
+                                        <p className="text-muted-foreground">{log.reason}</p>
+                                        <p className="text-xs text-right text-muted-foreground/70 mt-1">{format(new Date(log.timestamp), 'PPP')}</p>
+                                    </li>
+                                ))}
+                            </ul>
                         </ScrollArea>
                     </div>
                 )}
@@ -1542,20 +1534,22 @@ function MyPlatePageContent() {
                     </div>
                 )}
             </div>
-            <DialogFooter className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => {
-                    setExcuseModalState({isOpen: false, planId: null, planName: null});
-                    setIsLoggingNewExcuse(false);
-                    setNewExcuse('');
-                }}>Cancel</Button>
-                {!isLoggingNewExcuse && (
-                  <Button variant="secondary" size="sm" onClick={() => setIsLoggingNewExcuse(true)}>
-                      Log New Excuse
-                  </Button>
-                )}
-                {isLoggingNewExcuse && (
-                    <Button onClick={handleSaveExcuse}>Save Reason</Button>
-                )}
+            <DialogFooter className="flex justify-between w-full">
+                {!isLoggingNewExcuse ? (
+                    <Button variant="secondary" size="sm" onClick={() => setIsLoggingNewExcuse(true)}>
+                        Log New Excuse
+                    </Button>
+                ) : <div />}
+                <div className="flex gap-2">
+                    <Button variant="outline" onClick={() => {
+                        setExcuseModalState({isOpen: false, planId: null, planName: null});
+                        setIsLoggingNewExcuse(false);
+                        setNewExcuse('');
+                    }}>Cancel</Button>
+                    {isLoggingNewExcuse && (
+                        <Button onClick={handleSaveExcuse}>Save Reason</Button>
+                    )}
+                </div>
             </DialogFooter>
         </DialogContent>
     </Dialog>
@@ -1568,3 +1562,5 @@ export default function MyPlatePage() {
 }
 
 
+
+    
