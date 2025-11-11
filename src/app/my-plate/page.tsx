@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -35,7 +36,7 @@ import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 
-import type { AllWorkoutPlans, ExerciseDefinition, WorkoutMode, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog, SkillAcquisitionPlan } from '@/types/workout';
+import type { AllWorkoutPlans, ExerciseDefinition, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog, SkillAcquisitionPlan } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -1546,9 +1547,11 @@ function MyPlatePageContent() {
                         />
                     </div>
                 ) : (
-                    <Button variant="outline" className="w-full" onClick={() => setIsLoggingNewExcuse(true)}>
-                        Log New Excuse
-                    </Button>
+                    <div className="flex justify-end">
+                      <Button variant="outline" size="sm" onClick={() => setIsLoggingNewExcuse(true)}>
+                          Log New Excuse
+                      </Button>
+                    </div>
                 )}
             </div>
             <DialogFooter>
@@ -1570,3 +1573,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
