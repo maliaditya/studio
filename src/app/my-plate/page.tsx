@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -197,12 +198,23 @@ function MyPlatePageContent() {
   const [essentialLinkedHabitId, setEssentialLinkedHabitId] = useState<string | null>(null);
   const [excuseModalState, setExcuseModalState] = useState<{ isOpen: boolean; planId: string | null; planName: string | null }>({ isOpen: false, planId: null, planName: null });
   const [newExcuse, setNewExcuse] = useState('');
+  const [newExcuseFear, setNewExcuseFear] = useState('');
   const [editingExcuseLogId, setEditingExcuseLogId] = useState<string | null>(null);
   const [editedHandlingStrategy, setEditedHandlingStrategy] = useState('');
   
   const [isNewReasonModalOpen, setIsNewReasonModalOpen] = useState(false);
   const [newReasonText, setNewReasonText] = useState('');
 
+  const FEAR_CATEGORIES = [
+    'Fear of Loss',
+    'Fear of Death',
+    'Fear of Shame',
+    'Fear of Rejection',
+    'Fear of Pain',
+    'Fear of Injury',
+    'Fear of Helplessness',
+    'Fear of loss of Control',
+  ];
 
   
   // Meal selection modal
@@ -1131,7 +1143,8 @@ function MyPlatePageContent() {
     const newLogEntry: AbandonmentLog = {
         id: `log_${Date.now()}`,
         timestamp: Date.now(),
-        reason: newExcuse.trim()
+        reason: newExcuse.trim(),
+        fear: newExcuseFear || undefined
     };
     setAbandonmentLogs(prev => {
         const existingLogs = prev[excuseModalState.planId!] || [];
@@ -1141,6 +1154,7 @@ function MyPlatePageContent() {
         };
     });
     setNewExcuse('');
+    setNewExcuseFear('');
   };
   
   const handleUpdateExcuse = (logId: string) => {
@@ -1607,9 +1621,12 @@ function MyPlatePageContent() {
               </div>
           </DialogContent>
       </Dialog>
-      <Dialog open={excuseModalState.isOpen} onOpenChange={() => {
-        setExcuseModalState({isOpen: false, planId: null, planName: null});
-        setNewExcuse('');
+      <Dialog open={excuseModalState.isOpen} onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setExcuseModalState({isOpen: false, planId: null, planName: null});
+            setNewExcuse('');
+            setNewExcuseFear('');
+          }
       }}>
         <DialogContent className="h-full max-h-[90vh] sm:max-w-7xl grid grid-cols-1 md:grid-cols-2 gap-6 p-0">
           <div className="flex flex-col gap-6 p-6 min-h-0">
@@ -1625,7 +1642,7 @@ function MyPlatePageContent() {
                                 <Card key={log.id} className="cursor-pointer group relative" onClick={() => { setEditingExcuseLogId(log.id); setEditedHandlingStrategy(log.handlingStrategy || ''); }}>
                                     <AlertDialog>
                                         <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100">
+                                            <Button variant="ghost" size="icon" className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                                                 <Trash2 className="h-4 w-4 text-destructive"/>
                                             </Button>
                                         </AlertDialogTrigger>
@@ -1642,6 +1659,7 @@ function MyPlatePageContent() {
                                     </AlertDialog>
                                     <CardContent className="p-3">
                                         <p className="text-sm font-medium">{log.reason}</p>
+                                        {log.fear && (<Badge variant="outline" className="mt-1">{log.fear}</Badge>)}
                                         <p className="text-xs text-muted-foreground mt-1">{format(new Date(log.timestamp), 'PPP')}</p>
                                         {editingExcuseLogId === log.id ? (
                                             <div className="mt-2 pt-2 border-t space-y-2">
@@ -1678,11 +1696,22 @@ function MyPlatePageContent() {
                       </div>
                   </ScrollArea>
               </div>
-              <DialogFooter className="p-0 border-t pt-6 flex justify-end">
+              <DialogFooter className="p-0 border-t pt-6 flex flex-col gap-4">
                 <form onSubmit={(e) => { e.preventDefault(); handleSaveExcuse(); }} className="flex gap-2 items-center w-full">
                     <Input value={newExcuse} onChange={e => setNewExcuse(e.target.value)} placeholder="Enter reason for abandonment..." />
                     <Button type="submit">Save Reason</Button>
                 </form>
+                <Select onValueChange={setNewExcuseFear} value={newExcuseFear}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select an underlying fear (optional)..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="">-- No Fear Category --</SelectItem>
+                      {FEAR_CATEGORIES.map(fear => (
+                          <SelectItem key={fear} value={fear}>{fear}</SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </DialogFooter>
           </div>
           <div className="flex flex-col gap-6 bg-muted/30 p-6 border-l min-h-0">
@@ -1727,7 +1756,7 @@ function MyPlatePageContent() {
                                <p className="font-semibold">{equation.outcome}</p>
                                <AlertDialog>
                                   <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
                                       <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
                                   </AlertDialogTrigger>
@@ -1780,4 +1809,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-

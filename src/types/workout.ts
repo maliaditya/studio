@@ -494,6 +494,8 @@ export interface AbandonmentLog {
   id: string;
   timestamp: number;
   reason: string;
+  handlingStrategy?: string;
+  fear?: string;
 }
 
 export interface SkillDomain {
