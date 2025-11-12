@@ -1124,7 +1124,6 @@ function MyPlatePageContent() {
             [excuseModalState.planId!]: [...existingLogs, newLogEntry]
         };
     });
-    setNewExcuse('');
     setIsLoggingNewExcuse(false);
   };
   
@@ -1513,112 +1512,88 @@ function MyPlatePageContent() {
         setIsLoggingNewExcuse(false);
         setNewExcuse('');
       }}>
-        <DialogContent className="sm:max-w-7xl h-[90vh] flex flex-col">
-            <DialogHeader>
-                <DialogTitle>Log Abandonment Reason</DialogTitle>
-                <DialogDescription>
-                    Why did you stop pursuing the plan for "{excuseModalState.planName}"?
-                </DialogDescription>
-            </DialogHeader>
-            <div className="flex-grow py-4 space-y-4 min-h-0 flex flex-col">
-                 <div className="space-y-2 flex-grow min-h-0">
-                    <ScrollArea className="h-full">
-                        <div className="space-y-3 pr-4">
-                            {(abandonmentLogs[excuseModalState.planId!] || []).length > 0 ? (
-                                (abandonmentLogs[excuseModalState.planId!] || []).map(log => {
-                                    const plan = skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId);
-                                    const linkedEquations = (plan?.linkedRuleEquationIds || []).map(id => {
-                                        for (const pillar in pillarEquations) {
-                                            const found = pillarEquations[pillar].find(eq => eq.id === id);
-                                            if (found) return found;
-                                        }
-                                        return null;
-                                    }).filter((eq): eq is HabitEquation => !!eq);
-
-                                    return (
-                                        <div key={log.id} className="text-sm p-3 rounded-lg bg-muted/50 border">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <h5 className="font-semibold">Reason for Abandonment</h5>
-                                                    <p className="text-muted-foreground">{log.reason}</p>
-                                                    <p className="text-xs text-muted-foreground pt-2 border-t">{format(new Date(log.timestamp), 'PPP')}</p>
-                                                </div>
-                                                <div className="space-y-2 border-l pl-4">
-                                                     <h5 className="font-semibold">Why You Started</h5>
-                                                    {linkedEquations.length > 0 ? (
-                                                        <ul className="list-disc list-inside text-xs text-muted-foreground">
-                                                            {linkedEquations.map(eq => <li key={eq.id}>{eq.outcome}</li>)}
-                                                        </ul>
-                                                    ) : <p className="text-xs text-muted-foreground italic">No specific goals linked.</p>}
-                                                </div>
+        <DialogContent className="h-[90vh] max-w-full w-full sm:max-w-7xl grid grid-rows-[auto,1fr] p-0">
+          <DialogHeader className="p-4 border-b">
+              <DialogTitle>Log Abandonment Reason for "{excuseModalState.planName}"</DialogTitle>
+              <DialogDescription>Why did you stop pursuing this plan? Reflecting helps clarify future direction.</DialogDescription>
+          </DialogHeader>
+          <div className="grid md:grid-cols-2 gap-6 p-6 min-h-0">
+            <div className="flex flex-col gap-4">
+                <h4 className="font-semibold text-lg">Previous Reasons</h4>
+                <ScrollArea className="h-full">
+                    <div className="space-y-3 pr-4">
+                        {(abandonmentLogs[excuseModalState.planId!] || []).length > 0 ? (
+                            (abandonmentLogs[excuseModalState.planId!] || []).map(log => (
+                                <div key={log.id} className="text-sm rounded-lg bg-muted/50 border p-3 cursor-pointer" onClick={() => { setEditingExcuseLogId(log.id); setEditedHandlingStrategy(log.handlingStrategy || ''); }}>
+                                    <p className="font-semibold">{log.reason}</p>
+                                    <p className="text-xs text-muted-foreground mt-1">{format(new Date(log.timestamp), 'PPP')}</p>
+                                     {editingExcuseLogId === log.id ? (
+                                        <div className="mt-2 pt-2 border-t space-y-2">
+                                            <Textarea
+                                                value={editedHandlingStrategy}
+                                                onChange={(e) => setEditedHandlingStrategy(e.target.value)}
+                                                placeholder="How will you handle this next time?"
+                                                onClick={(e) => e.stopPropagation()}
+                                                autoFocus
+                                                className="text-xs"
+                                            />
+                                            <div className="flex justify-end gap-2">
+                                                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditingExcuseLogId(null); }}>Cancel</Button>
+                                                <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExcuse(log.id); }}>Save Strategy</Button>
                                             </div>
-                                             {editingExcuseLogId === log.id ? (
-                                                <div className="mt-2 pt-2 border-t space-y-2">
-                                                    <Textarea
-                                                        value={editedHandlingStrategy}
-                                                        onChange={(e) => setEditedHandlingStrategy(e.target.value)}
-                                                        placeholder="How will you handle this next time?"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        autoFocus
-                                                        className="text-xs"
-                                                    />
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditingExcuseLogId(null); }}>Cancel</Button>
-                                                        <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExcuse(log.id); }}>Save Strategy</Button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                 <div className="mt-2 pt-2 border-t cursor-pointer" onClick={() => { setEditingExcuseLogId(log.id); setEditedHandlingStrategy(log.handlingStrategy || ''); }}>
-                                                    <h5 className="font-semibold text-xs">Handling Strategy</h5>
-                                                    {log.handlingStrategy ? (
-                                                        <p className="text-xs mt-1 text-green-600 dark:text-green-400 italic">
-                                                            {log.handlingStrategy}
-                                                        </p>
-                                                    ) : <p className="text-xs text-muted-foreground italic">Click to add strategy</p>}
-                                                 </div>
-                                            )}
                                         </div>
-                                    )
-                                })
-                            ) : (
-                                <div className="flex items-center justify-center h-24 border rounded-md">
-                                    <p className="text-sm text-muted-foreground">No reasons logged for this plan yet.</p>
+                                    ) : (
+                                        log.handlingStrategy && (
+                                            <div className="mt-2 pt-2 border-t">
+                                                <p className="text-xs mt-1 text-green-600 dark:text-green-400 italic">
+                                                    {log.handlingStrategy}
+                                                </p>
+                                            </div>
+                                        )
+                                    )}
                                 </div>
-                            )}
-                        </div>
-                    </ScrollArea>
-                </div>
-                {isLoggingNewExcuse && (
-                    <div className="space-y-2 flex-shrink-0">
-                         <Label htmlFor="excuse-textarea">New Reason:</Label>
-                         <Textarea
-                            id="excuse-textarea"
-                            value={newExcuse}
-                            onChange={(e) => setNewExcuse(e.target.value)}
-                            placeholder="e.g., Lost interest, found a better approach..."
-                            className="min-h-[120px]"
-                            autoFocus
-                        />
+                            ))
+                        ) : (
+                            <div className="flex items-center justify-center h-24 border rounded-md">
+                                <p className="text-sm text-muted-foreground">No reasons logged for this plan yet.</p>
+                            </div>
+                        )}
                     </div>
-                )}
+                </ScrollArea>
             </div>
-            <DialogFooter className="flex justify-between w-full">
-                {!isLoggingNewExcuse ? (
-                    <Button variant="secondary" size="sm" onClick={() => setIsLoggingNewExcuse(true)}>
-                        Log New Excuse
-                    </Button>
-                ) : <div/>}
-                <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => {
-                        setExcuseModalState({isOpen: false, planId: null, planName: null});
-                        setIsLoggingNewExcuse(false);
-                        setNewExcuse('');
-                    }}>Cancel</Button>
-                    {isLoggingNewExcuse && (
-                        <Button onClick={handleSaveExcuse}>Save Reason</Button>
-                    )}
-                </div>
-            </DialogFooter>
+             <div className="flex flex-col gap-4">
+                 <h4 className="font-semibold text-lg">Why You Started</h4>
+                 <ScrollArea className="h-full">
+                     <div className="space-y-3 pr-4">
+                          {(skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.linkedRuleEquationIds || []).map(id => {
+                              const equation = pillarEquations.Mind.find(eq => eq.id === id) || pillarEquations.Body.find(eq => eq.id === id) || pillarEquations.Heart.find(eq => eq.id === id) || pillarEquations.Spirit.find(eq => eq.id === id);
+                              if (!equation) return null;
+                              return (
+                                  <div key={id} className="text-sm p-3 rounded-lg bg-muted/50 border">
+                                      <p className="font-semibold">{equation.outcome}</p>
+                                  </div>
+                              );
+                          })}
+                     </div>
+                 </ScrollArea>
+             </div>
+          </div>
+          <DialogFooter className="p-4 border-t flex justify-between w-full">
+            <div>
+              {isLoggingNewExcuse && (
+                  <div className="flex gap-2 items-center w-full max-w-sm">
+                      <Input value={newExcuse} onChange={e => setNewExcuse(e.target.value)} placeholder="Enter reason for abandonment..." onKeyDown={e => e.key === 'Enter' && handleSaveExcuse()} autoFocus/>
+                      <Button onClick={handleSaveExcuse}>Save Reason</Button>
+                  </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => setIsLoggingNewExcuse(true)} disabled={isLoggingNewExcuse}>
+                Log New Excuse
+              </Button>
+              <Button variant="outline" onClick={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>Close</Button>
+            </div>
+          </DialogFooter>
         </DialogContent>
     </Dialog>
     </>
@@ -1633,3 +1608,4 @@ export default function MyPlatePage() {
 
 
     
+
