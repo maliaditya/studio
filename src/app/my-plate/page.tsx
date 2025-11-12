@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -1612,7 +1611,7 @@ function MyPlatePageContent() {
         setExcuseModalState({isOpen: false, planId: null, planName: null});
         setNewExcuse('');
       }}>
-        <DialogContent className="h-[90vh] max-w-full w-full sm:max-w-7xl grid grid-cols-1 md:grid-cols-2 gap-6 p-0">
+        <DialogContent className="h-full max-h-[90vh] sm:max-w-7xl grid grid-cols-1 md:grid-cols-2 gap-6 p-0">
           <div className="flex flex-col gap-6 p-6 min-h-0">
               <DialogHeader>
                   <DialogTitle>Log Abandonment Reason for "{excuseModalState.planName}"</DialogTitle>
@@ -1782,6 +1781,3 @@ export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
 
-
-
-```
