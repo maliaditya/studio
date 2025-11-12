@@ -1127,7 +1127,6 @@ function MyPlatePageContent() {
             [excuseModalState.planId!]: [...existingLogs, newLogEntry]
         };
     });
-    setIsLoggingNewExcuse(false);
     setNewExcuse('');
   };
   
@@ -1563,7 +1562,7 @@ function MyPlatePageContent() {
               </DialogHeader>
               <div className="flex-grow flex flex-col gap-4 min-h-0">
                   <h4 className="font-semibold text-lg">Previous Reasons</h4>
-                  <ScrollArea className="h-full">
+                   <ScrollArea className="flex-grow">
                       <div className="space-y-3 pr-4">
                           {(abandonmentLogs[excuseModalState.planId!] || []).map(log => (
                                 <Card key={log.id} className="cursor-pointer" onClick={() => { setEditingExcuseLogId(log.id); setEditedHandlingStrategy(log.handlingStrategy || ''); }}>
@@ -1609,32 +1608,34 @@ function MyPlatePageContent() {
           <div className="flex flex-col gap-4 p-6 bg-muted/30 border-l min-h-0">
                <div className="flex justify-between items-center">
                     <h4 className="font-semibold text-lg">Why You Started</h4>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm">
-                                <PlusCircle className="mr-2 h-4 w-4" /> Link Rules
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80">
-                            <ScrollArea className="h-60">
-                                <div className="space-y-2 p-1">
-                                    {Object.values(pillarEquations).flat().map(eq => (
-                                        <div key={eq.id} className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id={`why-${eq.id}`}
-                                                checked={(skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.linkedRuleEquationIds || []).includes(eq.id)}
-                                                onCheckedChange={() => handleWhyYouStartedRuleToggle(eq.id)}
-                                            />
-                                            <Label htmlFor={`why-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </ScrollArea>
-                            <div className="mt-2 pt-2 border-t">
-                                <Button className="w-full" size="sm" onClick={() => setEquationEditorState({ isOpen: true })}>Create New Rule</Button>
-                            </div>
-                        </PopoverContent>
-                    </Popover>
+                    <div className="flex items-center gap-2">
+                      <Popover>
+                          <PopoverTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                  <PlusCircle className="mr-2 h-4 w-4" /> Link Rules
+                              </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80">
+                              <ScrollArea className="h-60">
+                                  <div className="space-y-2 p-1">
+                                      {Object.values(pillarEquations).flat().map(eq => (
+                                          <div key={eq.id} className="flex items-center space-x-2">
+                                              <Checkbox
+                                                  id={`why-${eq.id}`}
+                                                  checked={(skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.linkedRuleEquationIds || []).includes(eq.id)}
+                                                  onCheckedChange={() => handleWhyYouStartedRuleToggle(eq.id)}
+                                              />
+                                              <Label htmlFor={`why-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
+                                          </div>
+                                      ))}
+                                  </div>
+                              </ScrollArea>
+                          </PopoverContent>
+                      </Popover>
+                      <Button variant="outline" size="sm" onClick={() => setEquationEditorState({ isOpen: true })}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Log New Reason for Starting
+                      </Button>
+                    </div>
                </div>
                <ScrollArea className="h-full">
                    <div className="space-y-3 pr-4">
@@ -1650,21 +1651,19 @@ function MyPlatePageContent() {
                    </div>
                </ScrollArea>
            </div>
-          <DialogFooter className="p-4 border-t flex justify-between w-full col-span-1 md:col-span-2">
-            <div>
-              {isLoggingNewExcuse && (
-                  <div className="flex gap-2 items-center w-full max-w-sm">
-                      <Input value={newExcuse} onChange={e => setNewExcuse(e.target.value)} placeholder="Enter reason for abandonment..." onKeyDown={e => e.key === 'Enter' && handleSaveExcuse()} autoFocus/>
-                      <Button onClick={handleSaveExcuse}>Save Reason</Button>
-                  </div>
-              )}
-            </div>
+          <DialogFooter className="p-4 border-t flex justify-end w-full col-span-1 md:col-span-2">
             <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => setIsLoggingNewExcuse(true)} disabled={isLoggingNewExcuse}>
+              <Button variant="secondary" onClick={() => { setIsLoggingNewExcuse(true); setTimeout(() => document.getElementById('new-excuse-input')?.focus(), 50) }}>
                 Log New Excuse
               </Button>
               <Button variant="outline" onClick={() => setExcuseModalState({isOpen: false, planId: null, planName: null})}>Close</Button>
             </div>
+            {isLoggingNewExcuse && (
+                <form onSubmit={(e) => { e.preventDefault(); handleSaveExcuse(); }} className="flex gap-2 items-center w-full max-w-sm">
+                    <Input id="new-excuse-input" value={newExcuse} onChange={e => setNewExcuse(e.target.value)} placeholder="Enter reason for abandonment..." />
+                    <Button type="submit">Save Reason</Button>
+                </form>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1683,3 +1682,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
+    
