@@ -58,6 +58,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { TodaysDietCard } from '@/components/ui/TodaysDietCard';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { TimesheetPageContent } from '@/app/timesheet/page';
+import { Badge } from '@/components/ui/badge';
 
 const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
