@@ -35,6 +35,17 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EquationEditor } from '@/app/purpose/page';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog, SkillAcquisitionPlan, HabitEquation } from '@/types/workout';
@@ -1645,7 +1656,7 @@ function MyPlatePageContent() {
              <div className="flex justify-between items-center">
                 <h4 className="font-semibold text-lg">Why You Started</h4>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setIsNewReasonModalOpen(true)}>
+                     <Button variant="outline" size="sm" onClick={() => setIsNewReasonModalOpen(true)}>
                         <PlusCircle className="mr-2 h-4 w-4" /> Log New Reason
                      </Button>
                     <Popover>
@@ -1736,4 +1747,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
 
