@@ -1676,7 +1676,7 @@ function SkillPageContent() {
                 <DialogDescription>Select a task to begin a focus session.</DialogDescription>
             </DialogHeader>
             <div className="flex-grow min-h-0">
-                <DeepWorkPageContent />
+                <DeepWorkPageContent isModal={true} />
             </div>
         </DialogContent>
       </Dialog>

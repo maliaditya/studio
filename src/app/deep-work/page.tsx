@@ -609,7 +609,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
 });
 LibraryContent.displayName = 'LibraryContent';
 
-export function DeepWorkPageContent() {
+export function DeepWorkPageContent({ isModal = false }: { isModal?: boolean }) {
   const { toast } = useToast();
   const { 
     currentUser, 
@@ -1557,10 +1557,14 @@ export function DeepWorkPageContent() {
     });
     return childIds;
   }, [deepWorkDefinitions, upskillDefinitions]);
+  
+  const wrapperClass = isModal 
+    ? "p-4"
+    : "container mx-auto p-4 sm:p-6 lg:p-8";
 
   return (
     <DndContext sensors={sensors} onDragStart={(e) => setActiveId(e.active.id.toString())} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
-        <div className="container mx-auto p-4 sm:p-6 lg:p-8">
+        <div className={wrapperClass}>
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
             
             <aside className="lg:col-span-1 space-y-6 lg:sticky top-20">
@@ -2081,6 +2085,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
