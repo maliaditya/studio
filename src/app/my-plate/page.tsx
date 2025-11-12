@@ -1163,6 +1163,23 @@ function MyPlatePageContent() {
     setEditingExcuseLogId(null);
     setEditedHandlingStrategy('');
   };
+  
+  const handleDeleteExcuse = (planId: string, logId: string) => {
+    setAbandonmentLogs(prev => {
+        const planLogs = prev[planId] || [];
+        const updatedLogs = planLogs.filter(log => log.id !== logId);
+        if (updatedLogs.length > 0) {
+            return {
+                ...prev,
+                [planId]: updatedLogs
+            };
+        } else {
+            const newLogs = { ...prev };
+            delete newLogs[planId];
+            return newLogs;
+        }
+    });
+  };
 
 
   const activityInfo = editingActivity?.activity;
@@ -1606,7 +1623,24 @@ function MyPlatePageContent() {
                    <ScrollArea className="flex-grow">
                       <div className="space-y-3 pr-4">
                           {(abandonmentLogs[excuseModalState.planId!] || []).map(log => (
-                                <Card key={log.id} className="cursor-pointer" onClick={() => { setEditingExcuseLogId(log.id); setEditedHandlingStrategy(log.handlingStrategy || ''); }}>
+                                <Card key={log.id} className="cursor-pointer group relative" onClick={() => { setEditingExcuseLogId(log.id); setEditedHandlingStrategy(log.handlingStrategy || ''); }}>
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100">
+                                                <Trash2 className="h-4 w-4 text-destructive"/>
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>This will permanently delete this abandonment reason.</AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={() => handleDeleteExcuse(excuseModalState.planId!, log.id)}>Delete</AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
                                     <CardContent className="p-3">
                                         <p className="text-sm font-medium">{log.reason}</p>
                                         <p className="text-xs text-muted-foreground mt-1">{format(new Date(log.timestamp), 'PPP')}</p>
@@ -1646,7 +1680,7 @@ function MyPlatePageContent() {
                   </ScrollArea>
               </div>
               <DialogFooter className="p-0 border-t pt-6 flex justify-end">
-                <form onSubmit={(e) => { e.preventDefault(); handleSaveExcuse(); }} className="flex gap-2 items-center w-full max-w-sm">
+                <form onSubmit={(e) => { e.preventDefault(); handleSaveExcuse(); }} className="flex gap-2 items-center w-full">
                     <Input value={newExcuse} onChange={e => setNewExcuse(e.target.value)} placeholder="Enter reason for abandonment..." />
                     <Button type="submit">Save Reason</Button>
                 </form>
@@ -1662,7 +1696,7 @@ function MyPlatePageContent() {
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="outline" size="sm">
-                                <PlusCircle className="mr-2 h-4 w-4" /> Link Rules
+                                <LinkIconLucide className="mr-2 h-4 w-4" /> Link Rules
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-80">
@@ -1749,3 +1783,5 @@ export default function MyPlatePage() {
 }
 
 
+
+```
