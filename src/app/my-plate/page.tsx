@@ -33,6 +33,7 @@ import { TaskContextModal } from '@/components/TaskContextModal';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EquationEditor } from '@/app/purpose/page';
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog, SkillAcquisitionPlan, HabitEquation } from '@/types/workout';
@@ -152,6 +153,7 @@ function MyPlatePageContent() {
     skillAcquisitionPlans,
     setSkillAcquisitionPlans,
     pillarEquations,
+    setPillarEquations,
   } = useAuth();
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
@@ -186,6 +188,7 @@ function MyPlatePageContent() {
   const [isLoggingNewExcuse, setIsLoggingNewExcuse] = useState(false);
   const [editingExcuseLogId, setEditingExcuseLogId] = useState<string | null>(null);
   const [editedHandlingStrategy, setEditedHandlingStrategy] = useState('');
+  const [equationEditorState, setEquationEditorState] = useState<{ isOpen: boolean; pillar?: string; equation?: HabitEquation; }>({ isOpen: false });
 
 
   
@@ -1202,6 +1205,24 @@ function MyPlatePageContent() {
     });
   };
 
+  const handleSaveEquation = (pillar: string, equation: Omit<HabitEquation, 'id'>) => {
+    setPillarEquations(prev => {
+        const newEquations = { ...prev };
+        const newEquationsForPillar = [...(newEquations[pillar] || [])];
+        if (equationEditorState.equation?.id) { // Editing existing
+            const index = newEquationsForPillar.findIndex(eq => eq.id === equationEditorState.equation!.id);
+            if (index > -1) {
+                newEquationsForPillar[index] = { ...equationEditorState.equation, ...equation, metaRuleIds: equation.metaRuleIds || [] };
+            }
+        } else { // Adding new
+            newEquationsForPillar.push({ id: `eq_${Date.now()}`, ...equation, metaRuleIds: equation.metaRuleIds || [] });
+        }
+        newEquations[pillar] = newEquationsForPillar;
+        return newEquations;
+    });
+    setEquationEditorState({ isOpen: false });
+};
+
   return (
     <>
       <DragDropContext onDragEnd={onDragEnd}>
@@ -1544,38 +1565,39 @@ function MyPlatePageContent() {
                   <h4 className="font-semibold text-lg">Previous Reasons</h4>
                   <ScrollArea className="h-full">
                       <div className="space-y-3 pr-4">
-                          {(abandonmentLogs[excuseModalState.planId!] || []).length > 0 ? (
-                              (abandonmentLogs[excuseModalState.planId!] || []).map(log => (
-                                  <div key={log.id} className="text-sm rounded-lg bg-muted/50 border p-3 cursor-pointer" onClick={() => { setEditingExcuseLogId(log.id); setEditedHandlingStrategy(log.handlingStrategy || ''); }}>
-                                      <p className="font-semibold">{log.reason}</p>
-                                      <p className="text-xs text-muted-foreground mt-1">{format(new Date(log.timestamp), 'PPP')}</p>
-                                      {editingExcuseLogId === log.id ? (
-                                          <div className="mt-2 pt-2 border-t space-y-2">
-                                              <Textarea
-                                                  value={editedHandlingStrategy}
-                                                  onChange={(e) => setEditedHandlingStrategy(e.target.value)}
-                                                  placeholder="How will you handle this next time?"
-                                                  onClick={(e) => e.stopPropagation()}
-                                                  autoFocus
-                                                  className="text-xs"
-                                              />
-                                              <div className="flex justify-end gap-2">
-                                                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditingExcuseLogId(null); }}>Cancel</Button>
-                                                  <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExcuse(log.id); }}>Save Strategy</Button>
-                                              </div>
-                                          </div>
-                                      ) : (
-                                          log.handlingStrategy && (
-                                              <div className="mt-2 pt-2 border-t">
-                                                  <p className="text-xs mt-1 text-green-600 dark:text-green-400 italic">
-                                                      {log.handlingStrategy}
-                                                  </p>
-                                              </div>
-                                          )
-                                      )}
-                                  </div>
-                              ))
-                          ) : (
+                          {(abandonmentLogs[excuseModalState.planId!] || []).map(log => (
+                                <Card key={log.id} className="cursor-pointer" onClick={() => { setEditingExcuseLogId(log.id); setEditedHandlingStrategy(log.handlingStrategy || ''); }}>
+                                    <CardContent className="p-3">
+                                        <p className="text-sm font-medium">{log.reason}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">{format(new Date(log.timestamp), 'PPP')}</p>
+                                        {editingExcuseLogId === log.id ? (
+                                            <div className="mt-2 pt-2 border-t space-y-2">
+                                                <Textarea
+                                                    value={editedHandlingStrategy}
+                                                    onChange={(e) => setEditedHandlingStrategy(e.target.value)}
+                                                    placeholder="How will you handle this next time?"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    autoFocus
+                                                    className="text-xs"
+                                                />
+                                                <div className="flex justify-end gap-2">
+                                                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditingExcuseLogId(null); }}>Cancel</Button>
+                                                    <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExcuse(log.id); }}>Save Strategy</Button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            log.handlingStrategy && (
+                                                <div className="mt-2 pt-2 border-t">
+                                                    <p className="text-xs mt-1 text-green-600 dark:text-green-400 italic">
+                                                        {log.handlingStrategy}
+                                                    </p>
+                                                </div>
+                                            )
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ))}
+                          {(abandonmentLogs[excuseModalState.planId!] || []).length === 0 && (
                               <div className="flex items-center justify-center h-24 border rounded-md">
                                   <p className="text-sm text-muted-foreground">No reasons logged for this plan yet.</p>
                               </div>
@@ -1608,6 +1630,9 @@ function MyPlatePageContent() {
                                     ))}
                                 </div>
                             </ScrollArea>
+                            <div className="mt-2 pt-2 border-t">
+                                <Button className="w-full" size="sm" onClick={() => setEquationEditorState({ isOpen: true })}>Create New Rule</Button>
+                            </div>
                         </PopoverContent>
                     </Popover>
                </div>
@@ -1642,7 +1667,15 @@ function MyPlatePageContent() {
             </div>
           </DialogFooter>
         </DialogContent>
-    </Dialog>
+      </Dialog>
+      <EquationEditor
+        isOpen={equationEditorState.isOpen}
+        onOpenChange={(open) => setEquationEditorState({ ...equationEditorState, isOpen: open })}
+        pillarName={equationEditorState.pillar}
+        equation={equationEditorState.equation}
+        onSave={handleSaveEquation}
+        metaRules={metaRules}
+      />
     </>
   );
 }
