@@ -27,7 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart as PieChartIcon, Link as LinkIconLucide, Expand, LayoutDashboard, ChevronLeft, ChevronRight, Shield } from 'lucide-react';
+import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart as PieChartIcon, Link as LinkIconLucide, Expand, LayoutDashboard, ChevronLeft, ChevronRight, Shield, PlusCircle } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { TaskContextModal } from '@/components/TaskContextModal';
@@ -151,6 +151,7 @@ function MyPlatePageContent() {
     abandonmentLogs, 
     setAbandonmentLogs,
     skillAcquisitionPlans,
+    setSkillAcquisitionPlans,
     pillarEquations,
   } = useAuth();
   const { toast } = useToast();
@@ -1125,6 +1126,7 @@ function MyPlatePageContent() {
         };
     });
     setIsLoggingNewExcuse(false);
+    setNewExcuse('');
   };
   
   const handleUpdateExcuse = (logId: string) => {
@@ -1179,6 +1181,27 @@ function MyPlatePageContent() {
     });
   }, [activityInfo, upskillDefinitions, deepWorkDefinitions, coreSkills, microSkillMap, offerizationPlans, getUpskillNodeType, getDeepWorkNodeType]);
 
+  const handleWhyYouStartedRuleToggle = (ruleId: string) => {
+    if (!excuseModalState.planId) return;
+  
+    setSkillAcquisitionPlans(prev => {
+      const planIndex = prev.findIndex(p => p.specializationId === excuseModalState.planId);
+      if (planIndex > -1) {
+        const newPlans = [...prev];
+        const planToUpdate = { ...newPlans[planIndex] };
+        const currentIds = planToUpdate.linkedRuleEquationIds || [];
+        const isLinked = currentIds.includes(ruleId);
+        
+        planToUpdate.linkedRuleEquationIds = isLinked
+          ? currentIds.filter(id => id !== ruleId)
+          : [...currentIds, ruleId];
+        
+        newPlans[planIndex] = planToUpdate;
+        return newPlans;
+      }
+      return prev; // Should not happen if modal is open correctly
+    });
+  };
 
   return (
     <>
@@ -1512,73 +1535,98 @@ function MyPlatePageContent() {
         setIsLoggingNewExcuse(false);
         setNewExcuse('');
       }}>
-        <DialogContent className="h-[90vh] max-w-full w-full sm:max-w-7xl grid grid-rows-[auto,1fr] p-0">
-          <DialogHeader className="p-4 border-b">
-              <DialogTitle>Log Abandonment Reason for "{excuseModalState.planName}"</DialogTitle>
-              <DialogDescription>Why did you stop pursuing this plan? Reflecting helps clarify future direction.</DialogDescription>
-          </DialogHeader>
-          <div className="grid md:grid-cols-2 gap-6 p-6 min-h-0">
-            <div className="flex flex-col gap-4">
-                <h4 className="font-semibold text-lg">Previous Reasons</h4>
-                <ScrollArea className="h-full">
-                    <div className="space-y-3 pr-4">
-                        {(abandonmentLogs[excuseModalState.planId!] || []).length > 0 ? (
-                            (abandonmentLogs[excuseModalState.planId!] || []).map(log => (
-                                <div key={log.id} className="text-sm rounded-lg bg-muted/50 border p-3 cursor-pointer" onClick={() => { setEditingExcuseLogId(log.id); setEditedHandlingStrategy(log.handlingStrategy || ''); }}>
-                                    <p className="font-semibold">{log.reason}</p>
-                                    <p className="text-xs text-muted-foreground mt-1">{format(new Date(log.timestamp), 'PPP')}</p>
-                                     {editingExcuseLogId === log.id ? (
-                                        <div className="mt-2 pt-2 border-t space-y-2">
-                                            <Textarea
-                                                value={editedHandlingStrategy}
-                                                onChange={(e) => setEditedHandlingStrategy(e.target.value)}
-                                                placeholder="How will you handle this next time?"
-                                                onClick={(e) => e.stopPropagation()}
-                                                autoFocus
-                                                className="text-xs"
-                                            />
-                                            <div className="flex justify-end gap-2">
-                                                <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditingExcuseLogId(null); }}>Cancel</Button>
-                                                <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExcuse(log.id); }}>Save Strategy</Button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        log.handlingStrategy && (
-                                            <div className="mt-2 pt-2 border-t">
-                                                <p className="text-xs mt-1 text-green-600 dark:text-green-400 italic">
-                                                    {log.handlingStrategy}
-                                                </p>
-                                            </div>
-                                        )
-                                    )}
-                                </div>
-                            ))
-                        ) : (
-                            <div className="flex items-center justify-center h-24 border rounded-md">
-                                <p className="text-sm text-muted-foreground">No reasons logged for this plan yet.</p>
-                            </div>
-                        )}
-                    </div>
-                </ScrollArea>
-            </div>
-             <div className="flex flex-col gap-4">
-                 <h4 className="font-semibold text-lg">Why You Started</h4>
-                 <ScrollArea className="h-full">
-                     <div className="space-y-3 pr-4">
-                          {(skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.linkedRuleEquationIds || []).map(id => {
-                              const equation = pillarEquations.Mind.find(eq => eq.id === id) || pillarEquations.Body.find(eq => eq.id === id) || pillarEquations.Heart.find(eq => eq.id === id) || pillarEquations.Spirit.find(eq => eq.id === id);
-                              if (!equation) return null;
-                              return (
-                                  <div key={id} className="text-sm p-3 rounded-lg bg-muted/50 border">
-                                      <p className="font-semibold">{equation.outcome}</p>
+        <DialogContent className="h-[90vh] max-w-full w-full sm:max-w-7xl grid grid-cols-1 md:grid-cols-2 gap-6 p-0">
+          <div className="flex flex-col gap-4 p-6">
+              <DialogHeader>
+                  <DialogTitle>Log Abandonment Reason for "{excuseModalState.planName}"</DialogTitle>
+                  <DialogDescription>Why did you stop pursuing this plan? Reflecting helps clarify future direction.</DialogDescription>
+              </DialogHeader>
+              <div className="flex-grow flex flex-col gap-4 min-h-0">
+                  <h4 className="font-semibold text-lg">Previous Reasons</h4>
+                  <ScrollArea className="h-full">
+                      <div className="space-y-3 pr-4">
+                          {(abandonmentLogs[excuseModalState.planId!] || []).length > 0 ? (
+                              (abandonmentLogs[excuseModalState.planId!] || []).map(log => (
+                                  <div key={log.id} className="text-sm rounded-lg bg-muted/50 border p-3 cursor-pointer" onClick={() => { setEditingExcuseLogId(log.id); setEditedHandlingStrategy(log.handlingStrategy || ''); }}>
+                                      <p className="font-semibold">{log.reason}</p>
+                                      <p className="text-xs text-muted-foreground mt-1">{format(new Date(log.timestamp), 'PPP')}</p>
+                                      {editingExcuseLogId === log.id ? (
+                                          <div className="mt-2 pt-2 border-t space-y-2">
+                                              <Textarea
+                                                  value={editedHandlingStrategy}
+                                                  onChange={(e) => setEditedHandlingStrategy(e.target.value)}
+                                                  placeholder="How will you handle this next time?"
+                                                  onClick={(e) => e.stopPropagation()}
+                                                  autoFocus
+                                                  className="text-xs"
+                                              />
+                                              <div className="flex justify-end gap-2">
+                                                  <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditingExcuseLogId(null); }}>Cancel</Button>
+                                                  <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExcuse(log.id); }}>Save Strategy</Button>
+                                              </div>
+                                          </div>
+                                      ) : (
+                                          log.handlingStrategy && (
+                                              <div className="mt-2 pt-2 border-t">
+                                                  <p className="text-xs mt-1 text-green-600 dark:text-green-400 italic">
+                                                      {log.handlingStrategy}
+                                                  </p>
+                                              </div>
+                                          )
+                                      )}
                                   </div>
-                              );
-                          })}
-                     </div>
-                 </ScrollArea>
-             </div>
+                              ))
+                          ) : (
+                              <div className="flex items-center justify-center h-24 border rounded-md">
+                                  <p className="text-sm text-muted-foreground">No reasons logged for this plan yet.</p>
+                              </div>
+                          )}
+                      </div>
+                  </ScrollArea>
+              </div>
           </div>
-          <DialogFooter className="p-4 border-t flex justify-between w-full">
+          <div className="flex flex-col gap-4 p-6 bg-muted/30 border-l min-h-0">
+               <div className="flex justify-between items-center">
+                    <h4 className="font-semibold text-lg">Why You Started</h4>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm">
+                                <PlusCircle className="mr-2 h-4 w-4" /> Link Rules
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80">
+                            <ScrollArea className="h-60">
+                                <div className="space-y-2 p-1">
+                                    {Object.values(pillarEquations).flat().map(eq => (
+                                        <div key={eq.id} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`why-${eq.id}`}
+                                                checked={(skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.linkedRuleEquationIds || []).includes(eq.id)}
+                                                onCheckedChange={() => handleWhyYouStartedRuleToggle(eq.id)}
+                                            />
+                                            <Label htmlFor={`why-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </PopoverContent>
+                    </Popover>
+               </div>
+               <ScrollArea className="h-full">
+                   <div className="space-y-3 pr-4">
+                       {(skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.linkedRuleEquationIds || []).map(id => {
+                           const equation = pillarEquations.Mind.find(eq => eq.id === id) || pillarEquations.Body.find(eq => eq.id === id) || pillarEquations.Heart.find(eq => eq.id === id) || pillarEquations.Spirit.find(eq => eq.id === id);
+                           if (!equation) return null;
+                           return (
+                               <div key={id} className="text-sm p-3 rounded-lg bg-background border">
+                                   <p className="font-semibold">{equation.outcome}</p>
+                               </div>
+                           );
+                       })}
+                   </div>
+               </ScrollArea>
+           </div>
+          <DialogFooter className="p-4 border-t flex justify-between w-full col-span-1 md:col-span-2">
             <div>
               {isLoggingNewExcuse && (
                   <div className="flex gap-2 items-center w-full max-w-sm">
@@ -1609,3 +1657,138 @@ export default function MyPlatePage() {
 
     
 
+
+```
+- src/hooks/use-local-storage.ts:
+```ts
+"use client";
+
+import { useState, useEffect } from 'react';
+
+function useLocalStorage<T>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+  // Pass a function to useState to run the logic only once on initial render
+  const [storedValue, setStoredValue] = useState<T>(() => {
+    // Check if running on the client side
+    if (typeof window === 'undefined') {
+      return initialValue;
+    }
+    try {
+      // Get from local storage by key
+      const item = window.localStorage.getItem(key);
+      // Parse stored json or if none return initialValue
+      return item ? JSON.parse(item) : initialValue;
+    } catch (error) {
+      // If error also return initialValue
+      console.error(error);
+      return initialValue;
+    }
+  });
+
+  // useEffect to update local storage when the state changes
+  useEffect(() => {
+    // Check if running on the client side
+    if (typeof window !== 'undefined') {
+      try {
+        // Allow value to be a function so we have same API as useState
+        const valueToStore =
+          storedValue instanceof Function ? storedValue(storedValue) : storedValue;
+        // Save state
+        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+      } catch (error) {
+        // A more advanced implementation would handle the error case
+        console.error(error);
+      }
+    }
+  }, [key, storedValue]);
+
+  return [storedValue, setStoredValue];
+}
+
+export default useLocalStorage;
+
+```
+- src/services/workoutService.ts:
+```ts
+// This file has been intentionally left empty to remove backend functionality.
+
+```
+- tailwind.config.js:
+```js
+/** @type {import('tailwindcss').Config} */
+module.exports = {
+  darkMode: ["class"],
+  content: [
+    './pages/**/*.{ts,tsx}',
+    './components/**/*.{ts,tsx}',
+    './app/**/*.{ts,tsx}',
+    './src/**/*.{ts,tsx}',
+  ],
+  prefix: "",
+  theme: {
+    container: {
+      center: true,
+      padding: "2rem",
+      screens: {
+        "2xl": "1400px",
+      },
+    },
+    extend: {
+      colors: {
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))",
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))",
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))",
+        },
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+      },
+    },
+  },
+  plugins: [require("tailwindcss-animate")],
+}
+```
