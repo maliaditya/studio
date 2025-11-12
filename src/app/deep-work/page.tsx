@@ -609,7 +609,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
 });
 LibraryContent.displayName = 'LibraryContent';
 
-function DeepWorkPageContent() {
+export function DeepWorkPageContent() {
   const { toast } = useToast();
   const { 
     currentUser, 
@@ -2081,6 +2081,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 
