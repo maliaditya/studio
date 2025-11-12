@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -26,7 +27,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart as PieChartIcon, Link as LinkIconLucide, Expand, LayoutDashboard, ChevronLeft, ChevronRight, Shield, PlusCircle } from 'lucide-react';
+import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart as PieChartIcon, Link as LinkIconLucide, Expand, LayoutDashboard, ChevronLeft, ChevronRight, Shield, PlusCircle, Trash2 } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { TaskContextModal } from '@/components/TaskContextModal';
@@ -119,6 +120,7 @@ function MyPlatePageContent() {
     deepWorkDefinitions, setDeepWorkDefinitions,
     leadGenDefinitions,
     projects,
+    setProjects,
     productizationPlans,
     offerizationPlans,
     onOpenIntentionPopup,
@@ -1224,6 +1226,32 @@ function MyPlatePageContent() {
     setNewReasonText('');
   };
 
+  const handleDeleteWhyYouStartedRule = (ruleId: string) => {
+    if (!excuseModalState.planId) return;
+
+    setSkillAcquisitionPlans(prev => {
+      const planIndex = prev.findIndex(p => p.specializationId === excuseModalState.planId);
+      if (planIndex > -1) {
+        const newPlans = [...prev];
+        const planToUpdate = { ...newPlans[planIndex] };
+        planToUpdate.linkedRuleEquationIds = (planToUpdate.linkedRuleEquationIds || []).filter(id => id !== ruleId);
+        newPlans[planIndex] = planToUpdate;
+        return newPlans;
+      }
+      return prev;
+    });
+
+    setPillarEquations(prev => {
+        const newPillars = { ...prev };
+        for (const pillar in newPillars) {
+            newPillars[pillar] = (newPillars[pillar] || []).filter(eq => eq.id !== ruleId);
+        }
+        return newPillars;
+    });
+
+    toast({ title: 'Reason Deleted', description: 'The reason has been removed from this plan.' });
+  };
+
 
   return (
     <>
@@ -1617,6 +1645,9 @@ function MyPlatePageContent() {
              <div className="flex justify-between items-center">
                 <h4 className="font-semibold text-lg">Why You Started</h4>
                 <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setIsNewReasonModalOpen(true)}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Log New Reason
+                     </Button>
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="outline" size="sm">
@@ -1640,9 +1671,6 @@ function MyPlatePageContent() {
                             </ScrollArea>
                         </PopoverContent>
                     </Popover>
-                     <Button variant="outline" size="sm" onClick={() => setIsNewReasonModalOpen(true)}>
-                        <PlusCircle className="mr-2 h-4 w-4" /> Log New Reason
-                     </Button>
                 </div>
             </div>
             <ScrollArea className="h-full">
@@ -1651,8 +1679,25 @@ function MyPlatePageContent() {
                        const equation = Object.values(pillarEquations).flat().find(eq => eq.id === id);
                        if (!equation) return null;
                        return (
-                           <div key={id} className="text-sm p-3 rounded-lg bg-background border">
+                           <div key={id} className="text-sm p-3 rounded-lg bg-background border flex justify-between items-center group">
                                <p className="font-semibold">{equation.outcome}</p>
+                               <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100">
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                      <AlertDialogDescription>This will permanently delete this reason. This action cannot be undone.</AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction onClick={() => handleDeleteWhyYouStartedRule(id)}>Delete</AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                               </AlertDialog>
                            </div>
                        );
                    })}
@@ -1691,3 +1736,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
