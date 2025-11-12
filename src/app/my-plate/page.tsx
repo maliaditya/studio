@@ -1137,7 +1137,12 @@ function MyPlatePageContent() {
 
   const handleSaveExcuse = () => {
     if (!excuseModalState.planId || !newExcuse.trim()) {
-        toast({ title: 'Error', description: 'Excuse cannot be empty.', variant: 'destructive' });
+        if (!excuseModalState.planId) {
+            toast({ title: 'Error', description: 'Plan ID is missing.', variant: 'destructive' });
+        }
+        if (!newExcuse.trim()) {
+            toast({ title: 'Error', description: 'Excuse cannot be empty.', variant: 'destructive' });
+        }
         return;
     }
     const newLogEntry: AbandonmentLog = {
@@ -1153,8 +1158,6 @@ function MyPlatePageContent() {
             [excuseModalState.planId!]: [...existingLogs, newLogEntry]
         };
     });
-    setNewExcuse('');
-    setNewExcuseFear('');
   };
   
   const handleUpdateExcuse = (logId: string) => {
@@ -1699,14 +1702,13 @@ function MyPlatePageContent() {
               <DialogFooter className="p-0 border-t pt-6 flex flex-col gap-4">
                 <form onSubmit={(e) => { e.preventDefault(); handleSaveExcuse(); }} className="flex gap-2 items-center w-full">
                     <Input value={newExcuse} onChange={e => setNewExcuse(e.target.value)} placeholder="Enter reason for abandonment..." />
-                    <Button type="submit">Save Reason</Button>
                 </form>
-                <Select onValueChange={setNewExcuseFear} value={newExcuseFear}>
+                <Select onValueChange={(value) => setNewExcuseFear(value === 'none' ? '' : value)} value={newExcuseFear}>
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select an underlying fear (optional)..." />
                   </SelectTrigger>
                   <SelectContent>
-                      <SelectItem value="">-- No Fear Category --</SelectItem>
+                      <SelectItem value="none">-- No Fear Category --</SelectItem>
                       {FEAR_CATEGORIES.map(fear => (
                           <SelectItem key={fear} value={fear}>{fear}</SelectItem>
                       ))}
@@ -1718,7 +1720,7 @@ function MyPlatePageContent() {
              <div className="flex justify-between items-center">
                 <h4 className="font-semibold text-lg">Why You Started</h4>
                 <div className="flex items-center gap-2">
-                     <Button variant="outline" size="sm" onClick={() => setIsNewReasonModalOpen(true)}>
+                    <Button variant="outline" size="sm" onClick={() => setIsNewReasonModalOpen(true)}>
                         <PlusCircle className="mr-2 h-4 w-4" /> Log New Reason
                      </Button>
                     <Popover>
@@ -1763,7 +1765,7 @@ function MyPlatePageContent() {
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                      <AlertDialogDescription>This will permanently delete this reason. This action cannot be undone.</AlertDialogDescription>
+                                      <AlertDialogDescription>This will permanently delete this reason.</AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -1809,3 +1811,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
+```
