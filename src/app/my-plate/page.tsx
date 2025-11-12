@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -1158,6 +1157,8 @@ function MyPlatePageContent() {
             [excuseModalState.planId!]: [...existingLogs, newLogEntry]
         };
     });
+    setNewExcuse('');
+    setNewExcuseFear('');
   };
   
   const handleUpdateExcuse = (logId: string) => {
@@ -1811,5 +1812,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-```
