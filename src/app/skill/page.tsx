@@ -38,6 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
 import { SpacedRepetitionModal } from '@/components/SpacedRepetitionModal';
+import { DeepWorkPageContent } from '@/app/deep-work/page';
 
 
 function Draggable({ id, children, className }: { id: string, children: React.ReactNode, className?: string }) {
@@ -222,6 +223,8 @@ function SkillPageContent() {
   const [isLogProgressModalOpen, setIsLogProgressModalOpen] = useState(false);
   const [loggingMicroSkill, setLoggingMicroSkill] = useState<MicroSkill | null>(null);
   const [progressInput, setProgressInput] = useState<{ items: string, hours: string, pages: string }>({ items: '', hours: '', pages: '' });
+
+  const [isDeepWorkModalOpen, setIsDeepWorkModalOpen] = useState(false);
 
 
   useEffect(() => {
@@ -974,7 +977,7 @@ function SkillPageContent() {
 
   const handleSelectForDeepWork = (microSkill: MicroSkill) => {
     setSelectedMicroSkill(microSkill);
-    router.push('/deep-work');
+    setIsDeepWorkModalOpen(true);
   };
 
   const formatMinutes = (minutes: number) => {
@@ -1356,7 +1359,7 @@ function SkillPageContent() {
                                             return (
                                               <Card key={micro.id} className="flex flex-col group/item">
                                                   <CardHeader className="p-3 flex flex-row items-center justify-between">
-                                                      <CardTitle className="text-base flex-grow cursor-pointer hover:underline" onClick={() => setSelectedMicroSkill(micro)}>{micro.name}</CardTitle>
+                                                      <CardTitle className="text-base flex-grow cursor-pointer hover:underline" onClick={() => onSelectMicroSkill(micro)}>{micro.name}</CardTitle>
                                                       <div className="flex items-center">
                                                           <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/item:opacity-100" onClick={() => handleSelectForDeepWork(micro)}>
                                                             <Briefcase className="h-4 w-4 text-muted-foreground hover:text-primary"/>
@@ -1666,6 +1669,17 @@ function SkillPageContent() {
             </DialogContent>
         </Dialog>
       )}
+      <Dialog open={isDeepWorkModalOpen} onOpenChange={setIsDeepWorkModalOpen}>
+        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="p-4 border-b">
+                <DialogTitle>Deep Work</DialogTitle>
+                <DialogDescription>Select a task to begin a focus session.</DialogDescription>
+            </DialogHeader>
+            <div className="flex-grow min-h-0">
+                <DeepWorkPageContent />
+            </div>
+        </DialogContent>
+      </Dialog>
     </div>
     </DndContext>
   );
