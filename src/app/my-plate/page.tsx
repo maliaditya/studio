@@ -1212,7 +1212,6 @@ function MyPlatePageContent() {
         id: `eq_${Date.now()}`,
         metaRuleIds: [],
         outcome: newReasonText.trim(),
-        isWhy: true,
     };
 
     setPillarEquations(prev => {
@@ -1557,13 +1556,13 @@ function MyPlatePageContent() {
         setExcuseModalState({isOpen: false, planId: null, planName: null});
         setNewExcuse('');
       }}>
-        <DialogContent className="h-[90vh] max-w-full w-full sm:max-w-7xl grid grid-rows-[auto,1fr,auto] gap-6 p-0">
-          <DialogHeader className="p-6 border-b">
-              <DialogTitle>Log Abandonment Reason for "{excuseModalState.planName}"</DialogTitle>
-              <DialogDescription>Why did you stop pursuing this plan? Reflecting helps clarify future direction.</DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 px-6 min-h-0">
-              <div className="flex flex-col gap-4 min-h-0">
+        <DialogContent className="h-[90vh] max-w-full w-full sm:max-w-7xl grid grid-cols-1 md:grid-cols-2 gap-6 p-0">
+          <div className="flex flex-col gap-6 p-6 min-h-0">
+              <DialogHeader>
+                  <DialogTitle>Log Abandonment Reason for "{excuseModalState.planName}"</DialogTitle>
+                  <DialogDescription>Why did you stop pursuing this plan? Reflecting helps clarify future direction.</DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col gap-4 flex-grow min-h-0">
                   <h4 className="font-semibold text-lg">Previous Reasons</h4>
                    <ScrollArea className="flex-grow">
                       <div className="space-y-3 pr-4">
@@ -1607,59 +1606,59 @@ function MyPlatePageContent() {
                       </div>
                   </ScrollArea>
               </div>
-              <div className="flex flex-col gap-4 border-l pl-6 min-h-0">
-                   <div className="flex justify-between items-center">
-                        <h4 className="font-semibold text-lg">Why You Started</h4>
-                        <div className="flex items-center gap-2">
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="outline" size="sm">
-                                        <PlusCircle className="mr-2 h-4 w-4" /> Link Rules
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-80">
-                                    <ScrollArea className="h-60">
-                                        <div className="space-y-2 p-1">
-                                            {Object.values(pillarEquations).flat().map(eq => (
-                                                <div key={eq.id} className="flex items-center space-x-2">
-                                                    <Checkbox
-                                                        id={`why-${eq.id}`}
-                                                        checked={(skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.linkedRuleEquationIds || []).includes(eq.id)}
-                                                        onCheckedChange={() => handleWhyYouStartedRuleToggle(eq.id)}
-                                                    />
-                                                    <Label htmlFor={`why-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </ScrollArea>
-                                </PopoverContent>
-                            </Popover>
-                             <Button variant="outline" size="sm" onClick={() => setIsNewReasonModalOpen(true)}>
-                                <PlusCircle className="mr-2 h-4 w-4" /> Log New Reason
-                             </Button>
-                        </div>
-                   </div>
-                   <ScrollArea className="h-full">
-                       <div className="space-y-3 pr-4">
-                           {(skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.linkedRuleEquationIds || []).map(id => {
-                               const equation = Object.values(pillarEquations).flat().find(eq => eq.id === id);
-                               if (!equation) return null;
-                               return (
-                                   <div key={id} className="text-sm p-3 rounded-lg bg-background border">
-                                       <p className="font-semibold">{equation.outcome}</p>
-                                   </div>
-                               );
-                           })}
-                       </div>
-                   </ScrollArea>
-               </div>
+              <DialogFooter className="p-0 border-t pt-6 flex justify-end">
+                <form onSubmit={(e) => { e.preventDefault(); handleSaveExcuse(); }} className="flex gap-2 items-center w-full max-w-sm">
+                    <Input value={newExcuse} onChange={e => setNewExcuse(e.target.value)} placeholder="Enter reason for abandonment..." />
+                    <Button type="submit">Save Reason</Button>
+                </form>
+              </DialogFooter>
           </div>
-          <DialogFooter className="p-4 border-t flex justify-end">
-            <form onSubmit={(e) => { e.preventDefault(); handleSaveExcuse(); }} className="flex gap-2 items-center w-full max-w-sm">
-                <Input value={newExcuse} onChange={e => setNewExcuse(e.target.value)} placeholder="Enter reason for abandonment..." />
-                <Button type="submit">Save Reason</Button>
-            </form>
-          </DialogFooter>
+          <div className="flex flex-col gap-6 bg-muted/30 p-6 border-l min-h-0">
+             <div className="flex justify-between items-center">
+                <h4 className="font-semibold text-lg">Why You Started</h4>
+                <div className="flex items-center gap-2">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" size="sm">
+                                <PlusCircle className="mr-2 h-4 w-4" /> Link Rules
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80">
+                            <ScrollArea className="h-60">
+                                <div className="space-y-2 p-1">
+                                    {Object.values(pillarEquations).flat().map(eq => (
+                                        <div key={eq.id} className="flex items-center space-x-2">
+                                            <Checkbox
+                                                id={`why-${eq.id}`}
+                                                checked={(skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.linkedRuleEquationIds || []).includes(eq.id)}
+                                                onCheckedChange={() => handleWhyYouStartedRuleToggle(eq.id)}
+                                            />
+                                            <Label htmlFor={`why-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
+                                        </div>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        </PopoverContent>
+                    </Popover>
+                     <Button variant="outline" size="sm" onClick={() => setIsNewReasonModalOpen(true)}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Log New Reason
+                     </Button>
+                </div>
+            </div>
+            <ScrollArea className="h-full">
+               <div className="space-y-3 pr-4">
+                   {(skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.linkedRuleEquationIds || []).map(id => {
+                       const equation = Object.values(pillarEquations).flat().find(eq => eq.id === id);
+                       if (!equation) return null;
+                       return (
+                           <div key={id} className="text-sm p-3 rounded-lg bg-background border">
+                               <p className="font-semibold">{equation.outcome}</p>
+                           </div>
+                       );
+                   })}
+               </div>
+           </ScrollArea>
+          </div>
         </DialogContent>
       </Dialog>
       
@@ -1668,7 +1667,7 @@ function MyPlatePageContent() {
           <DialogHeader>
             <DialogTitle>Log New Reason for Starting</DialogTitle>
             <DialogDescription>
-              What was the core motivation or "why" behind starting this skill plan? This will be saved as a reusable rule.
+              What was the core motivation or "why" behind starting this skill plan?
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -1692,5 +1691,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-```
