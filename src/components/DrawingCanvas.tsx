@@ -78,14 +78,6 @@ const ExcalidrawWrapper = ({ initialDrawing, onSave, theme }: {
                 excalidrawAPI={(api) => setExcalidrawAPI(api)}
                 initialData={initialData}
                 theme={theme}
-                UIOptions={{
-                    canvasActions: {
-                        loadScene: false,
-                        saveToActiveFile: false,
-                        saveAsImage: false,
-                        export: false,
-                    }
-                }}
             >
                 <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 10 }}>
                      <Button onClick={handleSaveClick} size="sm"><Save className="mr-2 h-4 w-4"/> Save & Close</Button>
