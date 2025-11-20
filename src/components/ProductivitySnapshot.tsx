@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, Calendar as CalendarIcon, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin, PieChart as PieChartIcon, Expand, Clock, CalendarDays } from 'lucide-react';
+import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, Calendar as CalendarIcon, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin, PieChart as PieChartIcon, Expand, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -390,7 +390,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
           </div>
           <div className="flex items-center gap-1">
              <Button variant="outline" size="icon" onClick={() => setIsWeeklyReviewModalOpen(true)}>
-                <CalendarDays className="h-4 w-4" />
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><path d="M10 14h4l-2 4h2"></path></svg>
                 <span className="sr-only">Open Weekly Review</span>
             </Button>
             <Button variant="outline" size="icon" onClick={() => setIsTimetableModalOpen(true)}>
