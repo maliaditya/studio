@@ -23,7 +23,9 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
     coreSkills,
     offerizationPlans,
     permanentlyLoggedTaskIds,
-    getDescendantLeafNodes
+    getDescendantLeafNodes,
+    deepWorkDefinitions, 
+    upskillDefinitions,
   } = useAuth();
 
   const weeklyData = useMemo(() => {
@@ -102,7 +104,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
       brandingTasksCompleted,
       specializationProgress,
     };
-  }, [allUpskillLogs, allDeepWorkLogs, brandingLogs, coreSkills, offerizationPlans, permanentlyLoggedTaskIds, getDescendantLeafNodes]);
+  }, [allUpskillLogs, allDeepWorkLogs, brandingLogs, coreSkills, offerizationPlans, permanentlyLoggedTaskIds, getDescendantLeafNodes, deepWorkDefinitions, upskillDefinitions]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
