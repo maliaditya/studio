@@ -372,7 +372,7 @@ function SkillPageContent() {
 
       totalsMap.set(domain.id, { totalEst: totalDomainEst, totalLogged: totalDomainLogged });
     });
-    return totals;
+    return totalsMap;
   }, [skillDomains, coreSkills, specializationTotals]);
 
 
@@ -1691,6 +1691,3 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
-
-
-    
