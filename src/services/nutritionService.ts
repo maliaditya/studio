@@ -1,115 +1,261 @@
+"use client";
 
-/**
- * @fileOverview A local, keyword-based service for estimating nutritional content.
- * This service avoids AI calls for speed and reliability.
- *
- * - estimateCalories - A function that estimates calories and macros from meal descriptions.
- * - MealInput - The input type for the estimateCalories function.
- * - NutritionOutput - The return type for the estimateCalories function.
- */
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/contexts/AuthContext';
+import type { UserDietPlan, EditableMealPlan, MealItem } from '@/types/workout';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
+import { ScrollArea } from './ui/scroll-area';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Button } from './ui/button';
+import { PlusCircle, Trash2, BrainCircuit, Loader2 } from 'lucide-react';
 
-// NOTE: This is a client-side utility and not a Server Action. Do not add 'use server'.
+interface DietPlanModalProps {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+}
 
-// Basic nutritional data for common foods. Values are approximate per 100g unless unit is 'item' or 'scoop'.
-const foodData: Record<string, { calories: number; protein: number; carbs: number; fat: number; fiber: number; unit: 'g' | 'item' | 'scoop'; defaultAmount: number }> = {
-  // Proteins
-  'chicken breast': { calories: 165, protein: 31, carbs: 0, fat: 3.6, fiber: 0, unit: 'g', defaultAmount: 150 },
-  'ground beef': { calories: 250, protein: 26, carbs: 0, fat: 15, fiber: 0, unit: 'g', defaultAmount: 150 },
-  'salmon': { calories: 208, protein: 20, carbs: 0, fat: 13, fiber: 0, unit: 'g', defaultAmount: 150 },
-  'tuna': { calories: 132, protein: 28, carbs: 0, fat: 1, fiber: 0, unit: 'g', defaultAmount: 100 },
-  'egg': { calories: 78, protein: 6.5, carbs: 0.5, fat: 5.5, fiber: 0, unit: 'item', defaultAmount: 2 },
-  'whey protein': { calories: 120, protein: 25, carbs: 3, fat: 1, fiber: 0, unit: 'scoop', defaultAmount: 1 },
-  'tofu': { calories: 76, protein: 8, carbs: 1.9, fat: 4.8, fiber: 1.2, unit: 'g', defaultAmount: 100 },
+const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-  // Carbs
-  'white rice': { calories: 130, protein: 2.7, carbs: 28, fat: 0.3, fiber: 0.4, unit: 'g', defaultAmount: 150 },
-  'brown rice': { calories: 111, protein: 2.6, carbs: 23, fat: 0.9, fiber: 1.8, unit: 'g', defaultAmount: 150 },
-  'oats': { calories: 389, protein: 16.9, carbs: 66, fat: 6.9, fiber: 10.6, unit: 'g', defaultAmount: 50 },
-  'quinoa': { calories: 120, protein: 4.1, carbs: 21, fat: 1.9, fiber: 2.8, unit: 'g', defaultAmount: 100 },
-  'pasta': { calories: 131, protein: 5, carbs: 25, fat: 1.1, fiber: 1.8, unit: 'g', defaultAmount: 100 },
-  'bread': { calories: 265, protein: 9, carbs: 49, fat: 3.2, fiber: 2.7, unit: 'g', defaultAmount: 50 }, // ~2 slices
-  'potato': { calories: 77, protein: 2, carbs: 17, fat: 0.1, fiber: 2.2, unit: 'g', defaultAmount: 150 },
-  'sweet potato': { calories: 86, protein: 1.6, carbs: 20, fat: 0.1, fiber: 3, unit: 'g', defaultAmount: 150 },
-
-  // Fats
-  'avocado': { calories: 160, protein: 2, carbs: 8.5, fat: 15, fiber: 7, unit: 'item', defaultAmount: 0.5 },
-  'almonds': { calories: 579, protein: 21, carbs: 22, fat: 49, fiber: 12, unit: 'g', defaultAmount: 25 },
-  'peanut butter': { calories: 588, protein: 25, carbs: 20, fat: 50, fiber: 8, unit: 'g', defaultAmount: 30 },
-  'olive oil': { calories: 884, protein: 0, carbs: 0, fat: 100, fiber: 0, unit: 'g', defaultAmount: 15 }, // ~1 tbsp
-
-  // Veggies & Fruits
-  'broccoli': { calories: 55, protein: 3.7, carbs: 11.2, fat: 0.6, fiber: 5.2, unit: 'g', defaultAmount: 100 },
-  'spinach': { calories: 23, protein: 2.9, carbs: 3.6, fat: 0.4, fiber: 2.2, unit: 'g', defaultAmount: 100 },
-  'banana': { calories: 89, protein: 1.1, carbs: 23, fat: 0.3, fiber: 2.6, unit: 'item', defaultAmount: 1 },
-  'apple': { calories: 52, protein: 0.3, carbs: 14, fat: 0.2, fiber: 2.4, unit: 'item', defaultAmount: 1 },
-  'berries': { calories: 57, protein: 0.7, carbs: 14.5, fat: 0.3, fiber: 2.4, unit: 'g', defaultAmount: 100 },
+const getDefaultPlan = (): UserDietPlan => {
+  return WEEK_DAYS.map(day => ({
+    day,
+    meal1: [], meal2: [], meal3: [], supplements: [],
+    totalCalories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0,
+  }));
 };
 
-export interface MealInput {
-  meal1: string;
-  meal2: string;
-  meal3: string;
+const MEAL_KEYS: (keyof EditableMealPlan)[] = ['meal1', 'meal2', 'meal3', 'supplements'];
+type MealKey = 'meal1' | 'meal2' | 'meal3' | 'supplements';
+const MEAL_NAMES: Record<MealKey, string> = {
+  meal1: "Meal 1",
+  meal2: "Meal 2",
+  meal3: "Meal 3",
+  supplements: "Snacks & Supplements",
 }
 
-export interface NutritionOutput {
-  totalCalories: number;
-  protein: number;
-  carbs: number;
-  fat: number;
-  fiber: number;
-}
+const NUTRITION_FIELDS: (keyof MealItem)[] = ['protein', 'carbs', 'fat', 'fiber', 'calories'];
 
-// Sort keys by length, descending, to match longer phrases first (e.g., "chicken breast" before "chicken")
-const sortedFoodKeys = Object.keys(foodData).sort((a, b) => b.length - a.length);
+const MealEditor = ({ mealKey, day, plan, onUpdate }: { 
+  mealKey: MealKey, 
+  day: string,
+  plan: EditableMealPlan,
+  onUpdate: (day: string, field: MealKey, items: MealItem[]) => void
+}) => {
+  const items = Array.isArray(plan[mealKey]) ? (plan[mealKey] as MealItem[]) : [];
 
-export function estimateCalories(input: MealInput): NutritionOutput {
-  let fullText = `${input.meal1} ${input.meal2} ${input.meal3}`.toLowerCase();
+  const handleItemChange = (itemId: string, field: keyof MealItem, value: string) => {
+    const updatedItems = items.map(item => {
+      if (item.id === itemId) {
+        const numericFields = ['protein', 'carbs', 'fat', 'fiber', 'calories'];
+        if (numericFields.includes(field)) {
+            const numValue = value === '' ? null : parseFloat(value);
+            return { ...item, [field]: isNaN(numValue!) ? null : numValue };
+        }
+        return { ...item, [field]: value };
+      }
+      return item;
+    });
+    onUpdate(day, mealKey, updatedItems);
+  };
+
+  const handleAddItem = () => {
+    const newItem: MealItem = {
+      id: `item_${Date.now()}`,
+      quantity: '', content: '', protein: null, carbs: null, fat: null, fiber: null, calories: null,
+    };
+    onUpdate(day, mealKey, [...items, newItem]);
+  };
+
+  const handleDeleteItem = (itemId: string) => {
+    onUpdate(day, mealKey, items.filter(item => item.id !== itemId));
+  };
   
-  const totals = {
-    totalCalories: 0,
-    protein: 0,
-    carbs: 0,
-    fat: 0,
-    fiber: 0,
-  };
+  const mealTotals = useMemo(() => {
+    return items.reduce((totals, item) => {
+      totals.protein += item.protein || 0;
+      totals.carbs += item.carbs || 0;
+      totals.fat += item.fat || 0;
+      totals.fiber += item.fiber || 0;
+      totals.calories += item.calories || 0;
+      return totals;
+    }, { protein: 0, carbs: 0, fat: 0, fiber: 0, calories: 0 });
+  }, [items]);
 
-  sortedFoodKeys.forEach(food => {
-    // Regex to find an optional number, optional unit, and the food keyword
-    const foodRegex = new RegExp(`(\\d*\\.?\\d+)?\\s*(g|grams|gram|scoop|scoops|items|item)?\\s*${food.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi');
-    
-    let match;
-    while ((match = foodRegex.exec(fullText)) !== null) {
-      if (match[0].trim().length === 0) continue;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-lg">{MEAL_NAMES[mealKey]}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="overflow-x-auto -mx-4">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[100px]">Qty</TableHead>
+                <TableHead>Content</TableHead>
+                <TableHead className="w-[90px]">Protein (g)</TableHead>
+                <TableHead className="w-[90px]">Carbs (g)</TableHead>
+                <TableHead className="w-[90px]">Fat (g)</TableHead>
+                <TableHead className="w-[90px]">Fiber (g)</TableHead>
+                <TableHead className="w-[90px]">Calories</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map(item => (
+                <TableRow key={item.id}>
+                  <TableCell><Input value={item.quantity} onChange={(e) => handleItemChange(item.id, 'quantity', e.target.value)} className="h-8" /></TableCell>
+                  <TableCell><Input value={item.content} onChange={(e) => handleItemChange(item.id, 'content', e.target.value)} className="h-8" /></TableCell>
+                  {NUTRITION_FIELDS.map(field => (
+                     <TableCell key={field}>
+                        <Input 
+                            type="number" 
+                            value={item[field] === null ? '' : item[field]!} 
+                            onChange={(e) => handleItemChange(item.id, field, e.target.value)} 
+                            className="h-8" 
+                        />
+                     </TableCell>
+                  ))}
+                  <TableCell>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteItem(item.id)} className="h-8 w-8 text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <Button variant="outline" size="sm" onClick={handleAddItem} className="mt-2">
+          <PlusCircle className="mr-2 h-4 w-4" /> Add Item
+        </Button>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs mt-4 pt-2 border-t text-center">
+            <div><div className="font-bold">{mealTotals.calories.toFixed(0)}</div><div className="text-muted-foreground">Calories</div></div>
+            <div><div className="font-bold">{mealTotals.protein.toFixed(0)}g</div><div className="text-muted-foreground">Protein</div></div>
+            <div><div className="font-bold">{mealTotals.carbs.toFixed(0)}g</div><div className="text-muted-foreground">Carbs</div></div>
+            <div><div className="font-bold">{mealTotals.fat.toFixed(0)}g</div><div className="text-muted-foreground">Fat</div></div>
+            <div><div className="font-bold">{mealTotals.fiber.toFixed(0)}g</div><div className="text-muted-foreground">Fiber</div></div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+};
 
-      const data = foodData[food];
-      let quantity = parseFloat(match[1]);
+export function DietPlanModal({
+  isOpen,
+  onOpenChange,
+}: DietPlanModalProps) {
+  const { dietPlan, setDietPlan } = useAuth();
+  const [activeTab, setActiveTab] = useState("Monday");
+  
+  const plan = Array.isArray(dietPlan) && dietPlan.length === 7 ? dietPlan : getDefaultPlan();
+
+  useEffect(() => {
+    const updatedPlan = plan.map(dayPlan => {
+      let dailyTotals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
       
-      if (isNaN(quantity)) {
-        quantity = data.defaultAmount;
-      }
+      MEAL_KEYS.forEach(mealKey => {
+        const mealItems = dayPlan[mealKey];
+        if (Array.isArray(mealItems)) {
+            (mealItems as MealItem[]).forEach(item => {
+                dailyTotals.calories += item.calories || 0;
+                dailyTotals.protein += item.protein || 0;
+                dailyTotals.carbs += item.carbs || 0;
+                dailyTotals.fat += item.fat || 0;
+                dailyTotals.fiber += item.fiber || 0;
+            });
+        }
+      });
+      
+      return {
+        ...dayPlan,
+        totalCalories: dailyTotals.calories,
+        protein: dailyTotals.protein,
+        carbs: dailyTotals.carbs,
+        fat: dailyTotals.fat,
+        fiber: dailyTotals.fiber,
+      };
+    });
 
-      let multiplier = 1;
-      if (data.unit === 'g') {
-        multiplier = quantity / 100;
-      } else { // 'item' or 'scoop'
-        multiplier = quantity;
-      }
-
-      totals.totalCalories += data.calories * multiplier;
-      totals.protein += data.protein * multiplier;
-      totals.carbs += data.carbs * multiplier;
-      totals.fat += data.fat * multiplier;
-      totals.fiber += data.fiber * multiplier;
-
-      fullText = fullText.substring(0, match.index) + " ".repeat(match[0].length) + fullText.substring(match.index + match[0].length);
+    if (JSON.stringify(updatedPlan) !== JSON.stringify(plan)) {
+      setDietPlan(updatedPlan);
     }
-  });
+  }, [plan, setDietPlan]);
 
-  return {
-    totalCalories: Math.round(totals.totalCalories),
-    protein: Math.round(totals.protein),
-    carbs: Math.round(totals.carbs),
-    fat: Math.round(totals.fat),
-    fiber: Math.round(totals.fiber),
+  const handleUpdateDayPlan = (day: string, field: MealKey, items: MealItem[]) => {
+    setDietPlan(currentPlan =>
+      currentPlan.map(dayPlan =>
+        dayPlan.day === day ? { ...dayPlan, [field]: items } : dayPlan
+      )
+    );
   };
+
+  const activeDayPlan = plan.find(p => p.day === activeTab);
+  const dailyTotals = useMemo(() => {
+    if (!activeDayPlan) return { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
+    return {
+      calories: activeDayPlan.totalCalories || 0,
+      protein: activeDayPlan.protein || 0,
+      carbs: activeDayPlan.carbs || 0,
+      fat: activeDayPlan.fat || 0,
+      fiber: activeDayPlan.fiber || 0,
+    }
+  }, [activeDayPlan]);
+
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-6xl max-h-[90dvh] flex flex-col">
+        <DialogHeader>
+          <DialogTitle>My Weekly Diet Plan</DialogTitle>
+          <DialogDescription>
+            Plan your meals and track your nutritional totals. Changes are saved automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex-grow min-h-0 flex flex-col">
+            <TabsList className="grid w-full grid-cols-7">
+                {WEEK_DAYS.map(day => (
+                    <TabsTrigger key={day} value={day}>{day.substring(0,3)}</TabsTrigger>
+                ))}
+            </TabsList>
+            <div className="mt-4 flex-grow min-h-0 overflow-y-auto pr-2">
+                <TabsContent value={activeTab} className="m-0 h-full">
+                    <ScrollArea className="h-full pr-4">
+                        <div className="space-y-6">
+                            <MealEditor mealKey="meal1" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
+                            <MealEditor mealKey="meal2" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
+                            <MealEditor mealKey="meal3" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
+                            <MealEditor mealKey="supplements" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
+                        </div>
+                    </ScrollArea>
+                </TabsContent>
+            </div>
+            <div className="mt-4 pt-4 border-t flex-shrink-0">
+              <div className="flex justify-between items-center">
+                  <h3 className="text-lg font-semibold">Daily Totals for {activeTab}</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-x-6 gap-y-2 text-sm text-center">
+                      <div><div className="font-bold text-lg">{dailyTotals.calories.toFixed(0)}</div><div className="text-muted-foreground">Calories</div></div>
+                      <div><div className="font-bold text-lg">{dailyTotals.protein.toFixed(0)}g</div><div className="text-muted-foreground">Protein</div></div>
+                      <div><div className="font-bold text-lg">{dailyTotals.carbs.toFixed(0)}g</div><div className="text-muted-foreground">Carbs</div></div>
+                      <div><div className="font-bold text-lg">{dailyTotals.fat.toFixed(0)}g</div><div className="text-muted-foreground">Fat</div></div>
+                      <div><div className="font-bold text-lg">{dailyTotals.fiber.toFixed(0)}g</div><div className="text-muted-foreground">Fiber</div></div>
+                  </div>
+              </div>
+            </div>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
 }
