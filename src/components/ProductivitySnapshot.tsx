@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, Calendar as CalendarIcon, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin, PieChart as PieChartIcon, Expand, Clock } from 'lucide-react';
+import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, Calendar as CalendarIcon, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin, PieChart as PieChartIcon, Expand, Clock, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -34,6 +34,7 @@ import { KanbanPageContent } from '@/app/kanban/page';
 import { ChartsPageContent as ChartsPageContentActual } from '@/app/charts/page';
 import { TimesheetPageContent } from '@/app/timesheet/page';
 import { TimetablePageContent } from '@/app/timetable/page';
+import { WeeklyReviewModal } from './WeeklyReviewModal';
 
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -271,6 +272,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
   const [isChartModalOpen, setIsChartModalOpen] = useState(false);
   const [isTimesheetModalOpen, setIsTimesheetModalOpen] = useState(false);
   const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
+  const [isWeeklyReviewModalOpen, setIsWeeklyReviewModalOpen] = useState(false);
 
 
   const themeColors = useThemeColors();
@@ -387,6 +389,10 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
             <CardTitle className="flex items-center gap-2 text-primary">Your Productivity Snapshot</CardTitle>
           </div>
           <div className="flex items-center gap-1">
+             <Button variant="outline" size="icon" onClick={() => setIsWeeklyReviewModalOpen(true)}>
+                <CalendarDays className="h-4 w-4" />
+                <span className="sr-only">Open Weekly Review</span>
+            </Button>
             <Button variant="outline" size="icon" onClick={() => setIsTimetableModalOpen(true)}>
                 <CalendarIcon className="h-4 w-4" />
                 <span className="sr-only">Open Timetable</span>
@@ -402,7 +408,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div className="md:col-span-1 flex flex-col items-center justify-center text-center p-4 rounded-lg bg-muted/50">
                 <p className="text-muted-foreground">Productivity Level</p>
                 {productivityLevel !== undefined ? (
@@ -589,6 +595,11 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
           )}
         </CardContent>
       </Card>
+        
+      <WeeklyReviewModal
+        isOpen={isWeeklyReviewModalOpen}
+        onOpenChange={setIsWeeklyReviewModalOpen}
+      />
 
       {selectedReleaseInfo && (
         <Dialog open={isProjectDetailsModalOpen} onOpenChange={setIsProjectDetailsModalOpen}>
@@ -679,5 +690,3 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
     </>
   );
 }
-
-    
