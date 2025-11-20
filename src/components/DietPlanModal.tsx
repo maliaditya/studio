@@ -20,7 +20,6 @@ import { ScrollArea } from './ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Button } from './ui/button';
 import { PlusCircle, Trash2, BrainCircuit, Loader2 } from 'lucide-react';
-import { estimateCalories, NutritionOutput } from '@/services/nutritionService';
 
 interface DietPlanModalProps {
   isOpen: boolean;
@@ -159,8 +158,6 @@ export function DietPlanModal({
   onOpenChange,
 }: DietPlanModalProps) {
   const { dietPlan, setDietPlan } = useAuth();
-  const [smartEstimateText, setSmartEstimateText] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("Monday");
   
   const plan = Array.isArray(dietPlan) && dietPlan.length === 7 ? dietPlan : getDefaultPlan();
@@ -205,55 +202,6 @@ export function DietPlanModal({
     );
   };
 
-  const handleSmartEstimate = async () => {
-    if (!smartEstimateText.trim()) return;
-    setIsLoading(true);
-    try {
-      const result = estimateCalories({ meal1: smartEstimateText, meal2: '', meal3: '' });
-
-      const newItems: MealItem[] = Object.entries(result).map(([key, value]) => {
-          if (key === 'totalCalories' || key === 'day') return null; // These are not food items
-          
-          if (value > 0) {
-              const baseItem = {
-                  id: `smart_${key}_${Date.now()}`,
-                  quantity: 'Est.',
-                  content: `${value}g ${key.charAt(0).toUpperCase() + key.slice(1)}`, // e.g., 150g Protein
-                  calories: key === 'protein' ? value * 4 : key === 'carbs' ? value * 4 : value * 9,
-                  protein: key === 'protein' ? value : 0,
-                  carbs: key === 'carbs' ? value : 0,
-                  fat: key === 'fat' ? value : 0,
-                  fiber: key === 'fiber' ? value : 0,
-              };
-              return baseItem;
-          }
-          return null;
-      }).filter((item): item is MealItem => item !== null);
-      
-      const newItemsWithCorrectCalories = newItems.map(item => {
-          let calories = 0;
-          if (item.protein) calories += item.protein * 4;
-          if (item.carbs) calories += item.carbs * 4;
-          if (item.fat) calories += item.fat * 9;
-          return { ...item, calories };
-      });
-      
-      setDietPlan(currentPlan =>
-        currentPlan.map(dayPlan => {
-            if (dayPlan.day === activeTab) {
-                return { ...dayPlan, meal1: newItemsWithCorrectCalories, meal2: [], meal3: [], supplements: [] };
-            }
-            return dayPlan;
-        })
-      );
-      
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const activeDayPlan = plan.find(p => p.day === activeTab);
   const dailyTotals = useMemo(() => {
     if (!activeDayPlan) return { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 };
@@ -287,35 +235,10 @@ export function DietPlanModal({
                 <TabsContent value={activeTab} className="m-0 h-full">
                     <ScrollArea className="h-full pr-4">
                         <div className="space-y-6">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <BrainCircuit className="text-primary h-5 w-5" />
-                                        Smart Estimate
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Describe your full day's meals. The system will parse keywords to estimate your macros. This will replace the current items for this day.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex gap-2">
-                                        <Textarea 
-                                            value={smartEstimateText} 
-                                            onChange={(e) => setSmartEstimateText(e.target.value)}
-                                            placeholder="e.g., For breakfast I had 3 eggs and 50g of oats. For lunch, 200g chicken breast with 150g white rice..."
-                                        />
-                                        <Button onClick={handleSmartEstimate} disabled={isLoading} className="flex-shrink-0">
-                                            {isLoading ? <Loader2 className="h-4 w-4 animate-spin"/> : "Estimate"}
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                            <div className="space-y-6">
-                                <MealEditor mealKey="meal1" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
-                                <MealEditor mealKey="meal2" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
-                                <MealEditor mealKey="meal3" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
-                                <MealEditor mealKey="supplements" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
-                            </div>
+                            <MealEditor mealKey="meal1" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
+                            <MealEditor mealKey="meal2" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
+                            <MealEditor mealKey="meal3" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
+                            <MealEditor mealKey="supplements" day={activeTab} plan={activeDayPlan!} onUpdate={handleUpdateDayPlan} />
                         </div>
                     </ScrollArea>
                 </TabsContent>
