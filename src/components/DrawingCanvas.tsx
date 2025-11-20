@@ -51,10 +51,7 @@ const ExcalidrawWrapper = ({ initialDrawing, onSave, theme }: {
         }
     }, [initialDrawing]);
 
-    const handleSaveClick = () => {
-        if (!excalidrawAPI) return;
-        const elements = excalidrawAPI.getSceneElements();
-        const appState = excalidrawAPI.getAppState();
+    const handleSave = (elements: readonly NonDeleted<ExcalidrawElement>[], appState: AppState) => {
         const drawingData = JSON.stringify({
             type: "excalidraw",
             version: 2,
@@ -78,21 +75,8 @@ const ExcalidrawWrapper = ({ initialDrawing, onSave, theme }: {
                 excalidrawAPI={(api) => setExcalidrawAPI(api)}
                 initialData={initialData}
                 theme={theme}
-                UIOptions={{
-                    canvasActions: {
-                        toggleTheme: true,
-                        clearCanvas: true,
-                        export: true,
-                        loadScene: true,
-                        saveAsImage: true,
-                        saveToActiveFile: true,
-                    },
-                }}
-            >
-                <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 10 }}>
-                     <Button onClick={handleSaveClick} size="sm"><Save className="mr-2 h-4 w-4"/> Save & Close</Button>
-                </div>
-            </Excalidraw>
+                onSaveToActiveFile={handleSave}
+            />
         </div>
     );
 }
