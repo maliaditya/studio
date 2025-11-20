@@ -1615,61 +1615,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const scheduleTaskFromMindMap = (definitionId: string, activityType: ActivityType, slotName: string, duration = 0) => {
     let definition: ExerciseDefinition | undefined;
-    let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
-    let logSource: DatedWorkout[];
     const todayKey = format(new Date(), 'yyyy-MM-dd');
-    
-    switch (activityType) {
-        case 'upskill':
-            definition = upskillDefinitions.find(d => d.id === definitionId);
-            logsUpdater = setAllUpskillLogs;
-            logSource = allUpskillLogs;
-            break;
-        case 'deepwork':
-            definition = deepWorkDefinitions.find(d => d.id === definitionId);
-            logsUpdater = setAllDeepWorkLogs;
-            logSource = allDeepWorkLogs;
-            break;
-        case 'branding':
-            definition = deepWorkDefinitions.find(d => d.id === definitionId);
-            logsUpdater = setBrandingLogs;
-            logSource = brandingLogs;
-            break;
-        default:
-            toast({ title: "Error", description: "Invalid activity type for scheduling.", variant: "destructive" });
-            return;
-    }
+
+    const sourceDefs = activityType === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+    definition = sourceDefs.find(d => d.id === definitionId);
 
     if (!definition) {
         toast({ title: "Error", description: "Task definition not found.", variant: "destructive" });
         return;
     }
 
-    const logForDay = logSource.find(log => log.date === todayKey) || { id: todayKey, date: todayKey, exercises: [] };
-    let exerciseInstance = logForDay.exercises.find(ex => ex.definitionId === definitionId);
+    const logSource = activityType === 'upskill' ? allUpskillLogs :
+                      activityType === 'deepwork' ? allDeepWorkLogs :
+                      brandingLogs;
+    const logsUpdater = activityType === 'upskill' ? setAllUpskillLogs :
+                        activityType === 'deepwork' ? setAllDeepWorkLogs :
+                        setBrandingLogs;
+
+    const logForDay = logSource.find(log => log.date === todayKey);
+    const existingExercises = logForDay ? [...logForDay.exercises] : [];
+    let exerciseInstance = existingExercises.find(ex => ex.definitionId === definitionId);
 
     if (!exerciseInstance) {
         exerciseInstance = {
             id: `${definition.id}-${Date.now()}-${Math.random()}`,
-            definitionId: definition.id,
-            name: definition.name,
-            category: definition.category,
+            definitionId: definition.id, name: definition.name, category: definition.category,
             loggedSets: [],
             targetSets: activityType === 'branding' ? 4 : 1,
             targetReps: activityType === 'branding' ? '4 stages' : '25',
             focusAreaIds: definition.focusAreaIds,
         };
-        logForDay.exercises.push(exerciseInstance);
-        
-        logsUpdater(prevLogs => {
-            const existingLogIndex = prevLogs.findIndex(log => log.date === todayKey);
-            if (existingLogIndex > -1) {
-                const newLogs = [...prevLogs];
-                newLogs[existingLogIndex] = logForDay;
-                return newLogs;
-            }
-            return [...prevLogs, logForDay];
-        });
+        existingExercises.push(exerciseInstance);
+
+        if (logForDay) {
+            logsUpdater(prev => prev.map(log => log.date === todayKey ? { ...log, exercises: existingExercises } : log));
+        } else {
+            logsUpdater(prev => [...prev, { id: todayKey, date: todayKey, exercises: existingExercises }]);
+        }
     }
 
     const newActivity: Activity = {
@@ -1679,17 +1661,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         completed: false,
         taskIds: [exerciseInstance.id],
         slot: slotName,
-        linkedEntityType: activityType === 'deepwork' ? 'intention' : activityType === 'upskill' ? 'curiosity' : undefined,
+        linkedEntityType: activityType === 'deepwork' ? 'intention' : 'curiosity',
         duration,
     };
     
     setSchedule(prev => {
-        const newSchedule = { ...prev };
-        const daySchedule = { ...(newSchedule[todayKey] || {}) };
-        const activitiesInSlot = Array.isArray(daySchedule[slotName]) ? daySchedule[slotName] as Activity[] : [];
-        daySchedule[slotName] = [...activitiesInSlot, newActivity as Activity];
-        newSchedule[todayKey] = daySchedule;
-        return newSchedule;
+        const newDaySchedule = { ...(prev[todayKey] || {}) };
+        const activitiesInSlot = Array.isArray(newDaySchedule[slotName]) ? newDaySchedule[slotName] as Activity[] : [];
+        newDaySchedule[slotName] = [...activitiesInSlot, newActivity as Activity];
+        return { ...prev, [todayKey]: newDaySchedule };
     });
 
     toast({ title: "Task Scheduled", description: `"${definition.name}" has been added to your ${slotName} slot.` });
@@ -3508,6 +3488,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
