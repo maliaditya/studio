@@ -23,14 +23,81 @@ interface DrawingCanvasProps {
   isOpen: boolean;
   initialDrawing?: string; // This will now be a JSON string of elements
   position: { x: number; y: number };
-  onSave: (dataUrl: string) => void;
+  onSave: (drawingData: string) => void; // Changed to save JSON string
   onClose: () => void;
 }
 
+const ExcalidrawWrapper = ({ initialDrawing, onSave, theme }: { 
+    initialDrawing?: string; 
+    onSave: (drawingData: string) => void;
+    theme: string;
+}) => {
+    const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawAPIRefValue | null>(null);
+    const [initialData, setInitialData] = useState<{
+        elements: readonly NonDeleted<ExcalidrawElement>[];
+    } | null>(null);
+
+    useEffect(() => {
+        if (initialDrawing) {
+            try {
+                const parsedData = JSON.parse(initialDrawing);
+                setInitialData({ elements: parsedData.elements || [] });
+            } catch (e) {
+                console.error("Failed to parse initial drawing data:", e);
+                setInitialData({ elements: [] });
+            }
+        } else {
+            setInitialData({ elements: [] });
+        }
+    }, [initialDrawing]);
+
+    const handleSaveClick = () => {
+        if (!excalidrawAPI) return;
+        const elements = excalidrawAPI.getSceneElements();
+        const appState = excalidrawAPI.getAppState();
+        const drawingData = JSON.stringify({
+            type: "excalidraw",
+            version: 2,
+            source: "dock-app",
+            elements: elements,
+            appState: {
+                viewBackgroundColor: appState.viewBackgroundColor,
+                gridSize: appState.gridSize,
+            }
+        });
+        onSave(drawingData);
+    };
+
+    if (initialData === null) {
+        return <div className="flex h-full w-full items-center justify-center">Preparing Canvas...</div>;
+    }
+
+    return (
+        <div style={{ height: "100%", width: "100%" }}>
+            <Excalidraw
+                excalidrawAPI={(api) => setExcalidrawAPI(api)}
+                initialData={initialData}
+                theme={theme}
+                UIOptions={{
+                    canvasActions: {
+                        loadScene: false,
+                        saveToActiveFile: false,
+                        saveAsImage: false,
+                        export: false,
+                    }
+                }}
+            >
+                <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 10 }}>
+                     <Button onClick={handleSaveClick} size="sm"><Save className="mr-2 h-4 w-4"/> Save & Close</Button>
+                </div>
+            </Excalidraw>
+        </div>
+    );
+}
+
 export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClose }: DrawingCanvasProps) {
-  const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawAPIRefValue | null>(null);
-  const [initialData, setInitialData] = useState<readonly NonDeleted<ExcalidrawElement>[] | null>(null);
   const [theme, setTheme] = useState('dark');
+  const [isMounted, setIsMounted] = useState(false); // New state to track mounting
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: 'drawing-canvas-popup',
@@ -48,7 +115,7 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
   };
 
   useEffect(() => {
-    // Detect system theme for Excalidraw
+    setIsMounted(true); // Component has mounted on the client
     const handleThemeChange = (e: MediaQueryListEvent) => {
         setTheme(e.matches ? 'dark' : 'light');
     };
@@ -57,46 +124,6 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     mediaQuery.addEventListener('change', handleThemeChange);
     return () => mediaQuery.removeEventListener('change', handleThemeChange);
   }, []);
-
-  useEffect(() => {
-    if (initialDrawing) {
-        try {
-            const parsedData = JSON.parse(initialDrawing);
-            setInitialData(parsedData.elements || []);
-        } catch (e) {
-            console.error("Failed to parse initial drawing data:", e);
-            setInitialData([]);
-        }
-    } else {
-        setInitialData([]);
-    }
-  }, [initialDrawing]);
-
-  const handleSave = async () => {
-    if (!excalidrawAPI) return;
-    const elements = excalidrawAPI.getSceneElements();
-    const appState = excalidrawAPI.getAppState();
-    
-    const { exportToBlob } = await import("@excalidraw/excalidraw");
-    
-    const blob = await exportToBlob({
-        elements,
-        appState: {
-            ...appState,
-            // Ensure background is transparent for saving, but not in view
-            viewBackgroundColor: 'transparent', 
-        },
-        files: excalidrawAPI.getFiles(),
-        mimeType: "image/png",
-    });
-
-    const reader = new FileReader();
-    reader.onloadend = () => {
-        const dataUrl = reader.result as string;
-        onSave(dataUrl); // This is now a data URL of the PNG
-    };
-    reader.readAsDataURL(blob);
-  };
   
   if (!isOpen) return null;
 
@@ -111,28 +138,20 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
                     <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
                     <CardTitle className="text-base">Drawing Canvas</CardTitle>
                 </div>
-                <div className="flex items-center gap-2">
-                     <Button variant="ghost" size="icon" onClick={handleSave}><Save className="h-4 w-4"/></Button>
-                    <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4"/></Button>
-                </div>
+                <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4"/></Button>
             </CardHeader>
             <CardContent className="p-0 flex-grow relative">
-               {initialData !== null && (
-                 <Excalidraw
-                    excalidrawAPI={(api) => setExcalidrawAPI(api)}
-                    initialData={{
-                      elements: initialData,
-                      appState: { viewBackgroundColor: "transparent", currentItemFontFamily: 1 }
+               {isMounted ? (
+                 <ExcalidrawWrapper 
+                    initialDrawing={initialDrawing} 
+                    onSave={(data) => {
+                        onSave(data);
+                        onClose();
                     }}
                     theme={theme}
-                    UIOptions={{
-                      canvasActions: {
-                        loadScene: false, // We'll handle loading via initialData
-                        saveToActiveFile: false,
-                        saveAsImage: false,
-                      }
-                    }}
-                  />
+                 />
+               ) : (
+                <div className="flex h-full w-full items-center justify-center">Loading Canvas...</div>
                )}
             </CardContent>
         </Card>
