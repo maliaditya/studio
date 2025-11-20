@@ -7,7 +7,8 @@ import { Button } from './ui/button';
 import { Save, X, GripVertical, Eraser, Download, Upload } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
-import type { ExcalidrawAPIRefValue, ExcalidrawElement, NonDeleted } from "@excalidraw/excalidraw/types/types";
+import type { ExcalidrawElement, NonDeleted, AppState } from "@excalidraw/excalidraw/types/types";
+import type { ExcalidrawAPIRefValue } from '@excalidraw/excalidraw';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
