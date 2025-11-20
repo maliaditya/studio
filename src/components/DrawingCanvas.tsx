@@ -23,7 +23,7 @@ interface DrawingCanvasProps {
   isOpen: boolean;
   initialDrawing?: string; // This will now be a JSON string of elements
   position: { x: number; y: number };
-  onSave: (drawingData: string) => void; // Changed to save JSON string
+  onSave: (drawingData: string) => void;
   onClose: () => void;
 }
 
@@ -78,6 +78,16 @@ const ExcalidrawWrapper = ({ initialDrawing, onSave, theme }: {
                 excalidrawAPI={(api) => setExcalidrawAPI(api)}
                 initialData={initialData}
                 theme={theme}
+                UIOptions={{
+                    canvasActions: {
+                        toggleTheme: true,
+                        clearCanvas: true,
+                        export: true,
+                        loadScene: true,
+                        saveAsImage: true,
+                        saveToActiveFile: true,
+                    },
+                }}
             >
                 <div style={{ position: 'absolute', top: '10px', right: '10px', zIndex: 10 }}>
                      <Button onClick={handleSaveClick} size="sm"><Save className="mr-2 h-4 w-4"/> Save & Close</Button>
@@ -97,11 +107,11 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
   
   const style: React.CSSProperties = {
     position: 'fixed',
-    top: position.y,
-    left: position.x,
+    top: '50%',
+    left: '50%',
     width: '95vw',
     height: '95vh',
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
+    transform: transform ? `translate(calc(-50% + ${transform.x}px), calc(-50% + ${transform.y}px))` : 'translate(-50%, -50%)',
     willChange: 'transform',
     zIndex: 110,
   };
