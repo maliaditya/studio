@@ -27,12 +27,12 @@ interface DrawingCanvasProps {
   onClose: () => void;
 }
 
-const ExcalidrawWrapper = ({ initialDrawing, onSave, theme }: { 
-    initialDrawing?: string; 
+const ExcalidrawWrapper = ({ initialDrawing, onSave, theme, apiRef }: {
+    initialDrawing?: string;
     onSave: (drawingData: string) => void;
     theme: string;
+    apiRef: React.MutableRefObject<ExcalidrawAPIRefValue | null>;
 }) => {
-    const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawAPIRefValue | null>(null);
     const [initialData, setInitialData] = useState<{
         elements: readonly NonDeleted<ExcalidrawElement>[];
     } | null>(null);
@@ -51,19 +51,6 @@ const ExcalidrawWrapper = ({ initialDrawing, onSave, theme }: {
         }
     }, [initialDrawing]);
 
-    const handleSave = (elements: readonly NonDeleted<ExcalidrawElement>[], appState: AppState) => {
-        const drawingData = JSON.stringify({
-            type: "excalidraw",
-            version: 2,
-            source: "dock-app",
-            elements: elements,
-            appState: {
-                viewBackgroundColor: appState.viewBackgroundColor,
-                gridSize: appState.gridSize,
-            }
-        });
-        onSave(drawingData);
-    };
 
     if (initialData === null) {
         return <div className="flex h-full w-full items-center justify-center">Preparing Canvas...</div>;
@@ -72,10 +59,9 @@ const ExcalidrawWrapper = ({ initialDrawing, onSave, theme }: {
     return (
         <div style={{ height: "100%", width: "100%" }}>
             <Excalidraw
-                excalidrawAPI={(api) => setExcalidrawAPI(api)}
+                excalidrawAPI={(api) => apiRef.current = api}
                 initialData={initialData}
                 theme={theme}
-                onSaveToActiveFile={handleSave}
             />
         </div>
     );
@@ -83,7 +69,8 @@ const ExcalidrawWrapper = ({ initialDrawing, onSave, theme }: {
 
 export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClose }: DrawingCanvasProps) {
   const [theme, setTheme] = useState('dark');
-  const [isMounted, setIsMounted] = useState(false); // New state to track mounting
+  const [isMounted, setIsMounted] = useState(false);
+  const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null);
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: 'drawing-canvas-popup',
@@ -101,7 +88,7 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
   };
 
   useEffect(() => {
-    setIsMounted(true); // Component has mounted on the client
+    setIsMounted(true);
     const handleThemeChange = (e: MediaQueryListEvent) => {
         setTheme(e.matches ? 'dark' : 'light');
     };
@@ -110,6 +97,25 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     mediaQuery.addEventListener('change', handleThemeChange);
     return () => mediaQuery.removeEventListener('change', handleThemeChange);
   }, []);
+
+  const handleSaveClick = () => {
+    if (excalidrawAPIRef.current) {
+      const elements = excalidrawAPIRef.current.getSceneElements();
+      const appState = excalidrawAPIRef.current.getAppState();
+      const drawingData = JSON.stringify({
+        type: "excalidraw",
+        version: 2,
+        source: "dock-app",
+        elements: elements,
+        appState: {
+          viewBackgroundColor: appState.viewBackgroundColor,
+          gridSize: appState.gridSize,
+        }
+      });
+      onSave(drawingData);
+      onClose();
+    }
+  };
   
   if (!isOpen) return null;
 
@@ -117,24 +123,27 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     <div ref={setNodeRef} style={style} {...attributes}>
         <Card className="w-full h-full bg-background text-foreground p-0 flex flex-col shadow-2xl border-2 border-primary/50">
             <CardHeader 
-                className="p-2 cursor-grab active:cursor-grabbing flex flex-row items-center justify-between border-b"
-                {...listeners}
+                className="p-2 flex flex-row items-center justify-between border-b"
             >
-                <div className="flex items-center gap-2">
+                <div 
+                  className="flex items-center gap-2 cursor-grab active:cursor-grabbing flex-grow"
+                  {...listeners}
+                >
                     <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
                     <CardTitle className="text-base">Drawing Canvas</CardTitle>
                 </div>
-                <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4"/></Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" onClick={handleSaveClick}><Save className="h-4 w-4"/></Button>
+                  <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4"/></Button>
+                </div>
             </CardHeader>
             <CardContent className="p-0 flex-grow relative">
                {isMounted ? (
                  <ExcalidrawWrapper 
                     initialDrawing={initialDrawing} 
-                    onSave={(data) => {
-                        onSave(data);
-                        onClose();
-                    }}
+                    onSave={onSave}
                     theme={theme}
+                    apiRef={excalidrawAPIRef}
                  />
                ) : (
                 <div className="flex h-full w-full items-center justify-center">Loading Canvas...</div>
