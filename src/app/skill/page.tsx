@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -373,7 +372,7 @@ function SkillPageContent() {
 
       totalsMap.set(domain.id, { totalEst: totalDomainEst, totalLogged: totalDomainLogged });
     });
-    return totalsMap;
+    return totals;
   }, [skillDomains, coreSkills, specializationTotals]);
 
 
@@ -1670,7 +1669,7 @@ function SkillPageContent() {
         </Dialog>
       )}
       <Dialog open={isDeepWorkModalOpen} onOpenChange={setIsDeepWorkModalOpen}>
-        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col overflow-hidden">
             <DialogHeader className="p-4 border-b">
                 <DialogTitle>Deep Work</DialogTitle>
                 <DialogDescription>Select a task to begin a focus session.</DialogDescription>
@@ -1692,3 +1691,6 @@ export default function SkillPage() {
         </AuthGuard>
     )
 }
+
+
+    
