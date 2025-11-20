@@ -113,7 +113,7 @@ interface AuthContextType {
   handleLogLearning: (activity: Activity, duration: number) => void;
   logSubTaskTime: (subTaskId: string, durationMinutes: number) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
-  scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string, duration: number) => void;
+  scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string, duration?: number) => void;
   updateActivity: (updatedActivity: Activity) => void;
   findRootTask: (activity: Activity) => ExerciseDefinition | null;
 
@@ -1613,11 +1613,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
-  const scheduleTaskFromMindMap = (definitionId: string, activityType: ActivityType, slotName: string) => {
+  const scheduleTaskFromMindMap = (definitionId: string, activityType: ActivityType, slotName: string, duration = 0) => {
     let definition: ExerciseDefinition | undefined;
     let logsUpdater: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
     let logSource: DatedWorkout[];
-
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     
     switch (activityType) {
@@ -1646,14 +1645,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
     }
 
-    let todaysLog = logSource.find(log => log.date === todayKey);
-    let exerciseInstance: WorkoutExercise | undefined;
-
-    if (!todaysLog) {
-        todaysLog = { id: todayKey, date: todayKey, exercises: [] };
-    }
-
-    exerciseInstance = todaysLog.exercises.find(ex => ex.definitionId === definitionId);
+    const logForDay = logSource.find(log => log.date === todayKey) || { id: todayKey, date: todayKey, exercises: [] };
+    let exerciseInstance = logForDay.exercises.find(ex => ex.definitionId === definitionId);
 
     if (!exerciseInstance) {
         exerciseInstance = {
@@ -1666,18 +1659,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             targetReps: activityType === 'branding' ? '4 stages' : '25',
             focusAreaIds: definition.focusAreaIds,
         };
-        todaysLog.exercises.push(exerciseInstance);
+        logForDay.exercises.push(exerciseInstance);
+        
+        logsUpdater(prevLogs => {
+            const existingLogIndex = prevLogs.findIndex(log => log.date === todayKey);
+            if (existingLogIndex > -1) {
+                const newLogs = [...prevLogs];
+                newLogs[existingLogIndex] = logForDay;
+                return newLogs;
+            }
+            return [...prevLogs, logForDay];
+        });
     }
-    
-    logsUpdater(prevLogs => {
-        const existingLogIndex = prevLogs.findIndex(log => log.date === todayKey);
-        if (existingLogIndex > -1) {
-            const newLogs = [...prevLogs];
-            newLogs[existingLogIndex] = todaysLog!;
-            return newLogs;
-        }
-        return [...prevLogs, todaysLog!];
-    });
 
     const newActivity: Activity = {
         id: `${activityType}-${Date.now()}-${Math.random()}`,
@@ -1686,7 +1679,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         completed: false,
         taskIds: [exerciseInstance.id],
         slot: slotName,
-        linkedEntityType: activityType === 'deepwork' ? 'intention' : activityType === 'upskill' ? 'curiosity' : undefined
+        linkedEntityType: activityType === 'deepwork' ? 'intention' : activityType === 'upskill' ? 'curiosity' : undefined,
+        duration,
     };
     
     setSchedule(prev => {
@@ -3514,6 +3508,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
