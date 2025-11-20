@@ -375,7 +375,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     getUpskillLoggedMinutesRecursive: (def: ExerciseDefinition) => number;
     calculateTotalEstimate: (def: ExerciseDefinition) => number;
     formatMinutes: (minutes: number) => string;
-    handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
+    handleAddTaskToSession: (definitionId: string, activityType: 'upskill' | 'deepwork', slotName: string) => void;
     handleCardClick: (def: ExerciseDefinition) => void;
     handleSelectFocusArea: (def: ExerciseDefinition | null, type: 'deepwork' | 'upskill') => void;
     handleToggleReadyForBranding: (id: string) => void;
@@ -513,7 +513,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                             deepworkDef={def}
                             getDeepWorkNodeType={getDeepWorkNodeType}
                             getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
-                            handleAddTaskToSession={handleAddTaskToSession}
+                            handleAddTaskToSession={scheduleTaskFromMindMap}
                             handleCardClick={handleCardClick}
                             handleToggleReadyForBranding={handleToggleReadyForBranding}
                             handleUnlinkItem={handleUnlinkItem}
@@ -974,11 +974,6 @@ export function DeepWorkPageContent({ isModal = false }: { isModal?: boolean }) 
     setNavigationStack(prev => prev.map(item => item.id === editingFocusArea.id ? { ...item, ...finalData } as (ExerciseDefinition & { type: 'deepwork' | 'upskill'}) : item));
     toast({ title: "Success", description: `Task updated to "${finalData.name}".` });
     setEditingFocusArea(null);
-  };
-
-  const handleAddTaskToSession = (definition: ExerciseDefinition, slot: string) => {
-    const estimatedDuration = calculateTotalEstimate(definition);
-    scheduleTaskFromMindMap(definition.id, definition.category === "Content Bundle" ? 'branding' : (deepWorkDefinitions.some(d => d.id === definition.id) ? 'deepwork' : 'upskill'), slot, estimatedDuration);
   };
 
   const handleRemoveExerciseFromWorkout = (exerciseId: string) => {
@@ -1684,7 +1679,7 @@ export function DeepWorkPageContent({ isModal = false }: { isModal?: boolean }) 
                                 getUpskillLoggedMinutesRecursive={getUpskillLoggedMinutesRecursive}
                                 calculateTotalEstimate={calculateTotalEstimate}
                                 formatMinutes={formatMinutes}
-                                handleAddTaskToSession={handleAddTaskToSession}
+                                handleAddTaskToSession={scheduleTaskFromMindMap}
                                 handleCardClick={handleCardClick}
                                 handleSelectFocusArea={handleSelectFocusArea}
                                 handleToggleReadyForBranding={handleToggleReadyForBranding}
@@ -1716,7 +1711,7 @@ export function DeepWorkPageContent({ isModal = false }: { isModal?: boolean }) 
                                         deepworkDef={def}
                                         getDeepWorkNodeType={getDeepWorkNodeType}
                                         getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
-                                        handleAddTaskToSession={handleAddTaskToSession}
+                                        handleAddTaskToSession={scheduleTaskFromMindMap}
                                         handleCardClick={handleCardClick}
                                         handleToggleReadyForBranding={handleToggleReadyForBranding}
                                         handleUnlinkItem={handleUnlinkItem}
@@ -2020,7 +2015,7 @@ export function DeepWorkPageContent({ isModal = false }: { isModal?: boolean }) 
                             deepworkDef={activeDragItem as ExerciseDefinition}
                             getDeepWorkNodeType={getDeepWorkNodeType}
                             getDeepWorkLoggedMinutes={getDeepWorkLoggedMinutes}
-                            handleAddTaskToSession={handleAddTaskToSession}
+                            handleAddTaskToSession={scheduleTaskFromMindMap}
                             handleCardClick={handleCardClick}
                             handleToggleReadyForBranding={handleToggleReadyForBranding}
                             handleUnlinkItem={handleUnlinkItem}
@@ -2085,6 +2080,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 

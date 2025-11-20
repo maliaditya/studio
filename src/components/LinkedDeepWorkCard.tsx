@@ -205,7 +205,7 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     deepworkDef: ExerciseDefinition;
     getDeepWorkNodeType: (def: ExerciseDefinition) => string;
     getDeepWorkLoggedMinutes: (def: ExerciseDefinition) => number;
-    handleAddTaskToSession: (definition: ExerciseDefinition, slot: string) => void;
+    handleAddTaskToSession: (definitionId: string, activityType: 'deepwork', slotName: string) => void;
     handleCardClick: (def: ExerciseDefinition) => void;
     handleToggleReadyForBranding: (id: string) => void;
     handleUnlinkItem: (type: 'deepwork' | 'upskill' | 'resource', id: string) => void;
@@ -248,7 +248,7 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     activeProjectIds,
     currentSlot,
 }, ref) => {
-    const { permanentlyLoggedTaskIds, getDescendantLeafNodes, settings } = useAuth();
+    const { permanentlyLoggedTaskIds, getDescendantLeafNodes, settings, scheduleTaskFromMindMap } = useAuth();
     const { schedulingLevel = 3 } = settings;
 
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -335,7 +335,7 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                                 <div>
                                     <AddToSessionPopover 
                                         definition={deepworkDef} 
-                                        onSelectSlot={(slot) => handleAddTaskToSession(deepworkDef, slot)} 
+                                        onSelectSlot={(slot) => scheduleTaskFromMindMap(deepworkDef.id, 'deepwork', slot)} 
                                         disabled={!isAddToSessionEnabled}
                                         currentSlot={currentSlot}
                                     />
