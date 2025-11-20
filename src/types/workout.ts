@@ -553,6 +553,7 @@ export interface Project {
   releases?: Release[];
   purposePillar?: string;
   productPlan?: ProjectPlan; // Added for dedicated product planning
+  isReadyForBranding?: boolean;
 }
 
 // Professional Experience Types

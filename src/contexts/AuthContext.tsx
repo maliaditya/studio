@@ -326,13 +326,13 @@ interface AuthContextType {
   setPillarEquations: React.Dispatch<React.SetStateAction<Record<string, HabitEquation[]>>>;
   skillAcquisitionPlans: SkillAcquisitionPlan[];
   setSkillAcquisitionPlans: React.Dispatch<React.SetStateAction<SkillAcquisitionPlan[]>>;
+  abandonmentLogs: Record<string, AbandonmentLog[]>;
+  setAbandonmentLogs: React.Dispatch<React.SetStateAction<Record<string, AbandonmentLog[]>>>;
   addPillarCard: () => void;
   updatePillarCard: (updatedCard: PillarCardData) => void;
   deletePillarCard: (cardId: string) => void;
   specializations: CoreSkill[];
   allEquations: HabitEquation[];
-  abandonmentLogs: Record<string, AbandonmentLog[]>;
-  setAbandonmentLogs: React.Dispatch<React.SetStateAction<Record<string, AbandonmentLog[]>>>;
 
   // Path Diagram Data
   pathNodes: PathNode[];
@@ -404,6 +404,7 @@ interface AuthContextType {
   openMindsetWidget: () => void;
   isMindsetModalOpen: boolean;
   setIsMindsetModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  toggleProjectBrandingStatus: (projectId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -625,6 +626,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
 
+  const toggleProjectBrandingStatus = useCallback((projectId: string) => {
+    setProjects(prevProjects =>
+      prevProjects.map(p =>
+        p.id === projectId ? { ...p, isReadyForBranding: !p.isReadyForBranding } : p
+      )
+    );
+  }, [setProjects]);
 
   const prevUser = usePrevious(currentUser);
   
@@ -1029,7 +1037,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
     return newDurations;
-  }, [schedule, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, allUpskillLogs, allDeepWorkLogs, getDescendantLeafNodes, microSkillMap, brandingLogs]);
+  }, [schedule, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, allUpskillLogs, allDeepWorkLogs, brandingLogs, getDescendantLeafNodes, microSkillMap]);
   
   const permanentlyLoggedTaskIds = useMemo(() => {
     const loggedIds = new Set<string>();
@@ -3335,6 +3343,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     recalculateAndFixTaskTypes,
     openMindsetWidget,
     isMindsetModalOpen, setIsMindsetModalOpen,
+    toggleProjectBrandingStatus,
   };
 
   useEffect(() => {
@@ -3488,6 +3497,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 

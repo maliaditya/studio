@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import type { Release, ExerciseDefinition, SharingStatus, Activity, DailySchedule, ActivityType } from '@/types/workout';
+import type { Release, ExerciseDefinition, SharingStatus, Activity, DailySchedule, ActivityType, Project } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ChartsPageContent as ChartsPageContentActual } from '@/app/charts/page';
@@ -267,8 +267,8 @@ export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData
 export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllocationModal, todaysSchedule, activityDurations, showTimeAllocation = true }: ProductivitySnapshotProps) {
   const router = useRouter();
   const [isProjectDetailsModalOpen, setIsProjectDetailsModalOpen] = useState(false);
-  const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service' } | null>(null);
-  const { microSkillMap, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs } = useAuth();
+  const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service', project?: Project } | null>(null);
+  const { microSkillMap, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, toggleProjectBrandingStatus } = useAuth();
   const [isChartModalOpen, setIsChartModalOpen] = useState(false);
   const [isTimesheetModalOpen, setIsTimesheetModalOpen] = useState(false);
   const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
@@ -309,6 +309,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
   }, [selectedReleaseInfo, microSkillMap, upskillDefinitions, deepWorkDefinitions]);
 
   const isMicroSkillComplete = (skill: { curiosities: ExerciseDefinition[], intentions: ExerciseDefinition[] }) => {
+    const { getDescendantLeafNodes, permanentlyLoggedTaskIds } = useAuth();
     const allChildTasks: { id: string; type: 'upskill' | 'deepwork' }[] = [];
 
     const getDescendants = (startNodeId: string, defs: ExerciseDefinition[], linkKey: 'linkedUpskillIds' | 'linkedDeepWorkIds', type: 'upskill' | 'deepwork') => {
@@ -336,12 +337,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
     
     if (allChildTasks.length === 0) return false;
 
-    const loggedTaskIds = new Set([
-        ...allDeepWorkLogs.flatMap(log => log.exercises.filter(ex => ex.loggedSets.length > 0).map(ex => ex.definitionId)),
-        ...allUpskillLogs.flatMap(log => log.exercises.filter(ex => ex.loggedSets.length > 0).map(ex => ex.definitionId))
-    ]);
-
-    return allChildTasks.every(task => loggedTaskIds.has(task.id));
+    return allChildTasks.every(task => permanentlyLoggedTaskIds.has(task.id));
   };
 
 
@@ -390,7 +386,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
           </div>
           <div className="flex items-center gap-1">
              <Button variant="outline" size="icon" onClick={() => setIsWeeklyReviewModalOpen(true)}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><path d="M10 14h4l-2 4h2"></path></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><path d="M8 2v4"/><path d="M16 2v4"/><path d="M4.5 10.5h15"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/><rect width="18" height="18" x="3" y="4" rx="2"/></svg>
                 <span className="sr-only">Open Weekly Review</span>
             </Button>
             <Button variant="outline" size="icon" onClick={() => setIsTimetableModalOpen(true)}>
@@ -469,56 +465,6 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
                     <p className="text-sm text-muted-foreground text-center py-2 min-h-[6rem]">Log time for specializations to see your top 5 here.</p>
                 )}
                </div>
-               <Separator className="my-2" />
-               <div className="relative">
-                  <h4 className="font-semibold mb-2 flex items-center gap-2"><TrendingUp /> Specialization Progress</h4>
-                   {learningItems.length > 0 ? (
-                      <Carousel
-                          items={learningItems}
-                          renderItem={(item) => {
-                              const progress = item.estimated > 0 ? (item.logged / item.estimated) * 100 : 0;
-                              const isOverspent = item.logged > item.estimated;
-                              const overspentHours = item.logged - item.estimated;
-                              return (
-                                <div className="space-y-2 p-3 rounded-lg bg-muted/30">
-                                  <div className="flex justify-between items-start">
-                                    <span className="font-semibold text-sm text-foreground">{item.name}</span>
-                                  </div>
-                                  <div className="h-2 w-full rounded-full bg-muted overflow-hidden flex">
-                                    {isOverspent ? (
-                                        <>
-                                            <div 
-                                                className="h-full bg-primary" 
-                                                style={{ width: `${(item.estimated / item.logged) * 100}%` }}
-                                            />
-                                            <div 
-                                                className="h-full bg-orange-500"
-                                                style={{ width: `${((item.logged - item.estimated) / item.logged) * 100}%` }}
-                                            />
-                                        </>
-                                    ) : (
-                                        <div 
-                                            className="h-full bg-primary" 
-                                            style={{ width: `${progress}%` }} 
-                                        />
-                                    )}
-                                  </div>
-                                  <div className="flex justify-between text-xs text-muted-foreground">
-                                    <span>{item.logged.toFixed(1)}h logged</span>
-                                    {isOverspent ? (
-                                        <span className="font-medium text-orange-500">+{overspentHours.toFixed(1)}h over</span>
-                                    ) : (
-                                        <span>{item.estimated.toFixed(1)}h est.</span>
-                                    )}
-                                  </div>
-                                </div>
-                              )
-                          }}
-                      />
-                  ) : (
-                      <p className="text-sm text-muted-foreground text-center py-2 min-h-[6rem]">Log time against estimated goals to see your learning progress.</p>
-                  )}
-              </div>
               <Separator className="my-2" />
               <div className="relative">
                 <h4 className="font-semibold mb-2 flex items-center gap-2"><Rocket /> Upcoming Roadmap</h4>
@@ -534,7 +480,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
                             <div 
                               className="flex flex-col justify-between p-3 rounded-md bg-muted/30 border-b-0 h-[100px] cursor-pointer" 
                               onClick={() => {
-                                setSelectedReleaseInfo({ release: item.release, topic: item.topic, type: item.type });
+                                setSelectedReleaseInfo({ release: item.release, topic: item.topic, type: item.type, project: item.project });
                                 setIsProjectDetailsModalOpen(true);
                               }}
                             >
@@ -645,8 +591,16 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
                 })}
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsProjectDetailsModalOpen(false)}>Close</Button>
+            <DialogFooter className="sm:justify-between">
+                <Button 
+                    variant={selectedReleaseInfo.project?.isReadyForBranding ? 'default' : 'outline'}
+                    onClick={() => selectedReleaseInfo.project && toggleProjectBrandingStatus(selectedReleaseInfo.project.id)}
+                    disabled={!selectedReleaseInfo.project}
+                >
+                  <Check className={cn("mr-2 h-4 w-4", !selectedReleaseInfo.project?.isReadyForBranding && "hidden")} />
+                  {selectedReleaseInfo.project?.isReadyForBranding ? 'Ready for Branding' : 'Add to Branding Pipeline'}
+                </Button>
+                <Button variant="outline" onClick={() => setIsProjectDetailsModalOpen(false)}>Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
