@@ -1,0 +1,27 @@
+diff --git a/node_modules/@excalidraw/excalidraw/package.json b/node_modules/@excalidraw/excalidraw/package.json
+index 6a02c3c..5935c75 100644
+--- a/node_modules/@excalidraw/excalidraw/package.json
++++ b/node_modules/@excalidraw/excalidraw/package.json
+@@ -69,8 +69,6 @@
+   "dependencies": {
+     "clsx": "^1.2.1",
+     "nanoid": "^3.3.4",
+-    "perfect-freehand": "^1.2.0",
+-    "react-error-boundary": "^3.1.4"
++    "perfect-freehand": "^1.2.0"
+   },
+   "peerDependencies": {
+     "react": ">=16.8.0",
+@@ -79,7 +77,8 @@
+   "devDependencies": {
+     "eslint-config-custom": "*",
+     "typescript": "^4.7.4",
+-    "react": "^18.2.0",
+-    "react-dom": "^18.2.0"
++    "react": "^18.3.1",
++    "react-dom": "^18.3.1",
++    "react-error-boundary": "^3.1.4"
+   },
+   "eslintConfig": {
+     "extends": "custom"
+
