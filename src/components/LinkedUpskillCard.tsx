@@ -51,46 +51,6 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
 
 const SLOT_NAMES: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
-function AddToSessionPopover({ definition, onSelectSlot, disabled = false, currentSlot }: { 
-    definition: ExerciseDefinition; 
-    onSelectSlot: (slotName: string) => void; 
-    disabled?: boolean;
-    currentSlot: string;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" disabled={disabled}>
-          <PlusCircle className="h-4 w-4" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-48 p-1">
-        <div className="flex flex-col">
-          <p className="p-2 text-xs font-semibold text-muted-foreground">Add to slot...</p>
-          {SLOT_NAMES.map(slotName => (
-            <Button
-              key={slotName}
-              variant="ghost"
-              className={cn(
-                "w-full justify-start h-8",
-                slotName === currentSlot && "bg-primary/10 text-primary"
-              )}
-              onClick={() => {
-                onSelectSlot(slotName as string);
-                setIsOpen(false);
-              }}
-            >
-              {slotName}
-            </Button>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 const DraggableSubtaskItem: React.FC<{ 
     childId: string;
     parentId: string;
@@ -260,12 +220,13 @@ export const LinkedUpskillCard = React.forwardRef<HTMLDivElement, {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div>
-                    <AddToSessionPopover 
-                      definition={upskillDef} 
-                      onSelectSlot={(slot) => handleAddTaskToSession(upskillDef.id, 'upskill', slot)} 
-                      disabled={!isAddToSessionEnabled}
-                      currentSlot={currentSlot}
-                    />
+                    <Button
+                        variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"
+                        onClick={() => handleAddTaskToSession(upskillDef.id, 'upskill', currentSlot)}
+                        disabled={!isAddToSessionEnabled}
+                    >
+                        <PlusCircle className="h-4 w-4" />
+                    </Button>
                   </div>
                 </TooltipTrigger>
                 {!isAddToSessionEnabled && (

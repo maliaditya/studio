@@ -159,48 +159,6 @@ const DraggableSubtaskItem: React.FC<{
 };
 
 
-const SLOT_NAMES: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
-
-function AddToSessionPopover({ definition, onSelectSlot, disabled = false, currentSlot }: { 
-    definition: ExerciseDefinition; 
-    onSelectSlot: (slotName: string) => void; 
-    disabled?: boolean;
-    currentSlot: string;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  
-  return (
-    <Popover open={isOpen} onOpenChange={setIsOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm" disabled={disabled}>
-          <PlusCircle className="h-4 w-4" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-48 p-1">
-        <div className="flex flex-col">
-          <p className="p-2 text-xs font-semibold text-muted-foreground">Add to slot...</p>
-          {SLOT_NAMES.map(slotName => (
-            <Button
-              key={slotName}
-              variant="ghost"
-              className={cn(
-                "w-full justify-start h-8",
-                slotName === currentSlot && "bg-primary/10 text-primary"
-              )}
-              onClick={() => {
-                onSelectSlot(slotName as string);
-                setIsOpen(false);
-              }}
-            >
-              {slotName}
-            </Button>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
 export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
     deepworkDef: ExerciseDefinition;
     getDeepWorkNodeType: (def: ExerciseDefinition) => string;
@@ -333,12 +291,13 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <div>
-                                    <AddToSessionPopover 
-                                        definition={deepworkDef} 
-                                        onSelectSlot={(slot) => scheduleTaskFromMindMap(deepworkDef.id, 'deepwork', slot)} 
+                                    <Button
+                                        variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-background/50 backdrop-blur-sm"
+                                        onClick={() => handleAddTaskToSession(deepworkDef.id, 'deepwork', currentSlot)}
                                         disabled={!isAddToSessionEnabled}
-                                        currentSlot={currentSlot}
-                                    />
+                                    >
+                                        <PlusCircle className="h-4 w-4" />
+                                    </Button>
                                 </div>
                             </TooltipTrigger>
                             {!isAddToSessionEnabled && (
