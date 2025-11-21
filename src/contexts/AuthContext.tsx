@@ -676,7 +676,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setDrawingCanvasState({
       ...state,
       isOpen: true,
-      position: { x: (window.innerWidth - 832) / 2, y: (window.innerHeight - 700) / 2 },
+      position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
       onSave: (dataUrl) => {
         handleUpdateResource({
           ...resources.find(r => r.id === state.resourceId)!,
@@ -3497,6 +3497,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
