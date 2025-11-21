@@ -594,6 +594,19 @@ ${JSON.stringify(finalTemplate, null, 2)}
                     />
                   </div>
                   <div className="flex items-center space-x-2">
+                    <Label htmlFor="drawing-autosave" className="font-normal flex-shrink-0">
+                        Drawing Canvas Autosave (sec):
+                    </Label>
+                    <Input
+                        id="drawing-autosave"
+                        type="number"
+                        value={settings.drawingCanvasAutoSaveInterval || 30}
+                        onChange={(e) => handleSettingChange('drawingCanvasAutoSaveInterval', parseInt(e.target.value, 10) || 0)}
+                        className="w-20 h-8"
+                        placeholder="30"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
                     <Label htmlFor="daily-goal" className="font-normal flex-shrink-0">
                       Daily Productive Hours Goal:
                     </Label>

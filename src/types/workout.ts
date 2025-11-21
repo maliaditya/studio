@@ -498,11 +498,6 @@ export interface AbandonmentLog {
   fear?: string;
 }
 
-export interface SkillDomain {
-  id: string;
-  name: string;
-}
-
 export interface CoreSkill {
   id: string;
   domainId: string;
@@ -772,6 +767,7 @@ export interface UserSettings {
   spacedRepetitionSlot?: SlotName;
   pdfViewerWidth?: number;
   timestampAnnotationOffset?: number;
+  drawingCanvasAutoSaveInterval?: number;
 }
 
 export interface ActiveFocusSession {
@@ -828,13 +824,18 @@ export interface PdfViewerPopupState {
   size?: { width: number };
 }
 
+export type DrawingCanvasData = {
+    id: string; // Composite: `${resourceId}-${pointId}`
+    resourceId: string;
+    pointId: string;
+    initialDrawing?: string;
+    isPinned?: boolean;
+};
 export interface DrawingCanvasPopupState {
   isOpen: boolean;
-  resourceId: string;
-  pointId: string;
-  initialDrawing?: string;
+  activeCanvasId: string | null;
+  openCanvases: DrawingCanvasData[];
   position: { x: number, y: number };
-  onSave: (dataUrl: string) => void;
 }
 
 export interface DailyLearningLog {
