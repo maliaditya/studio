@@ -10,7 +10,8 @@ import { getPdf } from "@/lib/audioDB";
 import type { Resource } from "@/types/workout";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = require('pdfjs-dist/build/pdf.worker.min.mjs');
+
 
 interface PdfViewerProps {
   resource: Resource | null;

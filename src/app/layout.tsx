@@ -425,6 +425,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onOpenTaskContext={openTaskContextPopup}
             onOpenHabitPopup={openRuleDetailPopup}
             currentSlot={currentSlot}
+            onRemoveActivity={() => {}}
         />
       )}
       {authContext.settings.widgetVisibility.smartLogging && (
@@ -494,9 +495,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             {drawingCanvasState?.isOpen && (
               <DrawingCanvas
                 isOpen={drawingCanvasState.isOpen}
-                initialDrawing={drawingCanvasState.initialDrawing}
-                position={drawingCanvasState.position}
-                onSave={drawingCanvasState.onSave}
                 onClose={() => setDrawingCanvasState(null)}
               />
             )}
@@ -505,9 +503,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             ))}
             {ResourcePopup && Array.from(openPopups.values()).map(popupState => (
               <ResourcePopup key={popupState.resourceId} popupState={popupState} />
-            ))}
-            {Array.from(intentionPopups.values()).map(popupState => (
-                <IntentionDetailPopup key={popupState.resourceId} popupState={popupState} onClose={closeIntentionPopup} />
             ))}
             {Array.from(generalPopups.values()).map(popupState => (
               <GeneralResourcePopup 

@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
 import { useAuth } from "@/contexts/AuthContext";
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+pdfjs.GlobalWorkerOptions.workerSrc = require('pdfjs-dist/build/pdf.worker.min.mjs');
 
 export default function PdfViewerPopup() {
     const { pdfViewerState, setPdfViewerState, settings, setSettings, setResources } = useAuth();
