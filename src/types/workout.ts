@@ -768,6 +768,11 @@ export interface UserSettings {
   pdfViewerWidth?: number;
   timestampAnnotationOffset?: number;
   drawingCanvasAutoSaveInterval?: number;
+  githubToken?: string;
+  githubOwner?: string;
+  githubRepo?: string;
+  githubPath?: string;
+  lastSync?: { sha: string, timestamp: number };
 }
 
 export interface ActiveFocusSession {

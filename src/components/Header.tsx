@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
@@ -599,24 +599,8 @@ export function Header() {
     signOut, 
     isDemoTokenModalOpen, 
     setIsDemoTokenModalOpen, 
-    pushDemoDataWithToken, 
-    coreSkills, 
-    deepWorkDefinitions, 
-    getDescendantLeafNodes, 
-    offerizationPlans, 
-    settings, 
-    schedule,
-    dailyReviewLogs,
-    workoutMode,
-    workoutPlans,
-    exerciseDefinitions,
-    allWorkoutLogs,
-    handleToggleDailyGoalCompletion,
-    workoutPlanRotation,
-    openMindsetWidget,
-    setIsTodaysPredictionModalOpen,
-    habitCards,
-    mechanismCards,
+    pushDemoDataWithToken,
+    syncWithGitHub,
   } = useAuth();
 
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
@@ -624,103 +608,6 @@ export function Header() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUpcomingTasksModalOpen, setIsUpcomingTasksModalOpen] = useState(false);
   
-  const upcomingTaskCount = useMemo(() => {
-    const today = startOfToday();
-    const todayKey = format(today, 'yyyy-MM-dd');
-    
-    // 1. Spaced Repetition Tasks (Pending & Today's Review)
-    const repetitionSkillsForCount = coreSkills.flatMap(cs => 
-        cs.skillAreas.flatMap(sa => 
-            sa.microSkills.filter(ms => ms.isReadyForRepetition)
-        )
-    );
-
-    const repetitionTaskCount = repetitionSkillsForCount.filter(skill => {
-        const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
-        const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
-        const completionDates = new Set<string>();
-        allLeafNodes.forEach(node => {
-            if (node.last_logged_date) completionDates.add(node.last_logged_date);
-        });
-        const sortedDates = Array.from(completionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
-        if (sortedDates.length === 0) return false;
-
-        let reps = 1;
-        let lastReviewDate = sortedDates[0];
-        for (let i = 1; i < sortedDates.length; i++) {
-            const daysBetween = differenceInDays(sortedDates[i], lastReviewDate);
-            if (daysBetween <= ([1, 2, 4, 8, 16, 32, 64, 128][reps - 1] || 128)) {
-                reps++;
-            } else {
-                reps = 1;
-            }
-            lastReviewDate = sortedDates[i];
-        }
-        const nextInterval = [1, 2, 4, 8, 16, 32, 64, 128][reps] || 128;
-        const nextReviewDate = addDays(lastReviewDate, nextInterval);
-        return isBefore(nextReviewDate, today) || isToday(nextReviewDate);
-    }).length;
-
-    // 2. Daily Learning Goals
-    const todaysCompletions = new Set(dailyReviewLogs.find(log => log.date === todayKey)?.completedResourceIds || []);
-    const learningGoalsCount = Object.values(offerizationPlans || {}).reduce((count, plan) => {
-        if (plan.learningPlan) {
-            const activeAudio = (plan.learningPlan.audioVideoResources || []).filter(res => res.completionDate && isAfter(parseISO(res.completionDate), today) && !todaysCompletions.has(res.id));
-            const activeBooks = (plan.learningPlan.bookWebpageResources || []).filter(res => res.completionDate && isAfter(parseISO(res.completionDate), today) && !todaysCompletions.has(res.id));
-            return count + activeAudio.length + activeBooks.length;
-        }
-        return count;
-    }, 0);
-    
-    // 3. Ad-hoc Scheduled Tasks
-    const routineTasks = (settings.routines || []).map(task => {
-        if (task.type === 'workout') {
-            const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
-            return { ...task, details: description };
-        }
-        return task;
-    });
-
-    const routineTaskIdentifiers = new Set(routineTasks.map(rt => `${rt.details}_${rt.type}_${rt.slot}`));
-    
-    const todaysSchedule = schedule[todayKey] || {};
-    const scheduledTaskCount = Object.values(todaysSchedule).flat().filter(act => {
-        if (!act || act.completed) return false;
-        return !routineTaskIdentifiers.has(`${act.details}_${act.type}_${act.slot}`);
-    }).length;
-
-    return repetitionTaskCount + learningGoalsCount + scheduledTaskCount;
-  }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes, offerizationPlans, settings.routines, schedule, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, dailyReviewLogs, workoutPlanRotation, settings.workoutScheduling]);
-  
-  const todaysPredictionCount = useMemo(() => {
-    const today = startOfToday();
-    const fiveDaysAgo = startOfDay(subDays(today, 5));
-
-    let count = 0;
-    const allLinks: { stopper: Stopper; isUrge: boolean }[] = [];
-    
-    habitCards.forEach(habit => {
-      const negativeMechanism = mechanismCards.find(m => m.id === habit.response?.resourceId);
-      (negativeMechanism?.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
-      (habit.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
-
-      const positiveMechanism = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
-      (positiveMechanism?.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
-      (habit.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
-    });
-
-    allLinks.forEach(link => {
-      (link.stopper.timestamps || []).forEach((ts: number) => {
-        const eventDate = new Date(ts);
-        if (eventDate >= fiveDaysAgo && eventDate < today) {
-          count++;
-        }
-      });
-    });
-
-    return count;
-  }, [habitCards, mechanismCards]);
-
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -740,32 +627,16 @@ export function Header() {
               
               <GlobalSearch open={isSearchOpen} setOpen={setIsSearchOpen} />
 
-              <div className="relative">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsUpcomingTasksModalOpen(true)}>
-                    <Info className="h-4 w-4" />
-                    <span className="sr-only">Upcoming Tasks</span>
-                </Button>
-                {upcomingTaskCount > 0 && (
-                  <Badge variant="destructive" className="absolute -top-1 -right-2 h-5 w-5 justify-center p-0">{upcomingTaskCount}</Badge>
-                )}
-              </div>
-              <div className="relative">
-                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsTodaysPredictionModalOpen(true)}>
-                  <ActivityIcon className="h-4 w-4" />
-                  <span className="sr-only">Today's Predictions</span>
-                </Button>
-                {todaysPredictionCount > 0 && (
-                  <Badge variant="secondary" className="absolute -top-1 -right-2 h-5 w-5 justify-center p-0">{todaysPredictionCount}</Badge>
-                )}
-              </div>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openMindsetWidget}>
-                  <Brain className="h-4 w-4" />
-                  <span className="sr-only">Mindset</span>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}>
+                <Github className="h-4 w-4" />
+                <span className="sr-only">Sync with GitHub</span>
               </Button>
-              <Button variant="ghost" className="hidden sm:inline-flex" onClick={() => setIsSupportModalOpen(true)}>
-                  <Heart className="mr-2 h-4 w-4 text-red-500" />
-                  Support
+              
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsSettingsModalOpen(true)}>
+                  <Settings className="h-4 w-4" />
+                  <span className="sr-only">Settings</span>
               </Button>
+
             
               {currentUser && <SaveStatusWidget />}
 
