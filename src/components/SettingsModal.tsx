@@ -67,10 +67,8 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const [copyType, setCopyType] = useState<'specialization' | 'micro-skills'>('specialization');
 
   // State for GitHub settings inputs
-  const [githubToken, setGithubToken] = useState('');
-  const [githubOwner, setGithubOwner] = useState('');
-  const [githubRepo, setGithubRepo] = useState('');
-  const [githubPath, setGithubPath] = useState('');
+  const [localSettings, setLocalSettings] = useState(settings);
+
   
   const defaultFileName = useMemo(() => {
     if (!currentUser?.username) return 'lifeos_backup.json';
@@ -80,42 +78,32 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
 
 
   useEffect(() => {
-    if (isOpen && settings) {
-      setGithubToken(settings.githubToken || '');
-      setGithubOwner(settings.githubOwner || '');
-      setGithubRepo(settings.githubRepo || '');
-      setGithubPath(settings.githubPath || defaultFileName);
+    if (isOpen) {
+      setLocalSettings({
+          ...settings,
+          githubPath: settings.githubPath || defaultFileName,
+      });
     }
   }, [isOpen, settings, defaultFileName]);
 
-
-  const settingsKey = currentUser ? `dock_settings_${currentUser.username}` : null;
-
-  const handleSettingChange = (key: keyof typeof settings, value: any) => {
-    if (!settingsKey) return;
-    
-    const newSettings = { ...settings, [key]: value };
-    setSettings(newSettings);
-
-    try {
-      localStorage.setItem(settingsKey, JSON.stringify(newSettings));
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Could not save your setting.",
-        variant: "destructive",
-      });
-    }
+  const handleLocalSettingChange = (key: keyof typeof settings, value: any) => {
+    setLocalSettings(prev => ({...prev, [key]: value}));
   };
   
   const handleGithubSettingsSave = () => {
-    handleSettingChange('githubToken', githubToken);
-    handleSettingChange('githubOwner', githubOwner);
-    handleSettingChange('githubRepo', githubRepo);
-    handleSettingChange('githubPath', githubPath);
+    setSettings(prev => ({
+        ...prev,
+        githubToken: localSettings.githubToken,
+        githubOwner: localSettings.githubOwner,
+        githubRepo: localSettings.githubRepo,
+        githubPath: localSettings.githubPath,
+    }));
     toast({ title: "GitHub Settings Saved", description: "Your sync configuration has been updated." });
   };
 
+  const handleSettingChange = (key: keyof typeof settings, value: any) => {
+    setSettings(prev => ({ ...prev, [key]: value }));
+  };
 
   const handleWidgetVisibilityChange = (widgetId: keyof WidgetVisibility, isVisible: boolean) => {
     handleSettingChange('widgetVisibility', {
@@ -419,19 +407,19 @@ ${JSON.stringify(finalTemplate, null, 2)}
                       <div className="space-y-4 pt-4 border-t">
                           <div className="space-y-1">
                             <Label htmlFor="github-token">Personal Access Token (PAT)</Label>
-                            <Input id="github-token" type="password" placeholder="ghp_..." value={githubToken} onChange={(e) => setGithubToken(e.target.value)} />
+                            <Input id="github-token" type="password" placeholder="ghp_..." value={localSettings.githubToken || ''} onChange={(e) => handleLocalSettingChange('githubToken', e.target.value)} />
                           </div>
                           <div className="space-y-1">
                             <Label htmlFor="github-owner">Repository Owner</Label>
-                            <Input id="github-owner" placeholder="e.g., your-username" value={githubOwner} onChange={(e) => setGithubOwner(e.target.value)} />
+                            <Input id="github-owner" placeholder="e.g., your-username" value={localSettings.githubOwner || ''} onChange={(e) => handleLocalSettingChange('githubOwner', e.target.value)} />
                           </div>
                           <div className="space-y-1">
                             <Label htmlFor="github-repo">Repository Name</Label>
-                            <Input id="github-repo" placeholder="e.g., lifeos-backup" value={githubRepo} onChange={(e) => setGithubRepo(e.target.value)} />
+                            <Input id="github-repo" placeholder="e.g., lifeos-backup" value={localSettings.githubRepo || ''} onChange={(e) => handleLocalSettingChange('githubRepo', e.target.value)} />
                           </div>
                           <div className="space-y-1">
                             <Label htmlFor="github-path">File Path in Repo</Label>
-                            <Input id="github-path" placeholder="e.g., backup.json" value={githubPath} onChange={(e) => setGithubPath(e.target.value)} />
+                            <Input id="github-path" placeholder="e.g., backup.json" value={localSettings.githubPath || ''} onChange={(e) => handleLocalSettingChange('githubPath', e.target.value)} />
                           </div>
                           <Button onClick={handleGithubSettingsSave}>Save GitHub Settings</Button>
                       </div>
