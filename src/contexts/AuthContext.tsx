@@ -640,7 +640,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const updateDrawingData = useCallback((canvasId: string, data: string) => {
-    // This updates the popup state which is temporary.
     setDrawingCanvasState(prev => {
         if (!prev) return null;
         const newOpenCanvases = (prev.openCanvases || []).map(c => 
@@ -648,7 +647,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
         return { ...prev, openCanvases: newOpenCanvases };
     });
-    // This is the "side-effect" that updates the source of truth in resources
+    
     const canvasToUpdate = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
     if(canvasToUpdate) {
         setResources(prevResources => prevResources.map(r => {
@@ -712,28 +711,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
     setDrawingCanvasState(prev => {
-        // Keep existing open canvases
         const newOpenCanvases = [...(prev?.openCanvases || [])];
         const existingCanvasIndex = newOpenCanvases.findIndex(c => c.id === canvasId);
-
+    
         const newCanvasData = {
             id: canvasId,
             resourceId: state.resourceId,
             pointId: state.pointId,
             name: state.name || 'Untitled Canvas',
             initialDrawing: state.initialDrawing,
-            // Preserve pinned status if it exists
-            isPinned: newOpenCanvases[existingCanvasIndex]?.isPinned || false,
+            isPinned: (existingCanvasIndex > -1) ? newOpenCanvases[existingCanvasIndex].isPinned : false,
         };
-
+    
         if (existingCanvasIndex > -1) {
-            // Update existing canvas data in place
             newOpenCanvases[existingCanvasIndex] = newCanvasData;
         } else {
-            // Add new canvas if it's not already open
             newOpenCanvases.push(newCanvasData);
         }
-
+    
         return {
             isOpen: true,
             position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
@@ -741,7 +736,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             activeCanvasId: canvasId,
         };
     });
-}, []);
+  }, []);
 
   const handleDrawingCanvasPopupDragEnd = useCallback((event: DragEndEvent) => {
     const { active, delta } = event;
@@ -3570,3 +3565,4 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
