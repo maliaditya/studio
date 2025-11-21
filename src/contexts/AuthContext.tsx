@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -3228,7 +3229,30 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           throw new Error('Could not pull data from GitHub.');
       }
       const data = await response.json();
+      
+      if (!data.content) {
+        toast({
+          title: "Empty Remote File",
+          description: "The file on GitHub is empty. Pushing local data to start.",
+          variant: "default",
+        });
+        const localData = getAllUserData();
+        const localDataString = JSON.stringify(localData, null, 2);
+        await pushToGitHub(token, owner, repo, path, localDataString, "Initialize with local data", data.sha);
+        return;
+      }
+      
       const content = atob(data.content);
+
+      if (!content) {
+          toast({
+              title: "Empty Remote File",
+              description: "The file on GitHub is empty. Your local data has not been overwritten.",
+              variant: "default",
+          });
+          return;
+      }
+      
       const parsedData = JSON.parse(content);
       
       loadImportedData(parsedData.main, parsedData.ui);
