@@ -4,15 +4,18 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from './ui/button';
-import { Save, X, GripVertical, Eraser, Download, Upload } from 'lucide-react';
+import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import type { ExcalidrawElement, NonDeleted, AppState } from "@excalidraw/excalidraw/types/types";
 import type { ExcalidrawAPIRefValue } from '@excalidraw/excalidraw';
+import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
-  async () => (await import("@excalidraw/excalidraw")).Excalidraw,
+  () => import("@excalidraw/excalidraw").then((mod) => mod.Excalidraw),
   {
     ssr: false,
     loading: () => <div className="flex h-full w-full items-center justify-center">Loading Canvas...</div>
@@ -21,27 +24,36 @@ const Excalidraw = dynamic(
 
 interface DrawingCanvasProps {
   isOpen: boolean;
-  initialDrawing?: string; // This will now be a JSON string of elements
-  position: { x: number; y: number };
-  onSave: (drawingData: string) => void;
   onClose: () => void;
 }
 
-const ExcalidrawWrapper = ({ initialDrawing, onSave, theme, apiRef }: {
-    initialDrawing?: string;
+const ExcalidrawWrapper = ({ 
+    activeCanvas, 
+    onSave, 
+    theme, 
+    apiRef 
+}: {
+    activeCanvas: { id: string, data?: string };
     onSave: (drawingData: string) => void;
     theme: string;
     apiRef: React.MutableRefObject<ExcalidrawAPIRefValue | null>;
 }) => {
     const [initialData, setInitialData] = useState<{
         elements: readonly NonDeleted<ExcalidrawElement>[];
+        appState?: Partial<AppState>;
     } | null>(null);
 
+    const { settings } = useAuth();
+    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    
     useEffect(() => {
-        if (initialDrawing) {
+        if (activeCanvas.data) {
             try {
-                const parsedData = JSON.parse(initialDrawing);
-                setInitialData({ elements: parsedData.elements || [] });
+                const parsedData = JSON.parse(activeCanvas.data);
+                setInitialData({
+                    elements: parsedData.elements || [],
+                    appState: parsedData.appState || {}
+                });
             } catch (e) {
                 console.error("Failed to parse initial drawing data:", e);
                 setInitialData({ elements: [] });
@@ -49,8 +61,35 @@ const ExcalidrawWrapper = ({ initialDrawing, onSave, theme, apiRef }: {
         } else {
             setInitialData({ elements: [] });
         }
-    }, [initialDrawing]);
+    }, [activeCanvas.id, activeCanvas.data]);
 
+    const handleChange = (elements: readonly ExcalidrawElement[], appState: AppState) => {
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+        
+        saveTimeoutRef.current = setTimeout(() => {
+            const drawingData = JSON.stringify({
+                type: "excalidraw",
+                version: 2,
+                source: "dock-app",
+                elements: elements,
+                appState: {
+                    viewBackgroundColor: appState.viewBackgroundColor,
+                    gridSize: appState.gridSize,
+                }
+            });
+            onSave(drawingData);
+        }, settings.drawingCanvasAutoSaveInterval || 30000);
+    };
+
+    useEffect(() => {
+        return () => {
+            if (saveTimeoutRef.current) {
+                clearTimeout(saveTimeoutRef.current);
+            }
+        };
+    }, []);
 
     if (initialData === null) {
         return <div className="flex h-full w-full items-center justify-center">Preparing Canvas...</div>;
@@ -62,15 +101,18 @@ const ExcalidrawWrapper = ({ initialDrawing, onSave, theme, apiRef }: {
                 excalidrawAPI={(api) => apiRef.current = api}
                 initialData={initialData}
                 theme={theme}
+                onChange={handleChange}
             />
         </div>
     );
 }
 
-export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClose }: DrawingCanvasProps) {
+export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
+  const { drawingCanvasState, setDrawingCanvasState, updateDrawingData, togglePinDrawing } = useAuth();
   const [theme, setTheme] = useState('dark');
   const [isMounted, setIsMounted] = useState(false);
   const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null);
+  const { toast } = useToast();
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: 'drawing-canvas-popup',
@@ -78,8 +120,8 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
   
   const style: React.CSSProperties = {
     position: 'fixed',
-    top: '50%',
-    left: '50%',
+    top: drawingCanvasState?.position.y || '50%',
+    left: drawingCanvasState?.position.x || '50%',
     width: '95vw',
     height: '95vh',
     transform: transform ? `translate(calc(-50% + ${transform.x}px), calc(-50% + ${transform.y}px))` : 'translate(-50%, -50%)',
@@ -97,9 +139,9 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
     mediaQuery.addEventListener('change', handleThemeChange);
     return () => mediaQuery.removeEventListener('change', handleThemeChange);
   }, []);
-
+  
   const handleSaveClick = () => {
-    if (excalidrawAPIRef.current) {
+    if (excalidrawAPIRef.current && drawingCanvasState?.activeCanvasId) {
       const elements = excalidrawAPIRef.current.getSceneElements();
       const appState = excalidrawAPIRef.current.getAppState();
       const drawingData = JSON.stringify({
@@ -112,41 +154,100 @@ export function DrawingCanvas({ isOpen, initialDrawing, position, onSave, onClos
           gridSize: appState.gridSize,
         }
       });
-      onSave(drawingData);
-      onClose();
+      updateDrawingData(drawingCanvasState.activeCanvasId, drawingData);
+      toast({ title: "Canvas Saved" });
     }
   };
+
+  const handleTabClick = (canvasId: string) => {
+    setDrawingCanvasState(prev => prev ? { ...prev, activeCanvasId: canvasId } : null);
+  };
   
-  if (!isOpen) return null;
+  const handleCloseTab = (e: React.MouseEvent, canvasId: string) => {
+    e.stopPropagation();
+    setDrawingCanvasState(prev => {
+        if (!prev) return null;
+        
+        const newOpenCanvases = prev.openCanvases.filter(c => c.id !== canvasId);
+        
+        // If we closed the active tab, find a new one to activate
+        if (prev.activeCanvasId === canvasId) {
+            let newActiveId: string | null = null;
+            if (newOpenCanvases.length > 0) {
+                const pinned = newOpenCanvases.filter(c => c.isPinned);
+                const notPinned = newOpenCanvases.filter(c => !c.isPinned);
+                newActiveId = (pinned[0] || notPinned[0])?.id || null;
+            }
+            return { ...prev, openCanvases: newOpenCanvases, activeCanvasId: newActiveId };
+        }
+        
+        return { ...prev, openCanvases: newOpenCanvases };
+    });
+  };
+
+  const handleTogglePin = (e: React.MouseEvent, canvasId: string) => {
+    e.stopPropagation();
+    togglePinDrawing(canvasId);
+  };
+  
+  const activeCanvas = drawingCanvasState?.openCanvases.find(c => c.id === drawingCanvasState.activeCanvasId);
+  
+  if (!isOpen || !drawingCanvasState) return null;
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
         <Card className="w-full h-full bg-background text-foreground p-0 flex flex-col shadow-2xl border-2 border-primary/50">
             <CardHeader 
-                className="p-2 flex flex-row items-center justify-between border-b"
+                className="p-2 pl-3 flex flex-row items-center justify-between border-b gap-4"
             >
                 <div 
-                  className="flex items-center gap-2 cursor-grab active:cursor-grabbing flex-grow"
+                  className="flex items-center gap-2 cursor-grab active:cursor-grabbing flex-shrink-0"
                   {...listeners}
                 >
                     <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
-                    <CardTitle className="text-base">Drawing Canvas</CardTitle>
+                    <CardTitle className="text-base truncate">
+                      {activeCanvas ? `${activeCanvas.name} - Drawing Canvas` : 'Drawing Canvas'}
+                    </CardTitle>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex-grow min-w-0 overflow-x-auto">
+                    <div className="flex items-center gap-2">
+                        {drawingCanvasState.openCanvases.map(canvas => (
+                            <Button
+                                key={canvas.id}
+                                variant={drawingCanvasState.activeCanvasId === canvas.id ? "secondary" : "ghost"}
+                                size="sm"
+                                className="h-8 pl-2 pr-1 flex items-center gap-1 flex-shrink-0"
+                                onClick={() => handleTabClick(canvas.id)}
+                            >
+                                <span className="truncate max-w-[120px]">{canvas.name}</span>
+                                <button onClick={(e) => handleTogglePin(e, canvas.id)} className="p-1 rounded hover:bg-muted">
+                                    <Pin className={cn("h-3 w-3", canvas.isPinned ? "text-primary fill-current" : "text-muted-foreground")}/>
+                                </button>
+                                {!canvas.isPinned && (
+                                    <button onClick={(e) => handleCloseTab(e, canvas.id)} className="p-1 rounded hover:bg-destructive/20">
+                                        <X className="h-3 w-3 text-destructive"/>
+                                    </button>
+                                )}
+                            </Button>
+                        ))}
+                    </div>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
                   <Button variant="ghost" size="icon" onClick={handleSaveClick}><Save className="h-4 w-4"/></Button>
                   <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4"/></Button>
                 </div>
             </CardHeader>
             <CardContent className="p-0 flex-grow relative">
-               {isMounted ? (
+               {isMounted && activeCanvas ? (
                  <ExcalidrawWrapper 
-                    initialDrawing={initialDrawing} 
-                    onSave={onSave}
+                    key={activeCanvas.id} // Important to re-mount Excalidraw when canvas changes
+                    activeCanvas={activeCanvas}
+                    onSave={(data) => updateDrawingData(activeCanvas.id, data)}
                     theme={theme}
                     apiRef={excalidrawAPIRef}
                  />
                ) : (
-                <div className="flex h-full w-full items-center justify-center">Loading Canvas...</div>
+                <div className="flex h-full w-full items-center justify-center">Select a canvas to start drawing.</div>
                )}
             </CardContent>
         </Card>
