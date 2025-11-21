@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github, Download } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
@@ -600,6 +600,7 @@ export function Header() {
     setIsDemoTokenModalOpen, 
     pushDemoDataWithToken,
     syncWithGitHub,
+    downloadFromGitHub,
   } = useAuth();
 
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
@@ -630,6 +631,11 @@ export function Header() {
                 <Github className="h-4 w-4" />
                 <span className="sr-only">Sync with GitHub</span>
               </Button>
+
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}>
+                <Download className="h-4 w-4" />
+                <span className="sr-only">Download from GitHub</span>
+              </Button>
               
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsSettingsModalOpen(true)}>
                   <Settings className="h-4 w-4" />
@@ -651,5 +657,3 @@ export function Header() {
     </>
   );
 }
-
-    

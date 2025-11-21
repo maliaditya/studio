@@ -89,6 +89,7 @@ interface AuthContextType {
   isTodaysPredictionModalOpen: boolean;
   setIsTodaysPredictionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   syncWithGitHub: () => Promise<void>;
+  downloadFromGitHub: () => Promise<void>;
   
   // Shared health state
   weightLogs: WeightLog[];
@@ -713,7 +714,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
     setDrawingCanvasState(prev => {
-        const newOpenCanvases = prev?.openCanvases ? [...prev.openCanvases] : [];
+        if (!prev || !prev.isOpen) {
+            return {
+                isOpen: true,
+                position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+                openCanvases: [{
+                    id: canvasId,
+                    resourceId: state.resourceId,
+                    pointId: state.pointId,
+                    name: state.name,
+                    initialDrawing: state.initialDrawing,
+                }],
+                activeCanvasId: canvasId,
+            };
+        }
+
+        const newOpenCanvases = [...(prev.openCanvases || [])];
         const canvasIndex = newOpenCanvases.findIndex(c => c.id === canvasId);
     
         if (canvasIndex === -1) {
@@ -727,8 +743,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     
         return {
+            ...prev,
             isOpen: true,
-            position: prev?.position || { x: window.innerWidth / 2, y: window.innerHeight / 2 },
             openCanvases: newOpenCanvases,
             activeCanvasId: canvasId,
         };
@@ -742,8 +758,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setDrawingCanvasState(prev => prev ? {
         ...prev,
         position: {
-          x: prev.x + delta.x,
-          y: prev.y + delta.y,
+          x: prev.position.x + delta.x,
+          y: prev.position.y + delta.y,
         },
       } : null);
     }
@@ -3270,6 +3286,40 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       }
   }
 
+  const downloadFromGitHub = async () => {
+    const { githubToken, githubOwner, githubRepo, githubPath } = settings;
+    if (!githubToken || !githubOwner || !githubRepo || !githubPath) {
+        toast({ title: 'GitHub settings not configured', variant: 'destructive' });
+        return;
+    }
+    toast({ title: "Downloading..." });
+    try {
+        const response = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${githubPath}`, {
+            headers: { 'Authorization': `token ${githubToken}` }
+        });
+        if (!response.ok) throw new Error('Failed to fetch file metadata from GitHub.');
+        
+        const data = await response.json();
+        const downloadUrl = data.download_url;
+        
+        const fileResponse = await fetch(downloadUrl);
+        if (!fileResponse.ok) throw new Error('Failed to download file content.');
+
+        const blob = await fileResponse.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = githubPath.split('/').pop() || 'backup.json';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+
+        toast({ title: "Download Successful" });
+    } catch (error) {
+        toast({ title: 'Download Failed', description: error instanceof Error ? error.message : "Unknown error", variant: 'destructive' });
+    }
+  };
+
   useEffect(() => {
     const user = getCurrentLocalUser();
     if (user) {
@@ -3415,6 +3465,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     clearAllLocalFiles,
     isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen,
     syncWithGitHub,
+    downloadFromGitHub,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule: populatedSchedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
@@ -3555,6 +3606,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 
