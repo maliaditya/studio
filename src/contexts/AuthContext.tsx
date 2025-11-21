@@ -631,13 +631,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const togglePinDrawing = useCallback((canvasId: string) => {
     setDrawingCanvasState(prev => {
-        if (!prev) return null;
-        const newOpenCanvases = (prev.openCanvases || []).map(c => 
-            c.id === canvasId ? { ...c, isPinned: !c.isPinned } : c
-        );
-        return { ...prev, openCanvases: newOpenCanvases };
+      if (!prev) return null;
+      const newOpenCanvases = (prev.openCanvases || []).map(c => 
+        c.id === canvasId ? { ...c, isPinned: !c.isPinned } : c
+      );
+      return { ...prev, openCanvases: newOpenCanvases };
     });
-}, []);
+  }, []);
 
   const updateDrawingData = useCallback((canvasId: string, data: string) => {
     setDrawingCanvasState(prev => {
@@ -711,23 +711,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
     setDrawingCanvasState(prev => {
-        const existingCanvases = prev?.openCanvases || [];
-        const canvasIndex = existingCanvases.findIndex(c => c.id === canvasId);
-        
-        let newOpenCanvases;
-        if (canvasIndex > -1) {
-            newOpenCanvases = [...existingCanvases];
-        } else {
-            newOpenCanvases = [...existingCanvases, {
+        const newOpenCanvases = prev?.openCanvases ? [...prev.openCanvases] : [];
+        const canvasIndex = newOpenCanvases.findIndex(c => c.id === canvasId);
+
+        if (canvasIndex === -1) {
+            newOpenCanvases.push({
                 id: canvasId,
                 resourceId: state.resourceId,
                 pointId: state.pointId,
                 name: state.name,
                 initialDrawing: state.initialDrawing,
                 isPinned: false
-            }];
+            });
         }
-
+        
         return {
             isOpen: true,
             position: prev?.position || { x: window.innerWidth / 2, y: window.innerHeight / 2 },
@@ -3155,12 +3152,12 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const syncWithGitHub = async () => {
-    if (isLoadingState || (localChangeCount === 0 && coreSkills.length > 0)) {
-        toast({ title: "Please Wait", description: "Application data is still loading or no changes to sync.", variant: "default" });
+    const localDataIsLoaded = coreSkills.length > 0 || projects.length > 0;
+    
+    if (isLoadingState || (!localDataIsLoaded && localChangeCount === 0)) {
+        toast({ title: "Please Wait", description: "Application data is still loading.", variant: "default" });
         return;
     }
-
-    const localDataIsEmpty = coreSkills.length === 0 && projects.length === 0;
 
     const token = settings.githubToken;
     const owner = settings.githubOwner;
@@ -3183,14 +3180,9 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             headers: { 'Authorization': `token ${token}` }
         });
 
-        if (remoteMetaResponse.status === 404) { // File doesn't exist
-            if (localDataIsEmpty) {
-                 toast({ title: "No Data to Sync", description: "Your local data and remote backup are both empty." });
-                 return;
-            }
-            // Initial push
-            const localData = getAllUserData();
-            const localDataString = JSON.stringify(localData, null, 2);
+        if (remoteMetaResponse.status === 404) {
+            const allUserData = getAllUserData();
+            const localDataString = JSON.stringify(allUserData, null, 2);
             await pushToGitHub(token, owner, repo, path, localDataString, "Initial backup");
             toast({ title: "Initial Push Successful", description: "Your data has been backed up to GitHub." });
             return;
@@ -3199,17 +3191,15 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         if (remoteMetaResponse.ok) {
             const remoteMeta = await remoteMetaResponse.json();
             
-            if (localDataIsEmpty) {
-                await pullFromGitHub(token, owner, repo, path);
+            if (!localDataIsLoaded) {
+                await pullFromGitHub(token, owner, repo, path, remoteMeta.sha);
             } else if (settings.lastSync && settings.lastSync.sha === remoteMeta.sha) {
-                // Local is ahead or in sync, safe to push
                 const localData = getAllUserData();
                 const localDataString = JSON.stringify(localData, null, 2);
                 await pushToGitHub(token, owner, repo, path, localDataString, "Update from LifeOS", remoteMeta.sha);
                 toast({ title: "Push Successful", description: "Your local changes have been pushed to GitHub." });
             } else {
-                // Remote has changes, pull them
-                await pullFromGitHub(token, owner, repo, path);
+                await pullFromGitHub(token, owner, repo, path, remoteMeta.sha);
             }
         } else {
              throw new Error(`GitHub API error: ${remoteMetaResponse.statusText}`);
@@ -3252,7 +3242,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     setLocalChangeCount(0);
   }
 
-  async function pullFromGitHub(token: string, owner: string, repo: string, path: string) {
+  async function pullFromGitHub(token: string, owner: string, repo: string, path: string, sha: string) {
       const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
           headers: { 'Authorization': `token ${token}` }
       });
@@ -3569,5 +3559,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
