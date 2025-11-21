@@ -2989,7 +2989,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const findRootTask = useCallback((activity: Activity): ExerciseDefinition | null => {
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d.id]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
     
     // First, find the definitionId of the current task instance
     let currentDefId: string | undefined;
@@ -3141,7 +3141,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const syncWithGitHub = async () => {
-    // Check local storage for GitHub configuration
     const token = settings.githubToken;
     const owner = settings.githubOwner;
     const repo = settings.githubRepo;
@@ -3162,13 +3161,11 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         const localData = getAllUserData();
         const localDataString = JSON.stringify(localData, null, 2);
 
-        // Fetch file metadata from GitHub to get the latest SHA
         const remoteMetaResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
             headers: { 'Authorization': `token ${token}` }
         });
 
         if (remoteMetaResponse.status === 404) {
-            // File doesn't exist, initial push
             await pushToGitHub(token, owner, repo, path, localDataString, "Initial backup");
             toast({ title: "Initial Push Successful", description: "Your data has been backed up to GitHub." });
             return;
@@ -3181,14 +3178,11 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         const remoteMeta = await remoteMetaResponse.json();
         const remoteSha = remoteMeta.sha;
 
-        // Compare last sync timestamp
         const lastSync = settings.lastSync;
         if (lastSync && lastSync.sha === remoteSha) {
-            // No changes on remote, safe to push
             await pushToGitHub(token, owner, repo, path, localDataString, "Update from LifeOS", remoteSha);
             toast({ title: "Push Successful", description: "Your local changes have been pushed to GitHub." });
         } else {
-            // Remote has changed, need to pull first
             await pullFromGitHub(token, owner, repo, path);
             toast({ title: "Pull Successful", description: "Remote changes have been pulled. Please review and push again if needed." });
         }
@@ -3222,7 +3216,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     }
     
     const result = await pushResponse.json();
-    handleSettingChange('lastSync', { sha: result.content.sha, timestamp: Date.now() });
+    setSettings(prev => ({...prev, lastSync: { sha: result.content.sha, timestamp: Date.now() }}));
     setLocalChangeCount(0);
   }
 
@@ -3238,7 +3232,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       const parsedData = JSON.parse(content);
       
       loadImportedData(parsedData.main, parsedData.ui);
-      handleSettingChange('lastSync', { sha: data.sha, timestamp: Date.now() });
+      setSettings(prev => ({...prev, lastSync: { sha: data.sha, timestamp: Date.now() }}));
   }
 
   useEffect(() => {
