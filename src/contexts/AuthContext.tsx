@@ -699,9 +699,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 data: state.initialDrawing,
             });
         }
-
+        
         return {
-            ...state,
             isOpen: true,
             position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
             onSave: (dataUrl) => {
@@ -713,7 +712,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               });
             },
             openCanvases: newOpenCanvases,
-            activeCanvasId: canvasId, // Set the new/selected canvas as active
+            activeCanvasId: canvasId,
         };
     });
   }, [resources]);
@@ -3527,6 +3526,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 

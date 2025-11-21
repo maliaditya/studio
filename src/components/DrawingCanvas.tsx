@@ -205,9 +205,6 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
                   {...listeners}
                 >
                     <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
-                    <CardTitle className="text-base truncate">
-                      {activeCanvas ? `${activeCanvas.name} - Drawing Canvas` : 'Drawing Canvas'}
-                    </CardTitle>
                 </div>
                 <div className="flex-grow min-w-0 overflow-x-auto">
                     <div className="flex items-center gap-2">
@@ -247,7 +244,7 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
                     apiRef={excalidrawAPIRef}
                  />
                ) : (
-                <div className="flex h-full w-full items-center justify-center">Select a canvas to start drawing.</div>
+                <div className="flex h-full w-full items-center justify-center text-muted-foreground">Select a canvas to start drawing.</div>
                )}
             </CardContent>
         </Card>
