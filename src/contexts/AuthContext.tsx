@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -746,7 +747,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ...prev,
         position: {
           x: prev.position.x + delta.x,
-          y: prev.position.y + delta.y,
+          y: prev.y + delta.y,
         },
       } : null);
     }
@@ -1560,8 +1561,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (data && data.main) {
             loadImportedData(data.main, data.ui || {});
             toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
+        } else if (data === null) {
+            // This is a valid case where the user has no cloud data yet.
+            toast({ title: "No Cloud Data", description: "You can start using the app and push your data to the cloud later." });
         } else {
-            toast({ title: "No Cloud Data", description: result.message || "No data was found in the cloud for this user." });
+            toast({ title: "No Data Found", description: result.message || "No data was found in the cloud for this user." });
         }
 
     } catch (error) {
@@ -3154,6 +3158,11 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         });
         return;
     }
+    
+    if (isLoadingState) {
+        toast({ title: "Please Wait", description: "Application data is still loading. Please try again in a moment.", variant: "default" });
+        return;
+    }
 
     try {
         toast({ title: "Syncing with GitHub..." });
@@ -3181,10 +3190,9 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                 toast({ title: "Push Successful", description: "Your local changes have been pushed to GitHub." });
             } else {
                 await pullFromGitHub(token, owner, repo, path);
-                // toast for pull is in the pull function itself
             }
         } else {
-            console.error("Remote meta response error:", remoteMetaResponse.status);
+             throw new Error(`GitHub API error: ${remoteMetaResponse.statusText}`);
         }
     } catch (error) {
         console.error("GitHub Sync Error:", error);
@@ -3197,6 +3205,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   async function pushToGitHub(token: string, owner: string, repo: string, path: string, content: string, message: string, sha?: string) {
+    if (!content || content === "{}") {
+      toast({ title: "Sync Cancelled", description: "Cannot push empty data.", variant: "destructive" });
+      return;
+    }
     const pushResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
         method: 'PUT',
         headers: {
@@ -3228,9 +3240,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           throw new Error('Could not pull data from GitHub.');
       }
       const data = await response.json();
-      const content = data.content ? atob(data.content) : null;
       
-      if (!content) {
+      if (!data.content) {
           toast({
               title: "Empty Remote File",
               description: "The file on GitHub is empty. Your local data has not been overwritten.",
@@ -3239,11 +3250,20 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           return;
       }
       
+      const content = atob(data.content);
+      if (!content) {
+          toast({
+              title: "Empty Remote File",
+              description: "The file on GitHub is empty after decoding. Your local data has not been overwritten.",
+              variant: "default",
+          });
+          return;
+      }
+
       const parsedData = JSON.parse(content);
       loadImportedData(parsedData.main, parsedData.ui);
       setSettings(prev => ({...prev, lastSync: { sha: data.sha, timestamp: Date.now() }}));
       toast({ title: "Pull Successful", description: "Data has been imported from your GitHub backup." });
-      loadImportedData(parsedData.main, parsedData.ui);
   }
 
   useEffect(() => {
@@ -3524,4 +3544,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Supplements",
 };
+
 
