@@ -1536,45 +1536,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pullDataFromCloud = async (usernameOverride?: string) => {
     const effectiveUsername = usernameOverride || currentUser?.username;
     if (!effectiveUsername) {
-        toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
-        return;
+      toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
+      return;
     }
-
+  
     const isDemo = effectiveUsername === 'demo';
-
+  
     if (!isDemo) {
-        toast({ title: "Syncing...", description: "Fetching your latest data from the cloud." });
+      toast({ title: "Syncing...", description: "Fetching your latest data from the cloud." });
     }
-
+  
     try {
-        const response = await fetch(`/api/blob-sync?username=${effectiveUsername.toLowerCase()}`);
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.error || 'Failed to fetch data.');
-        }
-        
-        const data = result.data;
-        
-        if (data && data.main) {
-            loadImportedData(data.main, data.ui || {});
-            toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
-        } else if (data === null) {
-            // This is a valid case where the user has no cloud data yet.
-            toast({ title: "No Cloud Data", description: "You can start using the app and push your data to the cloud later." });
-        } else {
-            toast({ title: "No Data Found", description: result.message || "No data was found in the cloud for this user." });
-        }
-
+      const response = await fetch(`/api/blob-sync?username=${effectiveUsername.toLowerCase()}`);
+      
+      if (!response.ok) {
+        const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+        throw new Error(errorResult.error || 'Failed to fetch data.');
+      }
+      
+      const textData = await response.text();
+      
+      if (!textData) {
+        toast({ title: "No Cloud Data", description: "You can start using the app and push your data to the cloud later." });
+        return;
+      }
+  
+      const result = JSON.parse(textData);
+      const data = result.data;
+  
+      if (data && data.main) {
+        loadImportedData(data.main, data.ui || {});
+        toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
+      } else {
+        toast({ title: "No Data Found", description: result.message || "No data was found in the cloud for this user." });
+      }
+  
     } catch (error) {
-        console.error("Pull from cloud failed:", error);
-        if (!isDemo) {
-            toast({
-                title: "Sync Failed",
-                description: error instanceof Error ? error.message : "An unknown error occurred.",
-                variant: "destructive",
-            });
-        }
+      console.error("Pull from cloud failed:", error);
+      if (!isDemo) {
+        toast({
+          title: "Sync Failed",
+          description: error instanceof Error ? error.message : "An unknown error occurred.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -3157,9 +3162,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         return;
     }
     
-    if (isLoadingState && localChangeCount === 0) {
-      toast({ title: "Please Wait", description: "Application data is still loading. Please try again in a moment.", variant: "default" });
-      setTimeout(syncWithGitHub, 2000); // Retry after a delay
+    // Added check to prevent sync with empty data on initial load
+    if (isLoadingState || (localChangeCount === 0 && coreSkills.length === 0)) {
+      toast({ title: "Please Wait", description: "Application data is still loading. Retrying in 2 seconds.", variant: "default" });
+      setTimeout(syncWithGitHub, 2000);
       return;
     }
 
@@ -3182,9 +3188,13 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         if (remoteMetaResponse.ok) {
             const remoteMeta = await remoteMetaResponse.json();
             const remoteSha = remoteMeta.sha;
+            
+            const localDataIsEmpty = coreSkills.length === 0 && projects.length === 0;
 
-            const lastSync = settings.lastSync;
-            if (lastSync && lastSync.sha === remoteSha) {
+            if(localDataIsEmpty) {
+                 await pullFromGitHub(token, owner, repo, path);
+            }
+            else if (settings.lastSync && settings.lastSync.sha === remoteSha) {
                 await pushToGitHub(token, owner, repo, path, localDataString, "Update from LifeOS", remoteSha);
                 toast({ title: "Push Successful", description: "Your local changes have been pushed to GitHub." });
             } else {
@@ -3240,29 +3250,29 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       }
       const data = await response.json();
       
-      if (!data.content) {
-          toast({
-              title: "Empty Remote File",
-              description: "The file on GitHub is empty. Your local data has not been overwritten.",
-              variant: "default",
-          });
-          return;
+      const content = atob(data.content);
+      if (!content || content.trim() === "") {
+        toast({
+            title: "Empty Remote File",
+            description: "The file on GitHub is empty. Your local data has not been overwritten.",
+            variant: "default",
+        });
+        return;
       }
       
-      const content = atob(data.content);
-      if (!content) {
-          toast({
-              title: "Empty Remote File",
-              description: "The file on GitHub is empty after decoding. Your local data has not been overwritten.",
-              variant: "default",
-          });
-          return;
+      try {
+        const parsedData = JSON.parse(content);
+        if (parsedData && parsedData.main) {
+          loadImportedData(parsedData.main, parsedData.ui || {});
+          setSettings(prev => ({...prev, lastSync: { sha: data.sha, timestamp: Date.now() }}));
+          toast({ title: "Pull Successful", description: "Data has been imported from your GitHub backup." });
+        } else {
+          toast({ title: "Invalid Data", description: "The data from GitHub appears to be in an incorrect format.", variant: "destructive" });
+        }
+      } catch (parseError) {
+          console.error("Failed to parse pulled data:", parseError);
+          toast({ title: "Parse Error", description: "Could not read the data from GitHub. It may be corrupted.", variant: "destructive" });
       }
-
-      const parsedData = JSON.parse(content);
-      loadImportedData(parsedData.main, parsedData.ui);
-      setSettings(prev => ({...prev, lastSync: { sha: data.sha, timestamp: Date.now() }}));
-      toast({ title: "Pull Successful", description: "Data has been imported from your GitHub backup." });
   }
 
   useEffect(() => {
@@ -3543,6 +3553,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Supplements",
 };
+
 
 
 
