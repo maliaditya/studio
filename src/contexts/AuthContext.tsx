@@ -719,7 +719,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             resourceId: state.resourceId,
             pointId: state.pointId,
             name: state.name || 'Untitled Canvas',
-            data: state.initialDrawing,
+            initialDrawing: state.initialDrawing,
             isPinned: prev?.openCanvases.find(c => c.id === canvasId)?.isPinned || false,
         };
 
@@ -1289,7 +1289,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setBrainHacks(mainData.brainHacks || []);
     setSpacedRepetitionData(mainData.spacedRepetitionData || {});
     setDailyReviewLogs(mainData.dailyReviewLogs || []);
-    setAbandonmentLogs(mainData.abandonmentLogs || []);
+    setAbandonmentLogs(mainData.abandonmentLogs || {});
     
     // UI State
     setPinnedFolderIds(new Set(uiData.pinnedFolderIds || []));
@@ -2996,7 +2996,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const findRootTask = useCallback((activity: Activity): ExerciseDefinition | null => {
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d.id]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
     
     // First, find the definitionId of the current task instance
     let currentDefId: string | undefined;
@@ -3162,24 +3162,23 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         return;
     }
     
-    // Added check to prevent sync with empty data on initial load
-    if (isLoadingState || (localChangeCount === 0 && coreSkills.length === 0)) {
-      toast({ title: "Please Wait", description: "Application data is still loading. Retrying in 2 seconds.", variant: "default" });
-      setTimeout(syncWithGitHub, 2000);
+    if (isLoadingState) {
+      toast({ title: "Please Wait", description: "Application data is still loading.", variant: "default" });
       return;
     }
+    
+    const localDataIsEmpty = coreSkills.length === 0 && projects.length === 0;
 
     try {
         toast({ title: "Syncing with GitHub..." });
-
-        const localData = getAllUserData();
-        const localDataString = JSON.stringify(localData, null, 2);
 
         const remoteMetaResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
             headers: { 'Authorization': `token ${token}` }
         });
 
         if (remoteMetaResponse.status === 404) {
+            const localData = getAllUserData();
+            const localDataString = JSON.stringify(localData, null, 2);
             await pushToGitHub(token, owner, repo, path, localDataString, "Initial backup");
             toast({ title: "Initial Push Successful", description: "Your data has been backed up to GitHub." });
             return;
@@ -3189,12 +3188,12 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             const remoteMeta = await remoteMetaResponse.json();
             const remoteSha = remoteMeta.sha;
             
-            const localDataIsEmpty = coreSkills.length === 0 && projects.length === 0;
-
             if(localDataIsEmpty) {
                  await pullFromGitHub(token, owner, repo, path);
             }
             else if (settings.lastSync && settings.lastSync.sha === remoteSha) {
+                const localData = getAllUserData();
+                const localDataString = JSON.stringify(localData, null, 2);
                 await pushToGitHub(token, owner, repo, path, localDataString, "Update from LifeOS", remoteSha);
                 toast({ title: "Push Successful", description: "Your local changes have been pushed to GitHub." });
             } else {
@@ -3557,3 +3556,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
 
+
+
+    
