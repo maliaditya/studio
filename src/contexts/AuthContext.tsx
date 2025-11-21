@@ -629,15 +629,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
 
-  const togglePinDrawing = useCallback((canvasId: string) => {
+  const togglePinDrawing = (canvasId: string) => {
     setDrawingCanvasState(prev => {
-      if (!prev) return null;
-      const newOpenCanvases = (prev.openCanvases || []).map(c => 
-        c.id === canvasId ? { ...c, isPinned: !c.isPinned } : c
-      );
-      return { ...prev, openCanvases: newOpenCanvases };
+        if (!prev) return null;
+        const updatedCanvases = (prev.openCanvases || []).map(canvas => 
+            canvas.id === canvasId 
+                ? { ...canvas, isPinned: !canvas.isPinned } 
+                : canvas
+        );
+        return { ...prev, openCanvases: updatedCanvases };
     });
-  }, []);
+  };
 
   const updateDrawingData = useCallback((canvasId: string, data: string) => {
     setDrawingCanvasState(prev => {
@@ -713,7 +715,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setDrawingCanvasState(prev => {
         const newOpenCanvases = prev?.openCanvases ? [...prev.openCanvases] : [];
         const canvasIndex = newOpenCanvases.findIndex(c => c.id === canvasId);
-
+    
         if (canvasIndex === -1) {
             newOpenCanvases.push({
                 id: canvasId,
@@ -721,10 +723,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 pointId: state.pointId,
                 name: state.name,
                 initialDrawing: state.initialDrawing,
-                isPinned: false
             });
         }
-        
+    
         return {
             isOpen: true,
             position: prev?.position || { x: window.innerWidth / 2, y: window.innerHeight / 2 },
@@ -741,7 +742,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setDrawingCanvasState(prev => prev ? {
         ...prev,
         position: {
-          x: prev.position.x + delta.x,
+          x: prev.x + delta.x,
           y: prev.y + delta.y,
         },
       } : null);
@@ -1533,59 +1534,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const pullDataFromCloud = async (usernameOverride?: string) => {
     const effectiveUsername = usernameOverride || currentUser?.username;
     if (!effectiveUsername) {
-      toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
-      return;
-    }
-  
-    const isDemo = effectiveUsername === 'demo';
-  
-    if (!isDemo) {
-      toast({ title: "Syncing...", description: "Fetching your latest data from the cloud." });
-    }
-  
-    try {
-      const response = await fetch(`/api/blob-sync?username=${effectiveUsername.toLowerCase()}`);
-      
-      if (!response.ok) {
-        const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
-        throw new Error(errorResult.error || 'Failed to fetch data.');
-      }
-      
-      const textData = await response.text();
-      
-      // If the local data is empty, we should load whatever is in the cloud.
-      const localDataIsEmpty = coreSkills.length === 0 && projects.length === 0;
-
-      if (!textData && !localDataIsEmpty) {
-        toast({ title: "Empty Remote File", description: "The backup file on GitHub is empty. Your local data has not been overwritten.", variant: "default" });
+        toast({ title: "Error", description: "You must be logged in to sync.", variant: "destructive" });
         return;
-      }
-  
-      if (textData) {
-        const result = JSON.parse(textData);
-        const data = result.data;
-    
-        if (data && data.main) {
-          loadImportedData(data.main, data.ui || {});
-          toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
-        } else if (!localDataIsEmpty) {
-          toast({ title: "No Data Found", description: result.message || "No data was found in the cloud for this user." });
+    }
+
+    const isDemo = effectiveUsername === 'demo';
+
+    if (!isDemo) {
+        toast({ title: "Syncing...", description: "Fetching your latest data from the cloud." });
+    }
+
+    try {
+        const response = await fetch(`/api/blob-sync?username=${effectiveUsername.toLowerCase()}`);
+        
+        if (!response.ok) {
+            const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
+            throw new Error(errorResult.error || 'Failed to fetch data.');
         }
-      } else if (localDataIsEmpty) {
-         toast({ title: "No Data Found", description: "No local or remote data. Start by creating some items!" });
-      }
+        
+        const textData = await response.text();
+        const localDataIsEmpty = coreSkills.length === 0 && projects.length === 0;
+
+        if (textData) {
+            const result = JSON.parse(textData);
+            const data = result.data;
+
+            if (data && data.main) {
+                loadImportedData(data.main, data.ui || {});
+                toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
+            } else if (!localDataIsEmpty) {
+                toast({ title: "No Data Found", description: result.message || "No data was found in the cloud for this user." });
+            }
+        } else if (localDataIsEmpty) {
+            toast({ title: "No Data Found", description: "No local or remote data. Start by creating some items!" });
+        } else {
+            toast({ title: "Empty Remote File", description: "The backup file in the cloud is empty. Your local data has not been overwritten." });
+        }
   
     } catch (error) {
-      console.error("Pull from cloud failed:", error);
-      if (!isDemo) {
-        toast({
-          title: "Sync Failed",
-          description: error instanceof Error ? error.message : "An unknown error occurred.",
-          variant: "destructive",
-        });
-      }
+        console.error("Pull from cloud failed:", error);
+        if (!isDemo) {
+            toast({
+                title: "Sync Failed",
+                description: error instanceof Error ? error.message : "An unknown error occurred.",
+                variant: "destructive",
+            });
+        }
     }
-  };
+};
   
   const exportData = () => {
     if (!currentUser?.username) {
@@ -3559,6 +3555,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 
