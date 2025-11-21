@@ -637,7 +637,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
         return { ...prev, openCanvases: newOpenCanvases };
     });
-  }, []);
+}, []);
 
   const updateDrawingData = useCallback((canvasId: string, data: string) => {
     setDrawingCanvasState(prev => {
@@ -711,32 +711,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
     setDrawingCanvasState(prev => {
-        const newOpenCanvases = [...(prev?.openCanvases || [])];
-        const existingCanvasIndex = newOpenCanvases.findIndex(c => c.id === canvasId);
-    
-        const newCanvasData = {
-            id: canvasId,
-            resourceId: state.resourceId,
-            pointId: state.pointId,
-            name: state.name || 'Untitled Canvas',
-            initialDrawing: state.initialDrawing,
-            isPinned: (existingCanvasIndex > -1) ? newOpenCanvases[existingCanvasIndex].isPinned : false,
-        };
-    
-        if (existingCanvasIndex > -1) {
-            newOpenCanvases[existingCanvasIndex] = newCanvasData;
+        const existingCanvases = prev?.openCanvases || [];
+        const canvasIndex = existingCanvases.findIndex(c => c.id === canvasId);
+        
+        let newOpenCanvases;
+        if (canvasIndex > -1) {
+            newOpenCanvases = [...existingCanvases];
         } else {
-            newOpenCanvases.push(newCanvasData);
+            newOpenCanvases = [...existingCanvases, {
+                id: canvasId,
+                resourceId: state.resourceId,
+                pointId: state.pointId,
+                name: state.name,
+                initialDrawing: state.initialDrawing,
+                isPinned: false
+            }];
         }
-    
+
         return {
             isOpen: true,
-            position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+            position: prev?.position || { x: window.innerWidth / 2, y: window.innerHeight / 2 },
             openCanvases: newOpenCanvases,
             activeCanvasId: canvasId,
         };
     });
   }, []);
+
 
   const handleDrawingCanvasPopupDragEnd = useCallback((event: DragEndEvent) => {
     const { active, delta } = event;
@@ -1556,19 +1556,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       const textData = await response.text();
       
-      if (!textData) {
-        toast({ title: "No Cloud Data", description: "You can start using the app and push your data to the cloud later." });
+      // If the local data is empty, we should load whatever is in the cloud.
+      const localDataIsEmpty = coreSkills.length === 0 && projects.length === 0;
+
+      if (!textData && !localDataIsEmpty) {
+        toast({ title: "Empty Remote File", description: "The backup file on GitHub is empty. Your local data has not been overwritten.", variant: "default" });
         return;
       }
   
-      const result = JSON.parse(textData);
-      const data = result.data;
-  
-      if (data && data.main) {
-        loadImportedData(data.main, data.ui || {});
-        toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
-      } else {
-        toast({ title: "No Data Found", description: result.message || "No data was found in the cloud for this user." });
+      if (textData) {
+        const result = JSON.parse(textData);
+        const data = result.data;
+    
+        if (data && data.main) {
+          loadImportedData(data.main, data.ui || {});
+          toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
+        } else if (!localDataIsEmpty) {
+          toast({ title: "No Data Found", description: result.message || "No data was found in the cloud for this user." });
+        }
+      } else if (localDataIsEmpty) {
+         toast({ title: "No Data Found", description: "No local or remote data. Start by creating some items!" });
       }
   
     } catch (error) {
@@ -1582,7 +1589,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     }
   };
-
+  
   const exportData = () => {
     if (!currentUser?.username) {
         toast({ title: "Error", description: "You must be logged in to export data.", variant: "destructive" });
@@ -3148,8 +3155,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const syncWithGitHub = async () => {
-    if (isLoadingState) {
-        toast({ title: "Please Wait", description: "Application data is still loading.", variant: "default" });
+    if (isLoadingState || (localChangeCount === 0 && coreSkills.length > 0)) {
+        toast({ title: "Please Wait", description: "Application data is still loading or no changes to sync.", variant: "default" });
         return;
     }
 
@@ -3191,15 +3198,14 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
         if (remoteMetaResponse.ok) {
             const remoteMeta = await remoteMetaResponse.json();
-            const remoteSha = remoteMeta.sha;
             
             if (localDataIsEmpty) {
                 await pullFromGitHub(token, owner, repo, path);
-            } else if (settings.lastSync && settings.lastSync.sha === remoteSha) {
+            } else if (settings.lastSync && settings.lastSync.sha === remoteMeta.sha) {
                 // Local is ahead or in sync, safe to push
                 const localData = getAllUserData();
                 const localDataString = JSON.stringify(localData, null, 2);
-                await pushToGitHub(token, owner, repo, path, localDataString, "Update from LifeOS", remoteSha);
+                await pushToGitHub(token, owner, repo, path, localDataString, "Update from LifeOS", remoteMeta.sha);
                 toast({ title: "Push Successful", description: "Your local changes have been pushed to GitHub." });
             } else {
                 // Remote has changes, pull them
@@ -3256,16 +3262,15 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       const data = await response.json();
       
       const content = atob(data.content);
-      if (!content || content.trim() === "") {
-        toast({
-            title: "Empty Remote File",
-            description: "The file on GitHub is empty. Your local data has not been overwritten.",
-            variant: "default",
-        });
+      
+      const localDataIsEmpty = coreSkills.length === 0 && projects.length === 0;
+
+      if (!content && !localDataIsEmpty) {
+        toast({ title: "Empty Remote File", description: "The backup file on GitHub is empty. Your local data has not been overwritten.", variant: "default" });
         return;
       }
-      
-      try {
+  
+      if (content) {
         const parsedData = JSON.parse(content);
         if (parsedData && parsedData.main) {
           loadImportedData(parsedData.main, parsedData.ui || {});
@@ -3274,9 +3279,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         } else {
           toast({ title: "Invalid Data", description: "The data from GitHub appears to be in an incorrect format.", variant: "destructive" });
         }
-      } catch (parseError) {
-          console.error("Failed to parse pulled data:", parseError);
-          toast({ title: "Parse Error", description: "Could not read the data from GitHub. It may be corrupted.", variant: "destructive" });
+      } else if (localDataIsEmpty) {
+         toast({ title: "No Data Found", description: "No local or remote data. Start by creating some items!" });
       }
   }
 
@@ -3565,4 +3569,5 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
