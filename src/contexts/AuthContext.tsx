@@ -81,8 +81,9 @@ interface AuthContextType {
   handlePdfViewerPopupDragEnd: (event: DragEndEvent) => void;
   drawingCanvasState: DrawingCanvasPopupState | null;
   setDrawingCanvasState: React.Dispatch<React.SetStateAction<DrawingCanvasPopupState | null>>;
-  openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave' | 'openCanvases' | 'activeCanvasId'> & {name?: string}) => void;
+  openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'> & {name?: string}) => void;
   handleDrawingCanvasPopupDragEnd: (event: DragEndEvent) => void;
+  togglePinDrawing: (canvasId: string) => void;
   clearAllLocalFiles: () => Promise<void>;
   isTodaysPredictionModalOpen: boolean;
   setIsTodaysPredictionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -626,6 +627,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
 
+  const togglePinDrawing = (canvasId: string) => {
+    setDrawingCanvasState(prev => {
+        if (!prev) return null;
+        const newOpenCanvases = prev.openCanvases.map(c => 
+            c.id === canvasId ? { ...c, isPinned: !c.isPinned } : c
+        );
+        return { ...prev, openCanvases: newOpenCanvases };
+    });
+  };
+
   const toggleProjectBrandingStatus = useCallback((projectId: string) => {
     setProjects(prevProjects =>
       prevProjects.map(p =>
@@ -672,7 +683,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave' | 'openCanvases' | 'activeCanvasId'> & {name?: string}) => {
+  const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'> & {name?: string}) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
 
     setDrawingCanvasState(prev => {
@@ -3250,6 +3261,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     playbackRequest, setPlaybackRequest,
     pdfViewerState, setPdfViewerState, openPdfViewer, handlePdfViewerPopupDragEnd,
     drawingCanvasState, setDrawingCanvasState, openDrawingCanvas, handleDrawingCanvasPopupDragEnd,
+    togglePinDrawing,
     clearAllLocalFiles,
     isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen,
     settings, setSettings,
@@ -3515,6 +3527,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
