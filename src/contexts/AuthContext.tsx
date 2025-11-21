@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -711,21 +712,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
     setDrawingCanvasState(prev => {
-        const newOpenCanvases = [...(prev?.openCanvases || []).filter(c => c.isPinned)];
+        // Keep existing open canvases
+        const newOpenCanvases = [...(prev?.openCanvases || [])];
         const existingCanvasIndex = newOpenCanvases.findIndex(c => c.id === canvasId);
-        
+
         const newCanvasData = {
             id: canvasId,
             resourceId: state.resourceId,
             pointId: state.pointId,
             name: state.name || 'Untitled Canvas',
             initialDrawing: state.initialDrawing,
-            isPinned: prev?.openCanvases.find(c => c.id === canvasId)?.isPinned || false,
+            // Preserve pinned status if it exists
+            isPinned: newOpenCanvases[existingCanvasIndex]?.isPinned || false,
         };
 
         if (existingCanvasIndex > -1) {
+            // Update existing canvas data in place
             newOpenCanvases[existingCanvasIndex] = newCanvasData;
         } else {
+            // Add new canvas if it's not already open
             newOpenCanvases.push(newCanvasData);
         }
 
@@ -736,7 +741,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             activeCanvasId: canvasId,
         };
     });
-  }, []);
+}, []);
 
   const handleDrawingCanvasPopupDragEnd = useCallback((event: DragEndEvent) => {
     const { active, delta } = event;
@@ -3148,6 +3153,13 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const syncWithGitHub = async () => {
+    if (isLoadingState) {
+        toast({ title: "Please Wait", description: "Application data is still loading.", variant: "default" });
+        return;
+    }
+
+    const localDataIsEmpty = coreSkills.length === 0 && projects.length === 0;
+
     const token = settings.githubToken;
     const owner = settings.githubOwner;
     const repo = settings.githubRepo;
@@ -3161,13 +3173,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         });
         return;
     }
-    
-    if (isLoadingState) {
-      toast({ title: "Please Wait", description: "Application data is still loading.", variant: "default" });
-      return;
-    }
-    
-    const localDataIsEmpty = coreSkills.length === 0 && projects.length === 0;
 
     try {
         toast({ title: "Syncing with GitHub..." });
@@ -3176,7 +3181,12 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             headers: { 'Authorization': `token ${token}` }
         });
 
-        if (remoteMetaResponse.status === 404) {
+        if (remoteMetaResponse.status === 404) { // File doesn't exist
+            if (localDataIsEmpty) {
+                 toast({ title: "No Data to Sync", description: "Your local data and remote backup are both empty." });
+                 return;
+            }
+            // Initial push
             const localData = getAllUserData();
             const localDataString = JSON.stringify(localData, null, 2);
             await pushToGitHub(token, owner, repo, path, localDataString, "Initial backup");
@@ -3188,15 +3198,16 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             const remoteMeta = await remoteMetaResponse.json();
             const remoteSha = remoteMeta.sha;
             
-            if(localDataIsEmpty) {
-                 await pullFromGitHub(token, owner, repo, path);
-            }
-            else if (settings.lastSync && settings.lastSync.sha === remoteSha) {
+            if (localDataIsEmpty) {
+                await pullFromGitHub(token, owner, repo, path);
+            } else if (settings.lastSync && settings.lastSync.sha === remoteSha) {
+                // Local is ahead or in sync, safe to push
                 const localData = getAllUserData();
                 const localDataString = JSON.stringify(localData, null, 2);
                 await pushToGitHub(token, owner, repo, path, localDataString, "Update from LifeOS", remoteSha);
                 toast({ title: "Push Successful", description: "Your local changes have been pushed to GitHub." });
             } else {
+                // Remote has changes, pull them
                 await pullFromGitHub(token, owner, repo, path);
             }
         } else {
