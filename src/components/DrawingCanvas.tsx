@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from './ui/button';
 import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search } from 'lucide-react';
