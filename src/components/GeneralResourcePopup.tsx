@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
@@ -452,6 +451,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         authOpenDrawingCanvas({
             resourceId: resource.id,
             pointId: point.id,
+            name: point.text,
             initialDrawing: point.drawing,
         });
     }, [resource.id, authOpenDrawingCanvas]);

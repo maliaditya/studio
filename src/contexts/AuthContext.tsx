@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -628,7 +627,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
 
-  const togglePinDrawing = (canvasId: string) => {
+  const togglePinDrawing = useCallback((canvasId: string) => {
     setDrawingCanvasState(prev => {
         if (!prev) return null;
         const newOpenCanvases = prev.openCanvases.map(c => 
@@ -636,18 +635,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
         return { ...prev, openCanvases: newOpenCanvases };
     });
-  };
+  }, []);
 
-  const updateDrawingData = (canvasId: string, data: string) => {
+  const updateDrawingData = useCallback((canvasId: string, data: string) => {
     setDrawingCanvasState(prev => {
         if (!prev) return null;
-        const newOpenCanvases = prev.openCanvases.map(c => 
+        const newOpenCanvases = (prev.openCanvases || []).map(c => 
             c.id === canvasId ? { ...c, data: data } : c
         );
         return { ...prev, openCanvases: newOpenCanvases };
     });
     // This is a "side-effect" that updates the source of truth in resources
-    const canvasToUpdate = drawingCanvasState?.openCanvases.find(c => c.id === canvasId);
+    const canvasToUpdate = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
     if(canvasToUpdate) {
         setResources(prevResources => prevResources.map(r => {
             if(r.id === canvasToUpdate.resourceId) {
@@ -659,7 +658,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return r;
         }))
     }
-  };
+  }, [drawingCanvasState]);
 
 
   const toggleProjectBrandingStatus = useCallback((projectId: string) => {
@@ -712,11 +711,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
 
     setDrawingCanvasState(prev => {
-        const newOpenCanvases = prev?.openCanvases ? [...prev.openCanvases] : [];
+        const newOpenCanvases = [...(prev?.openCanvases || []).filter(c => c.isPinned)];
         let existingCanvas = newOpenCanvases.find(c => c.id === canvasId);
-        
+
         if (!existingCanvas) {
-            newOpenCanvases.push({
+             newOpenCanvases.push({
                 id: canvasId,
                 resourceId: state.resourceId,
                 pointId: state.pointId,
@@ -3538,21 +3537,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal1: "Meal 1",
   meal2: "Meal 2",
   meal3: "Meal 3",
-  supplements: "Snacks & Supplements",
-}
-    
+  supplements: "Supplements",
+};
 
     
-
-
-
-
-
-
-
-
-
-
-
-
-
