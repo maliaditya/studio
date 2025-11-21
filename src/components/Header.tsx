@@ -601,6 +601,8 @@ export function Header() {
     pushDemoDataWithToken,
     syncWithGitHub,
     downloadFromGitHub,
+    openMindsetWidget,
+    setIsTodaysPredictionModalOpen,
   } = useAuth();
 
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
@@ -626,6 +628,16 @@ export function Header() {
               </Button>
               
               <GlobalSearch open={isSearchOpen} setOpen={setIsSearchOpen} />
+
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openMindsetWidget}>
+                  <Brain className="h-4 w-4" />
+                  <span className="sr-only">Resistances & Urges</span>
+              </Button>
+
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsTodaysPredictionModalOpen(true)}>
+                  <ActivityIcon className="h-4 w-4" />
+                  <span className="sr-only">Today's Prediction</span>
+              </Button>
 
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}>
                 <Github className="h-4 w-4" />
