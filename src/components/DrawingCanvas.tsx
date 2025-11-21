@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
-  () => import('@excalidraw/excalidraw'),
+  async () => (await import('@excalidraw/excalidraw')).Excalidraw,
   {
     ssr: false,
     loading: () => <div className="flex h-full w-full items-center justify-center">Loading Canvas...</div>
@@ -190,7 +190,7 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
     togglePinDrawing(canvasId);
   };
   
-  const activeCanvas = (drawingCanvasState?.openCanvases || []).find(c => c.id === drawingCanvasState?.activeCanvasId);
+  const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
   
   if (!isOpen || !drawingCanvasState) return null;
 
