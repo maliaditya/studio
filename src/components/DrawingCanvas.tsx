@@ -190,7 +190,7 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
     togglePinDrawing(canvasId);
   };
   
-  const activeCanvas = drawingCanvasState?.openCanvases.find(c => c.id === drawingCanvasState.activeCanvasId);
+  const activeCanvas = (drawingCanvasState?.openCanvases || []).find(c => c.id === drawingCanvasState?.activeCanvasId);
   
   if (!isOpen || !drawingCanvasState) return null;
 
