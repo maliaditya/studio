@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -630,7 +631,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const togglePinDrawing = useCallback((canvasId: string) => {
     setDrawingCanvasState(prev => {
         if (!prev) return null;
-        const newOpenCanvases = prev.openCanvases.map(c => 
+        const newOpenCanvases = (prev.openCanvases || []).map(c => 
             c.id === canvasId ? { ...c, isPinned: !c.isPinned } : c
         );
         return { ...prev, openCanvases: newOpenCanvases };
@@ -638,6 +639,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const updateDrawingData = useCallback((canvasId: string, data: string) => {
+    // This updates the popup state which is temporary.
     setDrawingCanvasState(prev => {
         if (!prev) return null;
         const newOpenCanvases = (prev.openCanvases || []).map(c => 
@@ -645,7 +647,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         );
         return { ...prev, openCanvases: newOpenCanvases };
     });
-    // This is a "side-effect" that updates the source of truth in resources
+    // This is the "side-effect" that updates the source of truth in resources
     const canvasToUpdate = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
     if(canvasToUpdate) {
         setResources(prevResources => prevResources.map(r => {
@@ -658,7 +660,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return r;
         }))
     }
-  }, [drawingCanvasState]);
+  }, [drawingCanvasState, setResources]);
 
 
   const toggleProjectBrandingStatus = useCallback((projectId: string) => {
@@ -709,21 +711,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
-
     setDrawingCanvasState(prev => {
         const newOpenCanvases = [...(prev?.openCanvases || []).filter(c => c.isPinned)];
-        let existingCanvas = newOpenCanvases.find(c => c.id === canvasId);
-
-        if (!existingCanvas) {
-             newOpenCanvases.push({
-                id: canvasId,
-                resourceId: state.resourceId,
-                pointId: state.pointId,
-                name: state.name || 'Untitled Canvas',
-                data: state.initialDrawing,
-            });
-        }
+        const existingCanvasIndex = newOpenCanvases.findIndex(c => c.id === canvasId);
         
+        const newCanvasData = {
+            id: canvasId,
+            resourceId: state.resourceId,
+            pointId: state.pointId,
+            name: state.name || 'Untitled Canvas',
+            data: state.initialDrawing,
+            isPinned: prev?.openCanvases.find(c => c.id === canvasId)?.isPinned || false,
+        };
+
+        if (existingCanvasIndex > -1) {
+            newOpenCanvases[existingCanvasIndex] = newCanvasData;
+        } else {
+            newOpenCanvases.push(newCanvasData);
+        }
+
         return {
             isOpen: true,
             position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
@@ -1284,7 +1290,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setBrainHacks(mainData.brainHacks || []);
     setSpacedRepetitionData(mainData.spacedRepetitionData || {});
     setDailyReviewLogs(mainData.dailyReviewLogs || []);
-    setAbandonmentLogs(mainData.abandonmentLogs || {});
+    setAbandonmentLogs(mainData.abandonmentLogs || []);
     
     // UI State
     setPinnedFolderIds(new Set(uiData.pinnedFolderIds || []));
@@ -2983,7 +2989,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const findRootTask = useCallback((activity: Activity): ExerciseDefinition | null => {
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d.id]));
     
     // First, find the definitionId of the current task instance
     let currentDefId: string | undefined;
