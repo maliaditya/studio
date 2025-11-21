@@ -71,15 +71,22 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const [githubOwner, setGithubOwner] = useState('');
   const [githubRepo, setGithubRepo] = useState('');
   const [githubPath, setGithubPath] = useState('');
+  
+  const defaultFileName = useMemo(() => {
+    if (!currentUser?.username) return 'lifeos_backup.json';
+    const date = new Date().toISOString().split('T')[0];
+    return `lifeos_backup_${currentUser.username}_${date}.json`;
+  }, [currentUser]);
+
 
   useEffect(() => {
     if (isOpen && settings) {
       setGithubToken(settings.githubToken || '');
       setGithubOwner(settings.githubOwner || '');
       setGithubRepo(settings.githubRepo || '');
-      setGithubPath(settings.githubPath || '');
+      setGithubPath(settings.githubPath || defaultFileName);
     }
-  }, [isOpen, settings]);
+  }, [isOpen, settings, defaultFileName]);
 
 
   const settingsKey = currentUser ? `dock_settings_${currentUser.username}` : null;
@@ -423,7 +430,7 @@ ${JSON.stringify(finalTemplate, null, 2)}
                             <Input id="github-repo" placeholder="e.g., lifeos-backup" value={githubRepo} onChange={(e) => setGithubRepo(e.target.value)} />
                           </div>
                           <div className="space-y-1">
-                            <Label htmlFor="github-path">File Path</Label>
+                            <Label htmlFor="github-path">File Path in Repo</Label>
                             <Input id="github-path" placeholder="e.g., backup.json" value={githubPath} onChange={(e) => setGithubPath(e.target.value)} />
                           </div>
                           <Button onClick={handleGithubSettingsSave}>Save GitHub Settings</Button>
