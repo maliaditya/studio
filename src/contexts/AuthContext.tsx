@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -88,6 +87,7 @@ interface AuthContextType {
   clearAllLocalFiles: () => Promise<void>;
   isTodaysPredictionModalOpen: boolean;
   setIsTodaysPredictionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  syncWithGitHub: () => Promise<void>;
   
   // Shared health state
   weightLogs: WeightLog[];
@@ -3140,6 +3140,106 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       return newCard;
   };
 
+  const syncWithGitHub = async () => {
+    // Check local storage for GitHub configuration
+    const token = settings.githubToken;
+    const owner = settings.githubOwner;
+    const repo = settings.githubRepo;
+    const path = settings.githubPath;
+
+    if (!token || !owner || !repo || !path) {
+        toast({
+            title: "GitHub Sync Not Configured",
+            description: "Please configure your GitHub details in the settings.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+    try {
+        toast({ title: "Syncing with GitHub..." });
+
+        const localData = getAllUserData();
+        const localDataString = JSON.stringify(localData, null, 2);
+
+        // Fetch file metadata from GitHub to get the latest SHA
+        const remoteMetaResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+            headers: { 'Authorization': `token ${token}` }
+        });
+
+        if (remoteMetaResponse.status === 404) {
+            // File doesn't exist, initial push
+            await pushToGitHub(token, owner, repo, path, localDataString, "Initial backup");
+            toast({ title: "Initial Push Successful", description: "Your data has been backed up to GitHub." });
+            return;
+        }
+
+        if (!remoteMetaResponse.ok) {
+            throw new Error(`Failed to get remote file metadata. Status: ${remoteMetaResponse.status}`);
+        }
+
+        const remoteMeta = await remoteMetaResponse.json();
+        const remoteSha = remoteMeta.sha;
+
+        // Compare last sync timestamp
+        const lastSync = settings.lastSync;
+        if (lastSync && lastSync.sha === remoteSha) {
+            // No changes on remote, safe to push
+            await pushToGitHub(token, owner, repo, path, localDataString, "Update from LifeOS", remoteSha);
+            toast({ title: "Push Successful", description: "Your local changes have been pushed to GitHub." });
+        } else {
+            // Remote has changed, need to pull first
+            await pullFromGitHub(token, owner, repo, path);
+            toast({ title: "Pull Successful", description: "Remote changes have been pulled. Please review and push again if needed." });
+        }
+    } catch (error) {
+        console.error("GitHub Sync Error:", error);
+        toast({
+            title: "GitHub Sync Failed",
+            description: error instanceof Error ? error.message : "An unknown error occurred.",
+            variant: "destructive",
+        });
+    }
+  };
+
+  async function pushToGitHub(token: string, owner: string, repo: string, path: string, content: string, message: string, sha?: string) {
+    const pushResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+        method: 'PUT',
+        headers: {
+            'Authorization': `token ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            message,
+            content: btoa(unescape(encodeURIComponent(content))),
+            sha
+        })
+    });
+
+    if (!pushResponse.ok) {
+        const errorData = await pushResponse.json();
+        throw new Error(errorData.message || 'Failed to push file to GitHub.');
+    }
+    
+    const result = await pushResponse.json();
+    handleSettingChange('lastSync', { sha: result.content.sha, timestamp: Date.now() });
+    setLocalChangeCount(0);
+  }
+
+  async function pullFromGitHub(token: string, owner: string, repo: string, path: string) {
+      const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+          headers: { 'Authorization': `token ${token}` }
+      });
+      if (!response.ok) {
+          throw new Error('Could not pull data from GitHub.');
+      }
+      const data = await response.json();
+      const content = atob(data.content);
+      const parsedData = JSON.parse(content);
+      
+      loadImportedData(parsedData.main, parsedData.ui);
+      handleSettingChange('lastSync', { sha: data.sha, timestamp: Date.now() });
+  }
 
   useEffect(() => {
     const user = getCurrentLocalUser();
@@ -3285,6 +3385,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     togglePinDrawing, updateDrawingData,
     clearAllLocalFiles,
     isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen,
+    syncWithGitHub,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
     schedule: populatedSchedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
@@ -3396,133 +3497,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     isMindsetModalOpen, setIsMindsetModalOpen,
     toggleProjectBrandingStatus,
   };
-
-  useEffect(() => {
-    const user = getCurrentLocalUser();
-    if (user) {
-      setCurrentUser(user);
-      loadState(user.username);
-    }
-    setLoading(false);
-    const savedTheme = typeof window !== 'undefined' ? localStorage.getItem('lifeos_theme') || 'ad-dark' : 'ad-dark';
-    setThemeState(savedTheme);
-
-    const savedVolume = typeof window !== 'undefined' ? localStorage.getItem('lifeos_global_volume') : null;
-    if (savedVolume !== null) {
-        setGlobalVolumeState(parseFloat(savedVolume));
-    }
-  }, [loadState]);
-  
-   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      const currentHour = now.getHours();
-      if (currentHour >= 0 && currentHour < 4) setCurrentSlot('Late Night');
-      else if (currentHour >= 4 && currentHour < 8) setCurrentSlot('Dawn');
-      else if (currentHour >= 8 && currentHour < 12) setCurrentSlot('Morning');
-      else if (currentHour >= 12 && currentHour < 16) setCurrentSlot('Afternoon');
-      else if (currentHour >= 16 && currentHour < 20) setCurrentSlot('Evening');
-      else setCurrentSlot('Night');
-    }, 60000);
-
-    const now = new Date();
-    const currentHour = now.getHours();
-    if (currentHour >= 0 && currentHour < 4) setCurrentSlot('Late Night');
-    else if (currentHour >= 4 && currentHour < 8) setCurrentSlot('Dawn');
-    else if (currentHour >= 8 && currentHour < 12) setCurrentSlot('Morning');
-    else if (currentHour >= 12 && currentHour < 16) setCurrentSlot('Afternoon');
-    else if (currentHour >= 16 && currentHour < 20) setCurrentSlot('Evening');
-    else setCurrentSlot('Night');
-
-    return () => clearInterval(interval);
-  }, []);
-
-  useEffect(() => {
-    let timerId: NodeJS.Timeout | undefined;
-
-    if (activeFocusSession?.state === 'running') {
-      timerId = setInterval(() => {
-        setActiveFocusSession(prev => {
-          if (!prev || prev.state !== 'running') {
-            clearInterval(timerId!);
-            return prev;
-          }
-          if (prev.secondsLeft <= 1) {
-            clearInterval(timerId!);
-            return { ...prev, secondsLeft: 0, state: 'paused' };
-          }
-          return { ...prev, secondsLeft: prev.secondsLeft - 1 };
-        });
-      }, 1000);
-    }
-
-    return () => {
-      if (timerId) {
-        clearInterval(timerId);
-      }
-    };
-  }, [activeFocusSession?.state, setActiveFocusSession]);
-
-  useEffect(() => {
-    if (isLoadingState || !currentUser) return;
-  
-    const allDates = Object.keys(schedule).map(parseISO).filter(isValid);
-    if (allDates.length === 0) return;
-  
-    const latestDate = max(allDates);
-    const today = startOfDay(new Date());
-  
-    const startOfThisWeek = startOfWeek(today, { weekStartsOn: 1 });
-    const startOfLatestWeek = startOfWeek(latestDate, { weekStartsOn: 1 });
-  
-    if (isAfter(startOfThisWeek, startOfLatestWeek)) {
-      const newSchedule = { ...schedule };
-      let scheduleUpdated = false;
-      const daysToCarryOver = eachDayOfInterval({ start: startOfThisWeek, end: addDays(startOfThisWeek, 6) });
-  
-      daysToCarryOver.forEach(day => {
-        const dayKey = format(day, 'yyyy-MM-dd');
-        const lastWeekDayKey = format(subDays(day, 7), 'yyyy-MM-dd');
-        const lastWeekSchedule = schedule[lastWeekDayKey];
-  
-        if (lastWeekSchedule && !newSchedule[dayKey]) {
-          const newDaySchedule: DailySchedule = {};
-          Object.keys(lastWeekSchedule).forEach(key => {
-            const slotName = key as SlotName;
-            const activities = lastWeekSchedule[slotName] as Activity[] | undefined;
-            if (Array.isArray(activities)) {
-              newDaySchedule[slotName] = activities.map(act => ({
-                ...act,
-                id: `${act.type}-${dayKey}-${Math.random()}`,
-                completed: false,
-                completedAt: undefined,
-                focusSessionInitialStartTime: undefined,
-                focusSessionStartTime: undefined,
-                focusSessionEndTime: undefined,
-                focusSessionPauses: [],
-              }));
-            }
-          });
-          newSchedule[dayKey] = newDaySchedule;
-          scheduleUpdated = true;
-        }
-      });
-  
-      if (scheduleUpdated) {
-        setSchedule(newSchedule);
-        toast({
-          title: "New Week, New Plan!",
-          description: "Your schedule from last week has been carried over.",
-        });
-      }
-    }
-  }, [isLoadingState, currentUser, schedule, setSchedule, toast]);
-  
-  useEffect(() => {
-    if (playbackRequest) {
-      openGeneralPopup(playbackRequest.resourceId, null); 
-    }
-  }, [playbackRequest, openGeneralPopup]);
 
   return (
     <AuthContext.Provider value={value}>
