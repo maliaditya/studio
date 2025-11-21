@@ -81,7 +81,7 @@ interface AuthContextType {
   handlePdfViewerPopupDragEnd: (event: DragEndEvent) => void;
   drawingCanvasState: DrawingCanvasPopupState | null;
   setDrawingCanvasState: React.Dispatch<React.SetStateAction<DrawingCanvasPopupState | null>>;
-  openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => void;
+  openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave' | 'openCanvases' | 'activeCanvasId'> & {name?: string}) => void;
   handleDrawingCanvasPopupDragEnd: (event: DragEndEvent) => void;
   clearAllLocalFiles: () => Promise<void>;
   isTodaysPredictionModalOpen: boolean;
@@ -188,10 +188,10 @@ interface AuthContextType {
   setMindProgrammingPlanRotation: React.Dispatch<React.SetStateAction<boolean>>;
 
   // Resources
-  resourceFolders: ResourceFolder[];
-  setResourceFolders: React.Dispatch<React.SetStateAction<ResourceFolder[]>>;
   resources: Resource[];
   setResources: React.Dispatch<React.SetStateAction<Resource[]>>;
+  resourceFolders: ResourceFolder[];
+  setResourceFolders: React.Dispatch<React.SetStateAction<ResourceFolder[]>>;
   deleteResource: (resourceId: string) => void;
   pinnedFolderIds: Set<string>;
   setPinnedFolderIds: React.Dispatch<React.SetStateAction<Set<string>>>;
@@ -672,20 +672,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
-    setDrawingCanvasState({
-      ...state,
-      isOpen: true,
-      position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-      onSave: (dataUrl) => {
-        handleUpdateResource({
-          ...resources.find(r => r.id === state.resourceId)!,
-          points: resources.find(r => r.id === state.resourceId)?.points?.map(p =>
-            p.id === state.pointId ? { ...p, drawing: dataUrl } : p
-          )
-        });
-        setDrawingCanvasState(null);
-      }
+  const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave' | 'openCanvases' | 'activeCanvasId'> & {name?: string}) => {
+    const canvasId = `${state.resourceId}-${state.pointId}`;
+
+    setDrawingCanvasState(prev => {
+        const newOpenCanvases = prev?.openCanvases ? [...prev.openCanvases] : [];
+        let existingCanvas = newOpenCanvases.find(c => c.id === canvasId);
+        
+        if (!existingCanvas) {
+            newOpenCanvases.push({
+                id: canvasId,
+                resourceId: state.resourceId,
+                pointId: state.pointId,
+                name: state.name || 'Untitled Canvas',
+                data: state.initialDrawing,
+            });
+        }
+
+        return {
+            ...state,
+            isOpen: true,
+            position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+            onSave: (dataUrl) => {
+              handleUpdateResource({
+                ...resources.find(r => r.id === state.resourceId)!,
+                points: resources.find(r => r.id === state.resourceId)?.points?.map(p =>
+                  p.id === state.pointId ? { ...p, drawing: dataUrl } : p
+                )
+              });
+            },
+            openCanvases: newOpenCanvases,
+            activeCanvasId: canvasId, // Set the new/selected canvas as active
+        };
     });
   }, [resources]);
 
@@ -3497,6 +3515,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
