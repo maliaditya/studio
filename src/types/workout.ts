@@ -833,6 +833,7 @@ export type DrawingCanvasData = {
     id: string; // Composite: `${resourceId}-${pointId}`
     resourceId: string;
     pointId: string;
+    name: string;
     initialDrawing?: string;
     isPinned?: boolean;
 };

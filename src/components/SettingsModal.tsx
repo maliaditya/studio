@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -30,7 +29,7 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Copy, Trash2, RefreshCw } from 'lucide-react';
+import { Copy, Trash2, RefreshCw, Github } from 'lucide-react';
 import type { Activity, ActivityType, WorkoutSchedulingMode, WidgetVisibility, SlotName } from '@/types/workout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
@@ -67,6 +66,22 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const [specializationName, setSpecializationName] = useState('');
   const [copyType, setCopyType] = useState<'specialization' | 'micro-skills'>('specialization');
 
+  // State for GitHub settings inputs
+  const [githubToken, setGithubToken] = useState('');
+  const [githubOwner, setGithubOwner] = useState('');
+  const [githubRepo, setGithubRepo] = useState('');
+  const [githubPath, setGithubPath] = useState('');
+
+  useEffect(() => {
+    if (isOpen && settings) {
+      setGithubToken(settings.githubToken || '');
+      setGithubOwner(settings.githubOwner || '');
+      setGithubRepo(settings.githubRepo || '');
+      setGithubPath(settings.githubPath || '');
+    }
+  }, [isOpen, settings]);
+
+
   const settingsKey = currentUser ? `dock_settings_${currentUser.username}` : null;
 
   const handleSettingChange = (key: keyof typeof settings, value: any) => {
@@ -85,6 +100,15 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
       });
     }
   };
+  
+  const handleGithubSettingsSave = () => {
+    handleSettingChange('githubToken', githubToken);
+    handleSettingChange('githubOwner', githubOwner);
+    handleSettingChange('githubRepo', githubRepo);
+    handleSettingChange('githubPath', githubPath);
+    toast({ title: "GitHub Settings Saved", description: "Your sync configuration has been updated." });
+  };
+
 
   const handleWidgetVisibilityChange = (widgetId: keyof WidgetVisibility, isVisible: boolean) => {
     handleSettingChange('widgetVisibility', {
@@ -376,39 +400,36 @@ ${JSON.stringify(finalTemplate, null, 2)}
                   </RadioGroup>
                 </div>
                 
-                 <div className="space-y-4 rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">Cloud Sync</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Manage how your data is synced to the cloud.
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="auto-push"
-                      checked={settings.autoPush}
-                      onCheckedChange={(checked) => handleSettingChange('autoPush', checked)}
-                    />
-                    <Label htmlFor="auto-push" className="font-normal">
-                      Auto Push to Cloud
-                    </Label>
-                  </div>
-                   <div className="flex items-center space-x-2">
-                    <Label htmlFor="auto-push-limit" className="font-normal flex-shrink-0">
-                      Push when changes reach:
-                    </Label>
-                    <Input
-                      id="auto-push-limit"
-                      type="number"
-                      value={settings.autoPushLimit}
-                      onChange={(e) => handleSettingChange('autoPushLimit', parseInt(e.target.value, 10) || 0)}
-                      className="w-24 h-8"
-                      disabled={!settings.autoPush}
-                    />
-                  </div>
-                </div>
-
-                <Accordion type="multiple" className="w-full">
+                <Accordion type="multiple" className="w-full space-y-4">
+                   <AccordionItem value="item-github" className="border rounded-lg">
+                    <AccordionTrigger className="px-4 py-3">
+                      <div className="space-y-0.5 text-left">
+                        <Label className="text-base flex items-center gap-2"><Github /> GitHub Sync</Label>
+                        <p className="text-sm text-muted-foreground">Sync your local data with a GitHub repository.</p>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4">
+                      <div className="space-y-4 pt-4 border-t">
+                          <div className="space-y-1">
+                            <Label htmlFor="github-token">Personal Access Token (PAT)</Label>
+                            <Input id="github-token" type="password" placeholder="ghp_..." value={githubToken} onChange={(e) => setGithubToken(e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="github-owner">Repository Owner</Label>
+                            <Input id="github-owner" placeholder="e.g., your-username" value={githubOwner} onChange={(e) => setGithubOwner(e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="github-repo">Repository Name</Label>
+                            <Input id="github-repo" placeholder="e.g., lifeos-backup" value={githubRepo} onChange={(e) => setGithubRepo(e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="github-path">File Path</Label>
+                            <Input id="github-path" placeholder="e.g., backup.json" value={githubPath} onChange={(e) => setGithubPath(e.target.value)} />
+                          </div>
+                          <Button onClick={handleGithubSettingsSave}>Save GitHub Settings</Button>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
                   <AccordionItem value="item-widgets" className="border rounded-lg">
                     <AccordionTrigger className="px-4 py-3">
                         <div className="space-y-0.5 text-left">
@@ -435,7 +456,7 @@ ${JSON.stringify(finalTemplate, null, 2)}
                         </div>
                     </AccordionContent>
                   </AccordionItem>
-                  <AccordionItem value="item-scheduling" className="border rounded-lg mt-4">
+                  <AccordionItem value="item-scheduling" className="border rounded-lg">
                      <AccordionTrigger className="px-4 py-3">
                         <div className="space-y-0.5 text-left">
                           <Label className="text-base">Task Scheduling</Label>
@@ -510,7 +531,7 @@ ${JSON.stringify(finalTemplate, null, 2)}
                         </div>
                      </AccordionContent>
                   </AccordionItem>
-                  <AccordionItem value="item-habits" className="border rounded-lg mt-4">
+                  <AccordionItem value="item-habits" className="border rounded-lg">
                     <AccordionTrigger className="px-4 py-3">
                       <div className="space-y-0.5 text-left">
                         <Label className="text-base">Default Habit Links</Label>
@@ -545,7 +566,7 @@ ${JSON.stringify(finalTemplate, null, 2)}
                         </div>
                     </AccordionContent>
                   </AccordionItem>
-                   <AccordionItem value="item-routines" className="border rounded-lg mt-4">
+                   <AccordionItem value="item-routines" className="border rounded-lg">
                     <AccordionTrigger className="px-4 py-3">
                         <div className="space-y-0.5 text-left">
                         <Label className="text-base">Manage Routine Tasks</Label>
