@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -2990,7 +2989,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const findRootTask = useCallback((activity: Activity): ExerciseDefinition | null => {
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d.id]));
     
     // First, find the definitionId of the current task instance
     let currentDefId: string | undefined;
@@ -3172,20 +3171,20 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             return;
         }
 
-        if (!remoteMetaResponse.ok) {
-            throw new Error(`Failed to get remote file metadata. Status: ${remoteMetaResponse.status}`);
-        }
+        if (remoteMetaResponse.ok) {
+            const remoteMeta = await remoteMetaResponse.json();
+            const remoteSha = remoteMeta.sha;
 
-        const remoteMeta = await remoteMetaResponse.json();
-        const remoteSha = remoteMeta.sha;
-
-        const lastSync = settings.lastSync;
-        if (lastSync && lastSync.sha === remoteSha) {
-            await pushToGitHub(token, owner, repo, path, localDataString, "Update from LifeOS", remoteSha);
-            toast({ title: "Push Successful", description: "Your local changes have been pushed to GitHub." });
+            const lastSync = settings.lastSync;
+            if (lastSync && lastSync.sha === remoteSha) {
+                await pushToGitHub(token, owner, repo, path, localDataString, "Update from LifeOS", remoteSha);
+                toast({ title: "Push Successful", description: "Your local changes have been pushed to GitHub." });
+            } else {
+                await pullFromGitHub(token, owner, repo, path);
+                // toast for pull is in the pull function itself
+            }
         } else {
-            await pullFromGitHub(token, owner, repo, path);
-            toast({ title: "Pull Successful", description: "Remote changes have been pulled. Please review and push again if needed." });
+            console.error("Remote meta response error:", remoteMetaResponse.status);
         }
     } catch (error) {
         console.error("GitHub Sync Error:", error);
@@ -3229,21 +3228,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           throw new Error('Could not pull data from GitHub.');
       }
       const data = await response.json();
+      const content = data.content ? atob(data.content) : null;
       
-      if (!data.content) {
-        toast({
-          title: "Empty Remote File",
-          description: "The file on GitHub is empty. Pushing local data to start.",
-          variant: "default",
-        });
-        const localData = getAllUserData();
-        const localDataString = JSON.stringify(localData, null, 2);
-        await pushToGitHub(token, owner, repo, path, localDataString, "Initialize with local data", data.sha);
-        return;
-      }
-      
-      const content = atob(data.content);
-
       if (!content) {
           toast({
               title: "Empty Remote File",
@@ -3254,9 +3240,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       }
       
       const parsedData = JSON.parse(content);
-      
       loadImportedData(parsedData.main, parsedData.ui);
       setSettings(prev => ({...prev, lastSync: { sha: data.sha, timestamp: Date.now() }}));
+      toast({ title: "Pull Successful", description: "Data has been imported from your GitHub backup." });
+      loadImportedData(parsedData.main, parsedData.ui);
   }
 
   useEffect(() => {
@@ -3538,4 +3525,3 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   supplements: "Supplements",
 };
 
-    
