@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -662,7 +661,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }))
     }
   }, [drawingCanvasState, setResources]);
-
 
   const toggleProjectBrandingStatus = useCallback((projectId: string) => {
     setProjects(prevProjects =>
@@ -3159,9 +3157,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         return;
     }
     
-    if (isLoadingState) {
-        toast({ title: "Please Wait", description: "Application data is still loading. Please try again in a moment.", variant: "default" });
-        return;
+    if (isLoadingState && localChangeCount === 0) {
+      toast({ title: "Please Wait", description: "Application data is still loading. Please try again in a moment.", variant: "default" });
+      setTimeout(syncWithGitHub, 2000); // Retry after a delay
+      return;
     }
 
     try {
@@ -3544,5 +3543,6 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
   meal3: "Meal 3",
   supplements: "Supplements",
 };
+
 
 
