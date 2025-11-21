@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
-  () => import("@excalidraw/excalidraw").then((mod) => mod.Excalidraw),
+  () => import('@excalidraw/excalidraw'),
   {
     ssr: false,
     loading: () => <div className="flex h-full w-full items-center justify-center">Loading Canvas...</div>
@@ -211,7 +211,7 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
                 </div>
                 <div className="flex-grow min-w-0 overflow-x-auto">
                     <div className="flex items-center gap-2">
-                        {drawingCanvasState.openCanvases.map(canvas => (
+                        {(drawingCanvasState.openCanvases || []).map(canvas => (
                             <Button
                                 key={canvas.id}
                                 variant={drawingCanvasState.activeCanvasId === canvas.id ? "secondary" : "ghost"}
