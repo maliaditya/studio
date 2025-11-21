@@ -81,9 +81,10 @@ interface AuthContextType {
   handlePdfViewerPopupDragEnd: (event: DragEndEvent) => void;
   drawingCanvasState: DrawingCanvasPopupState | null;
   setDrawingCanvasState: React.Dispatch<React.SetStateAction<DrawingCanvasPopupState | null>>;
-  openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'> & {name?: string}) => void;
+  openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => void;
   handleDrawingCanvasPopupDragEnd: (event: DragEndEvent) => void;
   togglePinDrawing: (canvasId: string) => void;
+  updateDrawingData: (canvasId: string, data: string) => void;
   clearAllLocalFiles: () => Promise<void>;
   isTodaysPredictionModalOpen: boolean;
   setIsTodaysPredictionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -637,6 +638,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   };
 
+  const updateDrawingData = (canvasId: string, data: string) => {
+    setDrawingCanvasState(prev => {
+        if (!prev) return null;
+        const newOpenCanvases = prev.openCanvases.map(c => 
+            c.id === canvasId ? { ...c, data: data } : c
+        );
+        return { ...prev, openCanvases: newOpenCanvases };
+    });
+    // This is a "side-effect" that updates the source of truth in resources
+    const canvasToUpdate = drawingCanvasState?.openCanvases.find(c => c.id === canvasId);
+    if(canvasToUpdate) {
+        setResources(prevResources => prevResources.map(r => {
+            if(r.id === canvasToUpdate.resourceId) {
+                return {
+                    ...r,
+                    points: r.points?.map(p => p.id === canvasToUpdate.pointId ? {...p, drawing: data} : p)
+                }
+            }
+            return r;
+        }))
+    }
+  };
+
+
   const toggleProjectBrandingStatus = useCallback((projectId: string) => {
     setProjects(prevProjects =>
       prevProjects.map(p =>
@@ -683,7 +708,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'> & {name?: string}) => {
+  const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
 
     setDrawingCanvasState(prev => {
@@ -703,19 +728,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return {
             isOpen: true,
             position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-            onSave: (dataUrl) => {
-              handleUpdateResource({
-                ...resources.find(r => r.id === state.resourceId)!,
-                points: resources.find(r => r.id === state.resourceId)?.points?.map(p =>
-                  p.id === state.pointId ? { ...p, drawing: dataUrl } : p
-                )
-              });
-            },
             openCanvases: newOpenCanvases,
             activeCanvasId: canvasId,
         };
     });
-  }, [resources]);
+  }, []);
 
   const handleDrawingCanvasPopupDragEnd = useCallback((event: DragEndEvent) => {
     const { active, delta } = event;
@@ -3260,7 +3277,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     playbackRequest, setPlaybackRequest,
     pdfViewerState, setPdfViewerState, openPdfViewer, handlePdfViewerPopupDragEnd,
     drawingCanvasState, setDrawingCanvasState, openDrawingCanvas, handleDrawingCanvasPopupDragEnd,
-    togglePinDrawing,
+    togglePinDrawing, updateDrawingData,
     clearAllLocalFiles,
     isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen,
     settings, setSettings,
@@ -3526,6 +3543,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
     
 
     
+
 
 
 
