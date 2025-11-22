@@ -5,7 +5,6 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic';
 import { Button } from './ui/button';
 import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search } from 'lucide-react';
-import { useDraggable } from '@dnd-kit/core';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import type { ExcalidrawElement, NonDeleted, AppState } from "@excalidraw/excalidraw";
 import type { ExcalidrawAPIRefValue } from '@excalidraw/excalidraw';
@@ -98,12 +97,8 @@ const ExcalidrawWrapper = ({
 const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
     const { resources } = useAuth();
 
-    const onValueChange = (query: string) => {
-        // The filtering is handled by Command's internals, but you can add custom logic here if needed.
-    };
-
     return (
-        <Command shouldFilter={true} onValueChange={onValueChange}>
+        <Command shouldFilter={true}>
             <CommandInput 
                 placeholder="Search all canvases..." 
             />
@@ -134,22 +129,12 @@ const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource,
 });
 SearchContent.displayName = 'SearchContent';
 
-const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
-    const [position, setPosition] = useState({ 
-        x: typeof window !== 'undefined' ? window.innerWidth / 2 - 256 : 0, 
-        y: typeof window !== 'undefined' ? window.innerHeight / 2 - 200 : 0 
-    });
-
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({
-        id: 'canvas-search-popup',
-    });
-    
+const SearchPopup = React.memo(({ open, setOpen, onSelect }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
     const style: React.CSSProperties = {
         position: 'fixed',
-        top: position.y,
-        left: position.x,
-        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-        willChange: 'transform',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
         zIndex: 130,
     };
     
@@ -161,10 +146,10 @@ const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (ope
     if (!open) return null;
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes}>
+        <div style={style}>
              <Card className="w-[512px] shadow-2xl border-2 bg-popover">
-                <div className="flex items-center justify-between px-2 py-1 border-b" {...listeners}>
-                    <div className="flex items-center gap-2 cursor-grab active:cursor-grabbing">
+                <div className="flex items-center justify-between px-2 py-1 border-b">
+                    <div className="flex items-center gap-2">
                         <h3 className="font-semibold text-sm">Search All Canvases</h3>
                     </div>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
@@ -175,11 +160,12 @@ const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (ope
             </Card>
         </div>
     );
-};
+});
+SearchPopup.displayName = 'SearchPopup';
 
 
 export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
-  const { resources, drawingCanvasState, setDrawingCanvasState, updateDrawingData, togglePinDrawing, openDrawingCanvas: authOpenDrawingCanvas } = useAuth();
+  const { resources, drawingCanvasState, setDrawingCanvasState, updateDrawingData, togglePinDrawing, openDrawingCanvas: authOpenDrawingCanvas, useDraggable } = useAuth();
   const [theme, setTheme] = useState('dark');
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
