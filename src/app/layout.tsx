@@ -8,7 +8,6 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { Header } from '@/components/Header';
-import { Analytics } from '@vercel/analytics/react';
 import { BackgroundAudioPlayer } from '@/components/BackgroundAudioPlayer';
 import { MatrixBackground } from '@/components/MatrixBackground';
 import { DefaultBackground } from '@/components/DefaultBackground';
@@ -602,10 +601,9 @@ export default function RootLayout({
         <AuthProvider>
           <AppWrapper>{children}</AppWrapper>
         </AuthProvider>
-        <Analytics />
+        
         <div id="global-popup-root" style={{ position: 'fixed', top: 0, left: 0, zIndex: 60 }} />
       </body>
     </html>
   );
 }
-
