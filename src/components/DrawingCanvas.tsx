@@ -103,32 +103,25 @@ const ExcalidrawWrapper = ({
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
     onLinkOpen: OnLinkOpen;
 }) => {
-    const [initialData, setInitialData] = useState<{
-        elements: readonly NonDeleted<ExcalidrawElement>[];
-        appState?: Partial<AppState>;
-    }>({ elements: [] });
-    
-    useEffect(() => {
+    const initialData = useMemo(() => {
         if (activeCanvas.data && typeof activeCanvas.data === 'string') {
             try {
                 const parsedData = JSON.parse(activeCanvas.data);
-                setInitialData({
+                return {
                     elements: parsedData.elements || [],
                     appState: parsedData.appState || {}
-                });
+                };
             } catch (e) {
                 console.error("Failed to parse initial drawing data:", e);
-                setInitialData({ elements: [] });
             }
-        } else {
-            setInitialData({ elements: [] });
         }
+        return { elements: [] };
     }, [activeCanvas.id, activeCanvas.data]);
 
     return (
         <div style={{ height: "100%", width: "100%" }}>
             <Excalidraw
-                key={activeCanvas.id} // Add a key to force re-mount when canvas changes
+                key={activeCanvas.id} // This key is important.
                 excalidrawAPI={(api) => apiRef.current = api}
                 initialData={initialData}
                 theme={theme}
