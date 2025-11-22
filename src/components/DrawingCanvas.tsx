@@ -14,6 +14,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import type { Resource, ResourcePoint } from '@/types/workout';
 import { useDraggable } from '@dnd-kit/core';
 import dynamic from 'next/dynamic';
+import { randomId } from "@excalidraw/excalidraw";
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -298,19 +299,35 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     const api = excalidrawAPIRef.current;
     const canvasLink = `canvas://${resource.id}/${point.id}`;
     
-    const newElement: Partial<ExcalidrawElement> = {
+    const newElement: ExcalidrawElement = {
+        id: randomId(),
         type: 'text',
         x: api.getAppState().scrollX + 200,
         y: api.getAppState().scrollY + 200,
         text: `🔗 ${point.text || 'Untitled Link'}`,
         fontSize: 20,
         fontFamily: 1,
+        textAlign: "left",
+        verticalAlign: "top",
+        angle: 0,
+        strokeColor: "#1e1e1e",
+        backgroundColor: "transparent",
+        fillStyle: "hachure",
+        strokeWidth: 1,
+        strokeStyle: "solid",
+        roughness: 1,
+        opacity: 100,
+        isDeleted: false,
+        boundElements: null,
+        updated: Date.now(),
+        link: canvasLink,
         customData: { canvasLink },
-        link: canvasLink, // Also using link property for potential default behavior
+        width: 200, // Provide a default width
+        height: 24, // Provide a default height
     };
 
     api.updateScene({
-      elements: [...api.getSceneElements(), newElement as ExcalidrawElement]
+      elements: [...api.getSceneElements(), newElement]
     });
     setIsLinkingSearchOpen(false);
   };
