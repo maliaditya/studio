@@ -97,7 +97,7 @@ const ExcalidrawWrapper = ({
 }: {
     activeCanvas: { id: string, data?: string };
     theme: string;
-    apiRef: React.MutableRefObject<ExcalidrawAPIRefValue | null>;
+    apiRef: React.MutableRefObject<any | null>;
     onChange: (elements: readonly ExcalidrawElement[], appState: AppState) => void;
     onPointerDown: (activeTool: Readonly<{ type: string; }>, pointerDownState: PointerDownState) => void;
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
@@ -252,7 +252,6 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
               });
           }
       } else {
-          // For regular links, open them in a new browser tab.
           window.open(url, '_blank', 'noopener,noreferrer');
       }
   }, [authOpenDrawingCanvas]);
@@ -329,6 +328,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         verticalAlign: "top",
         isDeleted: false,
         link: `canvas://${resource.id}/${point.id}`,
+        customData: { canvasLink: `canvas://${resource.id}/${point.id}` },
     };
 
     api.updateScene({ elements: [...api.getSceneElements(), newElement as NonDeleted<ExcalidrawElement>] });
