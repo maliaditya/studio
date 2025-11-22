@@ -3,7 +3,7 @@
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from './ui/button';
-import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon } from 'lucide-react';
+import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { randomId, type ExcalidrawElement, type NonDeleted, type AppState, type PointerDownState } from "@excalidraw/excalidraw";
 import type { ExcalidrawAPIRefValue } from '@excalidraw/excalidraw';
@@ -290,10 +290,8 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   };
 
   const handleLinkingSearchSelect = (resource: Resource, point: ResourcePoint) => {
-    if (!excalidrawAPIRef.current) return;
-
     const api = excalidrawAPIRef.current;
-    const canvasLink = `canvas://${resource.id}/${point.id}`;
+    if (!api) return;
     
     const newElement: ExcalidrawElement = {
         id: randomId(),
@@ -316,7 +314,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         textAlign: "left",
         verticalAlign: "top",
         isDeleted: false,
-        customData: { canvasLink },
+        customData: { canvasLink: `canvas://${resource.id}/${point.id}` },
         link: null,
     };
 
@@ -338,7 +336,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                     className="flex items-center gap-2 cursor-grab active:cursor-grabbing flex-shrink-0"
                     {...listeners}
                   >
-                      <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+                       <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
                   </div>
                   <div className="flex-grow min-w-0 overflow-x-auto">
                       <div className="flex items-center gap-2">
