@@ -87,14 +87,12 @@ const ExcalidrawWrapper = ({
     apiRef,
     onChange,
     onPointerDown,
-    onKeyDown,
 }: {
     activeCanvas: { id: string, data?: string };
     theme: string;
     apiRef: React.MutableRefObject<ExcalidrawAPIRefValue | null>;
     onChange: (elements: readonly ExcalidrawElement[], appState: AppState) => void;
     onPointerDown: () => void;
-    onKeyDown: (event: React.KeyboardEvent) => void;
 }) => {
     const [initialData, setInitialData] = useState<{
         elements: readonly NonDeleted<ExcalidrawElement>[];
@@ -123,7 +121,7 @@ const ExcalidrawWrapper = ({
     }
 
     return (
-        <div style={{ height: "100%", width: "100%" }} onKeyDown={onKeyDown}>
+        <div style={{ height: "100%", width: "100%" }}>
             <Excalidraw
                 excalidrawAPI={(api) => apiRef.current = api}
                 initialData={initialData}
@@ -192,6 +190,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     if (!excalidrawAPIRef.current || !drawingCanvasState?.activeCanvasId) {
         return;
     }
+
     const elements = excalidrawAPIRef.current.getSceneElements();
     const appState = excalidrawAPIRef.current.getAppState();
     const drawingData = JSON.stringify({
@@ -204,7 +203,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
             gridSize: appState.gridSize,
         }
     });
-    
+
     updateDrawingData(drawingCanvasState.activeCanvasId, drawingData, () => {
         setIsDirty(false);
         hasUserInteractedRef.current = false;
@@ -226,13 +225,6 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
       hasUserInteractedRef.current = true;
     }
   };
-
-  const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
-    if ((event.ctrlKey || event.metaKey) && event.key === 's') {
-      event.preventDefault();
-      handleSaveClick();
-    }
-  }, [handleSaveClick]);
 
   const handleTabClick = (canvasId: string) => {
     if (isDirty) {
@@ -327,7 +319,6 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       apiRef={excalidrawAPIRef}
                       onChange={handleCanvasChange}
                       onPointerDown={handlePointerDown}
-                      onKeyDown={handleKeyDown}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">Select a canvas to start drawing.</div>
