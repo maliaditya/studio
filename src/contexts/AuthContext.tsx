@@ -644,13 +644,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const updateDrawingData = useCallback((canvasId: string, data: string) => {
     setDrawingCanvasState(prev => {
-        if (!prev) return null;
-        const newOpenCanvases = (prev.openCanvases || []).map(c => 
-            c.id === canvasId ? { ...c, data: data } : c
-        );
-        return { ...prev, openCanvases: newOpenCanvases };
+      if (!prev) return null;
+      return {
+        ...prev,
+        openCanvases: (prev.openCanvases || []).map(c =>
+          c.id === canvasId ? { ...c, data: data } : c
+        ),
+      };
     });
-    
     setResources(prevResources => {
         const canvasToUpdate = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
         if (!canvasToUpdate) return prevResources;
@@ -3594,6 +3595,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 
