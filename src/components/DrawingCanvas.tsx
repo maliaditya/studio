@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from './ui/button';
 import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search } from 'lucide-react';
@@ -14,7 +15,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import type { Resource, ResourcePoint } from '@/types/workout';
 import { useDraggable } from '@dnd-kit/core';
-import { Input } from './ui/input';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -35,11 +35,13 @@ const ExcalidrawWrapper = ({
     theme, 
     apiRef,
     setIsDirty,
+    isSavingRef,
 }: {
     activeCanvas: { id: string, data?: string };
     theme: string;
     apiRef: React.MutableRefObject<ExcalidrawAPIRefValue | null>;
     setIsDirty: React.Dispatch<React.SetStateAction<boolean>>;
+    isSavingRef: React.MutableRefObject<boolean>;
 }) => {
     const [initialData, setInitialData] = useState<{
         elements: readonly NonDeleted<ExcalidrawElement>[];
@@ -67,6 +69,7 @@ const ExcalidrawWrapper = ({
     }, [activeCanvas.id, activeCanvas.data, setIsDirty]);
 
     const handleChange = (elements: readonly ExcalidrawElement[], appState: AppState) => {
+        if (isSavingRef.current) return;
         setIsDirty(true);
     };
 
@@ -152,6 +155,7 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
   const [isDirty, setIsDirty] = useState(false);
   const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null);
   const { toast } = useToast();
+  const isSavingRef = useRef(false);
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: 'drawing-canvas-popup',
@@ -209,25 +213,47 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
   }, [drawingCanvasState?.isOpen, settings.pinnedCanvasIds, resources]);
 
   const handleSaveClick = useCallback(() => {
-    if (excalidrawAPIRef.current && drawingCanvasState?.activeCanvasId) {
-      const elements = excalidrawAPIRef.current.getSceneElements();
-      const appState = excalidrawAPIRef.current.getAppState();
-      const drawingData = JSON.stringify({
+    if (isSavingRef.current || !excalidrawAPIRef.current || !drawingCanvasState?.activeCanvasId) {
+        return;
+    }
+
+    isSavingRef.current = true;
+
+    const elements = excalidrawAPIRef.current.getSceneElements();
+    const appState = excalidrawAPIRef.current.getAppState();
+    const drawingData = JSON.stringify({
         type: "excalidraw",
         version: 2,
         source: "dock-app",
         elements: elements,
         appState: {
-          viewBackgroundColor: appState.viewBackgroundColor,
-          gridSize: appState.gridSize,
+            viewBackgroundColor: appState.viewBackgroundColor,
+            gridSize: appState.gridSize,
         }
-      });
-      updateDrawingData(drawingCanvasState.activeCanvasId, drawingData, () => {
-        setIsDirty(false);
+    });
+
+    updateDrawingData(drawingCanvasState.activeCanvasId, drawingData, () => {
         toast({ title: "Canvas Saved" });
-      });
-    }
-  }, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
+        setIsDirty(false);
+        setTimeout(() => {
+            isSavingRef.current = false;
+        }, 100); 
+    });
+}, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
+
+useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+            event.preventDefault();
+            handleSaveClick();
+        }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+        document.removeEventListener('keydown', handleKeyDown);
+    };
+}, [handleSaveClick]);
 
   const handleTabClick = (canvasId: string) => {
     if (isDirty) {
@@ -334,6 +360,7 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
                       theme={theme}
                       apiRef={excalidrawAPIRef}
                       setIsDirty={setIsDirty}
+                      isSavingRef={isSavingRef}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">Select a canvas to start drawing.</div>

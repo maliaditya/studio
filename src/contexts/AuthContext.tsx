@@ -84,7 +84,7 @@ interface AuthContextType {
   openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => void;
   handleDrawingCanvasPopupDragEnd: (event: DragEndEvent) => void;
   togglePinDrawing: (canvasId: string) => void;
-  updateDrawingData: (canvasId: string, data: string, callback?: () => void) => void;
+  updateDrawingData: (canvasId: string, data: string, onSaveComplete: () => void) => void;
   clearAllLocalFiles: () => Promise<void>;
   isTodaysPredictionModalOpen: boolean;
   setIsTodaysPredictionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -630,22 +630,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
 
-  const updateDrawingData = (canvasId: string, data: string, callback?: () => void) => {
+  const updateDrawingData = (canvasId: string, data: string, onSaveComplete: () => void) => {
     setDrawingCanvasState(prev => {
         if (!prev) return null;
-        return {
-            ...prev,
-            openCanvases: (prev.openCanvases || []).map(c => 
-                c.id === canvasId ? { ...c, data: data } : c
-            ),
-        };
+        const updatedCanvases = (prev.openCanvases || []).map(c => 
+            c.id === canvasId ? { ...c, data: data } : c
+        );
+        return { ...prev, openCanvases: updatedCanvases };
     });
+
     setResources(prevResources => {
         const canvasToUpdate = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
         if (!canvasToUpdate) return prevResources;
+        
         const { resourceId, pointId } = canvasToUpdate;
 
-        const updatedResources = prevResources.map(r => {
+        return prevResources.map(r => {
             if (r.id === resourceId) {
                 const newPoints = (r.points || []).map(p => 
                     p.id === pointId ? { ...p, drawing: data } : p
@@ -654,15 +654,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             return r;
         });
-        
-        // Execute callback after state is likely to have been updated
-        if (callback) {
-            setTimeout(callback, 0);
-        }
-
-        return updatedResources;
     });
-};
+
+    // Directly call the completion callback
+    onSaveComplete();
+  };
 
   const togglePinDrawing = (canvasId: string) => {
     setSettings(prev => {
@@ -3045,7 +3041,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const findRootTask = useCallback((activity: Activity): ExerciseDefinition | null => {
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d.id]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
     
     // First, find the definitionId of the current task instance
     let currentDefId: string | undefined;
@@ -3625,6 +3621,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 
