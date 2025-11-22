@@ -95,48 +95,43 @@ const ExcalidrawWrapper = ({
     );
 }
 
-const SearchContent = React.memo(({ onSelect, query, setQuery }: { 
+const SearchContent = React.memo(({ onSelect }: { 
     onSelect: (resource: Resource, point: ResourcePoint) => void;
-    query: string;
-    setQuery: (query: string) => void;
 }) => {
     const { resources } = useAuth();
-
+    
+    // We get the query from the CommandInput via context, so no need for local state.
+    // The Command component will handle filtering.
     const searchResults = useMemo(() => {
-        if (!query) return [];
-        const lowerCaseQuery = query.toLowerCase();
         return resources.flatMap(resource =>
             (resource.points || [])
-                .filter(point => point.type === 'paint' && point.text && point.text.toLowerCase().includes(lowerCaseQuery))
+                .filter(point => point.type === 'paint' && point.text)
                 .map(point => ({ resource, point }))
         );
-    }, [query, resources]);
+    }, [resources]);
 
     return (
-        <Command shouldFilter={false}>
-            <CommandList>
-                <CommandEmpty>No canvases found.</CommandEmpty>
-                <CommandGroup>
-                    {searchResults.map(({ resource, point }) => (
-                        <CommandItem
-                            key={point.id}
-                            value={point.text || 'Untitled Canvas'}
-                            onSelect={() => onSelect(resource, point)}
-                            className="flex justify-between items-center cursor-pointer"
-                        >
-                            <span>{point.text || 'Untitled Canvas'}</span>
-                            <span className="text-xs text-muted-foreground">{resource.name}</span>
-                        </CommandItem>
-                    ))}
-                </CommandGroup>
-            </CommandList>
-        </Command>
+        <CommandList>
+            <CommandEmpty>No canvases found.</CommandEmpty>
+            <CommandGroup>
+                {searchResults.map(({ resource, point }) => (
+                    <CommandItem
+                        key={point.id}
+                        value={point.text || 'Untitled Canvas'}
+                        onSelect={() => onSelect(resource, point)}
+                        className="flex justify-between items-center cursor-pointer"
+                    >
+                        <span>{point.text || 'Untitled Canvas'}</span>
+                        <span className="text-xs text-muted-foreground">{resource.name}</span>
+                    </CommandItem>
+                ))}
+            </CommandGroup>
+        </CommandList>
     );
 });
 SearchContent.displayName = 'SearchContent';
 
 const SearchPopup = React.memo(({ open, setOpen, onSelect }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
-    const [query, setQuery] = useState('');
     
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -151,27 +146,18 @@ const SearchPopup = React.memo(({ open, setOpen, onSelect }: { open: boolean, se
     return (
         <div style={style}>
              <Card className="w-[512px] shadow-2xl border-2 bg-popover">
-                <div className="flex items-center justify-between p-1 border-b">
-                    <Command className="w-full">
-                         <CommandInput 
+                <Command>
+                    <div className="flex items-center justify-between p-1 border-b">
+                        <CommandInput 
                           placeholder="Search all canvases..."
-                          value={query}
-                          onValueChange={setQuery}
                           className="h-9 border-0 shadow-none focus-visible:ring-0"
                         />
-                    </Command>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 mr-1" onClick={() => setOpen(false)}>
-                        <X className="h-4 w-4" />
-                    </Button>
-                </div>
-                <SearchContent 
-                    onSelect={(resource, point) => {
-                        onSelect(resource, point);
-                        setOpen(false);
-                    }} 
-                    query={query}
-                    setQuery={setQuery}
-                />
+                        <Button variant="ghost" size="icon" className="h-7 w-7 mr-1" onClick={() => setOpen(false)}>
+                            <X className="h-4 w-4" />
+                        </Button>
+                    </div>
+                    <SearchContent onSelect={onSelect} />
+                </Command>
             </Card>
         </div>
     );
