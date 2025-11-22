@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { Button } from './ui/button';
 import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
-import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import type { ExcalidrawElement, NonDeleted, AppState } from "@excalidraw/excalidraw/types/types";
 import type { ExcalidrawAPIRefValue } from '@excalidraw/excalidraw';
 import { useAuth } from '@/contexts/AuthContext';
@@ -96,7 +96,6 @@ const ExcalidrawWrapper = ({
 
 const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
     const { resources } = useAuth();
-    
     const [position, setPosition] = useState({ 
         x: typeof window !== 'undefined' ? window.innerWidth / 2 - 256 : 0, 
         y: typeof window !== 'undefined' ? window.innerHeight / 2 - 200 : 0 
@@ -120,35 +119,15 @@ const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (ope
         setOpen(false);
     }
     
-    const [query, setQuery] = useState('');
-    const searchResults = useMemo(() => {
-        if (!query) return [];
-        const results: { resource: Resource, point: ResourcePoint }[] = [];
-        resources.forEach(resource => {
-            (resource.points || [])
-            .filter(point => point.type === 'paint')
-            .forEach(point => {
-                const searchText = `${resource.name} ${point.text || ''}`.toLowerCase();
-                if (searchText.includes(query.toLowerCase())) {
-                    results.push({ resource, point });
-                }
-            });
-        });
-        return results;
-    }, [query, resources]);
-
-
     if (!open) return null;
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
              <Card className="w-[512px] shadow-2xl border-2 bg-popover">
-                <Command>
+                <Command shouldFilter={false}>
                     <div className="flex items-center border-b px-3" cmdk-input-wrapper="" {...listeners}>
                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                        <CommandInput 
-                         onValueChange={setQuery}
-                         className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
                          placeholder="Search all canvases..." 
                        />
                     </div>
@@ -156,16 +135,20 @@ const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (ope
                         <CommandList>
                             <CommandEmpty>No canvases found.</CommandEmpty>
                             <CommandGroup>
-                            {searchResults.map(({ resource, point }) => (
-                                <CommandItem
-                                key={point.id}
-                                onSelect={() => onSelectWrapper(() => onSelect(resource, point))}
-                                className="flex justify-between items-center cursor-pointer"
-                                >
-                                <span>{point.text || 'Untitled Canvas'}</span>
-                                <span className="text-xs text-muted-foreground">{resource.name}</span>
-                                </CommandItem>
-                            ))}
+                                {resources.flatMap(resource => 
+                                    (resource.points || [])
+                                    .filter(point => point.type === 'paint')
+                                    .map(point => ({ resource, point }))
+                                ).map(({ resource, point }) => (
+                                    <CommandItem
+                                        key={point.id}
+                                        onSelect={() => onSelectWrapper(() => onSelect(resource, point))}
+                                        className="flex justify-between items-center cursor-pointer"
+                                    >
+                                        <span>{point.text || 'Untitled Canvas'}</span>
+                                        <span className="text-xs text-muted-foreground">{resource.name}</span>
+                                    </CommandItem>
+                                ))}
                             </CommandGroup>
                         </CommandList>
                     </CardContent>
