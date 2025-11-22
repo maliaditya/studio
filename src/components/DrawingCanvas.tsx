@@ -5,7 +5,7 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from './ui/button';
 import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { type ExcalidrawElement, type NonDeleted, type AppState, type PointerDownState, type OnLinkOpen } from "@excalidraw/excalidraw";
+import { ExcalidrawElement, NonDeleted, AppState, PointerDownState, OnLinkOpen } from "@excalidraw/excalidraw";
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -103,21 +103,29 @@ const ExcalidrawWrapper = ({
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
     onLinkOpen: OnLinkOpen;
 }) => {
-    // This is now the definitive way to handle initialData.
-    // It's parsed on every render, but it's safe and prevents crashes.
-    let initialData: { elements: readonly ExcalidrawElement[], appState?: any };
-    try {
-        if (activeCanvas.data && typeof activeCanvas.data === 'string' && activeCanvas.data.trim() !== '') {
-            const parsedData = JSON.parse(activeCanvas.data);
-            initialData = {
-                elements: parsedData.elements || [], // Ensure elements is always an array
-                appState: parsedData.appState || {},
-            };
-        } else {
-            throw new Error("Data is empty or not a string.");
+    const [initialData, setInitialData] = useState<{ elements: readonly ExcalidrawElement[], appState?: any } | null>(null);
+
+    useEffect(() => {
+        setInitialData(null); // Set to null to show loading state while parsing
+        let data: { elements: readonly ExcalidrawElement[], appState?: any };
+        try {
+            if (activeCanvas.data && typeof activeCanvas.data === 'string' && activeCanvas.data.trim() !== '') {
+                const parsedData = JSON.parse(activeCanvas.data);
+                data = {
+                    elements: parsedData.elements || [], // Ensure elements is always an array
+                    appState: parsedData.appState || {},
+                };
+            } else {
+                throw new Error("Data is empty or not a string.");
+            }
+        } catch (e) {
+            data = { elements: [] };
         }
-    } catch (e) {
-        initialData = { elements: [] };
+        setInitialData(data);
+    }, [activeCanvas.id, activeCanvas.data]);
+
+    if (!initialData) {
+        return <div className="flex h-full w-full items-center justify-center">Loading canvas data...</div>;
     }
 
     return (
@@ -228,10 +236,9 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   }, []);
 
   const onLinkOpen: OnLinkOpen = useCallback((event, element) => {
+    event.preventDefault();
     const url = element.link;
     if (!url) return;
-    
-    event.preventDefault();
     
     if (url.startsWith('canvas://')) {
         const [protocol, ids] = url.split('://');
