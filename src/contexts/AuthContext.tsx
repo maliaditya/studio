@@ -84,7 +84,7 @@ interface AuthContextType {
   openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => void;
   handleDrawingCanvasPopupDragEnd: (event: DragEndEvent) => void;
   togglePinDrawing: (canvasId: string) => void;
-  updateDrawingData: (canvasId: string, data: string) => void;
+  updateDrawingData: (canvasId: string, data: string, callback?: () => void) => void;
   clearAllLocalFiles: () => Promise<void>;
   isTodaysPredictionModalOpen: boolean;
   setIsTodaysPredictionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -630,7 +630,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
 
-  const updateDrawingData = (canvasId: string, data: string) => {
+  const updateDrawingData = (canvasId: string, data: string, callback?: () => void) => {
     setDrawingCanvasState(prev => {
         if (!prev) return null;
         return {
@@ -645,7 +645,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!canvasToUpdate) return prevResources;
         const { resourceId, pointId } = canvasToUpdate;
 
-        return prevResources.map(r => {
+        const updatedResources = prevResources.map(r => {
             if (r.id === resourceId) {
                 const newPoints = (r.points || []).map(p => 
                     p.id === pointId ? { ...p, drawing: data } : p
@@ -654,6 +654,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             return r;
         });
+        
+        // Execute callback after state is likely to have been updated
+        if (callback) {
+            setTimeout(callback, 0);
+        }
+
+        return updatedResources;
     });
 };
 
@@ -784,7 +791,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ...prev,
         position: {
           x: prev.position.x + delta.x,
-          y: prev.position.y + delta.y,
+          y: prev.y + delta.y,
         },
       } : null);
     }
@@ -3618,6 +3625,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 

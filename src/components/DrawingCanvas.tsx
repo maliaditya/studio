@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
@@ -223,9 +222,10 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
           gridSize: appState.gridSize,
         }
       });
-      updateDrawingData(drawingCanvasState.activeCanvasId, drawingData);
-      setIsDirty(false);
-      toast({ title: "Canvas Saved" });
+      updateDrawingData(drawingCanvasState.activeCanvasId, drawingData, () => {
+        setIsDirty(false);
+        toast({ title: "Canvas Saved" });
+      });
     }
   }, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
 
@@ -331,7 +331,6 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
                   <ExcalidrawWrapper 
                       key={activeCanvas.id} // Important to re-mount Excalidraw when canvas changes
                       activeCanvas={activeCanvas}
-                      onSave={(data) => updateDrawingData(activeCanvas.id, data)}
                       theme={theme}
                       apiRef={excalidrawAPIRef}
                       setIsDirty={setIsDirty}
