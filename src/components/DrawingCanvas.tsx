@@ -86,13 +86,11 @@ const ExcalidrawWrapper = ({
     theme, 
     apiRef,
     onChange,
-    onSave,
 }: {
     activeCanvas: { id: string, data?: string };
     theme: string;
     apiRef: React.MutableRefObject<ExcalidrawAPIRefValue | null>;
     onChange: () => void;
-    onSave: () => void;
 }) => {
     const [initialData, setInitialData] = useState<{
         elements: readonly NonDeleted<ExcalidrawElement>[];
@@ -115,19 +113,6 @@ const ExcalidrawWrapper = ({
             setInitialData({ elements: [] });
         }
     }, [activeCanvas.id, activeCanvas.data]);
-
-    useEffect(() => {
-      const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.ctrlKey || e.metaKey) {
-          if (e.key === "s") {
-            e.preventDefault();
-            onSave();
-          }
-        }
-      };
-      window.addEventListener("keydown", handleKeyDown);
-      return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [onSave]);
 
     if (initialData === null) {
         return <div className="flex h-full w-full items-center justify-center">Preparing Canvas...</div>;
@@ -159,7 +144,8 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
-  const isSavingRef = useRef(false);
+  const [hasUserInteracted, setHasUserInteracted] = useState(false);
+  
   const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null);
   const { toast } = useToast();
 
@@ -188,17 +174,19 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     mediaQuery.addEventListener('change', handleThemeChange);
     return () => mediaQuery.removeEventListener('change', handleThemeChange);
   }, []);
-
+  
   const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
 
+  useEffect(() => {
+    // Reset interaction state when active canvas changes
+    setHasUserInteracted(false);
+    setIsDirty(false);
+  }, [drawingCanvasState?.activeCanvasId]);
+
   const handleSaveClick = useCallback(() => {
-    if (isSavingRef.current || !excalidrawAPIRef.current || !drawingCanvasState?.activeCanvasId) {
+    if (!excalidrawAPIRef.current || !drawingCanvasState?.activeCanvasId) {
         return;
     }
-
-    isSavingRef.current = true;
-    toast({ title: "Saving Canvas..." });
-
     const elements = excalidrawAPIRef.current.getSceneElements();
     const appState = excalidrawAPIRef.current.getAppState();
     const drawingData = JSON.stringify({
@@ -214,15 +202,31 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
     updateDrawingData(drawingCanvasState.activeCanvasId, drawingData, () => {
         setIsDirty(false);
-        isSavingRef.current = false;
+        setHasUserInteracted(false); // Reset interaction state after save
         toast({ title: "Canvas Saved" });
     });
-}, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
+  }, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
 
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+            event.preventDefault();
+            handleSaveClick();
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleSaveClick]);
 
   const handleCanvasChange = () => {
-    if (!isSavingRef.current) {
+    if (hasUserInteracted) {
       setIsDirty(true);
+    } else {
+      // This is the first change event, likely from loading data.
+      // We set the flag so the *next* change will mark it as dirty.
+      setHasUserInteracted(true);
     }
   };
 
@@ -313,12 +317,11 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
               <CardContent className="p-0 flex-grow relative">
                 {isMounted && activeCanvas ? (
                   <ExcalidrawWrapper 
-                      key={activeCanvas.id}
+                      key={activeCanvas.id} // Force re-mount when canvas changes
                       activeCanvas={activeCanvas}
                       theme={theme}
                       apiRef={excalidrawAPIRef}
                       onChange={handleCanvasChange}
-                      onSave={handleSaveClick}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">Select a canvas to start drawing.</div>
