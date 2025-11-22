@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
@@ -6,7 +7,7 @@ import { Button } from './ui/button';
 import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { randomId, type ExcalidrawElement, type NonDeleted, type AppState, type PointerDownState } from "@excalidraw/excalidraw";
-import type { ExcalidrawAPIRefValue } from '@excalidraw/excalidraw';
+import type { ExcalidrawAPIRefValue, OnLinkOpen } from '@excalidraw/excalidraw';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -91,6 +92,7 @@ const ExcalidrawWrapper = ({
     onChange,
     onPointerDown,
     onKeyDown,
+    onLinkOpen,
 }: {
     activeCanvas: { id: string, data?: string };
     theme: string;
@@ -98,6 +100,7 @@ const ExcalidrawWrapper = ({
     onChange: (elements: readonly ExcalidrawElement[], appState: AppState) => void;
     onPointerDown: (activeTool: Readonly<{ type: string; }>, pointerDownState: PointerDownState) => void;
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+    onLinkOpen: OnLinkOpen;
 }) => {
     const [initialData, setInitialData] = useState<{
         elements: readonly NonDeleted<ExcalidrawElement>[];
@@ -134,6 +137,7 @@ const ExcalidrawWrapper = ({
                 onChange={onChange}
                 onPointerDown={onPointerDown}
                 onKeyDown={onKeyDown}
+                onLinkOpen={onLinkOpen}
             />
         </div>
     );
@@ -228,20 +232,26 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     if (!isUserChange.current) {
       isUserChange.current = true;
     }
+  }, []);
 
-    const clickedElement = pointerDownState.hitElement;
-    if (clickedElement && clickedElement.customData?.canvasLink) {
-        const link = clickedElement.customData.canvasLink;
-        const [protocol, ids] = link.split('://');
-        if (protocol === 'canvas' && ids) {
-            const [resourceId, pointId] = ids.split('/');
-            authOpenDrawingCanvas({
-                resourceId,
-                pointId,
-                name: clickedElement.text || 'Linked Canvas',
-            });
-        }
-    }
+  const onLinkOpen: OnLinkOpen = useCallback((event, element) => {
+      const url = element.link;
+      if (!url) return;
+      
+      if (url.startsWith('canvas://')) {
+          event.preventDefault();
+          const [protocol, ids] = url.split('://');
+          if (ids) {
+              const [resourceId, pointId] = ids.split('/');
+              authOpenDrawingCanvas({
+                  resourceId,
+                  pointId,
+                  name: element.text || 'Linked Canvas',
+              });
+          }
+      } else {
+          // Allow default behavior for regular http links
+      }
   }, [authOpenDrawingCanvas]);
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -314,14 +324,12 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         textAlign: "left",
         verticalAlign: "top",
         isDeleted: false,
-        customData: { canvasLink: `canvas://${resource.id}/${point.id}` },
-        link: null,
+        link: `canvas://${resource.id}/${point.id}`,
     };
 
     api.updateScene({ elements: [...api.getSceneElements(), newElement as NonDeleted<ExcalidrawElement>] });
     setIsLinkingSearchOpen(false);
   };
-
   
   if (!isOpen || !drawingCanvasState) return null;
 
@@ -380,6 +388,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       onChange={handleCanvasChange}
                       onPointerDown={handlePointerDown}
                       onKeyDown={handleKeyDown}
+                      onLinkOpen={onLinkOpen}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">Select a canvas to start drawing.</div>
