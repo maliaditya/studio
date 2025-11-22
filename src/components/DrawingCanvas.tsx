@@ -1,13 +1,11 @@
 
-
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { randomId, type ExcalidrawElement, type NonDeleted, type AppState, type PointerDownState } from "@excalidraw/excalidraw";
-import type { ExcalidrawAPIRefValue, OnLinkOpen } from '@excalidraw/excalidraw';
+import { type ExcalidrawElement, type NonDeleted, type AppState, type PointerDownState, type OnLinkOpen } from "@excalidraw/excalidraw";
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -24,6 +22,9 @@ const Excalidraw = dynamic(
     loading: () => <div className="flex h-full w-full items-center justify-center">Loading Canvas...</div>
   }
 );
+
+// Self-contained random ID generator to avoid dependency issues.
+const randomId = () => Math.random().toString(36).slice(2, 11);
 
 const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
   const { resources } = useAuth();
@@ -158,7 +159,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLinkingSearchOpen, setIsLinkingSearchOpen] = useState(false);
   
-  const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null);
+  const excalidrawAPIRef = useRef<any>(null);
   const { toast } = useToast();
   
   const [isDirty, setIsDirty] = useState(false);
@@ -238,8 +239,9 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
       const url = element.link;
       if (!url) return;
       
+      event.preventDefault();
+      
       if (url.startsWith('canvas://')) {
-          event.preventDefault();
           const [protocol, ids] = url.split('://');
           if (ids) {
               const [resourceId, pointId] = ids.split('/');
@@ -250,9 +252,11 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
               });
           }
       } else {
-          // Allow default behavior for regular http links
+          // For regular links, open them in a new browser tab.
+          window.open(url, '_blank', 'noopener,noreferrer');
       }
   }, [authOpenDrawingCanvas]);
+
 
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if ((event.metaKey || event.ctrlKey) && event.key === 's') {
