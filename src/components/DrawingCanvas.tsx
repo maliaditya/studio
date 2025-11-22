@@ -5,7 +5,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import dynamic from 'next/dynamic';
 import { Button } from './ui/button';
 import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { ExcalidrawElement, NonDeleted, AppState } from "@excalidraw/excalidraw";
 import type { ExcalidrawAPIRefValue } from '@excalidraw/excalidraw';
 import { useAuth } from '@/contexts/AuthContext';
@@ -95,46 +95,49 @@ const ExcalidrawWrapper = ({
     );
 }
 
-const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
+const SearchContent = React.memo(({ onSelect, query, setQuery }: { 
+    onSelect: (resource: Resource, point: ResourcePoint) => void;
+    query: string;
+    setQuery: (query: string) => void;
+}) => {
     const { resources } = useAuth();
 
     const searchResults = useMemo(() => {
+        if (!query) return [];
+        const lowerCaseQuery = query.toLowerCase();
         return resources.flatMap(resource =>
             (resource.points || [])
-                .filter(point => point.type === 'paint')
+                .filter(point => point.type === 'paint' && point.text && point.text.toLowerCase().includes(lowerCaseQuery))
                 .map(point => ({ resource, point }))
         );
-    }, [resources]);
+    }, [query, resources]);
 
     return (
-        <Command shouldFilter={true}>
-            <CommandInput 
-                placeholder="Search all canvases..." 
-            />
-            <CardContent className="p-0">
-                <CommandList>
-                    <CommandEmpty>No canvases found.</CommandEmpty>
-                    <CommandGroup>
-                        {searchResults.map(({ resource, point }) => (
-                            <CommandItem
-                                key={point.id}
-                                value={point.text || 'Untitled Canvas'}
-                                onSelect={() => onSelect(resource, point)}
-                                className="flex justify-between items-center cursor-pointer"
-                            >
-                                <span>{point.text || 'Untitled Canvas'}</span>
-                                <span className="text-xs text-muted-foreground">{resource.name}</span>
-                            </CommandItem>
-                        ))}
-                    </CommandGroup>
-                </CommandList>
-            </CardContent>
+        <Command shouldFilter={false}>
+            <CommandList>
+                <CommandEmpty>No canvases found.</CommandEmpty>
+                <CommandGroup>
+                    {searchResults.map(({ resource, point }) => (
+                        <CommandItem
+                            key={point.id}
+                            value={point.text || 'Untitled Canvas'}
+                            onSelect={() => onSelect(resource, point)}
+                            className="flex justify-between items-center cursor-pointer"
+                        >
+                            <span>{point.text || 'Untitled Canvas'}</span>
+                            <span className="text-xs text-muted-foreground">{resource.name}</span>
+                        </CommandItem>
+                    ))}
+                </CommandGroup>
+            </CommandList>
         </Command>
     );
 });
 SearchContent.displayName = 'SearchContent';
 
 const SearchPopup = React.memo(({ open, setOpen, onSelect }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
+    const [query, setQuery] = useState('');
+    
     const style: React.CSSProperties = {
         position: 'fixed',
         top: '50%',
@@ -142,26 +145,33 @@ const SearchPopup = React.memo(({ open, setOpen, onSelect }: { open: boolean, se
         transform: 'translate(-50%, -50%)',
         zIndex: 130,
     };
-    
-    const onSelectWrapper = (resource: Resource, point: ResourcePoint) => {
-        onSelect(resource, point);
-        setOpen(false);
-    }
-    
+
     if (!open) return null;
 
     return (
         <div style={style}>
              <Card className="w-[512px] shadow-2xl border-2 bg-popover">
-                <div className="flex items-center justify-between px-2 py-1 border-b">
-                    <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-sm">Search All Canvases</h3>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
+                <div className="flex items-center justify-between p-1 border-b">
+                    <Command className="w-full">
+                         <CommandInput 
+                          placeholder="Search all canvases..."
+                          value={query}
+                          onValueChange={setQuery}
+                          className="h-9 border-0 shadow-none focus-visible:ring-0"
+                        />
+                    </Command>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 mr-1" onClick={() => setOpen(false)}>
                         <X className="h-4 w-4" />
                     </Button>
                 </div>
-                <SearchContent onSelect={onSelectWrapper} />
+                <SearchContent 
+                    onSelect={(resource, point) => {
+                        onSelect(resource, point);
+                        setOpen(false);
+                    }} 
+                    query={query}
+                    setQuery={setQuery}
+                />
             </Card>
         </div>
     );
