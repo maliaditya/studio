@@ -103,30 +103,24 @@ const ExcalidrawWrapper = ({
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
     onLinkOpen: OnLinkOpen;
 }) => {
-    const [initialData, setInitialData] = useState<{ elements: readonly ExcalidrawElement[], appState?: any } | null>(null);
-
-    useEffect(() => {
-        setInitialData(null); // Set to null to show loading state while parsing
-        let data: { elements: readonly ExcalidrawElement[], appState?: any };
+    // This is the robust way to parse and provide initial data.
+    // It's calculated on every render, which is fine, and guarantees a valid object.
+    const initialData = (() => {
         try {
             if (activeCanvas.data && typeof activeCanvas.data === 'string' && activeCanvas.data.trim() !== '') {
                 const parsedData = JSON.parse(activeCanvas.data);
-                data = {
+                return {
                     elements: parsedData.elements || [], // Ensure elements is always an array
                     appState: parsedData.appState || {},
                 };
-            } else {
-                throw new Error("Data is empty or not a string.");
             }
         } catch (e) {
-            data = { elements: [] };
+            console.error("Failed to parse canvas data, defaulting to empty.", e);
         }
-        setInitialData(data);
-    }, [activeCanvas.id, activeCanvas.data]);
+        // Default to an empty canvas if data is missing, empty, or invalid
+        return { elements: [] };
+    })();
 
-    if (!initialData) {
-        return <div className="flex h-full w-full items-center justify-center">Loading canvas data...</div>;
-    }
 
     return (
         <div style={{ height: "100%", width: "100%" }}>
@@ -143,6 +137,7 @@ const ExcalidrawWrapper = ({
         </div>
     );
 }
+ExcalidrawWrapper.displayName = "ExcalidrawWrapper";
 
 export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: () => void; }) {
   const { 
