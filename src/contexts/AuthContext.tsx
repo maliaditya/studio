@@ -651,18 +651,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { ...prev, openCanvases: newOpenCanvases };
     });
     
-    const canvasToUpdate = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
-    if(canvasToUpdate) {
-        setResources(prevResources => prevResources.map(r => {
-            if(r.id === canvasToUpdate.resourceId) {
-                return {
-                    ...r,
-                    points: r.points?.map(p => p.id === canvasToUpdate.pointId ? {...p, drawing: data} : p)
-                }
+    setResources(prevResources => {
+        const canvasToUpdate = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
+        if (!canvasToUpdate) return prevResources;
+
+        return prevResources.map(r => {
+            if (r.id === canvasToUpdate.resourceId) {
+                const newPoints = r.points?.map(p => 
+                    p.id === canvasToUpdate.pointId ? { ...p, drawing: data } : p
+                );
+                return { ...r, points: newPoints };
             }
             return r;
-        }))
-    }
+        });
+    });
   }, [drawingCanvasState, setResources]);
 
   const toggleProjectBrandingStatus = useCallback((projectId: string) => {
@@ -3184,46 +3186,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         });
         return;
     }
-
-    try {
-        toast({ title: "Syncing with GitHub..." });
-
-        const remoteMetaResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-            headers: { 'Authorization': `token ${token}` }
-        });
-
-        if (remoteMetaResponse.status === 404) {
-            const allUserData = getAllUserData();
-            const localDataString = JSON.stringify(allUserData, null, 2);
-            await pushToGitHub(token, owner, repo, path, localDataString, "Initial backup");
-            toast({ title: "Initial Push Successful", description: "Your data has been backed up to GitHub." });
-            return;
-        }
-
-        if (remoteMetaResponse.ok) {
-            const remoteMeta = await remoteMetaResponse.json();
-            
-            if (!localDataIsLoaded) {
-                await pullFromGitHub(token, owner, repo, path, remoteMeta.sha);
-            } else if (settings.lastSync && settings.lastSync.sha === remoteMeta.sha) {
-                const localData = getAllUserData();
-                const localDataString = JSON.stringify(localData, null, 2);
-                await pushToGitHub(token, owner, repo, path, localDataString, "Update from LifeOS", remoteMeta.sha);
-                toast({ title: "Push Successful", description: "Your local changes have been pushed to GitHub." });
-            } else {
-                await pullFromGitHub(token, owner, repo, path, remoteMeta.sha);
-            }
-        } else {
-             throw new Error(`GitHub API error: ${remoteMetaResponse.statusText}`);
-        }
-    } catch (error) {
-        console.error("GitHub Sync Error:", error);
-        toast({
-            title: "GitHub Sync Failed",
-            description: error instanceof Error ? error.message : "An unknown error occurred.",
-            variant: "destructive",
-        });
-    }
+    
+    pushDataToCloud();
   };
 
   async function pushToGitHub(token: string, owner: string, repo: string, path: string, content: string, message: string, sha?: string) {
@@ -3606,6 +3570,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 

@@ -66,23 +66,8 @@ const ExcalidrawWrapper = ({
     }, [activeCanvas.id, activeCanvas.data]);
 
     const handleChange = (elements: readonly ExcalidrawElement[], appState: AppState) => {
-        if (saveTimeoutRef.current) {
-            clearTimeout(saveTimeoutRef.current);
-        }
-        
-        saveTimeoutRef.current = setTimeout(() => {
-            const drawingData = JSON.stringify({
-                type: "excalidraw",
-                version: 2,
-                source: "dock-app",
-                elements: elements,
-                appState: {
-                    viewBackgroundColor: appState.viewBackgroundColor,
-                    gridSize: appState.gridSize,
-                }
-            });
-            onSave(drawingData);
-        }, settings.drawingCanvasAutoSaveInterval || 30000);
+        // Auto-saving is disabled in favor of manual save.
+        // You can re-enable this if needed.
     };
 
     useEffect(() => {
@@ -111,83 +96,36 @@ const ExcalidrawWrapper = ({
 
 const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
     const { resources } = useAuth();
-    const [query, setQuery] = useState('');
-
-    const { attributes, listeners, setNodeRef, transform } = useDraggable({
-        id: 'drawing-canvas-search-popup',
-    });
-
-    const style: React.CSSProperties = {
-        position: 'fixed',
-        top: '100px',
-        left: '100px',
-        transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-        zIndex: 120, // High z-index to be on top
-    };
-
-    const allCanvases = useMemo(() => {
-        const canvasList: { resource: Resource; point: ResourcePoint }[] = [];
-        resources.forEach(resource => {
-            resource.points?.forEach(point => {
-                if (point.type === 'paint') {
-                    canvasList.push({ resource, point });
-                }
-            });
-        });
-        return canvasList;
-    }, [resources]);
-
-    const filteredCanvases = useMemo(() => {
-        if (!query) return allCanvases;
-        const lowerCaseQuery = query.toLowerCase();
-        return allCanvases.filter(({ resource, point }) => 
-            (point.text && point.text.toLowerCase().includes(lowerCaseQuery)) ||
-            (resource.name && resource.name.toLowerCase().includes(lowerCaseQuery))
-        );
-    }, [query, allCanvases]);
-
-    if (!open) return null;
+    
+    const onSelectWrapper = (callback: () => void) => {
+        callback();
+        setOpen(false);
+    }
     
     return (
-        <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="w-96 shadow-2xl border-2 border-primary/30 bg-card">
-                <CardHeader className="p-2 pl-3 flex flex-row items-center justify-between border-b cursor-grab active:cursor-grabbing" {...listeners}>
-                    <CardTitle className="text-base flex items-center gap-2">
-                        <Search className="h-4 w-4"/>
-                        Search Canvases
-                    </CardTitle>
-                     <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={() => setOpen(false)}>
-                        <X className="h-4 w-4" />
-                    </Button>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <Command className="bg-transparent">
-                         <CommandInput 
-                            placeholder="Search all canvases..." 
-                            value={query}
-                            onValueChange={setQuery}
-                            className="border-0 focus-visible:ring-0"
-                         />
-                        <CommandList>
-                            <CommandEmpty>No canvases found.</CommandEmpty>
-                            <CommandGroup>
-                                {filteredCanvases.map(({ resource, point }) => (
-                                <CommandItem
-                                    key={point.id}
-                                    onSelect={() => onSelect(resource, point)}
-                                    className="flex justify-between items-center cursor-pointer"
-                                >
-                                    <span>{point.text || 'Untitled Canvas'}</span>
-                                    <span className="text-xs text-muted-foreground">{resource.name}</span>
-                                </CommandItem>
-                                ))}
-                            </CommandGroup>
-                        </CommandList>
-                    </Command>
-                </CardContent>
-            </Card>
-        </div>
-    )
+        <CommandDialog open={open} onOpenChange={setOpen}>
+          <CommandInput placeholder="Search all canvases..." />
+          <CommandList>
+            <CommandEmpty>No canvases found.</CommandEmpty>
+            <CommandGroup>
+              {resources.flatMap(resource =>
+                (resource.points || [])
+                  .filter(point => point.type === 'paint')
+                  .map(point => (
+                    <CommandItem
+                      key={point.id}
+                      onSelect={() => onSelectWrapper(() => onSelect(resource, point))}
+                      className="flex justify-between items-center cursor-pointer"
+                    >
+                      <span>{point.text || 'Untitled Canvas'}</span>
+                      <span className="text-xs text-muted-foreground">{resource.name}</span>
+                    </CommandItem>
+                  ))
+              )}
+            </CommandGroup>
+          </CommandList>
+        </CommandDialog>
+      )
 }
 
 export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
@@ -254,7 +192,6 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
         
         const newOpenCanvases = (prev.openCanvases || []).filter(c => c.id !== canvasId);
         
-        // If we closed the active tab, find a new one to activate
         if (prev.activeCanvasId === canvasId) {
             let newActiveId: string | null = null;
             if (newOpenCanvases.length > 0) {
