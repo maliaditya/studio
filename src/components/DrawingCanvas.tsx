@@ -94,8 +94,10 @@ const ExcalidrawWrapper = ({
     );
 }
 
-const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
+const SearchPopup = React.memo(({ open, setOpen, onSelect }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
     const { resources } = useAuth();
+    const [query, setQuery] = React.useState("");
+
     const [position, setPosition] = useState({ 
         x: typeof window !== 'undefined' ? window.innerWidth / 2 - 256 : 0, 
         y: typeof window !== 'undefined' ? window.innerHeight / 2 - 200 : 0 
@@ -117,7 +119,20 @@ const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (ope
     const onSelectWrapper = (callback: () => void) => {
         callback();
         setOpen(false);
+        setQuery("");
     }
+    
+    const filteredResults = useMemo(() => {
+        if (!query) return [];
+        
+        const lowerCaseQuery = query.toLowerCase();
+        
+        return resources.flatMap(resource => 
+            (resource.points || [])
+            .filter(point => point.type === 'paint' && (point.text || 'Untitled Canvas').toLowerCase().includes(lowerCaseQuery))
+            .map(point => ({ resource, point }))
+        );
+    }, [query, resources]);
     
     if (!open) return null;
 
@@ -125,21 +140,24 @@ const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (ope
         <div ref={setNodeRef} style={style} {...attributes}>
              <Card className="w-[512px] shadow-2xl border-2 bg-popover">
                 <Command shouldFilter={false}>
-                    <div className="flex items-center border-b px-3" cmdk-input-wrapper="" {...listeners}>
+                    <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                       <CommandInput 
+                       <Input 
                          placeholder="Search all canvases..." 
+                         className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 shadow-none focus-visible:ring-0"
+                         value={query}
+                         onChange={(e) => setQuery(e.target.value)}
+                         {...listeners} // Use listeners on the input itself to allow dragging
                        />
+                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
+                           <X className="h-4 w-4" />
+                       </Button>
                     </div>
                     <CardContent className="p-0">
                         <CommandList>
                             <CommandEmpty>No canvases found.</CommandEmpty>
                             <CommandGroup>
-                                {resources.flatMap(resource => 
-                                    (resource.points || [])
-                                    .filter(point => point.type === 'paint')
-                                    .map(point => ({ resource, point }))
-                                ).map(({ resource, point }) => (
+                                {filteredResults.map(({ resource, point }) => (
                                     <CommandItem
                                         key={point.id}
                                         onSelect={() => onSelectWrapper(() => onSelect(resource, point))}
@@ -156,7 +174,9 @@ const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (ope
             </Card>
         </div>
       )
-}
+});
+SearchPopup.displayName = 'SearchPopup';
+
 
 export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
   const { resources, drawingCanvasState, setDrawingCanvasState, updateDrawingData, togglePinDrawing, openDrawingCanvas: authOpenDrawingCanvas } = useAuth();
