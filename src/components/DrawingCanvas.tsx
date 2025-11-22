@@ -103,20 +103,22 @@ const ExcalidrawWrapper = ({
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
     onLinkOpen: OnLinkOpen;
 }) => {
-    const initialData = useMemo(() => {
-        if (activeCanvas.data && typeof activeCanvas.data === 'string') {
-            try {
-                const parsedData = JSON.parse(activeCanvas.data);
-                return {
-                    elements: parsedData.elements || [],
-                    appState: parsedData.appState || {}
-                };
-            } catch (e) {
-                console.error("Failed to parse initial drawing data:", e);
-            }
+    // This is now the definitive way to handle initialData.
+    // It's parsed on every render, but it's safe and prevents crashes.
+    let initialData: { elements: readonly ExcalidrawElement[], appState?: any };
+    try {
+        if (activeCanvas.data && typeof activeCanvas.data === 'string' && activeCanvas.data.trim() !== '') {
+            const parsedData = JSON.parse(activeCanvas.data);
+            initialData = {
+                elements: parsedData.elements || [], // Ensure elements is always an array
+                appState: parsedData.appState || {},
+            };
+        } else {
+            throw new Error("Data is empty or not a string.");
         }
-        return { elements: [] };
-    }, [activeCanvas.id, activeCanvas.data]);
+    } catch (e) {
+        initialData = { elements: [] };
+    }
 
     return (
         <div style={{ height: "100%", width: "100%" }}>
