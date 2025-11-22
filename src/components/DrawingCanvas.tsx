@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import type { Resource, ResourcePoint } from '@/types/workout';
+import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 import { Input } from './ui/input';
 
 // Dynamically import Excalidraw to avoid SSR issues
@@ -97,6 +98,14 @@ const ExcalidrawWrapper = ({
 const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
     const { resources } = useAuth();
 
+    const searchResults = useMemo(() => {
+        return resources.flatMap(resource =>
+            (resource.points || [])
+                .filter(point => point.type === 'paint')
+                .map(point => ({ resource, point }))
+        );
+    }, [resources]);
+
     return (
         <Command shouldFilter={true}>
             <CommandInput 
@@ -106,11 +115,7 @@ const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource,
                 <CommandList>
                     <CommandEmpty>No canvases found.</CommandEmpty>
                     <CommandGroup>
-                        {resources.flatMap(resource =>
-                            (resource.points || [])
-                                .filter(point => point.type === 'paint')
-                                .map(point => ({ resource, point }))
-                        ).map(({ resource, point }) => (
+                        {searchResults.map(({ resource, point }) => (
                             <CommandItem
                                 key={point.id}
                                 value={point.text || 'Untitled Canvas'}
@@ -165,7 +170,7 @@ SearchPopup.displayName = 'SearchPopup';
 
 
 export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
-  const { resources, drawingCanvasState, setDrawingCanvasState, updateDrawingData, togglePinDrawing, openDrawingCanvas: authOpenDrawingCanvas, useDraggable } = useAuth();
+  const { resources, drawingCanvasState, setDrawingCanvasState, updateDrawingData, togglePinDrawing, openDrawingCanvas: authOpenDrawingCanvas } = useAuth();
   const [theme, setTheme] = useState('dark');
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
