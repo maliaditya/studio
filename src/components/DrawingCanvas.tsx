@@ -35,12 +35,14 @@ const ExcalidrawWrapper = ({
     activeCanvas, 
     onSave, 
     theme, 
-    apiRef 
+    apiRef,
+    setIsDirty,
 }: {
     activeCanvas: { id: string, data?: string };
     onSave: (drawingData: string) => void;
     theme: string;
     apiRef: React.MutableRefObject<ExcalidrawAPIRefValue | null>;
+    setIsDirty: React.Dispatch<React.SetStateAction<boolean>>;
 }) => {
     const [initialData, setInitialData] = useState<{
         elements: readonly NonDeleted<ExcalidrawElement>[];
@@ -48,7 +50,6 @@ const ExcalidrawWrapper = ({
     } | null>(null);
 
     const { settings } = useAuth();
-    const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     
     useEffect(() => {
         if (activeCanvas.data) {
@@ -65,20 +66,12 @@ const ExcalidrawWrapper = ({
         } else {
             setInitialData({ elements: [] });
         }
-    }, [activeCanvas.id, activeCanvas.data]);
+        setIsDirty(false); // Reset dirty state when canvas changes
+    }, [activeCanvas.id, activeCanvas.data, setIsDirty]);
 
     const handleChange = (elements: readonly ExcalidrawElement[], appState: AppState) => {
-        // Auto-saving is disabled in favor of manual save.
-        // You can re-enable this if needed.
+        setIsDirty(true);
     };
-
-    useEffect(() => {
-        return () => {
-            if (saveTimeoutRef.current) {
-                clearTimeout(saveTimeoutRef.current);
-            }
-        };
-    }, []);
 
     if (initialData === null) {
         return <div className="flex h-full w-full items-center justify-center">Preparing Canvas...</div>;
@@ -159,6 +152,7 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
   const [theme, setTheme] = useState('dark');
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null);
   const { toast } = useToast();
 
@@ -217,7 +211,7 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
     }
   }, [drawingCanvasState?.isOpen, settings.pinnedCanvasIds, resources]);
 
-  const handleSaveClick = () => {
+  const handleSaveClick = useCallback(() => {
     if (excalidrawAPIRef.current && drawingCanvasState?.activeCanvasId) {
       const elements = excalidrawAPIRef.current.getSceneElements();
       const appState = excalidrawAPIRef.current.getAppState();
@@ -232,9 +226,24 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
         }
       });
       updateDrawingData(drawingCanvasState.activeCanvasId, drawingData);
+      setIsDirty(false);
       toast({ title: "Canvas Saved" });
     }
-  };
+  }, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+        if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+            event.preventDefault();
+            handleSaveClick();
+        }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [handleSaveClick]);
+
 
   const handleTabClick = (canvasId: string) => {
     setDrawingCanvasState(prev => prev ? { ...prev, activeCanvasId: canvasId } : null);
@@ -318,7 +327,9 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-4 w-4"/></Button>
-                    <Button variant="ghost" size="icon" onClick={handleSaveClick}><Save className="h-4 w-4"/></Button>
+                    <Button variant="ghost" size="icon" onClick={handleSaveClick}>
+                        <Save className={cn("h-4 w-4", isDirty ? "text-red-500" : "text-green-500")} />
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4"/></Button>
                   </div>
               </CardHeader>
@@ -330,6 +341,7 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
                       onSave={(data) => updateDrawingData(activeCanvas.id, data)}
                       theme={theme}
                       apiRef={excalidrawAPIRef}
+                      setIsDirty={setIsDirty}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">Select a canvas to start drawing.</div>
