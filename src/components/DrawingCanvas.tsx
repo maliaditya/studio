@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from './ui/button';
 import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search } from 'lucide-react';
@@ -95,41 +95,36 @@ const ExcalidrawWrapper = ({
     );
 }
 
-const SearchContent = React.memo(({ onSelect }: { 
-    onSelect: (resource: Resource, point: ResourcePoint) => void;
-}) => {
-    const { resources } = useAuth();
-    
-    // We get the query from the CommandInput via context, so no need for local state.
-    // The Command component will handle filtering.
-    const searchResults = useMemo(() => {
-        return resources.flatMap(resource =>
-            (resource.points || [])
-                .filter(point => point.type === 'paint' && point.text)
-                .map(point => ({ resource, point }))
-        );
-    }, [resources]);
+const SearchPopupContent = ({ onSelect }: { onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
+  const { resources } = useAuth();
+  
+  const searchResults = useMemo(() => {
+      return resources.flatMap(resource =>
+          (resource.points || [])
+              .filter(point => point.type === 'paint' && point.text)
+              .map(point => ({ resource, point }))
+      );
+  }, [resources]);
 
-    return (
-        <CommandList>
-            <CommandEmpty>No canvases found.</CommandEmpty>
-            <CommandGroup>
-                {searchResults.map(({ resource, point }) => (
-                    <CommandItem
-                        key={point.id}
-                        value={point.text || 'Untitled Canvas'}
-                        onSelect={() => onSelect(resource, point)}
-                        className="flex justify-between items-center cursor-pointer"
-                    >
-                        <span>{point.text || 'Untitled Canvas'}</span>
-                        <span className="text-xs text-muted-foreground">{resource.name}</span>
-                    </CommandItem>
-                ))}
-            </CommandGroup>
-        </CommandList>
-    );
-});
-SearchContent.displayName = 'SearchContent';
+  return (
+      <CommandList>
+          <CommandEmpty>No canvases found.</CommandEmpty>
+          <CommandGroup>
+              {searchResults.map(({ resource, point }) => (
+                  <CommandItem
+                      key={point.id}
+                      value={point.text || 'Untitled Canvas'}
+                      onSelect={() => onSelect(resource, point)}
+                      className="flex justify-between items-center cursor-pointer"
+                  >
+                      <span>{point.text || 'Untitled Canvas'}</span>
+                      <span className="text-xs text-muted-foreground">{resource.name}</span>
+                  </CommandItem>
+              ))}
+          </CommandGroup>
+      </CommandList>
+  );
+};
 
 const SearchPopup = React.memo(({ open, setOpen, onSelect }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
     
@@ -147,7 +142,7 @@ const SearchPopup = React.memo(({ open, setOpen, onSelect }: { open: boolean, se
         <div style={style}>
              <Card className="w-[512px] shadow-2xl border-2 bg-popover">
                 <Command>
-                    <div className="flex items-center justify-between p-1 border-b">
+                    <div className="flex items-center justify-between p-1">
                         <CommandInput 
                           placeholder="Search all canvases..."
                           className="h-9 border-0 shadow-none focus-visible:ring-0"
@@ -156,7 +151,7 @@ const SearchPopup = React.memo(({ open, setOpen, onSelect }: { open: boolean, se
                             <X className="h-4 w-4" />
                         </Button>
                     </div>
-                    <SearchContent onSelect={onSelect} />
+                    <SearchPopupContent onSelect={onSelect} />
                 </Command>
             </Card>
         </div>
