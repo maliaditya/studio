@@ -1,81 +1,46 @@
-{
-  "name": "nextn",
-  "version": "0.1.0",
-  "private": "true",
-  "scripts": {
-    "dev": "next dev -p 9002",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+
+"use server";
+/**
+ * @fileoverview This flow analyzes a single meal and returns its estimated nutritional information.
+ *
+ * - analyzeMeal - A function that takes a meal description and returns its macronutrient breakdown.
+ * - AnalyzeMealInput - The Zod schema for the input of the analyzeMeal function.
+ * - AnalyzeMealOutput - The Zod schema for the output of the analyzeMeal function.
+ */
+
+import { ai } from "@/ai/genkit";
+import { z } from "genkit/zod";
+import { Meat, Soup } from "lucide-react";
+
+export const AnalyzeMealInput = z.object({
+  mealDescription: z.string().describe("The description of a single meal, including ingredients and approximate quantities."),
+});
+
+export const AnalyzeMealOutput = z.object({
+  calories: z.number().describe("Estimated calories for the meal."),
+  protein: z.number().describe("Estimated protein in grams for the meal."),
+  carbs: z.number().describe("Estimated carbohydrates in grams for the meal."),
+  fat: z.number().describe("Estimated fat in grams for the meal."),
+  fiber: z.number().describe("Estimated fiber in grams for the meal."),
+});
+
+const analyzeMealPrompt = ai.definePrompt(
+  {
+    name: "analyzeMealPrompt",
+    inputSchema: AnalyzeMealInput,
+    outputSchema: AnalyzeMealOutput,
   },
-  "dependencies": {
-    "@dnd-kit/core": "^6.1.0",
-    "@dnd-kit/modifiers": "^7.0.0",
-    "@dnd-kit/sortable": "^8.0.0",
-    "@excalidraw/excalidraw": "^0.17.6",
-    "@hello-pangea/dnd": "^16.6.0",
-    "@hookform/resolvers": "^4.1.3",
-    "@radix-ui/react-accordion": "^1.2.3",
-    "@radix-ui/react-alert-dialog": "^1.1.6",
-    "@radix-ui/react-avatar": "^1.1.3",
-    "@radix-ui/react-checkbox": "^1.1.4",
-    "@radix-ui/react-dialog": "^1.1.6",
-    "@radix-ui/react-dropdown-menu": "^2.1.6",
-    "@radix-ui/react-label": "^2.1.2",
-    "@radix-ui/react-menubar": "^1.1.6",
-    "@radix-ui/react-popover": "^1.1.6",
-    "@radix-ui/react-progress": "^1.1.2",
-    "@radix-ui/react-radio-group": "^1.2.3",
-    "@radix-ui/react-scroll-area": "^1.2.3",
-    "@radix-ui/react-select": "^2.1.6",
-    "@radix-ui/react-separator": "^1.1.2",
-    "@radix-ui/react-slider": "^1.2.3",
-    "@radix-ui/react-slot": "^1.1.2",
-    "@radix-ui/react-switch": "^1.1.3",
-    "@radix-ui/react-tabs": "^1.1.3",
-    "@radix-ui/react-toast": "^1.2.6",
-    "@radix-ui/react-tooltip": "^1.1.8",
-    "@vercel/analytics": "^1.3.1",
-    "@vercel/blob": "^0.23.4",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "cmdk": "^1.0.0",
-    "date-fns": "^3.6.0",
-    "dotenv": "^16.5.0",
-    "firebase": "^11.9.1",
-    "framer-motion": "^11.2.10",
-    "lucide-react": "^0.475.0",
-    "next": "14.2.3",
-    "pdfjs-dist": "4.8.69",
-    "react": "^18.2.0",
-    "react-calendar-heatmap": "^1.9.0",
-    "react-day-picker": "^8.10.1",
-    "react-dom": "^18.2.0",
-    "react-hook-form": "^7.54.2",
-    "react-markdown": "^9.0.1",
-    "react-pdf": "^9.1.0",
-    "react-player": "^2.16.0",
-    "react-syntax-highlighter": "^15.5.0",
-    "react-zoom-pan-pinch": "^3.4.4",
-    "recharts": "^2.15.1",
-    "remark-gfm": "^4.0.0",
-    "tailwind-merge": "^3.0.1",
-    "tailwindcss-animate": "^1.0.7",
-    "three": "^0.165.0",
-    "zod": "^3.24.2"
-  },
-  "devDependencies": {
-    "@dnd-kit/utilities": "^3.2.2",
-    "@types/node": "^20",
-    "@types/react": "^18.2.0",
-    "@types/react-calendar-heatmap": "^1.6.7",
-    "@types/react-dom": "^18.2.0",
-    "@types/react-pdf": "^7.0.0",
-    "@types/react-syntax-highlighter": "^15.5.13",
-    "@types/three": "^0.165.0",
-    "postcss": "^8",
-    "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+  async (input) => {
+    return {
+      prompt: `Analyze the following meal and provide its estimated nutritional information. The description is: "${input.mealDescription}". Provide your best estimation for calories, protein, carbs, fat, and fiber.`,
+      tools: [],
+    };
   }
+);
+
+export async function analyzeMeal(
+  input: z.infer<typeof AnalyzeMealInput>
+): Promise<z.infer<typeof AnalyzeMealOutput>> {
+  const { output } = await analyzeMealPrompt(input);
+  return output!;
 }

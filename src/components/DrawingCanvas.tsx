@@ -5,7 +5,7 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { Button } from './ui/button';
 import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import type { ExcalidrawElement, NonDeleted, AppState, PointerDownState } from "@excalidraw/excalidraw";
+import { randomId, type ExcalidrawElement, type NonDeleted, type AppState, type PointerDownState } from "@excalidraw/excalidraw";
 import type { ExcalidrawAPIRefValue } from '@excalidraw/excalidraw';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -14,7 +14,6 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import type { Resource, ResourcePoint } from '@/types/workout';
 import { useDraggable } from '@dnd-kit/core';
 import dynamic from 'next/dynamic';
-import { randomId } from "@excalidraw/excalidraw";
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -155,11 +154,11 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLinkingSearchOpen, setIsLinkingSearchOpen] = useState(false);
   
-  const [isDirty, setIsDirty] = useState(false);
-  const isUserChange = useRef(false);
-
   const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null);
   const { toast } = useToast();
+  
+  const [isDirty, setIsDirty] = useState(false);
+  const isUserChange = useRef(false);
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: 'drawing-canvas-popup',
@@ -198,7 +197,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     if (!excalidrawAPIRef.current || !drawingCanvasState?.activeCanvasId) {
         return;
     }
-
+  
     const elements = excalidrawAPIRef.current.getSceneElements();
     const appState = excalidrawAPIRef.current.getAppState();
     const drawingData = JSON.stringify({
@@ -211,28 +210,25 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
             gridSize: appState.gridSize,
         }
     });
-
+  
     updateDrawingData(drawingCanvasState.activeCanvasId, drawingData, () => {
         setIsDirty(false);
-        isUserChange.current = false; // Reset interaction tracker after save
+        isUserChange.current = false;
         toast({ title: "Canvas Saved" });
     });
   }, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
 
-  const handleCanvasChange = (
-    elements: readonly ExcalidrawElement[],
-    appState: AppState
-  ) => {
+  const handleCanvasChange = useCallback(() => {
     if (isUserChange.current) {
         setIsDirty(true);
     }
-  };
+  }, []);
   
-  const handlePointerDown = (activeTool: Readonly<{ type: string; }>, pointerDownState: PointerDownState) => {
+  const handlePointerDown = useCallback((activeTool: Readonly<{ type: string; }>, pointerDownState: PointerDownState) => {
     if (!isUserChange.current) {
       isUserChange.current = true;
     }
-    
+
     const clickedElement = pointerDownState.hitElement;
     if (clickedElement && clickedElement.customData?.canvasLink) {
         const link = clickedElement.customData.canvasLink;
@@ -242,18 +238,18 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
             authOpenDrawingCanvas({
                 resourceId,
                 pointId,
-                name: clickedElement.text,
+                name: clickedElement.text || 'Linked Canvas',
             });
         }
     }
-  };
+  }, [authOpenDrawingCanvas]);
 
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if ((event.metaKey || event.ctrlKey) && event.key === 's') {
         event.preventDefault();
         handleSaveClick();
     }
-  };
+  }, [handleSaveClick]);
 
   const handleTabClick = (canvasId: string) => {
     if (isDirty) {
@@ -304,11 +300,8 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         type: 'text',
         x: api.getAppState().scrollX + 200,
         y: api.getAppState().scrollY + 200,
-        text: `🔗 ${point.text || 'Untitled Link'}`,
-        fontSize: 20,
-        fontFamily: 1,
-        textAlign: "left",
-        verticalAlign: "top",
+        width: 200,
+        height: 24,
         angle: 0,
         strokeColor: "#1e1e1e",
         backgroundColor: "transparent",
@@ -317,18 +310,17 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         strokeStyle: "solid",
         roughness: 1,
         opacity: 100,
+        text: `🔗 ${point.text || 'Untitled Link'}`,
+        fontSize: 20,
+        fontFamily: 1,
+        textAlign: "left",
+        verticalAlign: "top",
         isDeleted: false,
-        boundElements: null,
-        updated: Date.now(),
-        link: canvasLink,
         customData: { canvasLink },
-        width: 200, // Provide a default width
-        height: 24, // Provide a default height
+        link: null,
     };
 
-    api.updateScene({
-      elements: [...api.getSceneElements(), newElement]
-    });
+    api.updateScene({ elements: [...api.getSceneElements(), newElement as NonDeleted<ExcalidrawElement>] });
     setIsLinkingSearchOpen(false);
   };
 
