@@ -106,10 +106,10 @@ const ExcalidrawWrapper = ({
     const [initialData, setInitialData] = useState<{
         elements: readonly NonDeleted<ExcalidrawElement>[];
         appState?: Partial<AppState>;
-    } | null>(null);
+    }>({ elements: [] });
     
     useEffect(() => {
-        if (activeCanvas.data) {
+        if (activeCanvas.data && typeof activeCanvas.data === 'string') {
             try {
                 const parsedData = JSON.parse(activeCanvas.data);
                 setInitialData({
@@ -125,13 +125,10 @@ const ExcalidrawWrapper = ({
         }
     }, [activeCanvas.id, activeCanvas.data]);
 
-    if (initialData === null) {
-        return <div className="flex h-full w-full items-center justify-center">Preparing Canvas...</div>;
-    }
-
     return (
         <div style={{ height: "100%", width: "100%" }}>
             <Excalidraw
+                key={activeCanvas.id} // Add a key to force re-mount when canvas changes
                 excalidrawAPI={(api) => apiRef.current = api}
                 initialData={initialData}
                 theme={theme}
@@ -236,24 +233,24 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   }, []);
 
   const onLinkOpen: OnLinkOpen = useCallback((event, element) => {
-      const url = element.link;
-      if (!url) return;
-      
-      event.preventDefault();
-      
-      if (url.startsWith('canvas://')) {
-          const [protocol, ids] = url.split('://');
-          if (ids) {
-              const [resourceId, pointId] = ids.split('/');
-              authOpenDrawingCanvas({
-                  resourceId,
-                  pointId,
-                  name: element.text || 'Linked Canvas',
-              });
-          }
-      } else {
-          window.open(url, '_blank', 'noopener,noreferrer');
-      }
+    const url = element.link;
+    if (!url) return;
+    
+    event.preventDefault();
+    
+    if (url.startsWith('canvas://')) {
+        const [protocol, ids] = url.split('://');
+        if (ids) {
+            const [resourceId, pointId] = ids.split('/');
+            authOpenDrawingCanvas({
+                resourceId,
+                pointId,
+                name: element.text || 'Linked Canvas',
+            });
+        }
+    } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
   }, [authOpenDrawingCanvas]);
 
 
@@ -328,7 +325,6 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         verticalAlign: "top",
         isDeleted: false,
         link: `canvas://${resource.id}/${point.id}`,
-        customData: { canvasLink: `canvas://${resource.id}/${point.id}` },
     };
 
     api.updateScene({ elements: [...api.getSceneElements(), newElement as NonDeleted<ExcalidrawElement>] });
@@ -385,7 +381,6 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
               <CardContent className="p-0 flex-grow relative">
                 {isMounted && activeCanvas ? (
                   <ExcalidrawWrapper 
-                      key={activeCanvas.id}
                       activeCanvas={activeCanvas}
                       theme={theme}
                       apiRef={excalidrawAPIRef}
