@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -574,7 +573,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Mindset State
   const [mindsetCards, setMindsetCards] = useState<MindsetCard[]>([]);
   
-  // Pistons State
+  // Pistons
   const [isPistonsHeadOpen, setIsPistonsHeadOpen] = useState(false);
   const [pistons, setPistons] = useState<PistonsCategoryData>({});
   const [pistonsInitialState, setPistonsInitialState] = useState<PistonsInitialState | null>(null);
@@ -630,6 +629,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
 
+  const updateDrawingData = (canvasId: string, data: string) => {
+    setDrawingCanvasState(prev => {
+        if (!prev) return null;
+        return {
+            ...prev,
+            openCanvases: (prev.openCanvases || []).map(c => 
+                c.id === canvasId ? { ...c, data: data } : c
+            ),
+        };
+    });
+    setResources(prevResources => {
+        const canvasToUpdate = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
+        if (!canvasToUpdate) return prevResources;
+        const { resourceId, pointId } = canvasToUpdate;
+
+        return prevResources.map(r => {
+            if (r.id === resourceId) {
+                const newPoints = (r.points || []).map(p => 
+                    p.id === pointId ? { ...p, drawing: data } : p
+                );
+                return { ...r, points: newPoints };
+            }
+            return r;
+        });
+    });
+};
+
   const togglePinDrawing = (canvasId: string) => {
     setDrawingCanvasState(prev => {
         if (!prev) return null;
@@ -641,32 +667,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return { ...prev, openCanvases: updatedCanvases };
     });
   };
-
-  const updateDrawingData = useCallback((canvasId: string, data: string) => {
-    setDrawingCanvasState(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        openCanvases: (prev.openCanvases || []).map(c =>
-          c.id === canvasId ? { ...c, data: data } : c
-        ),
-      };
-    });
-    setResources(prevResources => {
-        const canvasToUpdate = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
-        if (!canvasToUpdate) return prevResources;
-
-        return prevResources.map(r => {
-            if (r.id === canvasToUpdate.resourceId) {
-                const newPoints = r.points?.map(p => 
-                    p.id === canvasToUpdate.pointId ? { ...p, drawing: data } : p
-                );
-                return { ...r, points: newPoints };
-            }
-            return r;
-        });
-    });
-  }, [drawingCanvasState, setResources]);
 
   const toggleProjectBrandingStatus = useCallback((projectId: string) => {
     setProjects(prevProjects =>
@@ -726,7 +726,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                     resourceId: state.resourceId,
                     pointId: state.pointId,
                     name: state.name,
-                    initialDrawing: state.initialDrawing,
+                    data: state.initialDrawing,
                 }],
                 activeCanvasId: canvasId,
             };
@@ -741,7 +741,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 resourceId: state.resourceId,
                 pointId: state.pointId,
                 name: state.name,
-                initialDrawing: state.initialDrawing,
+                data: state.initialDrawing,
             });
         }
     
@@ -3015,7 +3015,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const findRootTask = useCallback((activity: Activity): ExerciseDefinition | null => {
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d.id]));
     
     // First, find the definitionId of the current task instance
     let currentDefId: string | undefined;
@@ -3595,6 +3595,8 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
+
 
 
 
