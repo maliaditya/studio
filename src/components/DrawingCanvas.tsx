@@ -97,36 +97,28 @@ const ExcalidrawWrapper = ({
 
 const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
     const { resources } = useAuth();
-    const [query, setQuery] = useState("");
 
-    const filteredResults = useMemo(() => {
-        if (!query) return [];
-        const lowerCaseQuery = query.toLowerCase();
-        return resources.flatMap(resource => 
-            (resource.points || [])
-            .filter(point => point.type === 'paint' && (point.text || 'Untitled Canvas').toLowerCase().includes(lowerCaseQuery))
-            .map(point => ({ resource, point }))
-        );
-    }, [query, resources]);
+    const onValueChange = (query: string) => {
+        // The filtering is handled by Command's internals, but you can add custom logic here if needed.
+    };
 
     return (
-        <Command shouldFilter={false}>
-             <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
-                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                <CommandInput 
-                    placeholder="Search all canvases..." 
-                    className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 shadow-none focus-visible:ring-0"
-                    value={query}
-                    onValueChange={setQuery}
-                />
-            </div>
+        <Command shouldFilter={true} onValueChange={onValueChange}>
+            <CommandInput 
+                placeholder="Search all canvases..." 
+            />
             <CardContent className="p-0">
                 <CommandList>
                     <CommandEmpty>No canvases found.</CommandEmpty>
                     <CommandGroup>
-                        {filteredResults.map(({ resource, point }) => (
+                        {resources.flatMap(resource =>
+                            (resource.points || [])
+                                .filter(point => point.type === 'paint')
+                                .map(point => ({ resource, point }))
+                        ).map(({ resource, point }) => (
                             <CommandItem
                                 key={point.id}
+                                value={point.text || 'Untitled Canvas'}
                                 onSelect={() => onSelect(resource, point)}
                                 className="flex justify-between items-center cursor-pointer"
                             >
