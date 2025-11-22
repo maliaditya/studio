@@ -632,32 +632,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const updateDrawingData = (canvasId: string, data: string, onSaveComplete: () => void) => {
     setDrawingCanvasState(prev => {
-        if (!prev) return null;
-        const updatedCanvases = (prev.openCanvases || []).map(c => 
-            c.id === canvasId ? { ...c, data: data } : c
-        );
-        return { ...prev, openCanvases: updatedCanvases };
+      if (!prev) return null;
+      const updatedCanvases = (prev.openCanvases || []).map(c => 
+        c.id === canvasId ? { ...c, data: data } : c
+      );
+      return { ...prev, openCanvases: updatedCanvases };
     });
 
     setResources(prevResources => {
-        const canvasToUpdate = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
-        if (!canvasToUpdate) return prevResources;
-        
-        const { resourceId, pointId } = canvasToUpdate;
+      const canvasToUpdate = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
+      if (!canvasToUpdate) return prevResources;
+      
+      const { resourceId, pointId } = canvasToUpdate;
 
-        return prevResources.map(r => {
-            if (r.id === resourceId) {
-                const newPoints = (r.points || []).map(p => 
-                    p.id === pointId ? { ...p, drawing: data } : p
-                );
-                return { ...r, points: newPoints };
-            }
-            return r;
-        });
+      const updatedResources = prevResources.map(r => {
+        if (r.id === resourceId) {
+          const newPoints = (r.points || []).map(p => 
+            p.id === pointId ? { ...p, drawing: data } : p
+          );
+          return { ...r, points: newPoints };
+        }
+        return r;
+      });
+      // Call the onSaveComplete callback *after* state has been set
+      onSaveComplete();
+      return updatedResources;
     });
-
-    // Directly call the completion callback
-    onSaveComplete();
   };
 
   const togglePinDrawing = (canvasId: string) => {
@@ -3621,6 +3621,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 
