@@ -7,7 +7,7 @@ import { Button } from './ui/button';
 import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import type { ExcalidrawElement, NonDeleted, AppState } from "@excalidraw/excalidraw/types/types";
+import type { ExcalidrawElement, NonDeleted, AppState } from "@excalidraw/excalidraw";
 import type { ExcalidrawAPIRefValue } from '@excalidraw/excalidraw';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -111,7 +111,7 @@ const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource,
 
     return (
         <Command shouldFilter={false}>
-            <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
+             <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
                 <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                 <CommandInput 
                     placeholder="Search all canvases..." 
@@ -171,7 +171,10 @@ const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (ope
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
              <Card className="w-[512px] shadow-2xl border-2 bg-popover">
-                <div className="flex items-center justify-end px-2 py-1 border-b" {...listeners}>
+                <div className="flex items-center justify-between px-2 py-1 border-b" {...listeners}>
+                    <div className="flex items-center gap-2 cursor-grab active:cursor-grabbing">
+                        <h3 className="font-semibold text-sm">Search All Canvases</h3>
+                    </div>
                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
                         <X className="h-4 w-4" />
                     </Button>
