@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
+import { Input } from './ui/input';
 import type { Resource, ResourcePoint } from '@/types/workout';
 
 // Dynamically import Excalidraw to avoid SSR issues
