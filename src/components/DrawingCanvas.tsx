@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useRef, useState, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -86,11 +86,13 @@ const ExcalidrawWrapper = ({
     theme, 
     apiRef,
     onChange,
+    onPointerDown,
 }: {
     activeCanvas: { id: string, data?: string };
     theme: string;
     apiRef: React.MutableRefObject<ExcalidrawAPIRefValue | null>;
     onChange: () => void;
+    onPointerDown: () => void;
 }) => {
     const [initialData, setInitialData] = useState<{
         elements: readonly NonDeleted<ExcalidrawElement>[];
@@ -125,6 +127,7 @@ const ExcalidrawWrapper = ({
                 initialData={initialData}
                 theme={theme}
                 onChange={onChange}
+                onPointerDown={onPointerDown}
             />
         </div>
     );
@@ -145,7 +148,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   
   const [isDirty, setIsDirty] = useState(false);
-  const hasLoadedRef = useRef(false);
+  const hasUserInteractedRef = useRef(false);
 
   const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null);
   const { toast } = useToast();
@@ -179,7 +182,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
 
   useEffect(() => {
-    hasLoadedRef.current = false;
+    hasUserInteractedRef.current = false;
     setIsDirty(false);
   }, [drawingCanvasState?.activeCanvasId]);
 
@@ -201,39 +204,22 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     });
 
     updateDrawingData(drawingCanvasState.activeCanvasId, drawingData, () => {
-        if (excalidrawAPIRef.current) {
-            // This is the key: reset the scene's dirty flag internally
-            excalidrawAPIRef.current.resetScene(); 
-            // Then immediately restore the content. This sequence is not seen as a "dirtying" change.
-            excalidrawAPIRef.current.updateScene({ elements });
-        }
-        setIsDirty(false); // Update our own state
+        setIsDirty(false);
+        hasUserInteractedRef.current = false; // Reset interaction state after save
         toast({ title: "Canvas Saved" });
     });
   }, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-        if ((event.ctrlKey || event.metaKey) && event.key === 's') {
-            event.preventDefault();
-            handleSaveClick();
-        }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-        window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [handleSaveClick]);
-  
   const handleCanvasChange = () => {
-    // The first `onChange` event fires when initial data is loaded.
-    // We want to ignore this to prevent the canvas being marked as dirty on load.
-    if (!hasLoadedRef.current) {
-        hasLoadedRef.current = true;
-        return;
+    if (hasUserInteractedRef.current) {
+        setIsDirty(true);
     }
-    // Any subsequent change is a user interaction.
-    setIsDirty(true);
+  };
+  
+  const handlePointerDown = () => {
+    if (!hasUserInteractedRef.current) {
+      hasUserInteractedRef.current = true;
+    }
   };
 
   const handleTabClick = (canvasId: string) => {
@@ -328,6 +314,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       theme={theme}
                       apiRef={excalidrawAPIRef}
                       onChange={handleCanvasChange}
+                      onPointerDown={handlePointerDown}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">Select a canvas to start drawing.</div>
