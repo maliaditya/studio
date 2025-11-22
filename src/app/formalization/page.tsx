@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import type { Resource, CoreSkill, ExerciseDefinition, FormalizationData, FormalizationItem, PopupState } from '@/types/workout';
-import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff, Blocks, Database, Expand, X, GripVertical, Eye, ChevronsDown, ChevronsUp, Workflow } from 'lucide-react';
+import { BrainCircuit, BookCopy, ChevronRight, Folder, Link as LinkIcon, Library, Youtube, Globe, ExternalLink, MessageSquare, Code, ArrowRight, PlusCircle, Edit, Trash2, Play, Pause, GitMerge, EyeOff, Blocks, Database, Expand, X, GripVertical, Eye, ChevronsDown, ChevronsUp, Workflow, Paintbrush } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { MindMapViewer } from '@/components/MindMapViewer';
 import { useDraggable, DndContext, type DragEndEvent } from '@dnd-kit/core';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
@@ -168,19 +169,27 @@ const PropertyItemRow = ({ prop, handlePropertyChange, handleDeleteProperty }: {
     );
 };
 
-const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose, onSave }: { 
+const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose, onSave, onOpenDrawingCanvas }: { 
     item: FormalizationItem | null; 
     type: 'elements' | 'operations' | 'components';
     formalizationData?: FormalizationData;
     globalContext?: FormalizationData;
     onClose: () => void; 
     onSave: (itemToSave: FormalizationItem) => void;
+    onOpenDrawingCanvas: (resourceId: string, pointId: string) => void;
 }) => {
     const [text, setText] = useState('');
     const [properties, setProperties] = useState<PropertyItem[]>([]);
     const [linkedElementIds, setLinkedElementIds] = useState<string[]>([]);
     const [linkedComponentIds, setLinkedComponentIds] = useState<string[]>([]);
     const [linkedOperationIds, setLinkedOperationIds] = useState<string[]>([]);
+    const { resources } = useAuth();
+
+    const allCanvases = useMemo(() => {
+        return resources
+            .flatMap(res => (res.points || []).map(p => ({ ...p, resourceId: res.id, resourceName: res.name })))
+            .filter(point => point.type === 'paint' && point.drawing);
+    }, [resources]);
     
     useEffect(() => {
       if (item) {
@@ -243,6 +252,12 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
         return formalizationData.components.filter(c => c.id !== item?.id);
     }, [formalizationData, item]);
 
+    const handleLinkCanvas = (point: { resourceId: string, id: string, text?: string }) => {
+        const key = point.text ? `drawing: ${point.text}` : 'drawing';
+        const value = `canvas://${point.resourceId}/${point.id}`;
+        setProperties(prev => [...prev, { id: `prop_canvas_${Date.now()}`, key, value }]);
+    };
+
 
     return (
         <Dialog open={!!item} onOpenChange={(isOpen) => !isOpen && onClose()}>
@@ -273,7 +288,30 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
                                           />
                                       ))}
                                   </div>
-                                  <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
+                                  <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" size="sm"><Paintbrush className="mr-2 h-4 w-4"/>Link Canvas</Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[300px] p-0">
+                                            <Command>
+                                                <CommandInput placeholder="Search canvases..." />
+                                                <CommandList>
+                                                    <CommandEmpty>No canvases found.</CommandEmpty>
+                                                    <CommandGroup>
+                                                        {allCanvases.map(point => (
+                                                            <CommandItem key={point.id} onSelect={() => handleLinkCanvas(point)}>
+                                                                <span>{point.text || 'Untitled Canvas'}</span>
+                                                                <span className="text-xs ml-2 text-muted-foreground">{point.resourceName}</span>
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
+                                  </div>
                               </div>
                                <div className="space-y-2">
                                     <Label>Link Operations</Label>
@@ -357,7 +395,7 @@ interface ComponentPopupState {
     y: number;
 }
 
-const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsForSpec, allOpsForSpec, onClose, onOpenSubComponent, onEditItem }: { 
+const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsForSpec, allOpsForSpec, onClose, onOpenSubComponent, onEditItem, onOpenDrawingCanvas }: { 
     popupState: ComponentPopupState;
     allComponentsForSpec: FormalizationItem[];
     allElementsForSpec: FormalizationItem[];
@@ -365,6 +403,7 @@ const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsFor
     onClose: (id: string) => void;
     onOpenSubComponent: (id: string, event: React.MouseEvent) => void;
     onEditItem: (item: FormalizationItem, type: 'components' | 'elements' | 'operations') => void;
+    onOpenDrawingCanvas: (resourceId: string, pointId: string) => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
       id: `component-popup-${popupState.id}`,
@@ -479,6 +518,18 @@ const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsFor
                                                         <ul className="list-disc list-inside">
                                                             {Object.entries(el.properties).map(([key, value]) => {
                                                                 const linkedComp = allComponentsForSpec.find(c => c.id === value);
+                                                                const isCanvasLink = typeof value === 'string' && value.startsWith('canvas://');
+                                                                if (isCanvasLink) {
+                                                                    const [, resourceId, pointId] = value.split('/');
+                                                                    return (
+                                                                        <li key={key}>
+                                                                            <span className="font-semibold">{key}:</span>{' '}
+                                                                            <Badge variant="outline" className="cursor-pointer hover:ring-1 hover:ring-primary" onClick={() => onOpenDrawingCanvas(resourceId, pointId)}>
+                                                                                <Paintbrush className="mr-2 h-3 w-3" /> Canvas
+                                                                            </Badge>
+                                                                        </li>
+                                                                    );
+                                                                }
                                                                 return (
                                                                 <li key={key}>
                                                                     <span className="font-semibold">{key}:</span>{' '}
@@ -540,6 +591,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
         selectedFormalizationSpecId,
         setSelectedFormalizationSpecId,
         offerizationPlans,
+        openDrawingCanvas,
     } = useAuth();
     const { toast } = useToast();
     
@@ -1128,6 +1180,18 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                                                 <div className="mt-2 pt-2 border-t text-xs text-muted-foreground space-y-1">
                                                     {Object.entries(item.properties).map(([key, value]) => {
                                                         const linkedComp = fullFormalizationData?.components?.find(c => c.id === value);
+                                                        const isCanvasLink = typeof value === 'string' && value.startsWith('canvas://');
+                                                        if (isCanvasLink) {
+                                                            const [, resourceId, pointId] = value.split('/');
+                                                            return (
+                                                                <div key={key} className="flex items-center justify-between">
+                                                                    <span className="font-medium text-foreground">{key}:</span>
+                                                                    <Badge variant="outline" className="cursor-pointer hover:ring-1 hover:ring-primary" onClick={() => openDrawingCanvas(resourceId, pointId)}>
+                                                                        <Paintbrush className="mr-2 h-3 w-3" /> Canvas
+                                                                    </Badge>
+                                                                </div>
+                                                            );
+                                                        }
                                                         return (
                                                             <div key={key} className="flex items-center justify-between gap-2 group/prop">
                                                                 <span className="font-medium text-foreground">{key}:</span>
@@ -1331,6 +1395,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                     globalContext={{ elements: globalElements, operations: [], components: fullFormalizationData.components }}
                     onClose={() => setEditingItem(null)}
                     onSave={handleUpdateItem}
+                    onOpenDrawingCanvas={openDrawingCanvas}
                 />
             )}
              {Array.from(componentPopups.values()).map(popupState => (
@@ -1343,6 +1408,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                     onClose={closeComponentPopup}
                     onOpenSubComponent={(id, e) => openComponentPopup(id, e)}
                     onEditItem={(item, type) => setEditingItem({ item, type })}
+                    onOpenDrawingCanvas={openDrawingCanvas}
                 />
             ))}
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
@@ -1391,5 +1457,6 @@ export default function FormalizationPage() {
 
 
     
+
 
 
