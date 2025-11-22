@@ -143,9 +143,10 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [theme, setTheme] = useState('dark');
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
-  const [hasUserInteracted, setHasUserInteracted] = useState(false);
   
+  const [isDirty, setIsDirty] = useState(false);
+  const hasLoadedRef = useRef(false);
+
   const excalidrawAPIRef = useRef<ExcalidrawAPIRefValue | null>(null);
   const { toast } = useToast();
 
@@ -178,8 +179,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
 
   useEffect(() => {
-    // Reset interaction state when active canvas changes
-    setHasUserInteracted(false);
+    hasLoadedRef.current = false;
     setIsDirty(false);
   }, [drawingCanvasState?.activeCanvasId]);
 
@@ -201,8 +201,13 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     });
 
     updateDrawingData(drawingCanvasState.activeCanvasId, drawingData, () => {
-        setIsDirty(false);
-        setHasUserInteracted(false); // Reset interaction state after save
+        if (excalidrawAPIRef.current) {
+            // This is the key: reset the scene's dirty flag internally
+            excalidrawAPIRef.current.resetScene(); 
+            // Then immediately restore the content. This sequence is not seen as a "dirtying" change.
+            excalidrawAPIRef.current.updateScene({ elements });
+        }
+        setIsDirty(false); // Update our own state
         toast({ title: "Canvas Saved" });
     });
   }, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
@@ -219,15 +224,16 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         window.removeEventListener('keydown', handleKeyDown);
     };
   }, [handleSaveClick]);
-
+  
   const handleCanvasChange = () => {
-    if (hasUserInteracted) {
-      setIsDirty(true);
-    } else {
-      // This is the first change event, likely from loading data.
-      // We set the flag so the *next* change will mark it as dirty.
-      setHasUserInteracted(true);
+    // The first `onChange` event fires when initial data is loaded.
+    // We want to ignore this to prevent the canvas being marked as dirty on load.
+    if (!hasLoadedRef.current) {
+        hasLoadedRef.current = true;
+        return;
     }
+    // Any subsequent change is a user interaction.
+    setIsDirty(true);
   };
 
   const handleTabClick = (canvasId: string) => {
@@ -262,7 +268,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     authOpenDrawingCanvas({
         resourceId: resource.id,
         pointId: point.id,
-        name: point.text,
+        name: point.text || 'Untitled Canvas',
         initialDrawing: point.drawing,
     });
     setIsSearchOpen(false);
