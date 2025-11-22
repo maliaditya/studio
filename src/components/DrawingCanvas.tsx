@@ -96,7 +96,6 @@ const ExcalidrawWrapper = ({
 
 const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
     const { resources } = useAuth();
-    const [query, setQuery] = useState('');
     
     const [position, setPosition] = useState({ 
         x: typeof window !== 'undefined' ? window.innerWidth / 2 - 256 : 0, 
@@ -121,6 +120,7 @@ const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (ope
         setOpen(false);
     }
     
+    const [query, setQuery] = useState('');
     const searchResults = useMemo(() => {
         if (!query) return [];
         const results: { resource: Resource, point: ResourcePoint }[] = [];
@@ -137,19 +137,22 @@ const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (ope
         return results;
     }, [query, resources]);
 
+
     if (!open) return null;
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
              <Card className="w-[512px] shadow-2xl border-2 bg-popover">
                 <Command>
-                    <CardHeader className="p-0 border-b cursor-grab active:cursor-grabbing" {...listeners}>
-                       <CommandInput 
-                         placeholder="Search all canvases..." 
+                    <div className="flex items-center border-b px-3" cmdk-input-wrapper="" {...listeners}>
+                       <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                       <CommandPrimitive.Input 
                          value={query}
                          onValueChange={setQuery}
+                         className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                         placeholder="Search all canvases..." 
                        />
-                    </CardHeader>
+                    </div>
                     <CardContent className="p-0">
                         <CommandList>
                             <CommandEmpty>No canvases found.</CommandEmpty>
