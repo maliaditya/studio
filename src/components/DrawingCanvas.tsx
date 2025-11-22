@@ -13,8 +13,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
-import { Input } from './ui/input';
 import type { Resource, ResourcePoint } from '@/types/workout';
+import { Input } from './ui/input';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -95,10 +95,54 @@ const ExcalidrawWrapper = ({
     );
 }
 
-const SearchPopup = React.memo(({ open, setOpen, onSelect }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
+const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
     const { resources } = useAuth();
-    const [query, setQuery] = React.useState("");
+    const [query, setQuery] = useState("");
 
+    const filteredResults = useMemo(() => {
+        if (!query) return [];
+        const lowerCaseQuery = query.toLowerCase();
+        return resources.flatMap(resource => 
+            (resource.points || [])
+            .filter(point => point.type === 'paint' && (point.text || 'Untitled Canvas').toLowerCase().includes(lowerCaseQuery))
+            .map(point => ({ resource, point }))
+        );
+    }, [query, resources]);
+
+    return (
+        <Command shouldFilter={false}>
+            <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
+                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                <CommandInput 
+                    placeholder="Search all canvases..." 
+                    className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 shadow-none focus-visible:ring-0"
+                    value={query}
+                    onValueChange={setQuery}
+                />
+            </div>
+            <CardContent className="p-0">
+                <CommandList>
+                    <CommandEmpty>No canvases found.</CommandEmpty>
+                    <CommandGroup>
+                        {filteredResults.map(({ resource, point }) => (
+                            <CommandItem
+                                key={point.id}
+                                onSelect={() => onSelect(resource, point)}
+                                className="flex justify-between items-center cursor-pointer"
+                            >
+                                <span>{point.text || 'Untitled Canvas'}</span>
+                                <span className="text-xs text-muted-foreground">{resource.name}</span>
+                            </CommandItem>
+                        ))}
+                    </CommandGroup>
+                </CommandList>
+            </CardContent>
+        </Command>
+    );
+});
+SearchContent.displayName = 'SearchContent';
+
+const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
     const [position, setPosition] = useState({ 
         x: typeof window !== 'undefined' ? window.innerWidth / 2 - 256 : 0, 
         y: typeof window !== 'undefined' ? window.innerHeight / 2 - 200 : 0 
@@ -107,76 +151,36 @@ const SearchPopup = React.memo(({ open, setOpen, onSelect }: { open: boolean, se
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: 'canvas-search-popup',
     });
-
+    
     const style: React.CSSProperties = {
         position: 'fixed',
         top: position.y,
         left: position.x,
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         willChange: 'transform',
-        zIndex: 130, // Ensure it's above other popups
+        zIndex: 130,
     };
-
-    const onSelectWrapper = (callback: () => void) => {
-        callback();
-        setOpen(false);
-        setQuery("");
-    }
     
-    const filteredResults = useMemo(() => {
-        if (!query) return [];
-        
-        const lowerCaseQuery = query.toLowerCase();
-        
-        return resources.flatMap(resource => 
-            (resource.points || [])
-            .filter(point => point.type === 'paint' && (point.text || 'Untitled Canvas').toLowerCase().includes(lowerCaseQuery))
-            .map(point => ({ resource, point }))
-        );
-    }, [query, resources]);
+    const onSelectWrapper = (resource: Resource, point: ResourcePoint) => {
+        onSelect(resource, point);
+        setOpen(false);
+    }
     
     if (!open) return null;
 
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
              <Card className="w-[512px] shadow-2xl border-2 bg-popover">
-                <Command shouldFilter={false}>
-                    <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
-                       <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                       <Input 
-                         placeholder="Search all canvases..." 
-                         className="flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0 shadow-none focus-visible:ring-0"
-                         value={query}
-                         onChange={(e) => setQuery(e.target.value)}
-                         {...listeners} // Use listeners on the input itself to allow dragging
-                       />
-                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
-                           <X className="h-4 w-4" />
-                       </Button>
-                    </div>
-                    <CardContent className="p-0">
-                        <CommandList>
-                            <CommandEmpty>No canvases found.</CommandEmpty>
-                            <CommandGroup>
-                                {filteredResults.map(({ resource, point }) => (
-                                    <CommandItem
-                                        key={point.id}
-                                        onSelect={() => onSelectWrapper(() => onSelect(resource, point))}
-                                        className="flex justify-between items-center cursor-pointer"
-                                    >
-                                        <span>{point.text || 'Untitled Canvas'}</span>
-                                        <span className="text-xs text-muted-foreground">{resource.name}</span>
-                                    </CommandItem>
-                                ))}
-                            </CommandGroup>
-                        </CommandList>
-                    </CardContent>
-                </Command>
+                <div className="flex items-center justify-end px-2 py-1 border-b" {...listeners}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOpen(false)}>
+                        <X className="h-4 w-4" />
+                    </Button>
+                </div>
+                <SearchContent onSelect={onSelectWrapper} />
             </Card>
         </div>
-      )
-});
-SearchPopup.displayName = 'SearchPopup';
+    );
+};
 
 
 export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
