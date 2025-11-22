@@ -3166,12 +3166,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const syncWithGitHub = async () => {
-    const localDataIsLoaded = coreSkills.length > 0 || projects.length > 0;
-    
-    if (isLoadingState || (!localDataIsLoaded && localChangeCount === 0)) {
-        toast({ title: "Please Wait", description: "Application data is still loading.", variant: "default" });
-        return;
-    }
+    toast({ title: "Syncing...", description: "Pushing your data to GitHub." });
 
     const token = settings.githubToken;
     const owner = settings.githubOwner;
@@ -3186,8 +3181,43 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         });
         return;
     }
-    
-    pushDataToCloud();
+
+    try {
+        let sha: string | undefined = settings.lastSync?.sha;
+
+        // Try to get the SHA of the existing file to update it
+        if (!sha) {
+            try {
+                const fileResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+                    headers: { 'Authorization': `token ${token}` }
+                });
+                if (fileResponse.ok) {
+                    const fileData = await fileResponse.json();
+                    sha = fileData.sha;
+                } else if (fileResponse.status !== 404) {
+                    throw new Error('Could not fetch file details from GitHub.');
+                }
+            } catch (e) {
+                // If it fails (e.g. 404 not found), we proceed without a SHA, which will create the file.
+                console.warn("Could not get SHA for existing file. Will create a new file.", e);
+            }
+        }
+
+        const content = JSON.stringify(getAllUserData(), null, 2);
+        const message = `LifeOS backup: ${new Date().toISOString()}`;
+
+        await pushToGitHub(token, owner, repo, path, content, message, sha);
+
+        toast({ title: "Success", description: "Your data has been backed up to GitHub." });
+        setLocalChangeCount(0);
+    } catch (error) {
+        console.error("GitHub sync failed:", error);
+        toast({
+            title: "Sync Failed",
+            description: error instanceof Error ? error.message : "An unknown error occurred.",
+            variant: "destructive",
+        });
+    }
   };
 
   async function pushToGitHub(token: string, owner: string, repo: string, path: string, content: string, message: string, sha?: string) {
@@ -3570,6 +3600,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 
