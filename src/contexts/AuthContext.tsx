@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -657,14 +658,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 };
 
   const togglePinDrawing = (canvasId: string) => {
-    setDrawingCanvasState(prev => {
-        if (!prev) return null;
-        const updatedCanvases = (prev.openCanvases || []).map(canvas => 
-            canvas.id === canvasId 
-                ? { ...canvas, isPinned: !canvas.isPinned } 
-                : canvas
-        );
-        return { ...prev, openCanvases: updatedCanvases };
+    setSettings(prev => {
+        const currentPins = new Set(prev.pinnedCanvasIds || []);
+        if (currentPins.has(canvasId)) {
+            currentPins.delete(canvasId);
+        } else {
+            currentPins.add(canvasId);
+        }
+        return { ...prev, pinnedCanvasIds: Array.from(currentPins) };
     });
   };
 
@@ -718,16 +719,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
     setDrawingCanvasState(prev => {
         if (!prev || !prev.isOpen) {
+            const openCanvases = [{
+                id: canvasId,
+                resourceId: state.resourceId,
+                pointId: state.pointId,
+                name: state.name,
+                data: state.initialDrawing,
+                isPinned: (settings.pinnedCanvasIds || []).includes(canvasId)
+            }];
+            // Also open any other pinned canvases
+            (settings.pinnedCanvasIds || []).forEach(pinnedId => {
+                if (pinnedId !== canvasId) {
+                    const resource = resources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
+                    const point = resource?.points?.find(p => `${resource.id}-${p.id}` === pinnedId);
+                    if (resource && point) {
+                        openCanvases.push({
+                            id: pinnedId,
+                            resourceId: resource.id,
+                            pointId: point.id,
+                            name: point.text || 'Untitled Canvas',
+                            data: point.drawing,
+                            isPinned: true,
+                        });
+                    }
+                }
+            });
+
             return {
                 isOpen: true,
                 position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-                openCanvases: [{
-                    id: canvasId,
-                    resourceId: state.resourceId,
-                    pointId: state.pointId,
-                    name: state.name,
-                    data: state.initialDrawing,
-                }],
+                openCanvases,
                 activeCanvasId: canvasId,
             };
         }
@@ -742,6 +763,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 pointId: state.pointId,
                 name: state.name,
                 data: state.initialDrawing,
+                isPinned: (settings.pinnedCanvasIds || []).includes(canvasId)
             });
         }
     
@@ -752,7 +774,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             activeCanvasId: canvasId,
         };
     });
-  }, []);
+  }, [settings.pinnedCanvasIds, resources]);
 
 
   const handleDrawingCanvasPopupDragEnd = useCallback((event: DragEndEvent) => {
@@ -1348,6 +1370,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         allWidgetsVisible: true,
         agendaShowCurrentSlotOnly: false,
         spacedRepetitionSlot: 'Late Night',
+        pinnedCanvasIds: [],
     };
     setSettings({ ...defaultSettings, ...(mainData.settings || {}) });
 
@@ -3595,6 +3618,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 

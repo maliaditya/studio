@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
@@ -13,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from './ui/command';
 import type { Resource, ResourcePoint } from '@/types/workout';
-import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
+import { useDraggable } from '@dnd-kit/core';
 import { Input } from './ui/input';
 
 // Dynamically import Excalidraw to avoid SSR issues
@@ -95,7 +96,7 @@ const ExcalidrawWrapper = ({
     );
 }
 
-const SearchPopupContent = ({ onSelect }: { onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
+const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
   const { resources } = useAuth();
   
   const searchResults = useMemo(() => {
@@ -107,24 +108,28 @@ const SearchPopupContent = ({ onSelect }: { onSelect: (resource: Resource, point
   }, [resources]);
 
   return (
-      <CommandList>
-          <CommandEmpty>No canvases found.</CommandEmpty>
-          <CommandGroup>
-              {searchResults.map(({ resource, point }) => (
-                  <CommandItem
-                      key={point.id}
-                      value={point.text || 'Untitled Canvas'}
-                      onSelect={() => onSelect(resource, point)}
-                      className="flex justify-between items-center cursor-pointer"
-                  >
-                      <span>{point.text || 'Untitled Canvas'}</span>
-                      <span className="text-xs text-muted-foreground">{resource.name}</span>
-                  </CommandItem>
-              ))}
-          </CommandGroup>
-      </CommandList>
+    <Command shouldFilter={true}>
+        <CommandInput placeholder="Search all canvases..." />
+        <CommandList>
+            <CommandEmpty>No canvases found.</CommandEmpty>
+            <CommandGroup>
+                {searchResults.map(({ resource, point }) => (
+                    <CommandItem
+                        key={point.id}
+                        value={point.text || 'Untitled Canvas'}
+                        onSelect={() => onSelect(resource, point)}
+                        className="flex justify-between items-center cursor-pointer"
+                    >
+                        <span>{point.text || 'Untitled Canvas'}</span>
+                        <span className="text-xs text-muted-foreground">{resource.name}</span>
+                    </CommandItem>
+                ))}
+            </CommandGroup>
+        </CommandList>
+    </Command>
   );
-};
+});
+SearchContent.displayName = 'SearchContent';
 
 const SearchPopup = React.memo(({ open, setOpen, onSelect }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
     
@@ -141,18 +146,7 @@ const SearchPopup = React.memo(({ open, setOpen, onSelect }: { open: boolean, se
     return (
         <div style={style}>
              <Card className="w-[512px] shadow-2xl border-2 bg-popover">
-                <Command>
-                    <div className="flex items-center justify-between p-1">
-                        <CommandInput 
-                          placeholder="Search all canvases..."
-                          className="h-9 border-0 shadow-none focus-visible:ring-0"
-                        />
-                        <Button variant="ghost" size="icon" className="h-7 w-7 mr-1" onClick={() => setOpen(false)}>
-                            <X className="h-4 w-4" />
-                        </Button>
-                    </div>
-                    <SearchPopupContent onSelect={onSelect} />
-                </Command>
+                <SearchContent onSelect={onSelect} />
             </Card>
         </div>
     );
@@ -161,7 +155,7 @@ SearchPopup.displayName = 'SearchPopup';
 
 
 export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
-  const { resources, drawingCanvasState, setDrawingCanvasState, updateDrawingData, togglePinDrawing, openDrawingCanvas: authOpenDrawingCanvas } = useAuth();
+  const { resources, drawingCanvasState, setDrawingCanvasState, updateDrawingData, togglePinDrawing, openDrawingCanvas: authOpenDrawingCanvas, settings } = useAuth();
   const [theme, setTheme] = useState('dark');
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -194,6 +188,35 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
     return () => mediaQuery.removeEventListener('change', handleThemeChange);
   }, []);
   
+  useEffect(() => {
+    if (drawingCanvasState?.isOpen && (!drawingCanvasState.openCanvases || drawingCanvasState.openCanvases.length === 0)) {
+        const pinnedIds = settings.pinnedCanvasIds || [];
+        if (pinnedIds.length > 0) {
+            const canvasesToOpen = pinnedIds.map(pinnedId => {
+                const resource = resources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
+                const point = resource?.points?.find(p => `${resource.id}-${p.id}` === pinnedId);
+                if (resource && point) {
+                    return {
+                        id: pinnedId,
+                        resourceId: resource.id,
+                        pointId: point.id,
+                        name: point.text || 'Untitled Canvas',
+                        data: point.drawing,
+                        isPinned: true,
+                    };
+                }
+                return null;
+            }).filter((c): c is NonNullable<typeof c> => c !== null);
+
+            setDrawingCanvasState(prev => ({
+                ...(prev!),
+                openCanvases: canvasesToOpen,
+                activeCanvasId: canvasesToOpen[0]?.id || null,
+            }));
+        }
+    }
+  }, [drawingCanvasState?.isOpen, settings.pinnedCanvasIds, resources]);
+
   const handleSaveClick = () => {
     if (excalidrawAPIRef.current && drawingCanvasState?.activeCanvasId) {
       const elements = excalidrawAPIRef.current.getSceneElements();
@@ -282,9 +305,9 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
                               >
                                   <span className="truncate max-w-[120px]">{canvas.name}</span>
                                   <button onClick={(e) => handleTogglePin(e, canvas.id)} className="p-1 rounded hover:bg-muted">
-                                      <Pin className={cn("h-3 w-3", canvas.isPinned ? "text-primary fill-current" : "text-muted-foreground")}/>
+                                      <Pin className={cn("h-3 w-3", (settings.pinnedCanvasIds || []).includes(canvas.id) ? "text-primary fill-current" : "text-muted-foreground")}/>
                                   </button>
-                                  {!canvas.isPinned && (
+                                  {!(settings.pinnedCanvasIds || []).includes(canvas.id) && (
                                       <button onClick={(e) => handleCloseTab(e, canvas.id)} className="p-1 rounded hover:bg-destructive/20">
                                           <X className="h-3 w-3 text-destructive"/>
                                       </button>

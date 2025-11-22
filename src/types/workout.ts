@@ -773,6 +773,7 @@ export interface UserSettings {
   githubRepo?: string;
   githubPath?: string;
   lastSync?: { sha: string, timestamp: number };
+  pinnedCanvasIds?: string[];
 }
 
 export interface ActiveFocusSession {
@@ -834,7 +835,7 @@ export type DrawingCanvasData = {
     resourceId: string;
     pointId: string;
     name: string;
-    initialDrawing?: string;
+    data?: string; // JSON string of excalidraw data
     isPinned?: boolean;
 };
 export interface DrawingCanvasPopupState {
