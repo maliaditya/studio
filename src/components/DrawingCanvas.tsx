@@ -142,32 +142,32 @@ const SearchPopup = ({ open, setOpen, onSelect }: { open: boolean, setOpen: (ope
     return (
         <div ref={setNodeRef} style={style} {...attributes}>
              <Card className="w-[512px] shadow-2xl border-2 bg-popover">
-                <CardHeader className="p-0 border-b cursor-grab active:cursor-grabbing" {...listeners}>
-                    <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
+                <Command>
+                    <CardHeader className="p-0 border-b cursor-grab active:cursor-grabbing" {...listeners}>
                        <CommandInput 
                          placeholder="Search all canvases..." 
                          value={query}
                          onValueChange={setQuery}
                        />
-                    </Command>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <CommandList>
-                        <CommandEmpty>No canvases found.</CommandEmpty>
-                        <CommandGroup>
-                        {searchResults.map(({ resource, point }) => (
-                            <CommandItem
-                            key={point.id}
-                            onSelect={() => onSelectWrapper(() => onSelect(resource, point))}
-                            className="flex justify-between items-center cursor-pointer"
-                            >
-                            <span>{point.text || 'Untitled Canvas'}</span>
-                            <span className="text-xs text-muted-foreground">{resource.name}</span>
-                            </CommandItem>
-                        ))}
-                        </CommandGroup>
-                    </CommandList>
-                </CardContent>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <CommandList>
+                            <CommandEmpty>No canvases found.</CommandEmpty>
+                            <CommandGroup>
+                            {searchResults.map(({ resource, point }) => (
+                                <CommandItem
+                                key={point.id}
+                                onSelect={() => onSelectWrapper(() => onSelect(resource, point))}
+                                className="flex justify-between items-center cursor-pointer"
+                                >
+                                <span>{point.text || 'Untitled Canvas'}</span>
+                                <span className="text-xs text-muted-foreground">{resource.name}</span>
+                                </CommandItem>
+                            ))}
+                            </CommandGroup>
+                        </CommandList>
+                    </CardContent>
+                </Command>
             </Card>
         </div>
       )
