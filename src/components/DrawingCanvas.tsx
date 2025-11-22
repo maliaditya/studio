@@ -309,7 +309,9 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         link: canvasLink, // Also using link property for potential default behavior
     };
 
-    api.addElements([newElement as ExcalidrawElement]);
+    api.updateScene({
+      elements: [...api.getSceneElements(), newElement as ExcalidrawElement]
+    });
     setIsLinkingSearchOpen(false);
   };
 
