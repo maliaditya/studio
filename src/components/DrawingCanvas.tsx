@@ -33,13 +33,11 @@ interface DrawingCanvasProps {
 
 const ExcalidrawWrapper = ({ 
     activeCanvas, 
-    onSave, 
     theme, 
     apiRef,
     setIsDirty,
 }: {
     activeCanvas: { id: string, data?: string };
-    onSave: (drawingData: string) => void;
     theme: string;
     apiRef: React.MutableRefObject<ExcalidrawAPIRefValue | null>;
     setIsDirty: React.Dispatch<React.SetStateAction<boolean>>;
@@ -231,26 +229,21 @@ export function DrawingCanvas({ isOpen, onClose }: DrawingCanvasProps) {
     }
   }, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-        if ((event.ctrlKey || event.metaKey) && event.key === 's') {
-            event.preventDefault();
-            handleSaveClick();
-        }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-        window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [handleSaveClick]);
-
-
   const handleTabClick = (canvasId: string) => {
+    if (isDirty) {
+        handleSaveClick();
+    }
     setDrawingCanvasState(prev => prev ? { ...prev, activeCanvasId: canvasId } : null);
   };
   
   const handleCloseTab = (e: React.MouseEvent, canvasId: string) => {
     e.stopPropagation();
+    if (isDirty) {
+        const shouldSave = window.confirm("You have unsaved changes. Do you want to save before closing?");
+        if (shouldSave) {
+            handleSaveClick();
+        }
+    }
     setDrawingCanvasState(prev => {
         if (!prev) return null;
         
