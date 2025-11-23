@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -631,6 +630,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
 
+  const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
+    const canvasId = `${state.resourceId}-${state.pointId}`;
+    setDrawingCanvasState(prev => {
+        if (!prev || !prev.isOpen) {
+            const openCanvases = [{
+                id: canvasId,
+                resourceId: state.resourceId,
+                pointId: state.pointId,
+                name: state.name,
+                data: state.initialDrawing,
+                isPinned: (settings.pinnedCanvasIds || []).includes(canvasId)
+            }];
+            // Also open any other pinned canvases
+            (settings.pinnedCanvasIds || []).forEach(pinnedId => {
+                if (pinnedId !== canvasId) {
+                    const resource = resources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
+                    const point = resource?.points?.find(p => `${resource.id}-${p.id}` === pinnedId);
+                    if (resource && point) {
+                        openCanvases.push({
+                            id: pinnedId,
+                            resourceId: resource.id,
+                            pointId: point.id,
+                            name: point.text || 'Untitled Canvas',
+                            data: point.drawing,
+                            isPinned: true,
+                        });
+                    }
+                }
+            });
+
+            return {
+                isOpen: true,
+                position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+                openCanvases,
+                activeCanvasId: canvasId,
+            };
+        }
+
+        const newOpenCanvases = [...(prev.openCanvases || [])];
+        const canvasIndex = newOpenCanvases.findIndex(c => c.id === canvasId);
+    
+        if (canvasIndex === -1) {
+            newOpenCanvases.push({
+                id: canvasId,
+                resourceId: state.resourceId,
+                pointId: state.pointId,
+                name: state.name,
+                data: state.initialDrawing,
+                isPinned: (settings.pinnedCanvasIds || []).includes(canvasId)
+            });
+        }
+    
+        return {
+            ...prev,
+            isOpen: true,
+            openCanvases: newOpenCanvases,
+            activeCanvasId: canvasId,
+        };
+    });
+  }, [settings.pinnedCanvasIds, resources]);
+  
   const openDrawingCanvasFromHeader = useCallback(() => {
     // Find or create the scratchpad resource
     let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
@@ -675,13 +735,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     setResources(updatedResources);
 
-    authOpenDrawingCanvas({
+    openDrawingCanvas({
         resourceId: scratchpadResource.id,
         pointId: scratchpadPoint.id,
         name: scratchpadPoint.text || 'Scratchpad',
         initialDrawing: scratchpadPoint.drawing,
     });
-}, [resources, resourceFolders, setResources, setResourceFolders, authOpenDrawingCanvas]);
+  }, [resources, resourceFolders, setResources, setResourceFolders, openDrawingCanvas]);
 
   const updateDrawingData = useCallback((canvasId: string, data: string, onSaveComplete: () => void) => {
     setDrawingCanvasState(prev => {
@@ -770,68 +830,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } : null);
     }
   };
-
-  const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
-    const canvasId = `${state.resourceId}-${state.pointId}`;
-    setDrawingCanvasState(prev => {
-        if (!prev || !prev.isOpen) {
-            const openCanvases = [{
-                id: canvasId,
-                resourceId: state.resourceId,
-                pointId: state.pointId,
-                name: state.name,
-                data: state.initialDrawing,
-                isPinned: (settings.pinnedCanvasIds || []).includes(canvasId)
-            }];
-            // Also open any other pinned canvases
-            (settings.pinnedCanvasIds || []).forEach(pinnedId => {
-                if (pinnedId !== canvasId) {
-                    const resource = resources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
-                    const point = resource?.points?.find(p => `${resource.id}-${p.id}` === pinnedId);
-                    if (resource && point) {
-                        openCanvases.push({
-                            id: pinnedId,
-                            resourceId: resource.id,
-                            pointId: point.id,
-                            name: point.text || 'Untitled Canvas',
-                            data: point.drawing,
-                            isPinned: true,
-                        });
-                    }
-                }
-            });
-
-            return {
-                isOpen: true,
-                position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-                openCanvases,
-                activeCanvasId: canvasId,
-            };
-        }
-
-        const newOpenCanvases = [...(prev.openCanvases || [])];
-        const canvasIndex = newOpenCanvases.findIndex(c => c.id === canvasId);
-    
-        if (canvasIndex === -1) {
-            newOpenCanvases.push({
-                id: canvasId,
-                resourceId: state.resourceId,
-                pointId: state.pointId,
-                name: state.name,
-                data: state.initialDrawing,
-                isPinned: (settings.pinnedCanvasIds || []).includes(canvasId)
-            });
-        }
-    
-        return {
-            ...prev,
-            isOpen: true,
-            openCanvases: newOpenCanvases,
-            activeCanvasId: canvasId,
-        };
-    });
-  }, [settings.pinnedCanvasIds, resources]);
-
 
   const handleDrawingCanvasPopupDragEnd = useCallback((event: DragEndEvent) => {
     const { active, delta } = event;
@@ -3674,6 +3672,8 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
+
 
 
 
