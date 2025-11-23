@@ -106,28 +106,28 @@ const ExcalidrawWrapper = ({
   onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   onLinkOpen: OnLinkOpen;
 }) => {
-  const [initialData, setInitialData] = useState<{elements: readonly ExcalidrawElement[]}>({ elements: [] });
+  const [initialData, setInitialData] = useState<{ elements: readonly ExcalidrawElement[] } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
     let data;
     try {
-        if(activeCanvas.data && typeof activeCanvas.data === 'string') {
-            data = JSON.parse(activeCanvas.data);
-        }
-    } catch(e) {
-        console.error("Failed to parse canvas data", e);
-        data = { elements: [] };
+      if (activeCanvas.data && typeof activeCanvas.data === 'string') {
+        data = JSON.parse(activeCanvas.data);
+      }
+    } catch (e) {
+      console.error("Failed to parse canvas data", e);
     }
-
+    
     setInitialData({
-        elements: data?.elements || [],
+      elements: data?.elements || [],
     });
+
     setLoading(false);
   }, [activeCanvas.id, activeCanvas.data]);
-  
-  if(loading) {
+
+  if (loading) {
     return <div className="flex h-full w-full items-center justify-center">Loading Canvas...</div>;
   }
 
@@ -136,7 +136,7 @@ const ExcalidrawWrapper = ({
       <Excalidraw
         key={activeCanvas.id}
         excalidrawAPI={(api) => (apiRef.current = api)}
-        initialData={initialData}
+        initialData={initialData || { elements: [] }}
         theme={theme}
         onChange={onChange}
         onPointerDown={onPointerDown}
@@ -298,7 +298,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const handleLinkingSearchSelect = (resource: Resource, point: ResourcePoint) => {
     const api = excalidrawAPIRef.current;
     if (!api) return;
-    const { viewState } = api.getAppState();
+    const { scrollX, scrollY, width, height } = api.getAppState();
     
     // Get existing elements
     const existingElements = api.getSceneElements();
@@ -306,8 +306,8 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     const newElement: NonDeleted<ExcalidrawElement> = {
         id: randomId(),
         type: 'text',
-        x: viewState.scrollX + viewState.width / 2,
-        y: viewState.scrollY + viewState.height / 2,
+        x: scrollX + width / 2,
+        y: scrollY + height / 2,
         width: 200,
         height: 24,
         angle: 0,
