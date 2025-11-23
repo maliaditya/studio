@@ -136,7 +136,7 @@ const ExcalidrawWrapper = ({
       <Excalidraw
         key={activeCanvas.id}
         excalidrawAPI={(api) => (apiRef.current = api)}
-        initialData={initialData || { elements: [] }}
+        initialData={initialData}
         theme={theme}
         onChange={onChange}
         onPointerDown={onPointerDown}
@@ -155,7 +155,8 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     updateDrawingData, 
     togglePinDrawing, 
     openDrawingCanvas: authOpenDrawingCanvas, 
-    settings 
+    settings,
+    resources,
   } = useAuth();
   
   const [theme, setTheme] = useState('dark');
@@ -289,18 +290,33 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     const link = element.link;
     if (link?.startsWith('canvas://')) {
         const [resourceId, pointId] = link.replace('canvas://', '').split('/');
-        authOpenDrawingCanvas({ resourceId, pointId, name: 'Linked Canvas' });
+        
+        // Find the resource and point from the auth context
+        const resource = resources.find(r => r.id === resourceId);
+        const point = resource?.points?.find(p => p.id === pointId);
+        
+        if (resource && point) {
+            authOpenDrawingCanvas({
+                resourceId: resource.id,
+                pointId: point.id,
+                name: point.text || 'Linked Canvas',
+                initialDrawing: point.drawing
+            });
+        } else {
+            console.error("Linked canvas not found:", resourceId, pointId);
+            toast({ title: 'Error', description: 'Could not find the linked canvas.', variant: 'destructive'});
+        }
+
     } else if (link) {
         window.open(link, '_blank', 'noopener,noreferrer');
     }
-  }, [authOpenDrawingCanvas]);
+  }, [authOpenDrawingCanvas, resources, toast]);
   
   const handleLinkingSearchSelect = (resource: Resource, point: ResourcePoint) => {
     const api = excalidrawAPIRef.current;
     if (!api) return;
-    const { scrollX, scrollY, width, height } = api.getAppState();
     
-    // Get existing elements
+    const { scrollX, scrollY, width, height } = api.getAppState();
     const existingElements = api.getSceneElements();
 
     const newElement: NonDeleted<ExcalidrawElement> = {
