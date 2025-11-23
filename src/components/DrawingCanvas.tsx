@@ -108,24 +108,21 @@ const ExcalidrawWrapper = ({
 
     useEffect(() => {
         setLoading(true);
-        if (activeCanvas) {
-            try {
-                if (activeCanvas.data && typeof activeCanvas.data === 'string' && activeCanvas.data.trim() !== '') {
-                    const parsedData = JSON.parse(activeCanvas.data);
-                    setInitialData({
-                        elements: parsedData.elements || [], // GUARANTEE elements is an array
-                        appState: parsedData.appState || {},
-                    });
-                } else {
-                    // Handle case where data is empty or not present
-                    setInitialData({ elements: [] });
-                }
-            } catch (e) {
-                console.error("Failed to parse canvas data, defaulting to empty.", e);
-                setInitialData({ elements: [] }); // Safe default on parse error
-            } finally {
-                setLoading(false);
+        let dataToLoad: { elements: readonly ExcalidrawElement[], appState?: any } = { elements: [] };
+        try {
+            if (activeCanvas && activeCanvas.data && activeCanvas.data.trim()) {
+                const parsedData = JSON.parse(activeCanvas.data);
+                dataToLoad = {
+                    elements: parsedData.elements || [],
+                    appState: parsedData.appState || {},
+                };
             }
+        } catch (e) {
+            console.error("Failed to parse canvas data, defaulting to empty.", e);
+            // dataToLoad remains { elements: [] }
+        } finally {
+            setInitialData(dataToLoad);
+            setLoading(false);
         }
     }, [activeCanvas]);
     
@@ -136,7 +133,7 @@ const ExcalidrawWrapper = ({
     return (
         <div style={{ height: "100%", width: "100%" }}>
             <Excalidraw
-                key={activeCanvas.id} // This key is important.
+                key={activeCanvas.id}
                 excalidrawAPI={(api) => apiRef.current = api}
                 initialData={initialData}
                 theme={theme}
