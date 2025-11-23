@@ -226,8 +226,6 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   const [navigationStack, setNavigationStack] = useState<ExerciseDefinition[]>([]);
   const cardRef = useRef<HTMLDivElement>(null);
   
-  const [contentModalState, setContentModalState] = useState<{ isOpen: boolean; resource: Resource | null }>({ isOpen: false, resource: null });
-
   const [linkedIntentionsPopup, setLinkedIntentionsPopup] = useState<{ x: number; y: number; intentions: { intention: ExerciseDefinition; links: { source: string; target: string; }[] }[] } | null>(null);
 
   const [playingAudio, setPlayingAudio] = useState(false);
@@ -266,45 +264,6 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   }, [popupState.resourceId, deepWorkDefinitions, upskillDefinitions]);
 
   useEffect(() => {
-    if (!contentModalState.resource?.id) return;
-    const audioEl = audioRef.current;
-    if (!audioEl) return;
-    
-    let objectUrl: string | null = null;
-    const loadAudio = async () => {
-      if (contentModalState.resource?.hasLocalAudio) {
-        try {
-          const audioBlob = await getAudio(contentModalState.resource.id);
-          if (audioBlob) {
-            objectUrl = URL.createObjectURL(audioBlob);
-            setAudioSrc(objectUrl);
-          } else {
-            setAudioSrc(null);
-          }
-        } catch (error) { console.error("Failed to load audio from DB:", error); setAudioSrc(null); }
-      } else {
-          setAudioSrc(null);
-      }
-    };
-    loadAudio();
-    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [contentModalState.resource]);
-  
-  useEffect(() => {
-    const audioEl = audioRef.current;
-    if (!audioEl || !audioSrc) return;
-    if (audioEl.src !== audioSrc) {
-      audioEl.src = audioSrc;
-    }
-    if (playingAudio) {
-      audioEl.volume = globalVolume;
-      audioEl.play().catch(e => console.error("Audio play failed:", e));
-    } else {
-      audioEl.pause();
-    }
-  }, [playingAudio, audioSrc, globalVolume]);
-
-  useEffect(() => {
     const audioEl = audioRef.current;
     if (!audioEl) return;
     const handleTimeUpdate = () => setCurrentTime(audioEl.currentTime);
@@ -337,10 +296,6 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   const linkedItems = useMemo(() => {
     if (!currentItem) return { deepWork: [], upskill: [], resource: [] };
 
-    const directlyLinkedResources = (currentItem.linkedResourceIds || [])
-        .map(id => resources.find(r => r.id === id))
-        .filter((r): r is Resource => !!r);
-    
     const childDeepWorkItems = (currentItem.linkedDeepWorkIds || [])
         .map(id => deepWorkDefinitions.find(d => d.id === id))
         .filter((d): d is ExerciseDefinition => !!d);
@@ -349,18 +304,25 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
         .map(id => upskillDefinitions.find(d => d.id === id))
         .filter((d): d is ExerciseDefinition => !!d);
 
-    const resourcesFromChildren = [...childDeepWorkItems, ...childUpskillItems]
-        .flatMap(child => child.linkedResourceIds || [])
-        .map(id => resources.find(r => r.id === id))
-        .filter((r): r is Resource => !!r);
+    const allLinkedResourceIds = new Set<string>(currentItem.linkedResourceIds || []);
 
-    const allResourceIds = new Set(directlyLinkedResources.map(r => r.id));
-    const uniqueResourcesFromChildren = resourcesFromChildren.filter(r => !allResourceIds.has(r.id));
+    const processChildren = (children: ExerciseDefinition[]) => {
+      children.forEach(child => {
+        (child.linkedResourceIds || []).forEach(resId => allLinkedResourceIds.add(resId));
+        const grandChildren = [
+          ...(child.linkedDeepWorkIds || []).map(id => deepWorkDefinitions.find(d => d.id === id)),
+          ...(child.linkedUpskillIds || []).map(id => upskillDefinitions.find(d => d.id === id))
+        ].filter((d): d is ExerciseDefinition => !!d);
+        if (grandChildren.length > 0) {
+          processChildren(grandChildren);
+        }
+      });
+    };
     
+    processChildren([...childDeepWorkItems, ...childUpskillItems]);
+
     return {
-        deepWork: childDeepWorkItems,
-        upskill: childUpskillItems,
-        resource: [...directlyLinkedResources, ...uniqueResourcesFromChildren],
+        resource: Array.from(allLinkedResourceIds).map(id => resources.find(r => r.id === id)).filter((r): r is Resource => !!r),
     };
 }, [currentItem, deepWorkDefinitions, upskillDefinitions, resources]);
 
@@ -492,12 +454,11 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                     <ResourceItem
                         key={item.id}
                         item={item}
-                        onOpenNestedPopup={(resourceId, event) =>
-                            setContentModalState({
-                                isOpen: true,
-                                resource: resources.find(res => res.id === resourceId) || null,
-                            })
-                        }
+                        onOpenNestedPopup={(resourceId, event) => {
+                          if (cardRef.current) {
+                            openGeneralPopup(resourceId, event, popupState, cardRef.current.getBoundingClientRect());
+                          }
+                        }}
                     />
                 ))
             ) : (
@@ -510,8 +471,6 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   if (!currentItem) return null;
 
   const isUpskillCuriosity = upskillDefinitions.some(d => d.id === currentItem!.id) && (currentItem!.linkedUpskillIds?.length ?? 0) > 0 && !linkedUpskillChildIds.has(currentItem!.id);
-
-  const youtubeEmbedUrl = getYouTubeEmbedUrl(contentModalState.resource?.link);
 
   return (
     <>
@@ -553,100 +512,6 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
                 onClose={() => setLinkedIntentionsPopup(null)}
             />
         )}
-        
-        <Dialog open={contentModalState.isOpen} onOpenChange={() => setContentModalState({ isOpen: false, resource: null })}>
-            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
-                <DialogHeader className="p-4 border-b">
-                    <DialogTitle>{contentModalState.resource?.name}</DialogTitle>
-                </DialogHeader>
-                <div className="flex-grow min-h-0">
-                    <ScrollArea className="h-full">
-                        <div className="p-6">
-                           <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
-                           {(contentModalState.resource?.hasLocalAudio || youtubeEmbedUrl) && (
-                                <div className="w-full space-y-2 pt-2 mb-4 p-2 rounded-md bg-muted/50">
-                                    <div className="flex items-center gap-2">
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPlayingAudio(p => !p)}>
-                                            {playingAudio ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
-                                        </Button>
-                                        <span className="text-xs font-mono text-muted-foreground">{formatTime(currentTime)}</span>
-                                        <input
-                                            type="range"
-                                            min="0"
-                                            max={duration || 0}
-                                            value={currentTime}
-                                            onChange={(e) => {
-                                                const newTime = parseFloat(e.target.value);
-                                                setCurrentTime(newTime);
-                                                if (audioRef.current) audioRef.current.currentTime = newTime;
-                                                if (playerRef.current) playerRef.current.seekTo(newTime, 'seconds');
-                                            }}
-                                            className="w-full h-1 bg-primary/20 rounded-lg appearance-none cursor-pointer"
-                                        />
-                                        <span className="text-xs font-mono text-muted-foreground">{formatTime(duration)}</span>
-                                    </div>
-                                    {contentModalState.resource?.audioFileName && (
-                                        <p className="text-xs text-muted-foreground truncate" title={contentModalState.resource.audioFileName}>
-                                        Now Playing: {contentModalState.resource.audioFileName}
-                                        </p>
-                                    )}
-                                </div>
-                            )}
-                            
-                            {youtubeEmbedUrl && (
-                                <div className="aspect-video w-full bg-black overflow-hidden mb-4 rounded-md">
-                                    <ReactPlayer
-                                        ref={playerRef}
-                                        url={contentModalState.resource?.link!}
-                                        width="100%"
-                                        height="100%"
-                                        playing={playingAudio}
-                                        controls={true}
-                                        volume={globalVolume}
-                                        onProgress={(state) => setCurrentTime(state.playedSeconds)}
-                                        onDuration={setDuration}
-                                    />
-                                </div>
-                            )}
-
-                            <ul className="space-y-4">
-                                {(contentModalState.resource?.points || []).map(point => (
-                                    <li key={point.id} className="p-4 rounded-lg bg-muted/30 border">
-                                        <div className="flex items-start gap-4">
-                                            {point.type === 'timestamp' ? (
-                                                <button onClick={() => handleSeekTo(point.timestamp || 0)} className="font-mono text-primary font-semibold mt-1 flex-shrink-0 bg-background px-2 py-1 rounded-md text-base">
-                                                    {formatTime(point.timestamp || 0)}
-                                                </button>
-                                            ) : point.type === 'code' ? (
-                                                <Code className="h-5 w-5 mt-1 text-primary/70 flex-shrink-0" />
-                                            ) : point.type === 'markdown' ? (
-                                                <MessageSquare className="h-5 w-5 mt-1 text-primary/70 flex-shrink-0" />
-                                            ) : (
-                                                <ArrowRight className="h-5 w-5 mt-1 text-primary/50 flex-shrink-0" />
-                                            )}
-                                            
-                                            <div className="flex-grow min-w-0">
-                                                {point.type === 'markdown' ? (
-                                                    <div className="prose dark:prose-invert max-w-none">
-                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                                    </div>
-                                                ) : point.type === 'code' ? (
-                                                    <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '1rem', borderRadius: '0.5rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'all' }} codeTagProps={{style: {fontSize: '0.9rem', fontFamily: 'monospace'}}}>
-                                                        {point.text || ""}
-                                                    </SyntaxHighlighter>
-                                                ) : (
-                                                    <p className="pt-1 text-base">{point.text}</p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    </ScrollArea>
-                </div>
-            </DialogContent>
-        </Dialog>
     </>
   );
 }
