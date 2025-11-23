@@ -106,22 +106,30 @@ const ExcalidrawWrapper = ({
   onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   onLinkOpen: OnLinkOpen;
 }) => {
-  // Directly parse data and prepare it for Excalidraw, ensuring it's never undefined.
-  const initialData = (() => {
+  const [initialData, setInitialData] = useState<{elements: readonly ExcalidrawElement[]}>({ elements: [] });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    let data;
     try {
-      if (activeCanvas?.data) {
-        const parsedData = JSON.parse(activeCanvas.data);
-        return {
-          elements: parsedData.elements || [],
-          appState: parsedData.appState || {},
-        };
-      }
-    } catch (e) {
-      console.error("Failed to parse canvas data, defaulting to empty.", e);
+        if(activeCanvas.data && typeof activeCanvas.data === 'string') {
+            data = JSON.parse(activeCanvas.data);
+        }
+    } catch(e) {
+        console.error("Failed to parse canvas data", e);
+        data = { elements: [] };
     }
-    // Safe default for all error cases or missing data.
-    return { elements: [] };
-  })();
+
+    setInitialData({
+        elements: data?.elements || [],
+    });
+    setLoading(false);
+  }, [activeCanvas.id, activeCanvas.data]);
+  
+  if(loading) {
+    return <div className="flex h-full w-full items-center justify-center">Loading Canvas...</div>;
+  }
 
   return (
     <div style={{ height: "100%", width: "100%" }}>
@@ -153,6 +161,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [theme, setTheme] = useState('dark');
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isLinkingSearchOpen, setIsLinkingSearchOpen] = useState(false);
   
   const excalidrawAPIRef = useRef<any>(null);
   const { toast } = useToast();
@@ -286,6 +295,56 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     }
   }, [authOpenDrawingCanvas]);
   
+  const handleLinkingSearchSelect = (resource: Resource, point: ResourcePoint) => {
+    const api = excalidrawAPIRef.current;
+    if (!api) return;
+    const { viewState } = api.getAppState();
+    
+    // Get existing elements
+    const existingElements = api.getSceneElements();
+
+    const newElement: NonDeleted<ExcalidrawElement> = {
+        id: randomId(),
+        type: 'text',
+        x: viewState.scrollX + viewState.width / 2,
+        y: viewState.scrollY + viewState.height / 2,
+        width: 200,
+        height: 24,
+        angle: 0,
+        strokeColor: '#1e1e1e',
+        backgroundColor: 'transparent',
+        fillStyle: 'hachure',
+        strokeWidth: 1,
+        strokeStyle: 'solid',
+        roughness: 1,
+        opacity: 100,
+        groupIds: [],
+        frameId: null,
+        roundness: null,
+        seed: Math.floor(Math.random() * 1e9),
+        version: 1,
+        versionNonce: Math.floor(Math.random() * 1e9),
+        isDeleted: false,
+        boundElements: null,
+        updated: Date.now(),
+        link: `canvas://${resource.id}/${point.id}`,
+        text: point.text || "Untitled Canvas",
+        fontSize: 20,
+        fontFamily: 1,
+        textAlign: 'center',
+        verticalAlign: 'middle',
+        baseline: 8,
+        containerId: null,
+        originalText: point.text || "Untitled Canvas",
+        lineHeight: 1.2 as any,
+        locked: false,
+    }
+    api.updateScene({ elements: [...existingElements, newElement] });
+    api.history.clear(); // To prevent undoing the add
+    handleSaveClick(); // Save immediately after adding
+    setIsLinkingSearchOpen(false);
+  };
+  
   if (!isOpen || !drawingCanvasState) return null;
 
   return (
@@ -326,6 +385,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-4 w-4"/></Button>
+                    <Button variant="ghost" size="icon" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-4 w-4"/></Button>
                     <Button variant="ghost" size="icon" onClick={handleSaveClick}>
                         <Save className={cn("h-4 w-4", isDirty ? "text-red-500" : "text-green-500")} />
                     </Button>
@@ -350,6 +410,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
           </Card>
       </div>
       <SearchPopup open={isSearchOpen} setOpen={setIsSearchOpen} onSelect={handleSearchSelect} title="Search & Open Canvas" />
+      <SearchPopup open={isLinkingSearchOpen} setOpen={setIsLinkingSearchOpen} onSelect={handleLinkingSearchSelect} title="Link to a Canvas" />
     </>
   );
 }
