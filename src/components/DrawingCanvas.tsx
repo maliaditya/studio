@@ -92,7 +92,8 @@ const ExcalidrawWrapper = ({
     apiRef,
     onChange,
     onPointerDown,
-    onKeyDown
+    onKeyDown,
+    onLinkOpen
 }: {
     activeCanvas: { id: string, data?: string };
     theme: string;
@@ -100,6 +101,7 @@ const ExcalidrawWrapper = ({
     onChange: (elements: readonly ExcalidrawElement[], appState: AppState) => void;
     onPointerDown: (activeTool: Readonly<{ type: string; }>, pointerDownState: PointerDownState) => void;
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
+    onLinkOpen: OnLinkOpen;
 }) => {
     const [initialData, setInitialData] = useState<{ elements: readonly ExcalidrawElement[], appState?: any }>({ elements: [] });
     const [loading, setLoading] = useState(true);
@@ -138,6 +140,7 @@ const ExcalidrawWrapper = ({
                 onChange={onChange}
                 onPointerDown={onPointerDown}
                 onKeyDown={onKeyDown}
+                onLinkOpen={onLinkOpen}
             />
         </div>
     );
@@ -157,6 +160,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [theme, setTheme] = useState('dark');
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isLinkingSearchOpen, setIsLinkingSearchOpen] = useState(false);
   
   const excalidrawAPIRef = useRef<any>(null);
   const { toast } = useToast();
@@ -278,6 +282,51 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     });
     setIsSearchOpen(false);
   };
+
+  const handleLinkOpen: OnLinkOpen = useCallback((element, event) => {
+    event.preventDefault();
+    if (element.link?.startsWith('canvas://')) {
+        const [resourceId, pointId] = element.link.replace('canvas://', '').split('/');
+        authOpenDrawingCanvas({ resourceId, pointId, name: 'Linked Canvas', initialDrawing: '' }); // Let it load
+    } else {
+        window.open(element.link, '_blank', 'noopener,noreferrer');
+    }
+  }, [authOpenDrawingCanvas]);
+
+  const handleLinkingSearchSelect = (resource: Resource, point: ResourcePoint) => {
+    const api = excalidrawAPIRef.current;
+    if (!api) return;
+
+    const newElement: ExcalidrawElement = {
+        id: randomId(),
+        type: 'text',
+        x: api.getAppState().scrollX + 200,
+        y: api.getAppState().scrollY + 200,
+        width: 200,
+        height: 24,
+        angle: 0,
+        strokeColor: '#1e1e1e',
+        backgroundColor: 'transparent',
+        fillStyle: 'hachure',
+        strokeWidth: 1,
+        strokeStyle: 'solid',
+        roughness: 1,
+        opacity: 100,
+        isDeleted: false,
+        text: point.text || 'Untitled Canvas',
+        fontSize: 20,
+        fontFamily: 1,
+        textAlign: 'left',
+        verticalAlign: 'top',
+        boundElements: null,
+        link: `canvas://${resource.id}/${point.id}`,
+        locked: false,
+    }
+    api.addElements([newElement]);
+    api.history.clear(); // To prevent undoing the add
+    handleSaveClick(); // Save immediately after adding
+    setIsLinkingSearchOpen(false);
+  };
   
   if (!isOpen || !drawingCanvasState) return null;
 
@@ -319,6 +368,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-4 w-4"/></Button>
+                    <Button variant="ghost" size="icon" onClick={() => setIsLinkingSearchOpen(true)}><LinkIcon className="h-4 w-4"/></Button>
                     <Button variant="ghost" size="icon" onClick={handleSaveClick}>
                         <Save className={cn("h-4 w-4", isDirty ? "text-red-500" : "text-green-500")} />
                     </Button>
@@ -334,6 +384,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       onChange={handleCanvasChange}
                       onPointerDown={handlePointerDown}
                       onKeyDown={handleKeyDown}
+                      onLinkOpen={handleLinkOpen}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">Select a canvas to start drawing.</div>
@@ -342,6 +393,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
           </Card>
       </div>
       <SearchPopup open={isSearchOpen} setOpen={setIsSearchOpen} onSelect={handleSearchSelect} title="Search & Open Canvas" />
+      <SearchPopup open={isLinkingSearchOpen} setOpen={setIsLinkingSearchOpen} onSelect={handleLinkingSearchSelect} title="Link to a Canvas" />
     </>
   );
 }
