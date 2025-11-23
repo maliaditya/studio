@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
@@ -107,33 +106,22 @@ const ExcalidrawWrapper = ({
   onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   onLinkOpen: OnLinkOpen;
 }) => {
-  const [initialData, setInitialData] = useState<{ elements: readonly ExcalidrawElement[] } | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setLoading(true);
-    let data;
+  // Robustly parse data and provide a safe fallback on every render.
+  const initialData = useMemo(() => {
     try {
-      if (activeCanvas.data && typeof activeCanvas.data === 'string') {
+      if (activeCanvas.data) {
         const parsedData = JSON.parse(activeCanvas.data);
+        // Ensure the parsed data has a valid elements array.
         if (Array.isArray(parsedData.elements)) {
-            data = parsedData;
+          return { elements: parsedData.elements };
         }
       }
     } catch (e) {
-      console.error("Failed to parse canvas data", e);
+      console.error("Failed to parse canvas data, defaulting to empty.", e);
     }
-    
-    setInitialData({
-      elements: data?.elements || [],
-    });
-
-    setLoading(false);
+    // Fallback to a safe default if data is missing, malformed, or doesn't have the elements array.
+    return { elements: [] };
   }, [activeCanvas.id, activeCanvas.data]);
-
-  if (loading) {
-    return <div className="flex h-full w-full items-center justify-center">Loading Canvas...</div>;
-  }
 
   return (
     <div style={{ height: "100%", width: "100%" }}>
@@ -292,6 +280,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const onLinkOpen: OnLinkOpen = useCallback((element, event) => {
     event.preventDefault();
     const link = element.link;
+    
     if (link?.startsWith('canvas://')) {
         const [resourceId, pointId] = link.replace('canvas://', '').split('/');
         
@@ -299,7 +288,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         const point = resource?.points?.find(p => p.id === pointId);
         
         if (resource && point) {
-            const canvasId = `${resource.id}-${point.id}`;
+             const canvasId = `${resource.id}-${point.id}`;
             const isAlreadyOpen = drawingCanvasState?.openCanvases?.some(c => c.id === canvasId);
             
             if (isAlreadyOpen) {

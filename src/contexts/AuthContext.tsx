@@ -82,6 +82,7 @@ interface AuthContextType {
   drawingCanvasState: DrawingCanvasPopupState | null;
   setDrawingCanvasState: React.Dispatch<React.SetStateAction<DrawingCanvasPopupState | null>>;
   openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => void;
+  openDrawingCanvasFromHeader: () => void;
   handleDrawingCanvasPopupDragEnd: (event: DragEndEvent) => void;
   togglePinDrawing: (canvasId: string) => void;
   updateDrawingData: (canvasId: string, data: string, onSaveComplete: () => void) => void;
@@ -629,6 +630,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
+
+  const openDrawingCanvasFromHeader = useCallback(() => {
+    // Find or create the scratchpad resource
+    let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
+    let updatedFolders = [...resourceFolders];
+    let updatedResources = [...resources];
+    
+    if (!scratchpadFolder) {
+        scratchpadFolder = {
+            id: 'folder_scratchpad',
+            name: 'Scratchpad',
+            parentId: null,
+            icon: 'Paintbrush'
+        };
+        updatedFolders.push(scratchpadFolder);
+        setResourceFolders(updatedFolders);
+    }
+  
+    let scratchpadResource = resources.find(r => r.folderId === scratchpadFolder!.id && r.name === 'Default Scratchpad');
+    
+    if (!scratchpadResource) {
+        scratchpadResource = {
+            id: 'res_scratchpad',
+            name: 'Default Scratchpad',
+            folderId: scratchpadFolder.id,
+            type: 'card',
+            createdAt: new Date().toISOString(),
+            points: [],
+        };
+        updatedResources.push(scratchpadResource);
+    }
+    
+    let scratchpadPoint = scratchpadResource.points?.find(p => p.type === 'paint');
+    
+    if (!scratchpadPoint) {
+        scratchpadPoint = {
+            id: `point_scratchpad_${Date.now()}`,
+            text: 'Default Canvas',
+            type: 'paint',
+        };
+        scratchpadResource.points = [...(scratchpadResource.points || []), scratchpadPoint];
+    }
+    
+    setResources(updatedResources);
+
+    authOpenDrawingCanvas({
+        resourceId: scratchpadResource.id,
+        pointId: scratchpadPoint.id,
+        name: scratchpadPoint.text || 'Scratchpad',
+        initialDrawing: scratchpadPoint.drawing,
+    });
+}, [resources, resourceFolders, setResources, setResourceFolders, authOpenDrawingCanvas]);
 
   const updateDrawingData = useCallback((canvasId: string, data: string, onSaveComplete: () => void) => {
     setDrawingCanvasState(prev => {
@@ -3475,7 +3528,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     globalVolume, setGlobalVolume,
     playbackRequest, setPlaybackRequest,
     pdfViewerState, setPdfViewerState, openPdfViewer, handlePdfViewerPopupDragEnd,
-    drawingCanvasState, setDrawingCanvasState, openDrawingCanvas, handleDrawingCanvasPopupDragEnd,
+    drawingCanvasState, setDrawingCanvasState, openDrawingCanvas, openDrawingCanvasFromHeader, handleDrawingCanvasPopupDragEnd,
     togglePinDrawing, updateDrawingData,
     clearAllLocalFiles,
     isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen,
@@ -3621,6 +3674,7 @@ const MEAL_NAMES: Record<'meal1' | 'meal2' | 'meal3' | 'supplements', string> = 
 
 
     
+
 
 
 

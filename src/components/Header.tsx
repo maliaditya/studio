@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github, Download } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github, Download, Paintbrush } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
@@ -545,7 +545,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                                         <li key={index} className="p-3 rounded-md border bg-muted/30">
                                             <div className="flex items-start">
                                                 <Checkbox
-                                                    id={`goal-check-${goal.resourceId}`}
+                                                    id={`goal-check-modal-${goal.resourceId}`}
                                                     checked={isCompletedToday}
                                                     onCheckedChange={() => handleToggleDailyGoalCompletion(goal.resourceId)}
                                                     className="mr-2 mt-0.5"
@@ -603,6 +603,7 @@ export function Header() {
     downloadFromGitHub,
     openMindsetWidget,
     setIsTodaysPredictionModalOpen,
+    openDrawingCanvasFromHeader,
   } = useAuth();
 
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
@@ -632,6 +633,11 @@ export function Header() {
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openMindsetWidget}>
                   <Brain className="h-4 w-4" />
                   <span className="sr-only">Resistances & Urges</span>
+              </Button>
+              
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openDrawingCanvasFromHeader}>
+                  <Paintbrush className="h-4 w-4" />
+                  <span className="sr-only">Drawing Canvas</span>
               </Button>
 
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsTodaysPredictionModalOpen(true)}>
