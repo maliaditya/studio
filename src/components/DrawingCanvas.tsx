@@ -322,7 +322,8 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         link: `canvas://${resource.id}/${point.id}`,
         locked: false,
     }
-    api.addElements([newElement]);
+    const existingElements = api.getSceneElements();
+    api.updateScene({ elements: [...existingElements, newElement] });
     api.history.clear(); // To prevent undoing the add
     handleSaveClick(); // Save immediately after adding
     setIsLinkingSearchOpen(false);
