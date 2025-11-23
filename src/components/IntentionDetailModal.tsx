@@ -14,7 +14,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame, Code, MessageSquare, ArrowRight, GitMerge, GripVertical, X, Flag, Bolt, Focus, Link as LinkIcon, Play, Pause } from 'lucide-react';
 import type { ExerciseDefinition, Resource, PopupState as IntentionPopupState, ResourcePoint } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from './ui/card';
 import Image from 'next/image';
 import { Button } from './ui/button';
 import ReactMarkdown from 'react-markdown';
@@ -337,20 +337,12 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   const linkedItems = useMemo(() => {
     if (!currentItem) return { deepWork: [], upskill: [], resource: [] };
 
-    const linkedDeepWork = (currentItem.linkedDeepWorkIds || [])
-        .map(id => deepWorkDefinitions.find(d => d.id === id))
-        .filter((d): d is ExerciseDefinition => !!d);
-
-    const linkedUpskill = (currentItem.linkedUpskillIds || [])
-        .map(id => upskillDefinitions.find(d => d.id === id))
-        .filter((d): d is ExerciseDefinition => !!d);
-        
     const linkedResources = (currentItem.linkedResourceIds || [])
         .map(id => resources.find(r => r.id === id))
         .filter((r): r is Resource => !!r);
 
-    return { deepWork: linkedDeepWork, upskill: linkedUpskill, resource: linkedResources };
-  }, [currentItem, deepWorkDefinitions, upskillDefinitions, resources]);
+    return { resource: linkedResources };
+  }, [currentItem, resources]);
   
   const handleDrillDown = (subtask: ExerciseDefinition) => {
     if (upskillDefinitions.some(d => d.id === subtask.id)) {
@@ -375,6 +367,17 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     return isChild ? 'Action' : 'Standalone';
   }, [linkedDeepWorkChildIds]);
   
+  const getUpskillNodeType = useCallback((def: ExerciseDefinition) => {
+    if (def.nodeType) return def.nodeType;
+    const isParent = (def.linkedUpskillIds?.length ?? 0) > 0;
+    const isChild = linkedUpskillChildIds.has(def.id);
+    
+    if (isParent) {
+        return isChild ? 'Objective' : 'Curiosity';
+    }
+    return isChild ? 'Visualization' : 'Standalone';
+  }, [linkedUpskillChildIds]);
+
   const getIcon = (item: ExerciseDefinition) => {
     const isUpskill = upskillDefinitions.some(d => d.id === item.id);
     if (isUpskill) {
@@ -459,48 +462,34 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     });
   };
 
+  const renderContent = () => {
+    if (!currentItem) return null;
 
-  const renderDeepWorkNode = (item: ExerciseDefinition): JSX.Element => {
-    const childDeepWorkItems = (item.linkedDeepWorkIds || [])
-        .map(id => deepWorkDefinitions.find(d => d.id === id))
-        .filter((d): d is ExerciseDefinition => !!d)
-        .map(renderDeepWorkNode);
-
-    const childUpskillItems = (item.linkedUpskillIds || [])
-        .map(id => upskillDefinitions.find(d => d.id === id))
-        .filter((d): d is ExerciseDefinition => !!d)
-        .map(renderUpskillNode);
-    
-    const childResourceItems = (item.linkedResourceIds || [])
-        .map(id => resources.find(r => r.id === id))
-        .filter((r): r is Resource => !!r)
-        .map(r => <ResourceItem key={r.id} item={r} onOpenNestedPopup={(resourceId, event) => setContentModalState({ isOpen: true, resource: resources.find(res => res.id === resourceId) || null })} />);
-        
-    return (
-        <DeepWorkItem key={item.id} item={item} onDrillDown={handleDrillDown} getIcon={getIcon}>
-            {childDeepWorkItems}
-            {childUpskillItems}
-            {childResourceItems.length > 0 && <div className="space-y-2 mt-2">{childResourceItems}</div>}
-        </DeepWorkItem>
+    const childItems = (
+        (currentItem.linkedResourceIds || [])
+            .map(id => resources.find(r => r.id === id))
+            .filter((r): r is Resource => !!r)
     );
-  };
-
-  const renderUpskillNode = (item: ExerciseDefinition): JSX.Element => {
-    const childUpskillItems = (item.linkedUpskillIds || [])
-        .map(id => upskillDefinitions.find(d => d.id === id))
-        .filter((d): d is ExerciseDefinition => !!d)
-        .map(renderUpskillNode);
-    
-    const childResourceItems = (item.linkedResourceIds || [])
-        .map(id => resources.find(r => r.id === id))
-        .filter((r): r is Resource => !!r)
-        .map(r => <ResourceItem key={r.id} item={r} onOpenNestedPopup={(resourceId, event) => setContentModalState({ isOpen: true, resource: resources.find(res => res.id === resourceId) || null })} />);
 
     return (
-        <UpskillItem key={item.id} item={item} onDrillDown={handleDrillDown} getIcon={getIcon}>
-            {childUpskillItems}
-            {childResourceItems.length > 0 && <div className="space-y-2 mt-2">{childResourceItems}</div>}
-        </UpskillItem>
+        <div className="space-y-2">
+            {childItems.length > 0 ? (
+                childItems.map(item => (
+                    <ResourceItem
+                        key={item.id}
+                        item={item}
+                        onOpenNestedPopup={(resourceId, event) =>
+                            setContentModalState({
+                                isOpen: true,
+                                resource: resources.find(res => res.id === resourceId) || null,
+                            })
+                        }
+                    />
+                ))
+            ) : (
+                <p className="text-xs text-muted-foreground text-center py-4">No linked resources.</p>
+            )}
+        </div>
     );
   };
   
@@ -531,20 +520,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
           </CardHeader>
           <CardContent className="p-3 pt-0">
             <ScrollArea className="h-96 pr-4">
-              <div className="space-y-4">
-                {linkedItems.resource.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm">
-                      <Library className="h-4 w-4 text-blue-500" />Linked Resources
-                    </h3>
-                    <div className="space-y-1">
-                      {linkedItems.resource.map(item => <ResourceItem key={item.id} item={item} onOpenNestedPopup={(resourceId, event) => {
-                        setContentModalState({ isOpen: true, resource: resources.find(res => res.id === resourceId) || null });
-                      }} />)}
-                    </div>
-                  </div>
-                )}
-              </div>
+              {renderContent()}
             </ScrollArea>
           </CardContent>
           {isUpskillCuriosity && (
@@ -660,5 +636,3 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     </>
   );
 }
-
-    
