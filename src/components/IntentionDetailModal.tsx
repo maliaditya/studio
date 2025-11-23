@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
@@ -270,7 +271,9 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
             setAudioSrc(null);
           }
         } catch (error) { console.error("Failed to load audio from DB:", error); setAudioSrc(null); }
-      } else { setAudioSrc(null); }
+      } else {
+          setAudioSrc(null);
+      }
     };
     loadAudio();
     return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
@@ -651,3 +654,5 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     </>
   );
 }
+
+    

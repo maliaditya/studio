@@ -17,7 +17,7 @@ import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { createPortal } from 'react-dom';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
-import { RuleDetailPopupCard, MindsetTechniquePopup } from '@/components/HabitDetailPopup';
+import { RuleDetailPopupCard } from '@/components/HabitDetailPopup';
 import { TaskContextPopup } from '@/components/TaskContextPopup';
 import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
@@ -500,6 +500,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             {Object.entries(openBrainHackPopups).map(([hackId, pos]) => (
                 <BrainHacksCard key={hackId} parentId={hackId} initialPosition={pos} />
             ))}
+            {Array.from(intentionPopups.values()).map(popupState => (
+              <IntentionDetailPopup key={popupState.resourceId} popupState={popupState} onClose={closeIntentionPopup} />
+            ))}
             {ResourcePopup && Array.from(openPopups.values()).map(popupState => (
               <ResourcePopup key={popupState.resourceId} popupState={popupState} />
             ))}
@@ -524,13 +527,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                   onClose={closePillarPopup}
                 />
              )}
-             {linkedResistancePopup && (
-                <MindsetTechniquePopup
-                    popupState={linkedResistancePopup}
-                    onClose={() => setLinkedResistancePopup(null)}
-                />
-            )}
-            {Array.from(taskContextPopups.values()).map(popupState => (
+            {taskContextPopups && Array.from(taskContextPopups.values()).map(popupState => (
                 <TaskContextPopup
                     key={popupState.activityId}
                     popupState={popupState}
@@ -607,3 +604,5 @@ export default function RootLayout({
     </html>
   );
 }
+
+    
