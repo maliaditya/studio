@@ -337,13 +337,33 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   const linkedItems = useMemo(() => {
     if (!currentItem) return { deepWork: [], upskill: [], resource: [] };
 
-    const linkedResources = (currentItem.linkedResourceIds || [])
+    const directlyLinkedResources = (currentItem.linkedResourceIds || [])
+        .map(id => resources.find(r => r.id === id))
+        .filter((r): r is Resource => !!r);
+    
+    const childDeepWorkItems = (currentItem.linkedDeepWorkIds || [])
+        .map(id => deepWorkDefinitions.find(d => d.id === id))
+        .filter((d): d is ExerciseDefinition => !!d);
+
+    const childUpskillItems = (currentItem.linkedUpskillIds || [])
+        .map(id => upskillDefinitions.find(d => d.id === id))
+        .filter((d): d is ExerciseDefinition => !!d);
+
+    const resourcesFromChildren = [...childDeepWorkItems, ...childUpskillItems]
+        .flatMap(child => child.linkedResourceIds || [])
         .map(id => resources.find(r => r.id === id))
         .filter((r): r is Resource => !!r);
 
-    return { resource: linkedResources };
-  }, [currentItem, resources]);
-  
+    const allResourceIds = new Set(directlyLinkedResources.map(r => r.id));
+    const uniqueResourcesFromChildren = resourcesFromChildren.filter(r => !allResourceIds.has(r.id));
+    
+    return {
+        deepWork: childDeepWorkItems,
+        upskill: childUpskillItems,
+        resource: [...directlyLinkedResources, ...uniqueResourcesFromChildren],
+    };
+}, [currentItem, deepWorkDefinitions, upskillDefinitions, resources]);
+
   const handleDrillDown = (subtask: ExerciseDefinition) => {
     if (upskillDefinitions.some(d => d.id === subtask.id)) {
         console.log("Drilling into upskill item from intention popup is not fully supported yet with its own popup type.");
@@ -465,16 +485,10 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   const renderContent = () => {
     if (!currentItem) return null;
 
-    const childItems = (
-        (currentItem.linkedResourceIds || [])
-            .map(id => resources.find(r => r.id === id))
-            .filter((r): r is Resource => !!r)
-    );
-
     return (
         <div className="space-y-2">
-            {childItems.length > 0 ? (
-                childItems.map(item => (
+            {linkedItems.resource.length > 0 ? (
+                linkedItems.resource.map(item => (
                     <ResourceItem
                         key={item.id}
                         item={item}
