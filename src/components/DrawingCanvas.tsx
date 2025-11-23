@@ -103,24 +103,35 @@ const ExcalidrawWrapper = ({
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
     onLinkOpen: OnLinkOpen;
 }) => {
-    // This is the robust way to parse and provide initial data.
-    // It's calculated on every render, which is fine, and guarantees a valid object.
-    const initialData = (() => {
-        try {
-            if (activeCanvas.data && typeof activeCanvas.data === 'string' && activeCanvas.data.trim() !== '') {
-                const parsedData = JSON.parse(activeCanvas.data);
-                return {
-                    elements: parsedData.elements || [], // Ensure elements is always an array
-                    appState: parsedData.appState || {},
-                };
-            }
-        } catch (e) {
-            console.error("Failed to parse canvas data, defaulting to empty.", e);
-        }
-        // Default to an empty canvas if data is missing, empty, or invalid
-        return { elements: [] };
-    })();
+    const [initialData, setInitialData] = useState<{ elements: readonly ExcalidrawElement[], appState?: any }>({ elements: [] });
+    const [loading, setLoading] = useState(true);
 
+    useEffect(() => {
+        setLoading(true);
+        if (activeCanvas) {
+            try {
+                if (activeCanvas.data && typeof activeCanvas.data === 'string' && activeCanvas.data.trim() !== '') {
+                    const parsedData = JSON.parse(activeCanvas.data);
+                    setInitialData({
+                        elements: parsedData.elements || [], // GUARANTEE elements is an array
+                        appState: parsedData.appState || {},
+                    });
+                } else {
+                    // Handle case where data is empty or not present
+                    setInitialData({ elements: [] });
+                }
+            } catch (e) {
+                console.error("Failed to parse canvas data, defaulting to empty.", e);
+                setInitialData({ elements: [] }); // Safe default on parse error
+            } finally {
+                setLoading(false);
+            }
+        }
+    }, [activeCanvas]);
+    
+    if (loading) {
+        return <div className="flex h-full w-full items-center justify-center">Loading Canvas...</div>
+    }
 
     return (
         <div style={{ height: "100%", width: "100%" }}>
