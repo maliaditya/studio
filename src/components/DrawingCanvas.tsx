@@ -103,31 +103,20 @@ const ExcalidrawWrapper = ({
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
     onLinkOpen: OnLinkOpen;
 }) => {
-    const [initialData, setInitialData] = useState<{ elements: readonly ExcalidrawElement[], appState?: any }>({ elements: [] });
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        setLoading(true);
-        let dataToLoad: { elements: readonly ExcalidrawElement[], appState?: any } = { elements: [] };
-        try {
-            if (activeCanvas?.data) {
-                const parsedData = JSON.parse(activeCanvas.data);
-                if (Array.isArray(parsedData.elements)) {
-                    dataToLoad = {
-                        elements: parsedData.elements,
-                        appState: parsedData.appState || {},
-                    };
-                }
-            }
-        } catch (e) {
-            console.error("Failed to parse canvas data, defaulting to empty.", e);
+    let initialData: { elements: readonly ExcalidrawElement[], appState?: any };
+    try {
+        if (activeCanvas?.data) {
+            const parsedData = JSON.parse(activeCanvas.data);
+            // Ensure elements is always an array
+            initialData = {
+                elements: parsedData.elements || [],
+                appState: parsedData.appState || {},
+            };
+        } else {
+            initialData = { elements: [] };
         }
-        setInitialData(dataToLoad);
-        setLoading(false);
-    }, [activeCanvas.id, activeCanvas.data]);
-
-    if (loading) {
-        return <div className="flex h-full w-full items-center justify-center">Loading Canvas...</div>;
+    } catch (e) {
+        initialData = { elements: [] };
     }
 
     return (
@@ -287,7 +276,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     event.preventDefault();
     if (element.link?.startsWith('canvas://')) {
         const [resourceId, pointId] = element.link.replace('canvas://', '').split('/');
-        authOpenDrawingCanvas({ resourceId, pointId, name: 'Linked Canvas', initialDrawing: '' }); // Let it load
+        authOpenDrawingCanvas({ resourceId, pointId, name: 'Linked Canvas' });
     } else {
         window.open(element.link, '_blank', 'noopener,noreferrer');
     }
