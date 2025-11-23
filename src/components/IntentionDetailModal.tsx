@@ -14,7 +14,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { Lightbulb, Flashlight, Library, Globe, Youtube, ExternalLink, Briefcase, BookCopy, ArrowLeft, Frame, Code, MessageSquare, ArrowRight, GitMerge, GripVertical, X, Flag, Bolt, Focus, Link as LinkIcon, Play, Pause } from 'lucide-react';
 import type { ExerciseDefinition, Resource, PopupState as IntentionPopupState, ResourcePoint } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from './ui/card';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import Image from 'next/image';
 import { Button } from './ui/button';
 import ReactMarkdown from 'react-markdown';
@@ -293,7 +293,9 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   useEffect(() => {
     const audioEl = audioRef.current;
     if (!audioEl || !audioSrc) return;
-    if (audioEl.src !== audioSrc) audioEl.src = audioSrc;
+    if (audioEl.src !== audioSrc) {
+      audioEl.src = audioSrc;
+    }
     if (playingAudio) {
       audioEl.volume = globalVolume;
       audioEl.play().catch(e => console.error("Audio play failed:", e));
@@ -363,6 +365,7 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
   };
   
   const getDeepWorkNodeType = useCallback((def: ExerciseDefinition) => {
+    if (def.nodeType) return def.nodeType;
     const isParent = (def.linkedDeepWorkIds?.length ?? 0) > 0 || (def.linkedUpskillIds?.length ?? 0) > 0;
     const isChild = linkedDeepWorkChildIds.has(def.id);
     
@@ -529,32 +532,12 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
           <CardContent className="p-3 pt-0">
             <ScrollArea className="h-96 pr-4">
               <div className="space-y-4">
-                {linkedItems.deepWork.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm">
-                      <Briefcase className="h-4 w-4 text-green-500" />Linked Deep Work
-                    </h3>
-                    <div className="space-y-1">
-                      {linkedItems.deepWork.map(item => renderDeepWorkNode(item))}
-                    </div>
-                  </div>
-                )}
-                {linkedItems.upskill.length > 0 && (
-                  <div>
-                    <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm">
-                      <BookCopy className="h-4 w-4 text-amber-500" />Linked Learning
-                    </h3>
-                    <div className="space-y-1">
-                      {linkedItems.upskill.map(item => renderUpskillNode(item))}
-                    </div>
-                  </div>
-                )}
                 {linkedItems.resource.length > 0 && (
                   <div>
                     <h3 className="font-semibold mb-1 flex items-center gap-2 text-sm">
                       <Library className="h-4 w-4 text-blue-500" />Linked Resources
                     </h3>
-                    <div className="grid grid-cols-1 gap-2">
+                    <div className="space-y-1">
                       {linkedItems.resource.map(item => <ResourceItem key={item.id} item={item} onOpenNestedPopup={(resourceId, event) => {
                         setContentModalState({ isOpen: true, resource: resources.find(res => res.id === resourceId) || null });
                       }} />)}
@@ -677,3 +660,5 @@ export function IntentionDetailPopup({ popupState, onClose }: IntentionDetailPop
     </>
   );
 }
+
+    
