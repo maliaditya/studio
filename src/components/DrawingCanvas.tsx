@@ -103,31 +103,21 @@ const ExcalidrawWrapper = ({
     onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
     onLinkOpen: OnLinkOpen;
 }) => {
-    const [initialData, setInitialData] = useState<{ elements: readonly ExcalidrawElement[], appState?: any }>({ elements: [] });
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        setLoading(true);
-        let dataToLoad: { elements: readonly ExcalidrawElement[], appState?: any } = { elements: [] };
-        try {
-            if (activeCanvas && activeCanvas.data && activeCanvas.data.trim()) {
-                const parsedData = JSON.parse(activeCanvas.data);
-                dataToLoad = {
-                    elements: parsedData.elements || [],
+    let initialData: { elements: readonly ExcalidrawElement[], appState?: any } = { elements: [] };
+    
+    try {
+        if (activeCanvas?.data) {
+            const parsedData = JSON.parse(activeCanvas.data);
+            if (Array.isArray(parsedData.elements)) {
+                initialData = {
+                    elements: parsedData.elements,
                     appState: parsedData.appState || {},
                 };
             }
-        } catch (e) {
-            console.error("Failed to parse canvas data, defaulting to empty.", e);
-            // dataToLoad remains { elements: [] }
-        } finally {
-            setInitialData(dataToLoad);
-            setLoading(false);
         }
-    }, [activeCanvas]);
-    
-    if (loading) {
-        return <div className="flex h-full w-full items-center justify-center">Loading Canvas...</div>
+    } catch (e) {
+        console.error("Failed to parse canvas data, defaulting to empty.", e);
+        // initialData is already { elements: [] }
     }
 
     return (
