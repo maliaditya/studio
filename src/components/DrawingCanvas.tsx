@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
@@ -114,7 +115,10 @@ const ExcalidrawWrapper = ({
     let data;
     try {
       if (activeCanvas.data && typeof activeCanvas.data === 'string') {
-        data = JSON.parse(activeCanvas.data);
+        const parsedData = JSON.parse(activeCanvas.data);
+        if (Array.isArray(parsedData.elements)) {
+            data = parsedData;
+        }
       }
     } catch (e) {
       console.error("Failed to parse canvas data", e);
@@ -291,17 +295,23 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     if (link?.startsWith('canvas://')) {
         const [resourceId, pointId] = link.replace('canvas://', '').split('/');
         
-        // Find the resource and point from the auth context
         const resource = resources.find(r => r.id === resourceId);
         const point = resource?.points?.find(p => p.id === pointId);
         
         if (resource && point) {
-            authOpenDrawingCanvas({
-                resourceId: resource.id,
-                pointId: point.id,
-                name: point.text || 'Linked Canvas',
-                initialDrawing: point.drawing
-            });
+            const canvasId = `${resource.id}-${point.id}`;
+            const isAlreadyOpen = drawingCanvasState?.openCanvases?.some(c => c.id === canvasId);
+            
+            if (isAlreadyOpen) {
+                handleTabClick(canvasId);
+            } else {
+                 authOpenDrawingCanvas({
+                    resourceId: resource.id,
+                    pointId: point.id,
+                    name: point.text || 'Linked Canvas',
+                    initialDrawing: point.drawing,
+                });
+            }
         } else {
             console.error("Linked canvas not found:", resourceId, pointId);
             toast({ title: 'Error', description: 'Could not find the linked canvas.', variant: 'destructive'});
@@ -310,7 +320,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     } else if (link) {
         window.open(link, '_blank', 'noopener,noreferrer');
     }
-  }, [authOpenDrawingCanvas, resources, toast]);
+  }, [authOpenDrawingCanvas, resources, toast, drawingCanvasState, handleTabClick]);
   
   const handleLinkingSearchSelect = (resource: Resource, point: ResourcePoint) => {
     const api = excalidrawAPIRef.current;
