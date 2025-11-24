@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -296,6 +297,13 @@ function MyPlatePageContent() {
   
     const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
   
+    const formatDuration = (totalMinutes: number, suffix: string) => {
+      if (totalMinutes <= 0) return '';
+      const h = Math.floor(totalMinutes / 60);
+      const m = Math.round(totalMinutes % 60);
+      return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() + suffix;
+    };
+  
     for (const dateKey in schedule) {
       const daySchedule = schedule[dateKey];
       if (!daySchedule) continue;
@@ -311,97 +319,40 @@ function MyPlatePageContent() {
           let suffix = '';
   
           if (activity.completed) {
-            if (activity.type === 'upskill' || activity.type === 'deepwork' || activity.type === 'branding') {
-              let definition: ExerciseDefinition | undefined;
-              
-              if (activity.taskIds && activity.taskIds.length > 0) {
-                const mainLogInstanceId = activity.taskIds[0];
-                let mainDefId: string | undefined;
+            const allLogs = [
+                ...allUpskillLogs,
+                ...allDeepWorkLogs,
+                ...brandingLogs,
+            ];
+            const relevantLog = allLogs.find(log => log.date === dateKey);
+            const durationFromLogs = relevantLog?.exercises
+                .filter(ex => activity.taskIds?.includes(ex.id))
+                .reduce((sum, ex) => sum + (ex.loggedSets || []).reduce((setSum, set) => setSum + (set.weight || set.reps || 0), 0), 0) || 0;
+            
+            totalMinutes = activity.duration || durationFromLogs;
+            suffix = ' logged';
 
-                const allLogs = activity.type === 'upskill' ? allUpskillLogs : activity.type === 'branding' ? brandingLogs : allDeepWorkLogs;
-                mainDefId = allLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId)?.definitionId;
-                
-                if (mainDefId) {
-                  definition = allDefs.get(mainDefId);
-                }
-              }
-
-              if (definition) {
-                const leafNodes = getDescendantLeafNodes(definition.id, activity.type === 'upskill' ? 'upskill' : 'deepwork');
-                
-                if (leafNodes.length > 0) {
-                    totalMinutes = leafNodes.reduce((sum, node) => {
-                        if (node.last_logged_date === dateKey) {
-                            return sum + (node.loggedDuration || 0);
-                        }
-                        return sum;
-                    }, 0);
-                } else {
-                    if (definition.last_logged_date === dateKey) {
-                        totalMinutes = definition.loggedDuration || 0;
-                    }
-                }
-                suffix = ' logged';
-              }
-  
-            } else if (activity.duration) {
-              totalMinutes = activity.duration;
-              suffix = ' logged';
-            }
           } else {
-            // For non-completed tasks, calculate estimated duration
-            switch(activity.type) {
-              case 'workout': 
-                const { exercises: workoutExercises } = getExercisesForDay(parseISO(dateKey), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
-                totalMinutes = workoutExercises.length > 0 ? 90 : 0;
-                break;
+            switch (activity.type) {
+              case 'workout': totalMinutes = 90; break;
               case 'mindset': totalMinutes = 15; break;
               case 'upskill':
               case 'deepwork':
               case 'branding':
-                if (activity.taskIds && activity.taskIds.length > 0) {
-                  const mainLogInstanceId = activity.taskIds[0];
-                  let mainTaskDefId: string | undefined;
-                  const allLogs = [...allUpskillLogs, ...allDeepWorkLogs, ...brandingLogs];
-                  mainTaskDefId = allLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId)?.definitionId;
-
-                  if (mainTaskDefId) {
-                    const taskDef = allDefs.get(mainTaskDefId);
-                    if (taskDef) {
-                      totalMinutes = calculateTotalEstimate(taskDef);
-                    } else {
-                      totalMinutes = 120;
-                    }
-                  } else {
-                     totalMinutes = 120;
-                  }
-                } else {
-                  totalMinutes = 120;
-                }
+                totalMinutes = 120; // Default estimate
                 break;
-              case 'planning':
-              case 'tracking':
-              case 'essentials':
-              case 'nutrition':
-                 totalMinutes = activity.duration || 30; break;
-              case 'lead-generation': totalMinutes = 45; break;
-              case 'interrupt':
-              case 'distraction':
-                 totalMinutes = activity.duration || 0; break;
-              default: totalMinutes = 0;
+              default:
+                totalMinutes = activity.duration || 30;
+                break;
             }
           }
   
-          if (totalMinutes > 0) {
-            const h = Math.floor(totalMinutes / 60);
-            const m = Math.round(totalMinutes % 60);
-            newDurations[activity.id] = ((`${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`).trim() || '0m') + suffix;
-          }
+          newDurations[activity.id] = formatDuration(totalMinutes, suffix);
         }
       }
     }
     return newDurations;
-  }, [schedule, deepWorkDefinitions, upskillDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs, calculateTotalEstimate, getDescendantLeafNodes, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs]);
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs]);
 
 
   const slotDurations = useMemo(() => {
