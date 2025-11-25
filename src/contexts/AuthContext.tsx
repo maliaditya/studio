@@ -11,7 +11,7 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import { format, addDays, parseISO, subDays, startOfDay, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay, startOfToday } from 'date-fns';
+import { format, addDays, parseISO, subDays, startOfDay, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay, getHours } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
@@ -91,48 +91,9 @@ interface AuthContextType {
   syncWithGitHub: () => Promise<void>;
   downloadFromGitHub: () => Promise<void>;
   
-  // Shared health state
-  weightLogs: WeightLog[];
-  setWeightLogs: React.Dispatch<React.SetStateAction<WeightLog[]>>;
-  goalWeight: number | null;
-  setGoalWeight: React.Dispatch<React.SetStateAction<number | null>>;
-  height: number | null;
-  setHeight: React.Dispatch<React.SetStateAction<number | null>>;
-  dateOfBirth: string | null;
-  setDateOfBirth: React.Dispatch<React.SetStateAction<string | null>>;
-  gender: Gender | null;
-  setGender: React.Dispatch<React.SetStateAction<gender | null>>;
-  dietPlan: UserDietPlan;
-  setDietPlan: React.Dispatch<React.SetStateAction<UserDietPlan>>;
-  
-  // Global Schedule & Agenda State
+  // App Data States
   schedule: FullSchedule;
   setSchedule: React.Dispatch<React.SetStateAction<FullSchedule>>;
-  dailyPurposes: Record<string, string>;
-  setDailyPurposes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
-  isAgendaDocked: boolean;
-  setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
-  activityDurations: Record<string, string>;
-  handleToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
-  handleLogLearning: (activity: Activity, duration: number) => void;
-  logSubTaskTime: (subTaskId: string, durationMinutes: number) => void;
-  carryForwardTask: (activity: Activity, targetSlot: string) => void;
-  scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string, duration?: number) => void;
-  updateActivity: (updatedActivity: Activity) => void;
-  findRootTask: (activity: Activity) => ExerciseDefinition | null;
-
-
-  // Focus Session
-  focusSessionModalOpen: boolean;
-  setFocusSessionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  focusActivity: Activity | null;
-  focusDuration: number;
-  onOpenFocusModal: (activity: Activity) => boolean;
-  handleStartFocusSession: (activity: Activity, duration: number) => void;
-  activeFocusSession: ActiveFocusSession | null;
-  setActiveFocusSession: React.Dispatch<React.SetStateAction<ActiveFocusSession | null>>;
-
-  // Global Logs State
   allUpskillLogs: DatedWorkout[];
   setAllUpskillLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allDeepWorkLogs: DatedWorkout[];
@@ -145,6 +106,36 @@ interface AuthContextType {
   setAllLeadGenLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
   allMindProgrammingLogs: DatedWorkout[];
   setAllMindProgrammingLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>;
+  
+  // Shared health state
+  weightLogs: WeightLog[];
+  setWeightLogs: React.Dispatch<React.SetStateAction<WeightLog[]>>;
+  goalWeight: number | null;
+  setGoalWeight: React.Dispatch<React.SetStateAction<number | null>>;
+  height: number | null;
+  setHeight: React.Dispatch<React.SetStateAction<number | null>>;
+  dateOfBirth: string | null;
+  setDateOfBirth: React.Dispatch<React.SetStateAction<string | null>>;
+  gender: Gender | null;
+  setGender: React.Dispatch<React.SetStateAction<Gender | null>>;
+  dietPlan: UserDietPlan;
+  setDietPlan: React.Dispatch<React.SetStateAction<UserDietPlan>>;
+  
+  // Global Schedule & Agenda State
+  dailyPurposes: Record<string, string>;
+  setDailyPurposes: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  isAgendaDocked: boolean;
+  setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
+  
+  // Focus Session
+  focusSessionModalOpen: boolean;
+  setFocusSessionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  focusActivity: Activity | null;
+  focusDuration: number;
+  onOpenFocusModal: (activity: Activity) => boolean;
+  handleStartFocusSession: (activity: Activity, duration: number) => void;
+  activeFocusSession: ActiveFocusSession | null;
+  setActiveFocusSession: React.Dispatch<React.SetStateAction<ActiveFocusSession | null>>;
   
   // Data Definitions & Plans
   workoutMode: WorkoutMode;
@@ -162,7 +153,7 @@ interface AuthContextType {
   setUpskillDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
   topicGoals: Record<string, TopicGoal>;
   setTopicGoals: React.Dispatch<React.SetStateAction<Record<string, TopicGoal>>>;
-
+  
   deepWorkDefinitions: ExerciseDefinition[];
   setDeepWorkDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
   getDeepWorkNodeType: (def: ExerciseDefinition) => string;
@@ -179,7 +170,7 @@ interface AuthContextType {
   addFeatureToRelease: (release: Release, topic: string, featureName: string, type: 'product' | 'service') => void;
   
   copyOffer: (topic: string, offerId: string) => void;
-
+  
   mindProgrammingDefinitions: ExerciseDefinition[];
   setMindProgrammingDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>;
   mindProgrammingCategories: ExerciseCategory[];
@@ -190,7 +181,7 @@ interface AuthContextType {
   setMindProgrammingPlans: React.Dispatch<React.SetStateAction<AllWorkoutPlans>>;
   mindProgrammingPlanRotation: boolean;
   setMindProgrammingPlanRotation: React.Dispatch<React.SetStateAction<boolean>>;
-
+  
   // Resources
   resources: Resource[];
   setResources: React.Dispatch<React.SetStateAction<Resource[]>>;
@@ -218,7 +209,7 @@ interface AuthContextType {
   closeAllResourcePopups: () => void;
   handlePopupDragEnd: (event: DragEndEvent) => void;
   ResourcePopup: React.FC<ResourcePopupProps>;
-
+  
   // Intention Popups
   intentionPopups: Map<string, PopupState>;
   openIntentionPopup: (intentionId: string) => void;
@@ -230,13 +221,13 @@ interface AuthContextType {
   closeGeneralPopup: (resourceId: string) => void;
   handleUpdateResource: (resource: Resource) => void;
   handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
-
+  
   // Meta Rule Popup
   ruleDetailPopup: RuleDetailPopupState | null;
   openRuleDetailPopup: (ruleId: string, event: React.MouseEvent) => void;
   closeRuleDetailPopup: () => void;
   handleRulePopupDragEnd: (event: DragEndEvent) => void;
-
+  
   // Pillar Popup
   pillarPopupState: PillarPopupState | null;
   openPillarPopup: (pillarName: string, event?: React.MouseEvent) => void;
@@ -248,7 +239,7 @@ interface AuthContextType {
   openHabitDetailPopup: (habitId: string, event: React.MouseEvent) => void;
   closeHabitDetailPopup: () => void;
   handleHabitDetailPopupDragEnd: (event: DragEndEvent) => void;
-
+  
   // Task Context Popup
   taskContextPopups: Map<string, TaskContextPopupState>;
   openTaskContextPopup: (activityId: string, timerRect?: DOMRect, parentPopupState?: TaskContextPopupState) => void;
@@ -260,14 +251,14 @@ interface AuthContextType {
   openContentViewPopup: (contentId: string, resource: Resource, point: ResourcePoint, event?: React.MouseEvent) => void;
   closeContentViewPopup: (contentId: string) => void;
   handleContentViewPopupDragEnd: (event: DragEndEvent) => void;
-
+  
   // Today's Diet Popup
   todaysDietPopup: TodaysDietPopupState | null;
   openTodaysDietPopup: (event: React.MouseEvent) => void;
   closeTodaysDietPopup: () => void;
   handleTodaysDietPopupDragEnd: (event: DragEndEvent) => void;
   swapMealInSchedule: (targetSlot: string, targetActivityId: string, sourceDay: string, sourceMeal: 'meal1' | 'meal2' | 'meal3') => void;
-
+  
   // Workout Log Handlers
   logWorkoutSet: (date: Date, exerciseId: string, reps: number, weight: number) => void;
   updateWorkoutSet: (date: Date, exerciseId: string, setId: string, reps: number, weight: number) => void;
@@ -285,7 +276,7 @@ interface AuthContextType {
   updateGlobalElement: (elementId: string, updates: Partial<FormalizationItem>) => void;
   deleteGlobalElement: (elementId: string) => void;
   handleAddNewResourceCard: (folderId: string | null, position: { x: number; y: number; }) => Resource | undefined;
-
+  
   // Mindset
   mindsetCards: MindsetCard[];
   setMindsetCards: React.Dispatch<React.SetStateAction<MindsetCard[]>>;
@@ -312,7 +303,7 @@ interface AuthContextType {
   handleUpdateMicroSkill: (coreSkillId: string, areaId: string, microSkillId: string, name: string) => void;
   handleDeleteMicroSkill: (coreSkillId: string, areaId: string, microSkillId: string) => void;
   handleToggleMicroSkillRepetition: (coreSkillId: string, areaId: string, microSkillId: string, isReady: boolean) => void;
-
+  
   // Professional Experience
   companies: Company[];
   setCompanies: React.Dispatch<React.SetStateAction<Company[]>>;
@@ -337,12 +328,12 @@ interface AuthContextType {
   deletePillarCard: (cardId: string) => void;
   specializations: CoreSkill[];
   allEquations: HabitEquation[];
-
+  
   // Path Diagram Data
   pathNodes: PathNode[];
   setPathNodes: React.Dispatch<React.SetStateAction<PathNode[]>>;
-
-
+  
+  
   // New global map
   microSkillMap: Map<string, { coreSkillName: string; skillAreaName: string; microSkillName: string }>;
   permanentlyLoggedTaskIds: Set<string>;
@@ -383,7 +374,7 @@ interface AuthContextType {
   stopperProgressPopup: StopperProgressPopupState | null;
   openStopperProgressPopup: (stopper: Stopper, habitName: string) => void;
   setStopperProgressPopup: React.Dispatch<React.SetStateAction<StopperProgressPopupState | null>>;
-
+  
   // Top Priorities
   topPriorities: Priority[];
   setTopPriorities: React.Dispatch<React.SetStateAction<Priority[]>>;
@@ -391,7 +382,7 @@ interface AuthContextType {
   setBrainHacks: React.Dispatch<React.SetStateAction<BrainHack[]>>;
   getDeepWorkLoggedMinutes: (def: ExerciseDefinition) => number;
   getUpskillLoggedMinutesRecursive: (def: ExerciseDefinition) => number;
-
+  
   // Spaced Repetition
   spacedRepetitionData: Record<string, RepetitionData>;
   setSpacedRepetitionData: React.Dispatch<React.SetStateAction<Record<string, RepetitionData>>>;
@@ -409,6 +400,14 @@ interface AuthContextType {
   isMindsetModalOpen: boolean;
   setIsMindsetModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   toggleProjectBrandingStatus: (projectId: string) => void;
+  selectedUpskillTask: ExerciseDefinition | null;
+  setSelectedUpskillTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
+  selectedDeepWorkTask: ExerciseDefinition | null;
+  setSelectedDeepWorkTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
+  selectedMicroSkill: MicroSkill | null;
+  setSelectedMicroSkill: React.Dispatch<React.SetStateAction<MicroSkill | null>>;
+  handleToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
+  onRemoveActivity: (slotName: string, activityId: string) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -458,23 +457,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     routines: [],
     workoutScheduling: 'day-of-week',
     slotRules: {},
-    widgetVisibility: {
-      agenda: true,
-      smartLogging: true,
-      pistons: true,
-      mindset: true,
-      activityDistribution: true,
-      favorites: true,
-      topPriorities: true,
-      goals: true,
-      brainHacks: true,
-      ruleEquations: true,
-      visualizationTechniques: true,
-      spacedRepetition: true,
-    },
+    widgetVisibility: { agenda: true, smartLogging: true, pistons: true, mindset: true, activityDistribution: true, favorites: true, topPriorities: true, goals: true, brainHacks: true, ruleEquations: true, visualizationTechniques: true, spacedRepetition: true },
     allWidgetsVisible: true,
     agendaShowCurrentSlotOnly: false,
     spacedRepetitionSlot: 'Late Night',
+    pinnedCanvasIds: [],
   });
 
   // Health State
@@ -524,8 +511,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Resource Popups (Original system, kept for resources page)
   const [openPopups, setOpenPopups] = useState<Map<string, PopupState>>(new Map());
-  const [playingAudio, setPlayingAudio] = useState<{ id: string; isPlaying: boolean } | null>(null);
-  const audioRef = useRef<HTMLAudioElement>(null);
   
   // Intention Popups
   const [intentionPopups, setIntentionPopups] = useState<Map<string, PopupState>>(new Map());
@@ -908,7 +893,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         findAndUpdate(upskillDefinitions, setUpskillDefinitions);
     }
   }, [deepWorkDefinitions, upskillDefinitions, setDeepWorkDefinitions, setUpskillDefinitions]);
-
+  
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
   
@@ -1066,10 +1051,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     recurse(def);
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
-
-  const activityDurations = useMemo(() => {
-    return {}
-  }, []);
   
   const permanentlyLoggedTaskIds = useMemo(() => {
     const loggedIds = new Set<string>();
@@ -1106,8 +1087,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setSchedule]);
 
+  const onRemoveActivity = useCallback((slotName: string, activityId: string) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        if (newSchedule[todayKey]) {
+            const daySchedule = { ...newSchedule[todayKey] };
+            if (daySchedule[slotName]) {
+                daySchedule[slotName] = (daySchedule[slotName] as any[]).filter(act => act.id !== activityId);
+                newSchedule[todayKey] = daySchedule;
+            }
+        }
+        return newSchedule;
+    });
+  }, [setSchedule]);
+  
   const onOpenFocusModal = useCallback((activity: Activity) => {
-    const estDurationStr = activityDurations[activity.id];
+    const estDurationStr = activity.duration?.toString(); // use activity.duration first
     let minutes = 0;
     if (estDurationStr) {
       const hMatch = estDurationStr.match(/(\d+)h/);
@@ -1125,7 +1121,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setFocusActivity(activity);
     setFocusSessionModalOpen(true);
     return true;
-  }, [activityDurations]);
+  }, []);
   
   const getDeepWorkLoggedMinutes = useCallback((definition: ExerciseDefinition): number => {
     const leafNodes = getDescendantLeafNodes(definition.id, 'deepwork');
@@ -1176,7 +1172,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, topPriorities, brainHacks, settings, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, selectedFormalizationSpecId, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pipState, spacedRepetitionData, dailyReviewLogs, abandonmentLogs
   ]);
-
+  
   const saveState = useCallback(() => {
     if (currentUser?.username) {
         const allData = getAllUserData();
@@ -1339,73 +1335,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoadingState(false);
     }
   }, [loadImportedData, toast]);
-
-  const populatedSchedule = useMemo(() => {
-    const newSchedule = JSON.parse(JSON.stringify(schedule));
-  
-    if (!settings.routines || settings.routines.length === 0) {
-      return schedule;
-    }
-  
-    const today = startOfDay(new Date());
-    const scheduleDates = Object.keys(newSchedule).map(parseISO).filter(isValid);
-    
-    const earliestDateInSchedule = scheduleDates.length > 0 ? min(scheduleDates) : today;
-    const latestDateInSchedule = scheduleDates.length > 0 ? max(scheduleDates) : today;
-    
-    const startDate = min([today, earliestDateInSchedule]);
-    const endDate = addDays(max([today, latestDateInSchedule]), 30);
-  
-    const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
-  
-    dateRange.forEach(date => {
-      const dateKey = format(date, 'yyyy-MM-dd');
-      const dayOfWeek = getDay(date);
-      const daySchedule = newSchedule[dateKey] || {};
-      const activitiesInDay = new Set(
-        Object.values(daySchedule)
-              .flat()
-              .map((act: Activity) => `${act.details}_${act.type}_${act.slot}`)
-      );
-  
-      settings.routines.forEach((routine: Activity) => {
-          let shouldAdd = false;
-          if (routine.routine?.type === 'daily') {
-              shouldAdd = true;
-          } else if (routine.routine?.type === 'weekly') {
-              const routineCreationDate = routine.createdAt ? parseISO(routine.createdAt) : null;
-              if (routineCreationDate && isValid(routineCreationDate)) {
-                  if (getDay(routineCreationDate) === dayOfWeek) {
-                      shouldAdd = true;
-                  }
-              } else {
-                  shouldAdd = true; 
-              }
-          }
-
-          if (shouldAdd) {
-              const routineKey = `${routine.details}_${routine.type}_${routine.slot}`;
-              if (!activitiesInDay.has(routineKey)) {
-                  const slot = routine.slot as keyof DailySchedule;
-                  if (!daySchedule[slot]) daySchedule[slot] = [];
-                  (daySchedule[slot] as Activity[]).push({
-                      ...routine,
-                      id: `${routine.type}-${dateKey}-${Math.random()}`,
-                      completed: false,
-                      completedAt: undefined,
-                      focusSessionInitialStartTime: undefined,
-                      focusSessionStartTime: undefined,
-                      focusSessionEndTime: undefined,
-                      focusSessionPauses: [],
-                  });
-              }
-          }
-      });
-      newSchedule[dateKey] = daySchedule;
-    });
-  
-    return newSchedule;
-  }, [schedule, settings.routines]);
   
   const register = async (username: string, password: string) => {
     setLoading(true);
@@ -3341,61 +3270,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       }
     };
   }, [activeFocusSession?.state, setActiveFocusSession]);
-
-  useEffect(() => {
-    if (isLoadingState || !currentUser) return;
-  
-    const allDates = Object.keys(schedule).map(parseISO).filter(isValid);
-    if (allDates.length === 0) return;
-  
-    const latestDate = max(allDates);
-    const today = startOfDay(new Date());
-  
-    const startOfThisWeek = startOfWeek(today, { weekStartsOn: 1 });
-    const startOfLatestWeek = startOfWeek(latestDate, { weekStartsOn: 1 });
-  
-    if (isAfter(startOfThisWeek, startOfLatestWeek)) {
-      const newSchedule = { ...schedule };
-      let scheduleUpdated = false;
-      const daysToCarryOver = eachDayOfInterval({ start: startOfThisWeek, end: addDays(startOfThisWeek, 6) });
-  
-      daysToCarryOver.forEach(day => {
-        const dayKey = format(day, 'yyyy-MM-dd');
-        const lastWeekDayKey = format(subDays(day, 7), 'yyyy-MM-dd');
-        const lastWeekSchedule = schedule[lastWeekDayKey];
-  
-        if (lastWeekSchedule && !newSchedule[dayKey]) {
-          const newDaySchedule: DailySchedule = {};
-          Object.keys(lastWeekSchedule).forEach(key => {
-            const slotName = key as SlotName;
-            const activities = lastWeekSchedule[slotName] as Activity[] | undefined;
-            if (Array.isArray(activities)) {
-              newDaySchedule[slotName] = activities.map(act => ({
-                ...act,
-                id: `${act.type}-${dayKey}-${Math.random()}`,
-                completed: false,
-                completedAt: undefined,
-                focusSessionInitialStartTime: undefined,
-                focusSessionStartTime: undefined,
-                focusSessionEndTime: undefined,
-                focusSessionPauses: [],
-              }));
-            }
-          });
-          newSchedule[dayKey] = newDaySchedule;
-          scheduleUpdated = true;
-        }
-      });
-  
-      if (scheduleUpdated) {
-        setSchedule(newSchedule);
-        toast({
-          title: "New Week, New Plan!",
-          description: "Your schedule from last week has been carried over.",
-        });
-      }
-    }
-  }, [isLoadingState, currentUser, schedule, setSchedule, toast]);
   
   useEffect(() => {
     if (playbackRequest) {
@@ -3424,12 +3298,18 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     downloadFromGitHub,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
-    schedule: populatedSchedule, setSchedule, dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked, activityDurations,
+    schedule, setSchedule, 
+    allUpskillLogs, setAllUpskillLogs, 
+    allDeepWorkLogs, setAllDeepWorkLogs, 
+    allWorkoutLogs, setAllWorkoutLogs,
+    brandingLogs, setBrandingLogs,
+    allLeadGenLogs, setAllLeadGenLogs,
+    allMindProgrammingLogs, setAllMindProgrammingLogs,
+    dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked,
     handleToggleComplete, handleLogLearning, logSubTaskTime, carryForwardTask, scheduleTaskFromMindMap, updateActivity,
     findRootTask,
     focusSessionModalOpen, setFocusSessionModalOpen, focusActivity, focusDuration, onOpenFocusModal, handleStartFocusSession,
     activeFocusSession, setActiveFocusSession,
-    allUpskillLogs, setAllUpskillLogs, allDeepWorkLogs, setAllDeepWorkLogs, allWorkoutLogs, setAllWorkoutLogs, brandingLogs, setBrandingLogs, allLeadGenLogs, setAllLeadGenLogs,
     workoutMode, setWorkoutMode, strengthTrainingMode, setStrengthTrainingMode, workoutPlanRotation, setWorkoutPlanRotation, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
     deepWorkDefinitions, setDeepWorkDefinitions, getDeepWorkNodeType, getUpskillNodeType, updateTaskDuration,
@@ -3442,7 +3322,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     mindProgrammingMode, setMindProgrammingMode,
     mindProgrammingPlans, setMindProgrammingPlans,
     mindProgrammingPlanRotation, setMindProgrammingPlanRotation,
-    allMindProgrammingLogs, setAllMindProgrammingLogs,
     resourceFolders, setResourceFolders,
     resources, setResources, deleteResource,
     pinnedFolderIds, setPinnedFolderIds,
@@ -3532,6 +3411,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     openMindsetWidget,
     isMindsetModalOpen, setIsMindsetModalOpen,
     toggleProjectBrandingStatus,
+    onRemoveActivity,
   };
 
   return (

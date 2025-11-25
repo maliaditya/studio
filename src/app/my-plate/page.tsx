@@ -1,12 +1,26 @@
 
 "use client";
 
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, getDay, getISOWeek, getISOWeekYear, differenceInDays, addDays, parseISO, subDays, isAfter, startOfToday, isBefore, isSameDay, startOfWeek, max, min, isValid } from 'date-fns';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from '@/lib/utils';
+import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart as PieChartIcon, Link as LinkIconLucide, Expand, LayoutDashboard, ChevronLeft, ChevronRight, Shield, PlusCircle, Trash2 } from 'lucide-react';
+import { KanbanPageContent } from '@/app/kanban/page';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { TimesheetPageContent } from '@/app/timesheet/page';
+import { Badge } from '@/components/ui/badge';
+import { format, getDay, getISOWeek, getISOWeekYear, differenceInDays, addDays, parseISO, subDays, startOfToday, isAfter, isBefore, isSameDay, startOfWeek, max, min, isValid, eachDayOfInterval } from 'date-fns';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { MindMapViewer } from '@/components/MindMapViewer';
@@ -22,11 +36,6 @@ import { DashboardStats } from '@/components/DashboardStats';
 import { ProductivitySnapshot, TimeAllocationChart } from '@/components/ProductivitySnapshot';
 import { TimeSlots } from '@/components/TimeSlots';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
-import { Button } from '@/components/ui/button';
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from '@/lib/utils';
-import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart as PieChartIcon, Link as LinkIconLucide, Expand, LayoutDashboard, ChevronLeft, ChevronRight, Shield, PlusCircle, Trash2 } from 'lucide-react';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { TaskContextModal } from '@/components/TaskContextModal';
@@ -45,20 +54,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { TodaysDietCard } from '@/components/ui/TodaysDietCard';
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog, SkillAcquisitionPlan, HabitEquation } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
-import { KanbanPageContent } from '@/app/kanban/page';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { TodaysDietCard } from '@/components/ui/TodaysDietCard';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { TimesheetPageContent } from '@/app/timesheet/page';
-import { Badge } from '@/components/ui/badge';
+
 
 const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
@@ -66,134 +67,90 @@ const slotEndHours: Record<string, number> = {
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
-const activityColorMapping: Record<string, string> = {
-    'Deep Work': 'hsl(var(--chart-1))',
-    'Learning': 'hsl(var(--chart-2))',
-    'Workout': 'hsl(var(--chart-3))',
-    'Branding': 'hsl(var(--chart-4))',
-    'Lead Gen': 'hsl(var(--chart-5))',
-    'Essentials': 'hsl(173, 58%, 39%)',
-    'Planning': 'hsl(197, 37%, 24%)',
-    'Tracking': 'hsl(43, 74%, 66%)',
-    'Interrupts': 'hsl(var(--destructive))',
-    'Distractions': 'hsl(var(--destructive))',
-    'Nutrition': 'hsl(340, 82%, 56%)',
-    'Free Time': 'hsl(var(--muted))',
-    'Mindset': 'hsl(var(--chart-5))',
-};
-
-const parseDurationToMinutes = (durationStr: string | undefined): number => {
-    if (!durationStr || typeof durationStr !== 'string') return 0;
-    
-    let totalMinutes = 0;
-    const trimmedStr = durationStr.trim();
-    
-    const hourMatch = trimmedStr.match(/(\d+(?:\.\d+)?)\s*h/);
-    const minMatch = trimmedStr.match(/(\d+)\s*m/);
-
-    if (hourMatch) {
-        totalMinutes += parseFloat(hourMatch[1]) * 60;
-    }
-    if (minMatch) {
-        totalMinutes += parseInt(minMatch[1], 10);
-    }
-
-    if (!hourMatch && !minMatch && /^\d+$/.test(trimmedStr.trim())) {
-        totalMinutes += parseInt(trimmedStr.trim(), 10);
-    }
-
-    return totalMinutes;
-};
-
-
 function MyPlatePageContent() {
-  const { 
-    currentUser, 
-    setWeightLogs,
-    goalWeight, setGoalWeight,
-    height, setHeight,
-    dateOfBirth, setDateOfBirth,
-    gender, setGender,
-    dietPlan, setDietPlan,
-    schedule, setSchedule,
-    
-    isAgendaDocked, setIsAgendaDocked,
-    handleToggleComplete, handleLogLearning,
-    workoutMode, workoutPlans, exerciseDefinitions,
-    workoutPlanRotation,
-    strengthTrainingMode,
-    upskillDefinitions, setUpskillDefinitions,
-    topicGoals, 
-    deepWorkDefinitions, setDeepWorkDefinitions,
-    leadGenDefinitions,
-    projects,
-    setProjects,
-    productizationPlans,
-    offerizationPlans,
-    onOpenIntentionPopup,
-    handleStartFocusSession,
-    setIsAudioPlaying,
-    openTaskContextPopup,
-    metaRules,
-    coreSkills,
-    openTodaysDietPopup,
-    getUpskillNodeType,
-    getDeepWorkNodeType,
-    skillDomains,
-    microSkillMap,
-    currentSlot,
-    weightLogs,
-    logWorkoutSet,
-    updateWorkoutSet,
-    deleteWorkoutSet,
-    removeExerciseFromWorkout,
-    swapWorkoutExercise,
-    swapWorkoutForDay,
-    resources,
-    patterns,
-    openRuleDetailPopup,
-    getDescendantLeafNodes,
-    settings,
-    activeFocusSession,
-    onOpenFocusModal,
-    toggleRoutine,
-    activeProjectIds,
-    abandonmentLogs, 
-    setAbandonmentLogs,
-    skillAcquisitionPlans,
-    setSkillAcquisitionPlans,
-    pillarEquations,
-    setPillarEquations,
-  } = useAuth();
+    const {
+        currentUser,
+        settings,
+        setSettings,
+        goalWeight,
+        setGoalWeight,
+        height,
+        setHeight,
+        dateOfBirth,
+        setDateOfBirth,
+        gender,
+        setGender,
+        dietPlan,
+        setDietPlan,
+        isAgendaDocked,
+        setIsAgendaDocked,
+        workoutMode,
+        workoutPlans,
+        exerciseDefinitions,
+        workoutPlanRotation,
+        strengthTrainingMode,
+        upskillDefinitions,
+        setUpskillDefinitions,
+        topicGoals,
+        deepWorkDefinitions,
+        setDeepWorkDefinitions,
+        leadGenDefinitions,
+        projects,
+        setProjects,
+        productizationPlans,
+        offerizationPlans,
+        onOpenIntentionPopup,
+        handleStartFocusSession,
+        setIsAudioPlaying,
+        openTaskContextPopup,
+        metaRules,
+        coreSkills,
+        openTodaysDietPopup,
+        getUpskillNodeType,
+        getDeepWorkNodeType,
+        skillDomains,
+        microSkillMap,
+        currentSlot,
+        logWorkoutSet,
+        updateWorkoutSet,
+        deleteWorkoutSet,
+        removeExerciseFromWorkout,
+        swapWorkoutExercise,
+        swapWorkoutForDay,
+        resources,
+        patterns,
+        openRuleDetailPopup,
+        getDescendantLeafNodes,
+        activeFocusSession,
+        onOpenFocusModal,
+        toggleRoutine,
+        activeProjectIds,
+        abandonmentLogs,
+        setAbandonmentLogs,
+        skillAcquisitionPlans,
+        setSkillAcquisitionPlans,
+        pillarEquations,
+        setPillarEquations,
+        missedSlotReviews,
+        setMissedSlotReviews,
+        dailyReviewLogs,
+        handleToggleDailyGoalCompletion,
+        weightLogs,
+        setWeightLogs,
+    } = useAuth();
   
-  // Local state that was previously in AuthContext
-  const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
-  const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
-  const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
-  const [brandingLogs, setBrandingLogs] = useState<DatedWorkout[]>([]);
-  const [allLeadGenLogs, setAllLeadGenLogs] = useState<DatedWorkout[]>([]);
-  const [allMindProgrammingLogs, setAllMindProgrammingLogs] = useState<DatedWorkout[]>([]);
-  
-  // This effect will load the logs from localStorage once, when the component mounts
-  useEffect(() => {
-    if (currentUser?.username) {
-        const dataString = localStorage.getItem(`lifeos_data_${currentUser.username}`);
-        if (dataString) {
-            const data = JSON.parse(dataString);
-            setAllUpskillLogs(data.allUpskillLogs || data.upskillLogs || []);
-            setAllDeepWorkLogs(data.allDeepWorkLogs || data.deepWorkLogs || []);
-            setAllWorkoutLogs(data.allWorkoutLogs || data.workoutLogs || []);
-            setBrandingLogs(data.brandingLogs || []);
-            setAllLeadGenLogs(data.allLeadGenLogs || []);
-            setAllMindProgrammingLogs(data.allMindProgrammingLogs || []);
-        }
-    }
-  }, [currentUser]);
-
-
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
+  
+  // Local state management for logs
+  const [schedule, setSchedule] = useAuth().scheduleState;
+  const [allUpskillLogs, setAllUpskillLogs] = useAuth().upskillLogsState;
+  const [allDeepWorkLogs, setAllDeepWorkLogs] = useAuth().deepWorkLogsState;
+  const [allWorkoutLogs, setAllWorkoutLogs] = useAuth().workoutLogsState;
+  const [brandingLogs, setBrandingLogs] = useAuth().brandingLogsState;
+  const [allLeadGenLogs, setAllLeadGenLogs] = useAuth().leadGenLogsState;
+  const [allMindProgrammingLogs, setAllMindProgrammingLogs] = useAuth().mindProgrammingLogsState;
   
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -246,12 +203,73 @@ function MyPlatePageContent() {
 
   const [currentTimetableWeek, setCurrentTimetableWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
 
-
-  // State for Modal content
-  const [todaysExercises, setTodaysExercises] = useState<WorkoutExercise[]>([]);
-  const [todaysMuscleGroups, setTodaysMuscleGroups] = useState<string[]>([]);
+  const populatedSchedule = useMemo(() => {
+    const newSchedule = JSON.parse(JSON.stringify(schedule));
   
-  // State for productivity stats
+    if (!settings.routines || settings.routines.length === 0) {
+      return schedule;
+    }
+  
+    const today = startOfDay(new Date());
+    const scheduleDates = Object.keys(newSchedule).map(parseISO).filter(isValid);
+    
+    const earliestDateInSchedule = scheduleDates.length > 0 ? min(scheduleDates) : today;
+    const latestDateInSchedule = scheduleDates.length > 0 ? max(scheduleDates) : today;
+    
+    const startDate = min([today, earliestDateInSchedule]);
+    const endDate = addDays(max([today, latestDateInSchedule]), 30);
+  
+    const dateRange = eachDayOfInterval({ start: startDate, end: endDate });
+  
+    dateRange.forEach(date => {
+      const dateKey = format(date, 'yyyy-MM-dd');
+      const dayOfWeek = getDay(date);
+      const daySchedule = newSchedule[dateKey] || {};
+      const activitiesInDay = new Set(
+        Object.values(daySchedule)
+              .flat()
+              .map((act: Activity) => `${act.details}_${act.type}_${act.slot}`)
+      );
+  
+      settings.routines.forEach((routine: Activity) => {
+          let shouldAdd = false;
+          if (routine.routine?.type === 'daily') {
+              shouldAdd = true;
+          } else if (routine.routine?.type === 'weekly') {
+              const routineCreationDate = routine.createdAt ? parseISO(routine.createdAt) : null;
+              if (routineCreationDate && isValid(routineCreationDate)) {
+                  if (getDay(routineCreationDate) === dayOfWeek) {
+                      shouldAdd = true;
+                  }
+              } else {
+                  shouldAdd = true; 
+              }
+          }
+
+          if (shouldAdd) {
+              const routineKey = `${routine.details}_${routine.type}_${routine.slot}`;
+              if (!activitiesInDay.has(routineKey)) {
+                  const slot = routine.slot as keyof DailySchedule;
+                  if (!daySchedule[slot]) daySchedule[slot] = [];
+                  (daySchedule[slot] as Activity[]).push({
+                      ...routine,
+                      id: `${routine.type}-${dateKey}-${Math.random()}`,
+                      completed: false,
+                      completedAt: undefined,
+                      focusSessionInitialStartTime: undefined,
+                      focusSessionStartTime: undefined,
+                      focusSessionEndTime: undefined,
+                      focusSessionPauses: [],
+                  });
+              }
+          }
+      });
+      newSchedule[dateKey] = daySchedule;
+    });
+  
+    return newSchedule;
+  }, [schedule, settings.routines]);
+  
   const [oneYearAgo, setOneYearAgo] = useState<Date | null>(null);
   
   const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
@@ -313,72 +331,89 @@ function MyPlatePageContent() {
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
   
-    const activityDurations = useMemo(() => {
-      const newDurations: Record<string, string> = {};
-      if (!schedule) return newDurations;
+  const activityDurations = useMemo(() => {
+    const newDurations: Record<string, string> = {};
+    if (!schedule) return newDurations;
   
-      const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
   
-      const formatDuration = (totalMinutes: number, suffix: string) => {
-          if (totalMinutes <= 0) return '';
-          const h = Math.floor(totalMinutes / 60);
-          const m = Math.round(totalMinutes % 60);
-          return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() + suffix;
-      };
+    const formatDuration = (totalMinutes: number, suffix: string) => {
+        if (totalMinutes <= 0) return '';
+        const h = Math.floor(totalMinutes / 60);
+        const m = Math.round(totalMinutes % 60);
+        return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() + suffix;
+    };
   
-      Object.values(schedule).flat().flatMap(day => Object.values(day).flat()).forEach(activity => {
-          if (!activity || !activity.id) return;
-          
-          let totalMinutes = 0;
-          let suffix = '';
+    Object.values(schedule).flat().flatMap(day => Object.values(day).flat()).forEach(activity => {
+      if (!activity || !activity.id) return;
+      
+      let totalMinutes = 0;
+      let suffix = '';
   
-          if (activity.completed) {
-              if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-                  const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
-                  const pauseDurationsMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
-                  totalMinutes = Math.round((totalSessionMs - pauseDurationsMs) / 60000);
-              } else {
-                  totalMinutes = activity.duration || 0;
-              }
-              suffix = ' logged';
-          } else {
-              switch(activity.type) {
-                  case 'upskill':
-                  case 'deepwork':
-                      if (activity.linkedEntityType === 'intention' || activity.linkedEntityType === 'curiosity') {
-                          const mainLogInstance = [...allUpskillLogs, ...allDeepWorkLogs].flatMap(l => l.exercises).find(ex => activity.taskIds?.includes(ex.id));
-                          if (mainLogInstance) {
-                            const taskDef = allDefs.get(mainLogInstance.definitionId);
-                            if (taskDef) {
-                                totalMinutes = calculateTotalEstimate(taskDef);
-                            }
-                          }
-                      } else {
-                          totalMinutes = 120;
-                      }
-                      break;
-                  case 'workout': totalMinutes = 90; break;
-                  case 'mindset': totalMinutes = 15; break;
-                  case 'branding': totalMinutes = 120; break;
-                  case 'planning': case 'tracking': totalMinutes = 30; break;
-                  case 'lead-generation': totalMinutes = 45; break;
-                  default: totalMinutes = activity.duration || 0;
-              }
-          }
-          
-          if (totalMinutes > 0) {
-              newDurations[activity.id] = formatDuration(totalMinutes, suffix);
-          }
-      });
+      if (activity.completed) {
+        if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+          const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
+          const pauseDurationsMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
+          totalMinutes = Math.round((totalSessionMs - pauseDurationsMs) / 60000);
+        } else {
+          totalMinutes = activity.duration || 0;
+        }
+        suffix = ' logged';
+      } else if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.details) {
+        const isUpskill = activity.type === 'upskill';
+        const getNodeType = isUpskill ? getUpskillNodeType : getDeepWorkNodeType;
+        const nodeType = activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention' 
+            ? activity.linkedEntityType 
+            : null;
+
+        if(nodeType) {
+            const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.name === activity.details);
+            if (def) {
+                totalMinutes = calculateTotalEstimate(def);
+            } else {
+                totalMinutes = 120;
+            }
+        } else {
+            totalMinutes = 120;
+        }
+
+      } else {
+        switch(activity.type) {
+            case 'workout': totalMinutes = 90; break;
+            case 'mindset': totalMinutes = 15; break;
+            case 'branding': totalMinutes = 120; break;
+            case 'planning': case 'tracking': totalMinutes = 30; break;
+            case 'lead-generation': totalMinutes = 45; break;
+            default: totalMinutes = activity.duration || 0;
+        }
+      }
+      
+      if (totalMinutes > 0) {
+        newDurations[activity.id] = formatDuration(totalMinutes, suffix);
+      }
+    });
   
-      return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, microSkillMap, allMindProgrammingLogs, allWorkoutLogs, allLeadGenLogs]);
+    return newDurations;
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getUpskillNodeType, getDeepWorkNodeType, allMindProgrammingLogs, allWorkoutLogs, allLeadGenLogs]);
 
 
   const slotDurations = useMemo(() => {
     const durations: Record<string, { logged: number; total: number }> = {};
-    const daySchedule = schedule[selectedDateKey];
+    const daySchedule = populatedSchedule[selectedDateKey];
     if (!daySchedule) return durations;
+
+    const parseDurationToMinutes = (durationStr: string | undefined): number => {
+        if (!durationStr || typeof durationStr !== 'string') return 0;
+        let totalMinutes = 0;
+        const hourMatch = durationStr.match(/(\d+)\s*h/);
+        const minMatch = durationStr.match(/(\d+)\s*m/);
+        if (hourMatch) totalMinutes += parseInt(hourMatch[1]) * 60;
+        if (minMatch) totalMinutes += parseInt(minMatch[1]);
+        if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
+             totalMinutes += parseInt(durationStr.trim());
+        }
+        return totalMinutes;
+    };
 
     for (const slotName of slotOrder) {
         let loggedTime = 0;
@@ -398,7 +433,7 @@ function MyPlatePageContent() {
         durations[slotName] = { logged: loggedTime, total: totalTime };
     }
     return durations;
-  }, [schedule, selectedDateKey, activityDurations]);
+  }, [populatedSchedule, selectedDateKey, activityDurations]);
 
 
     const handleAddActivity = (slotName: string, type: ActivityType, detailsOverride?: string) => {
@@ -652,6 +687,41 @@ function MyPlatePageContent() {
     setCurrentSlotForMeal(null);
   };
 
+  const onRemoveActivity = (slotName: string, activityId: string) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        if (newSchedule[selectedDateKey]) {
+            const daySchedule = { ...newSchedule[selectedDateKey] };
+            if (daySchedule[slotName]) {
+                daySchedule[slotName] = (daySchedule[slotName] as any[]).filter(act => act.id !== activityId);
+                newSchedule[selectedDateKey] = daySchedule;
+            }
+        }
+        return newSchedule;
+    });
+  };
+
+  const handleToggleComplete = (slotName: string, activityId: string, isCompleted: boolean) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        const daySchedule = { ...(newSchedule[todayKey] || {}) };
+        const activities = Array.isArray(daySchedule[slotName]) ? [...(daySchedule[slotName] as Activity[])] : [];
+        const activityIndex = activities.findIndex(act => act.id === activityId);
+
+        if (activityIndex > -1) {
+            activities[activityIndex] = { 
+                ...activities[activityIndex], 
+                completed: isCompleted,
+                completedAt: isCompleted ? Date.now() : undefined,
+             };
+            daySchedule[slotName] = activities;
+            newSchedule[todayKey] = daySchedule;
+        }
+        
+        return newSchedule;
+    });
+  };
 
   const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
     if (activity.completed) return;
@@ -724,7 +794,7 @@ function MyPlatePageContent() {
           name: def.name,
           category: def.category,
           loggedSets: [],
-          targetSets: 1,
+          targetSets: pageType === 'branding' ? 4 : 1,
           targetReps: pageType === 'branding' ? '4 stages' : '25',
           focusAreaIds: def.focusAreaIds,
       }));
@@ -887,7 +957,7 @@ function MyPlatePageContent() {
 
   const brandingStatus = useMemo(() => {
     const todayLog = brandingLogs.find(log => log.date === selectedDateKey);
-    const todaysBrandingTasks = schedule[selectedDateKey]?.branding || [];
+    const todaysBrandingTasks = populatedSchedule[selectedDateKey]?.branding || [];
     
     const inProgressItems = (todaysBrandingTasks || [])
         .filter(act => !act.completed)
@@ -944,10 +1014,10 @@ function MyPlatePageContent() {
         message,
         subMessage
     };
-  }, [brandingLogs, schedule, selectedDateKey, deepWorkDefinitions]);
+  }, [brandingLogs, populatedSchedule, selectedDateKey, deepWorkDefinitions]);
   
   const timeAllocationData = useMemo(() => {
-    const dailyActivities = schedule[selectedDateKey] ? Object.values(schedule[selectedDateKey]).flat() : [];
+    const dailyActivities = populatedSchedule[selectedDateKey] ? Object.values(populatedSchedule[selectedDateKey]).flat() : [];
     const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
     const activityNameMap: Record<ActivityType, string> = { 
       deepwork: 'Deep Work', 
@@ -970,19 +1040,19 @@ function MyPlatePageContent() {
         if (mappedName) {
           const isCompletedOrLogged = activity.completed || ['interrupt', 'distraction', 'planning', 'tracking', 'essentials', 'nutrition'].includes(activity.type);
           if (isCompletedOrLogged) {
-            const duration = parseDurationToMinutes(activityDurations[activity.id]);
+            const duration = (activity as Activity).duration || 0;
             if (!totals[mappedName]) {
               totals[mappedName] = { time: 0, activities: [] };
             }
             totals[mappedName].time += duration;
-            totals[mappedName].activities.push({ name: activity.details, duration });
+            totals[mappedName].activities.push({ name: (activity as Activity).details, duration });
           }
         }
       }
     });
   
     return Object.entries(totals).map(([name, data]) => ({ name, time: data.time, activities: data.activities }));
-  }, [schedule, selectedDateKey, activityDurations]);
+  }, [populatedSchedule, selectedDateKey]);
   
   const dashboardStats = useMemo(() => {
     const {
@@ -996,7 +1066,7 @@ function MyPlatePageContent() {
       productivityLevel,
     } = productivityStats;
   
-    const todaysActivities = schedule[selectedDateKey] || {};
+    const todaysActivities = populatedSchedule[selectedDateKey] || {};
     const hasPlannedOrCompleted = Object.values(todaysActivities).flat().length > 0;
     const allCompleted = hasPlannedOrCompleted && Object.values(todaysActivities).flat().every(a => a.completed);
   
@@ -1016,34 +1086,9 @@ function MyPlatePageContent() {
       brandingStatus,
       productivityLevel,
     };
-  }, [productivityStats, schedule, selectedDateKey, upcomingReleases, brandingStatus]);
-
-  const handleLogWeight = (weight: number, date: Date) => {
-    if (!currentUser || isNaN(weight) || weight <= 0) {
-      toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
-      return;
-    }
-    const year = getISOWeekYear(date);
-    const week = getISOWeek(date).toString().padStart(2, '0');
-    const weekKey = `${year}-W${week}`;
-
-    setWeightLogs(prevLogs => {
-        const logIndex = prevLogs.findIndex(log => log.date === weekKey);
-        const newLog: WeightLog = { date: weekKey, weight: weight };
-        
-        if (logIndex > -1) {
-            const updatedLogs = [...prevLogs];
-            updatedLogs[logIndex] = newLog;
-            return updatedLogs;
-        } else {
-            return [...prevLogs, newLog].sort((a,b) => a.date.localeCompare(b.date));
-        }
-    });
-
-    toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
-  };
+  }, [productivityStats, populatedSchedule, selectedDateKey, upcomingReleases, brandingStatus]);
   
-  const selectedDaySchedule = schedule[selectedDateKey] || {};
+  const selectedDaySchedule = populatedSchedule[selectedDateKey] || {};
   
   const onDragEnd = (result: DropResult) => {
     const { source, destination } = result;
@@ -1091,85 +1136,6 @@ function MyPlatePageContent() {
         };
     });
   };
-  
-  const onRemoveActivity = (slotName: string, activityId: string) => {
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        if (newSchedule[selectedDateKey]) {
-            const daySchedule = { ...newSchedule[selectedDateKey] };
-            if (daySchedule[slotName]) {
-                daySchedule[slotName] = (daySchedule[slotName] as any[]).filter(act => act.id !== activityId);
-                newSchedule[selectedDateKey] = daySchedule;
-            }
-        }
-        return newSchedule;
-    });
-  };
-
-  const handleSaveExcuse = () => {
-    if (!excuseModalState.planId || !newExcuse.trim()) {
-        if (!excuseModalState.planId) {
-            toast({ title: 'Error', description: 'Plan ID is missing.', variant: 'destructive' });
-        }
-        if (!newExcuse.trim()) {
-            toast({ title: 'Error', description: 'Excuse cannot be empty.', variant: 'destructive' });
-        }
-        return;
-    }
-    const newLogEntry: AbandonmentLog = {
-        id: `log_${Date.now()}`,
-        timestamp: Date.now(),
-        reason: newExcuse.trim(),
-        fear: newExcuseFear || undefined
-    };
-    setAbandonmentLogs(prev => {
-        const existingLogs = prev[excuseModalState.planId!] || [];
-        return {
-            ...prev,
-            [excuseModalState.planId!]: [...existingLogs, newLogEntry]
-        };
-    });
-    setNewExcuse('');
-    setNewExcuseFear('');
-  };
-  
-  const handleUpdateExcuse = (logId: string) => {
-    if (!excuseModalState.planId || !editedHandlingStrategy.trim()) {
-      return;
-    }
-  
-    setAbandonmentLogs(prev => {
-      const planLogs = prev[excuseModalState.planId!] || [];
-      const updatedLogs = planLogs.map(log => 
-        log.id === logId ? { ...log, handlingStrategy: editedHandlingStrategy.trim() } : log
-      );
-      return {
-        ...prev,
-        [excuseModalState.planId!]: updatedLogs
-      };
-    });
-  
-    setEditingExcuseLogId(null);
-    setEditedHandlingStrategy('');
-  };
-  
-  const handleDeleteExcuse = (planId: string, logId: string) => {
-    setAbandonmentLogs(prev => {
-        const planLogs = prev[planId] || [];
-        const updatedLogs = planLogs.filter(log => log.id !== logId);
-        if (updatedLogs.length > 0) {
-            return {
-                ...prev,
-                [planId]: updatedLogs
-            };
-        } else {
-            const newLogs = { ...prev };
-            delete newLogs[planId];
-            return newLogs;
-        }
-    });
-  };
-
 
   const activityInfo = editingActivity?.activity;
 
@@ -1298,7 +1264,7 @@ function MyPlatePageContent() {
                       stats={dashboardStats} 
                       timeAllocationData={timeAllocationData}
                       onOpenTimeAllocationModal={() => setIsTimeAllocationModalOpen(true)}
-                      todaysSchedule={schedule[selectedDateKey] || {}}
+                      todaysSchedule={populatedSchedule[selectedDateKey] || {}}
                       activityDurations={activityDurations}
                       showTimeAllocation={isAgendaDocked}
                   />
@@ -1306,7 +1272,7 @@ function MyPlatePageContent() {
                  <div className="lg:col-span-2 space-y-6">
                   {isAgendaDocked ? (
                       <TodaysScheduleCard
-                          schedule={schedule}
+                          schedule={populatedSchedule}
                           date={selectedDate}
                           activityDurations={activityDurations}
                           isAgendaDocked={isAgendaDocked}
@@ -1338,7 +1304,7 @@ function MyPlatePageContent() {
                   <WeightGoalCard 
                     weightLogs={weightLogs}
                     goalWeight={goalWeight}
-                    onLogWeight={handleLogWeight}
+                    onLogWeight={onLogWeight}
                     height={height}
                     dateOfBirth={dateOfBirth}
                     gender={gender}
@@ -1376,7 +1342,7 @@ function MyPlatePageContent() {
             </CardContent>
           </Card>
           
-          <ActivityHeatmap schedule={schedule} onDateSelect={(date) => setSelectedDate(parseISO(date))} />
+          <ActivityHeatmap schedule={populatedSchedule} onDateSelect={(date) => setSelectedDate(parseISO(date))} />
         </div>
       </DragDropContext>
       
