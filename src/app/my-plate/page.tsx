@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -71,6 +72,7 @@ function MyPlatePageContent() {
         currentUser,
         settings,
         setSettings,
+        weightLogs, setWeightLogs,
         goalWeight,
         setGoalWeight,
         height,
@@ -141,8 +143,6 @@ function MyPlatePageContent() {
         handleToggleDailyGoalCompletion,
         schedule, 
         setSchedule,
-        weightLogs, 
-        setWeightLogs,
     } = useAuth();
     
   const { toast } = useToast();
@@ -1612,7 +1612,7 @@ function MyPlatePageContent() {
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="outline" size="sm">
-                                <LinkIcon className="mr-2 h-4 w-4" /> Link Rules
+                                <LinkIconLucide className="mr-2 h-4 w-4" /> Link Rules
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-80">
@@ -1697,5 +1697,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
+    
 
     
