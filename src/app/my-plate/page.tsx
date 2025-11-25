@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -141,6 +141,8 @@ function MyPlatePageContent() {
         handleToggleDailyGoalCompletion,
         schedule, 
         setSchedule,
+        weightLogs, 
+        setWeightLogs,
     } = useAuth();
     
   const { toast } = useToast();
@@ -1068,7 +1070,8 @@ function MyPlatePageContent() {
         }
         
         const [movedActivity] = sourceActivities.splice(source.index, 1);
-        
+        movedActivity.slot = destSlotName as SlotName;
+    
         if (sourceSlotName === destSlotName) {
             sourceActivities.splice(destination.index, 0, movedActivity);
             daySchedule[sourceSlotName as SlotName] = sourceActivities;
