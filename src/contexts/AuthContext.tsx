@@ -11,7 +11,7 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import { format, addDays, parseISO, subDays, startOfDay, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay, getHours } from 'date-fns';
+import { format, addDays, parseISO, subDays, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay, getHours, startOfToday } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
@@ -1541,8 +1541,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const activityDurations = useMemo(() => {
-    return {};
-  }, []);
+    const newDurations: Record<string, string> = {};
+    if (!schedule) return newDurations;
+  
+    const formatDuration = (totalMinutes: number, suffix: string) => {
+        if (totalMinutes <= 0) return '';
+        const h = Math.floor(totalMinutes / 60);
+        const m = Math.round(totalMinutes % 60);
+        return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() + suffix;
+    };
+  
+    Object.values(schedule).flat().flatMap(day => Object.values(day).flat()).forEach(activity => {
+      if (!activity || !activity.id) return;
+      
+      let totalMinutes = 0;
+      let suffix = '';
+  
+      if (activity.completed) {
+        if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+          const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
+          const pauseDurationsMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
+          totalMinutes = Math.round((totalSessionMs - pauseDurationsMs) / 60000);
+        } else {
+          totalMinutes = activity.duration || 0;
+        }
+        suffix = ' logged';
+      } else if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.details) {
+        const nodeType = activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention' ? activity.linkedEntityType : null;
+        const isHighLevel = nodeType === 'intention' || nodeType === 'curiosity';
+
+        if(isHighLevel) {
+            const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.name === activity.details);
+            if (def) {
+                totalMinutes = calculateTotalEstimate(def);
+            } else {
+                totalMinutes = 120;
+            }
+        } else {
+            totalMinutes = 120;
+        }
+
+      } else {
+        switch(activity.type) {
+            case 'workout': totalMinutes = 90; break;
+            case 'mindset': totalMinutes = 15; break;
+            case 'branding': totalMinutes = 120; break;
+            case 'planning': case 'tracking': totalMinutes = 30; break;
+            case 'lead-generation': totalMinutes = 45; break;
+            default: totalMinutes = activity.duration || 0;
+        }
+      }
+      
+      if (totalMinutes > 0) {
+        newDurations[activity.id] = formatDuration(totalMinutes, suffix);
+      }
+    });
+  
+    return newDurations;
+  }, [schedule, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
   
   const handleToggleComplete = useCallback((slotName: string, activityId: string, isCompleted: boolean) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -3513,6 +3569,5 @@ export const useAuth = (): AuthContextType => {
   return context;
 };
 
-  
 
-    
+  
