@@ -12,6 +12,7 @@ import { isToday, format } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from './ui/scroll-area';
 import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, History } from 'lucide-react';
+import { AgendaWidgetItem } from './AgendaWidgetItem';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -94,7 +95,7 @@ export function TimeSlots({
   onActivityClick,
   slotDurations,
 }: TimeSlotsProps) {
-  const { onRemoveActivity, handleToggleComplete, toggleRoutine } = useAuth();
+  const { onRemoveActivity, handleToggleComplete, toggleRoutine, onOpenTaskContext, onOpenHabitPopup } = useAuth();
   
   const slots = [
     { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
@@ -112,8 +113,6 @@ export function TimeSlots({
         const activities = (schedule[slot.name as keyof DailySchedule] as Activity[]) || [];
         const slotData = slotDurations[slot.name] || { logged: 0, total: 0 };
         const { logged: loggedTime } = slotData;
-        const freeTime = 240 - loggedTime;
-        const progress = (loggedTime / 240) * 100;
         
         const isCurrentSlotToday = isToday(date) && currentSlot === slot.name;
 
@@ -159,8 +158,8 @@ export function TimeSlots({
                           onActivityClick={onActivityClick}
                           onRemoveActivity={(slotName, id) => onRemoveActivity(slotName, id, date)}
                           setRoutine={toggleRoutine}
-                          onOpenTaskContext={(activityId, event) => { /* logic */ }}
-                          onOpenHabitPopup={(habitId, event) => { /* logic */ }}
+                          onOpenTaskContext={onOpenTaskContext}
+                          onOpenHabitPopup={onOpenHabitPopup}
                           context="timeslot"
                         />
                       ))
@@ -184,9 +183,8 @@ export function TimeSlots({
                 <div className="flex justify-between items-center">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
-                                <PlusCircle className="h-4 w-4" />
-                                <span className="sr-only">Add Activity</span>
+                            <Button variant="ghost" className="w-full justify-start h-8">
+                                <PlusCircle className="mr-2 h-4 w-4" /> Add Activity
                             </Button>
                         </DropdownMenuTrigger>
                         <AddActivityMenu onAddActivity={(type, details) => onAddActivity(slot.name, type, details)} />
@@ -201,5 +199,3 @@ export function TimeSlots({
     </>
   );
 }
-
-    
