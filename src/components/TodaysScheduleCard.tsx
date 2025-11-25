@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -37,12 +36,10 @@ interface TodaysScheduleCardProps {
   onLogLearning: (activity: Activity, duration: number) => void;
   onStartWorkoutLog: (activity: Activity) => void;
   onStartLeadGenLog: (activity: Activity) => void;
-  onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onOpenFocusModal: (activity: Activity) => boolean;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
   currentSlot: string;
-  onRemoveActivity: (slotName: string, activityId: string) => void;
 }
 
 export function TodaysScheduleCard({ 
@@ -54,14 +51,12 @@ export function TodaysScheduleCard({
   onLogLearning,
   onStartWorkoutLog,
   onStartLeadGenLog,
-  onToggleComplete,
   onOpenFocusModal,
   onOpenTaskContext,
   onOpenHabitPopup,
   currentSlot,
-  onRemoveActivity,
 }: TodaysScheduleCardProps) {
-  const { currentUser, carryForwardTask, settings, setSettings, habitCards, toggleRoutine, handleLinkHabit } = useAuth();
+  const { currentUser, carryForwardTask, settings, setSettings, habitCards, toggleRoutine, handleLinkHabit, handleToggleComplete, onRemoveActivity } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
@@ -274,13 +269,13 @@ export function TodaysScheduleCard({
                         key={activity.id}
                         activity={activity}
                         date={date}
-                        onToggleComplete={onToggleComplete}
+                        onToggleComplete={handleToggleComplete}
                         onActivityClick={(slot, act, e) => {
                             if (act.type === 'deepwork' || act.type === 'upskill' || act.type === 'branding') {
                                 onOpenFocusModal(act);
                             }
                         }}
-                        onRemoveActivity={onRemoveActivity}
+                        onRemoveActivity={(slot, id) => onRemoveActivity(slot, id, date)}
                         setRoutine={toggleRoutine}
                         onOpenTaskContext={onOpenTaskContext}
                         onOpenHabitPopup={onOpenHabitPopup}
@@ -314,3 +309,5 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
+
+    

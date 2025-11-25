@@ -1,30 +1,17 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, WorkoutSchedulingMode, ExerciseDefinition, CoreSkill, Stopper, MissedSlotReview } from '@/types/workout';
-import {
-  CheckCircle2, Circle, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, ChevronLeft, Trash2
-} from 'lucide-react';
+import React from 'react';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { DailySchedule, Activity, ActivityType, SlotName, RecurrenceRule } from '@/types/workout';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays, isToday, isBefore, startOfToday, parseISO, getHours, differenceInDays, isAfter } from 'date-fns';
+import { isToday, format } from 'date-fns';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from './ui/scroll-area';
-import { useRouter } from 'next/navigation';
-import { getExercisesForDay } from '@/lib/workoutUtils';
-import { useToast } from '@/hooks/use-toast';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuCheckboxItem, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from './ui/separator';
-import { Progress } from './ui/progress';
-import { Badge } from './ui/badge';
-import { MissedSlotModal } from './MissedSlotModal';
-import { Dialog, DialogHeader, DialogTitle, DialogDescription as DialogDescriptionComponent, DialogContent } from './ui/dialog';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, History } from 'lucide-react';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -88,128 +75,15 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
     );
 };
 
-export const AgendaWidgetItem: React.FC<{
-    activity: Activity & { slot: SlotName };
-    date: Date;
-    onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
-    onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
-    onRemoveActivity: (slotName: string, activityId: string) => void;
-    setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
-    onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
-    onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
-    context: 'timeslot' | 'agenda';
-  }> = ({
-  activity, date, onToggleComplete, onActivityClick, onRemoveActivity, setRoutine, onOpenTaskContext, onOpenHabitPopup, context
-}) => {
-    const { activityDurations, handleLinkHabit, habitCards } = useAuth();
-    const duration = activityDurations[activity.id] || null;
-
-    return (
-        <li
-            onClick={(e) => onActivityClick(activity.slot, activity, e)}
-            className={cn(
-                "group flex items-start gap-3 p-2 rounded-lg transition-colors cursor-pointer",
-                activity.completed ? 'bg-green-100/50 dark:bg-green-900/20' : 'hover:bg-muted/50'
-            )}
-        >
-            <div className="flex items-center gap-2 pt-0.5">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleComplete(activity.slot, activity.id, !activity.completed);
-                    }}
-                >
-                    {activity.completed ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    ) : (
-                        <Circle className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
-                    )}
-                </Button>
-            </div>
-            <div className="flex-grow min-w-0">
-                <p className={cn("font-medium text-sm", activity.completed && 'line-through text-muted-foreground')}>
-                    {activity.details}
-                </p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">{activityIcons[activity.type]} {activity.type.replace('-', ' ')}</span>
-                    {duration && <span>• {duration}</span>}
-                </div>
-            </div>
-             {context === 'timeslot' && (
-                <div className="flex flex-col items-end opacity-0 group-hover:opacity-100 transition-opacity -space-y-1">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="xs" className="h-6 px-1.5">
-                                <Repeat className="h-3 w-3"/>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                        <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
-                        {activity.isRoutine && <DropdownMenuSeparator />}
-                        {activity.isRoutine && <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">Remove Routine</DropdownMenuItem>}
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="xs" className="h-6 px-1.5">
-                                <LinkIcon className="h-3 w-3"/>
-                            </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            <DropdownMenuLabel>Link Habit</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <ScrollArea className="h-[200px]">
-                            {habitCards.map(habit => (
-                                <DropdownMenuCheckboxItem
-                                    key={habit.id}
-                                    checked={(activity.habitEquationIds || []).includes(habit.id)}
-                                    onCheckedChange={() => handleLinkHabit(activity.id, habit.id, date)}
-                                >
-                                    {habit.name}
-                                </DropdownMenuCheckboxItem>
-                            ))}
-                            </ScrollArea>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Button variant="ghost" size="xs" className="h-6 px-1.5" onClick={(e) => onOpenTaskContext(activity.id, e)}>
-                        <GitBranch className="h-3 w-3"/>
-                    </Button>
-                    <Button variant="ghost" size="xs" className="text-destructive hover:text-destructive h-6 px-1.5" onClick={() => onRemoveActivity(activity.slot, activity.id)}>
-                        <Trash2 className="h-3 w-3"/>
-                    </Button>
-                </div>
-            )}
-        </li>
-    );
-};
-AgendaWidgetItem.displayName = 'AgendaWidgetItem';
-
-
 interface TimeSlotsProps {
   date: Date;
   schedule: DailySchedule;
   currentSlot: string;
   remainingTime: string;
   onAddActivity: (slotName: string, type: ActivityType, details: string) => void;
-  onRemoveActivity: (slotName: string, activityId: string) => void;
-  onToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
   onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
   slotDurations: Record<string, { logged: number; total: number }>;
-  setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
-  deepWorkDefinitions: ExerciseDefinition[];
-  upskillDefinitions: ExerciseDefinition[];
 }
-
-const pillars = [
-    { name: 'Mind', attributes: ['Focus', 'Learning', 'Creativity'] },
-    { name: 'Body', attributes: ['Health', 'Strength', 'Energy'] },
-    { name: 'Heart', attributes: ['Relationships', 'Emotional Health'] },
-    { name: 'Spirit', attributes: ['Meaning', 'Contribution', 'Legacy'] },
-];
 
 export function TimeSlots({
   date,
@@ -217,278 +91,11 @@ export function TimeSlots({
   currentSlot,
   remainingTime,
   onAddActivity,
-  onRemoveActivity,
-  onToggleComplete,
   onActivityClick,
   slotDurations,
-  setRoutine,
 }: TimeSlotsProps) {
-
-  const { settings, setSettings, habitCards, mechanismCards, toggleRoutine, handleLinkHabit, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, allWorkoutLogs, metaRules, openRuleDetailPopup, openPillarPopup, missedSlotReviews, setMissedSlotReviews, setSchedule, schedule: fullSchedule, coreSkills, microSkillMap, allUpskillLogs, allDeepWorkLogs, deepWorkDefinitions, upskillDefinitions, purposeData, offerizationPlans, dailyReviewLogs, handleToggleDailyGoalCompletion } = useAuth();
-  const [missedSlotModalState, setMissedSlotModalState] = useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
-  const [optionsModalSlot, setOptionsModalSlot] = useState<string | null>(null);
-  const [lastXDays, setLastXDays] = useState(5);
-  const { toast } = useToast();
-
-  const handleLinkRule = (slotName: SlotName, ruleId: string) => {
-    const currentSlotRules = settings.slotRules?.[slotName] || [];
-    const isLinked = currentSlotRules.includes(ruleId);
-    
-    const newRules = isLinked
-        ? currentSlotRules.filter(id => id !== ruleId)
-        : [...currentSlotRules, ruleId];
-        
-    setSettings(prev => ({
-      ...prev,
-      slotRules: {
-        ...(prev.slotRules || {}),
-        [slotName]: newRules
-      }
-    }));
-  };
-
-  const handleOpenReviewModal = (slotName: string) => {
-    const allTasksInSlot = (schedule[slotName as keyof DailySchedule] as Activity[] | undefined) || [];
-    const incompleteTasks = allTasksInSlot.filter(a => a && !a.completed);
-    setMissedSlotModalState({ isOpen: true, slotName: slotName, allTasks: allTasksInSlot, incompleteTasks: incompleteTasks });
-  };
+  const { onRemoveActivity, handleToggleComplete, toggleRoutine } = useAuth();
   
-  const handleSaveMissedSlotReview = (review: MissedSlotReview, newDistraction?: Activity) => {
-    setMissedSlotReviews(prev => ({
-        ...prev,
-        [review.id]: review
-    }));
-
-    if (newDistraction) {
-        const todayKey = format(new Date(), 'yyyy-MM-dd');
-        setSchedule(prev => {
-            const newDaySchedule = { ...(prev[todayKey] || {}) };
-            const currentActivities = Array.isArray(newDaySchedule[newDistraction.slot]) 
-                ? newDaySchedule[newDistraction.slot] as Activity[]
-                : [];
-            
-            newDaySchedule[newDistraction.slot] = [...currentActivities, newDistraction];
-            
-            return { ...prev, [todayKey]: newDaySchedule };
-        });
-        toast({ title: 'Distraction Logged', description: 'Your unscheduled time has been logged as a distraction.' });
-    }
-
-    setMissedSlotModalState({ isOpen: false, slotName: '', incompleteTasks: [], allTasks: [] });
-  };
-  
-  const pastCompletedTasks = useMemo(() => {
-    if (!optionsModalSlot) return [];
-  
-    const loggedDates = new Set<string>();
-    const dateEntries = Object.entries(fullSchedule);
-  
-    for (let i = dateEntries.length - 1; i >= 0; i--) {
-      const [dateKey, daySchedule] = dateEntries[i];
-      const scheduleDate = parseISO(dateKey);
-      if (isBefore(scheduleDate, startOfToday())) {
-        const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
-        if (activities.some(activity => activity.completed)) {
-          loggedDates.add(dateKey);
-        }
-      }
-      if (loggedDates.size >= lastXDays) break;
-    }
-
-    const tasks = new Map<string, Activity>();
-  
-    loggedDates.forEach(dateKey => {
-      const daySchedule = fullSchedule[dateKey];
-      const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
-      
-      activities.forEach(activity => {
-        if (activity.completed && activity.type !== 'interrupt') {
-            const findRootSpecialization = (taskDef: ExerciseDefinition): string | null => {
-                const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === taskDef.category);
-                if (!microSkillInfo) return null;
-                
-                const coreSkill = coreSkills.find(cs => cs.name === microSkillInfo.coreSkillName);
-                if (!coreSkill || coreSkill.type !== 'Specialization') return null;
-          
-                let rootSpec = coreSkill;
-                while (rootSpec.parentId) {
-                    const parent = coreSkills.find(cs => cs.id === rootSpec.parentId);
-                    if (parent && parent.type === 'Specialization') {
-                        rootSpec = parent;
-                    } else {
-                        break;
-                    }
-                }
-                return rootSpec.name;
-            };
-
-            let taskDetail = activity.details;
-            let taskKey: string;
-            
-            if ((activity.type === 'upskill' || activity.type === 'deepwork')) {
-                const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-                const taskLog = allLogs.flatMap(log => log.exercises).find(ex => activity.taskIds?.includes(ex.id));
-                let definition;
-                if (taskLog) {
-                    definition = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.id === taskLog.definitionId);
-                }
-                if (definition) {
-                    const specializationName = findRootSpecialization(definition);
-                    if (specializationName) {
-                        taskDetail = specializationName;
-                    } else {
-                        taskDetail = definition.name;
-                    }
-                }
-            }
-          
-            taskKey = `${taskDetail.trim().toLowerCase()}-${activity.type}`;
-            if (!tasks.has(taskKey)) {
-                tasks.set(taskKey, { ...activity, details: taskDetail });
-            }
-        }
-      });
-    });
-  
-    return Array.from(tasks.values());
-  }, [fullSchedule, optionsModalSlot, lastXDays, deepWorkDefinitions, upskillDefinitions, microSkillMap, allUpskillLogs, allDeepWorkLogs, coreSkills]);
-  
-  const loggedResistances = useMemo(() => {
-    if (!optionsModalSlot) return [];
-  
-    const slotTimes = {
-      'Late Night': { start: 0, end: 4 }, 'Dawn': { start: 4, end: 8 },
-      'Morning': { start: 8, end: 12 }, 'Afternoon': { start: 12, end: 16 },
-      'Evening': { start: 16, end: 20 }, 'Night': { start: 20, end: 24 }
-    };
-    const slot = slotTimes[optionsModalSlot as SlotName];
-    if (!slot) return [];
-
-    const resistancesMap = new Map<string, { text: string; type: 'Urge' | 'Resistance' | 'Distraction'; count: number; dates: Set<string> }>();
-    const allLinks: { stopper: Stopper; isUrge: boolean }[] = [];
-
-    habitCards.forEach(habit => {
-        const negMech = mechanismCards.find(m => m.id === habit.response?.resourceId);
-        if (negMech?.urges) allLinks.push(...negMech.urges.map(s => ({ stopper: s, isUrge: true })));
-        if (habit.urges) allLinks.push(...habit.urges.map(s => ({ stopper: s, isUrge: true })));
-
-        const posMech = mechanismCards.find(m => m.id === habit.newResponse?.resourceId);
-        if (posMech?.resistances) allLinks.push(...posMech.resistances.map(s => ({ stopper: s, isUrge: false })));
-        if (habit.resistances) allLinks.push(...habit.resistances.map(s => ({ stopper: s, isUrge: false })));
-    });
-
-    allLinks.forEach(link => {
-        (link.stopper.timestamps || []).forEach((ts: number) => {
-            const eventHour = getHours(new Date(ts));
-            if (eventHour >= slot.start && eventHour < slot.end) {
-                const key = link.stopper.text;
-                if (!resistancesMap.has(key)) {
-                    resistancesMap.set(key, { text: key, type: link.isUrge ? 'Urge' : 'Resistance', count: 0, dates: new Set() });
-                }
-                const entry = resistancesMap.get(key)!;
-                entry.count += 1;
-                entry.dates.add(format(new Date(ts), 'yyyy-MM-dd'));
-            }
-        });
-    });
-    
-    Object.entries(fullSchedule).forEach(([dateKey, daySchedule]) => {
-      const activities = (daySchedule[optionsModalSlot as SlotName] as Activity[] | undefined) || [];
-      activities.forEach(activity => {
-          if (activity.type === 'distraction' && activity.completedAt) {
-              const eventHour = getHours(new Date(activity.completedAt));
-              if (eventHour >= slot.start && eventHour < slot.end) {
-                  const key = activity.details;
-                  if (!resistancesMap.has(key)) {
-                      resistancesMap.set(key, { text: key, type: 'Distraction', count: 0, dates: new Set() });
-                  }
-                  const entry = resistancesMap.get(key)!;
-                  entry.count += 1;
-                  entry.dates.add(dateKey);
-              }
-          }
-      });
-    });
-
-    return Array.from(resistancesMap.values()).sort((a,b) => b.count - a.count);
-  }, [optionsModalSlot, habitCards, mechanismCards, fullSchedule]);
-
-  const routineTasksForSlot = useMemo(() => {
-    if (!optionsModalSlot) return [];
-    return (settings.routines || []).filter(task => task.slot === optionsModalSlot);
-  }, [optionsModalSlot, settings.routines]);
-  
-  const dailyLearningGoals = useMemo(() => {
-    const goals: { specName: string, resourceName: string, dailyTarget: string, progress: string, resourceId: string }[] = [];
-    const today = startOfToday();
-    
-    const plannedSpecializations = Object.entries(offerizationPlans || {})
-        .filter(([, plan]) => plan.learningPlan && ((plan.learningPlan.audioVideoResources?.length || 0) > 0 || (plan.learningPlan.bookWebpageResources?.length || 0) > 0))
-        .map(([specId]) => coreSkills.find(s => s.id === specId))
-        .filter((spec): spec is NonNullable<typeof spec> => !!spec);
-        
-    plannedSpecializations.forEach(spec => {
-        const plan = offerizationPlans[spec.id]?.learningPlan;
-        if (!plan) return;
-        
-        const completed = spec.skillAreas.flatMap(sa => sa.microSkills).reduce((acc, ms) => {
-            acc.items += ms.completedItems || 0;
-            acc.hours += ms.completedHours || 0;
-            acc.pages += ms.completedPages || 0;
-            return acc;
-        }, { items: 0, hours: 0, pages: 0 });
-
-        const calculateTarget = (total: number | null, completed: number, start: string | null | undefined, end: string | null | undefined) => {
-            if (!total || !start || !end) return null;
-            const startDate = parseISO(start);
-            const endDate = parseISO(end);
-            
-            if (isAfter(startDate, endDate) || isBefore(endDate, today)) return null;
-            
-            const remainingWork = total - completed;
-            const relevantStartDate = isBefore(startDate, today) ? today : startDate;
-            const remainingDays = differenceInDays(endDate, relevantStartDate) + 1;
-        
-            if (remainingWork <= 0 || remainingDays <= 0) return null;
-        
-            return (remainingWork / remainingDays).toFixed(1);
-        };
-
-        (plan.audioVideoResources || []).forEach(res => {
-            const targetItems = calculateTarget(res.totalItems, completed.items, res.startDate, res.completionDate);
-            const targetHours = calculateTarget(res.totalHours, completed.hours, res.startDate, res.completionDate);
-            let dailyTarget = [];
-            if (targetItems) dailyTarget.push(`${targetItems} items/day`);
-            if (targetHours) dailyTarget.push(`${targetHours} h/day`);
-            
-            if (dailyTarget.length > 0) {
-                goals.push({
-                    specName: spec.name,
-                    resourceName: res.name,
-                    dailyTarget: dailyTarget.join(' & '),
-                    progress: `${completed.items}/${res.totalItems} items & ${completed.hours.toFixed(1)}/${res.totalHours}h`,
-                    resourceId: res.id,
-                });
-            }
-        });
-
-        (plan.bookWebpageResources || []).forEach(res => {
-            const targetPages = calculateTarget(res.totalPages, completed.pages, res.startDate, res.completionDate);
-            if (targetPages) {
-                goals.push({
-                    specName: spec.name,
-                    resourceName: res.name,
-                    dailyTarget: `${targetPages} pgs/day`,
-                    progress: `${completed.pages}/${res.totalPages} pages`,
-                    resourceId: res.id,
-                });
-            }
-        });
-    });
-    
-    return goals;
-}, [offerizationPlans, coreSkills]);
-
   const slots = [
     { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
     { name: 'Dawn', time: '4am - 8am', endHour: 8, icon: <Sunrise className="h-5 w-5 text-orange-400" /> },
@@ -497,6 +104,7 @@ export function TimeSlots({
     { name: 'Evening', time: '4pm - 8pm', endHour: 20, icon: <Sunset className="h-5 w-5 text-purple-500" /> },
     { name: 'Night', time: '8pm - 12am', endHour: 24, icon: <MoonStar className="h-5 w-5 text-indigo-500" /> }
   ];
+
   return (
     <>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -508,11 +116,6 @@ export function TimeSlots({
         const progress = (loggedTime / 240) * 100;
         
         const isCurrentSlotToday = isToday(date) && currentSlot === slot.name;
-        const isPastSlot = isBefore(date, startOfToday()) || (isToday(date) && new Date().getHours() >= slot.endHour);
-        
-        const linkedRules = metaRules.filter(rule => 
-            settings.slotRules?.[slot.name as SlotName]?.includes(rule.id)
-        );
 
         return (
           <Card
@@ -536,13 +139,10 @@ export function TimeSlots({
                     {remainingTime}
                   </div>
                 ) : (
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenReviewModal(slot.name)}>
+                  <div className="h-7 w-7 flex items-center justify-center">
                     {slot.icon}
-                  </Button>
+                  </div>
                 )}
-                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setOptionsModalSlot(slot.name)}>
-                    <History className="h-4 w-4" />
-                </Button>
               </div>
             </CardHeader>
             <CardContent className="flex flex-col flex-grow justify-between min-h-[8rem] p-3">
@@ -555,10 +155,10 @@ export function TimeSlots({
                           key={activity.id}
                           activity={{...activity, slot: slot.name as SlotName}}
                           date={date}
-                          onToggleComplete={onToggleComplete}
+                          onToggleComplete={handleToggleComplete}
                           onActivityClick={onActivityClick}
-                          onRemoveActivity={onRemoveActivity}
-                          setRoutine={setRoutine}
+                          onRemoveActivity={(slotName, id) => onRemoveActivity(slotName, id, date)}
+                          setRoutine={toggleRoutine}
                           onOpenTaskContext={(activityId, event) => { /* logic */ }}
                           onOpenHabitPopup={(habitId, event) => { /* logic */ }}
                           context="timeslot"
@@ -581,11 +181,6 @@ export function TimeSlots({
                 </ScrollArea>
               </div>
               <div className="flex-shrink-0 mt-2 space-y-2">
-                <Progress value={progress} className="h-2" />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>{loggedTime} min logged</span>
-                    <span>{freeTime} min {isPastSlot ? 'untracked' : 'free'}</span>
-                </div>
                 <div className="flex justify-between items-center">
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -603,215 +198,8 @@ export function TimeSlots({
         )
       })}
     </div>
-    <MissedSlotModal 
-      state={missedSlotModalState}
-      onOpenChange={(isOpen) => setMissedSlotModalState(prev => ({...prev, isOpen}))}
-      onSave={handleSaveMissedSlotReview}
-    />
-     {optionsModalSlot && (
-        <Dialog open={!!optionsModalSlot} onOpenChange={() => setOptionsModalSlot(null)}>
-            <DialogContent className="grid grid-cols-[2fr_1fr] max-w-7xl h-[90vh] gap-6 p-0">
-                <div className="col-span-1 flex flex-col gap-6 pl-6 py-6 min-h-0">
-                    <DialogHeader>
-                      <DialogTitle>Your Current Options for {optionsModalSlot}</DialogTitle>
-                    </DialogHeader>
-                    <div className="flex flex-col gap-4 flex-grow min-h-0">
-                      <div className="flex flex-col gap-4">
-                        <div className="flex justify-between items-center">
-                            <h3 className="font-semibold text-lg">Past Completed Tasks</h3>
-                            <div className="flex items-center gap-2 text-sm">
-                                <Label htmlFor="last-x-days-modal" className="text-muted-foreground flex-shrink-0">Last</Label>
-                                <Input 
-                                    id="last-x-days-modal"
-                                    type="number"
-                                    value={lastXDays}
-                                    onChange={e => setLastXDays(Math.max(1, parseInt(e.target.value) || 1))}
-                                    className="w-16 h-8"
-                                />
-                                <span className="text-muted-foreground">logged days</span>
-                            </div>
-                        </div>
-                          <ScrollArea className="h-40">
-                            {pastCompletedTasks.length > 0 ? (
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pr-4">
-                                    {pastCompletedTasks.map(task => (
-                                        <Card key={task.id}>
-                                            <CardHeader className="p-4 relative">
-                                                <div className="absolute top-2 right-2">
-                                                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => {
-                                                            onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
-                                                            setOptionsModalSlot(null);
-                                                        }}>
-                                                        <PlusCircle className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                                <CardTitle className="text-base flex items-center gap-2">
-                                                    {activityIcons[task.type]}
-                                                    {task.details}
-                                                </CardTitle>
-                                                <CardDescription>
-                                                    <Badge variant="outline" className="capitalize">{task.type.replace('-', ' ')}</Badge>
-                                                </CardDescription>
-                                            </CardHeader>
-                                        </Card>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-center h-full border rounded-md">
-                                    <p className="text-sm text-muted-foreground text-center">No completed tasks in this slot for the selected period.</p>
-                                </div>
-                            )}
-                          </ScrollArea>
-                      </div>
-                       <div className="flex flex-col gap-4">
-                          <h3 className="font-semibold text-lg">Past Friction</h3>
-                          <ScrollArea className="h-40">
-                              {loggedResistances.length > 0 ? (
-                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pr-4">
-                                      {loggedResistances.map(item => (
-                                          <Card key={item.text}>
-                                              <CardContent className="p-3">
-                                                  <p className="text-sm font-medium">{item.text}</p>
-                                                  <div className="flex justify-between items-center mt-1">
-                                                      <Badge variant={item.type === 'Urge' ? 'destructive' : item.type === 'Distraction' ? 'secondary' : 'outline'} className="capitalize text-xs">{item.type}</Badge>
-                                                      <span className="text-xs text-muted-foreground">Logged {item.count} time(s)</span>
-                                                  </div>
-                                              </CardContent>
-                                          </Card>
-                                      ))}
-                                  </div>
-                              ) : (
-                                  <div className="flex items-center justify-center h-full border rounded-md">
-                                      <p className="text-sm text-muted-foreground text-center">No friction logged in this slot.</p>
-                                  </div>
-                              )}
-                          </ScrollArea>
-                      </div>
-                      <div className="flex flex-col gap-4">
-                          <h3 className="font-semibold text-lg">Daily Learning Goals</h3>
-                           <ScrollArea className="h-40">
-                              {dailyLearningGoals.length > 0 ? (
-                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pr-4">
-                                  {dailyLearningGoals.map((goal, index) => {
-                                      const todaysCompletions = dailyReviewLogs.find(log => log.date === format(new Date(), 'yyyy-MM-dd'))?.completedResourceIds || [];
-                                      const isCompletedToday = todaysCompletions.includes(goal.resourceId);
-                                      return (
-                                          <Card key={index}>
-                                              <CardContent className="p-3">
-                                                  <div className="flex items-start">
-                                                      <Checkbox
-                                                          id={`goal-check-modal-${goal.resourceId}`}
-                                                          checked={isCompletedToday}
-                                                          onCheckedChange={() => handleToggleDailyGoalCompletion(goal.resourceId)}
-                                                          className="mr-2 mt-0.5"
-                                                      />
-                                                      <div className="flex-grow">
-                                                          <p className={cn("font-semibold text-sm", isCompletedToday && "line-through text-muted-foreground")} title={goal.resourceName}>{goal.resourceName}</p>
-                                                          <p className={cn("text-xs text-muted-foreground", isCompletedToday && "line-through")}>{goal.specName}</p>
-                                                          <div className="flex justify-between items-center mt-1 pt-1 border-t">
-                                                              <Badge variant="secondary" className={cn("text-xs", isCompletedToday && "line-through")}>{goal.progress}</Badge>
-                                                              <Badge variant="default" className={cn("text-xs", isCompletedToday && "line-through")}>{goal.dailyTarget}</Badge>
-                                                          </div>
-                                                      </div>
-                                                  </div>
-                                              </CardContent>
-                                          </Card>
-                                      )
-                                  })}
-                                  </div>
-                              ) : (
-                                   <div className="flex items-center justify-center h-full border rounded-md">
-                                      <p className="text-sm text-muted-foreground text-center">No active daily learning goals.</p>
-                                  </div>
-                              )}
-                          </ScrollArea>
-                      </div>
-                        <div className="flex flex-col gap-4">
-                            <h3 className="font-semibold text-lg">Routine Tasks for this Slot</h3>
-                            {routineTasksForSlot.length > 0 ? (
-                                <div className="space-y-2">
-                                    {routineTasksForSlot.map((task, index) => (
-                                         <Card key={index}>
-                                            <CardContent className="p-3 flex items-center justify-between">
-                                                <p className="font-medium text-sm">{task.details}</p>
-                                                <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => {
-                                                    onAddActivity(optionsModalSlot as SlotName, task.type, task.details);
-                                                }}>
-                                                    <PlusCircle className="h-4 w-4 text-green-500" />
-                                                </Button>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-center h-24 border rounded-md">
-                                    <p className="text-sm text-muted-foreground text-center">No routine tasks for this slot.</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-                <div className="col-span-1 flex flex-col gap-6 bg-muted/30 p-6 border-l min-h-0">
-                    <div className="flex flex-col gap-4">
-                        <h3 className="font-semibold text-lg">Daily Purpose</h3>
-                        <div className="space-y-2">
-                            {(purposeData.statement || "Not set for today.").split('\n').map((line, index) => (
-                                <Card key={index}>
-                                    <CardContent className="p-3">
-                                        <p className="text-sm whitespace-pre-wrap">{line}</p>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
-                    </div>
-                    <div className="flex flex-col gap-4 flex-grow min-h-0">
-                        <div className="flex justify-between items-center">
-                            <h3 className="font-semibold text-lg">Slot Rules</h3>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm">
-                                        <LinkIcon className="mr-2 h-4 w-4" /> Link Rules
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent className="w-80">
-                                    <DropdownMenuLabel>Select rules for this slot</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <ScrollArea className="h-60">
-                                    {metaRules.map(rule => (
-                                        <DropdownMenuCheckboxItem
-                                            key={rule.id}
-                                            checked={(settings.slotRules?.[optionsModalSlot as SlotName] || []).includes(rule.id)}
-                                            onCheckedChange={() => handleLinkRule(optionsModalSlot as SlotName, rule.id)}
-                                        >
-                                            {rule.text}
-                                        </DropdownMenuCheckboxItem>
-                                    ))}
-                                    </ScrollArea>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        </div>
-                         <ScrollArea className="h-full">
-                            {metaRules.filter(rule => settings.slotRules?.[optionsModalSlot as SlotName]?.includes(rule.id)).length > 0 ? (
-                                <div className="space-y-2 pr-4">
-                                    {metaRules.filter(rule => settings.slotRules?.[optionsModalSlot as SlotName]?.includes(rule.id)).map(rule => (
-                                        <Card key={rule.id} onClick={(e) => openRuleDetailPopup(rule.id, e)} className="cursor-pointer hover:bg-muted">
-                                            <CardContent className="p-3">
-                                                <p className="text-sm">{rule.text}</p>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="flex items-center justify-center h-full border rounded-md">
-                                    <p className="text-sm text-muted-foreground text-center">No rules linked to this slot.</p>
-                                </div>
-                            )}
-                        </ScrollArea>
-                    </div>
-                </div>
-            </DialogContent>
-        </Dialog>
-    )}
     </>
   );
 }
+
+    

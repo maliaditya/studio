@@ -48,10 +48,10 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogDescription,
+  AlertDialogDescription as AlertDialogDescriptionComponent,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialogTitle as AlertDialogTitleComponent,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
@@ -86,6 +86,7 @@ function MyPlatePageContent() {
         workoutMode,
         workoutPlans,
         exerciseDefinitions,
+        allWorkoutLogs,
         workoutPlanRotation,
         strengthTrainingMode,
         upskillDefinitions,
@@ -93,7 +94,9 @@ function MyPlatePageContent() {
         topicGoals,
         deepWorkDefinitions,
         setDeepWorkDefinitions,
+        allDeepWorkLogs,
         leadGenDefinitions,
+        allLeadGenLogs,
         projects,
         setProjects,
         productizationPlans,
@@ -117,6 +120,8 @@ function MyPlatePageContent() {
         swapWorkoutExercise,
         swapWorkoutForDay,
         resources,
+        brandingLogs,
+        allMindProgrammingLogs,
         patterns,
         openRuleDetailPopup,
         getDescendantLeafNodes,
@@ -134,38 +139,13 @@ function MyPlatePageContent() {
         setMissedSlotReviews,
         dailyReviewLogs,
         handleToggleDailyGoalCompletion,
+        schedule, 
+        setSchedule,
     } = useAuth();
-  
+    
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
-  
-  // Local state for logs, previously in AuthContext
-  const [schedule, setSchedule] = useState<FullSchedule>({});
-  const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
-  const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
-  const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
-  const [brandingLogs, setBrandingLogs] = useState<DatedWorkout[]>([]);
-  const [allLeadGenLogs, setAllLeadGenLogs] = useState<DatedWorkout[]>([]);
-  const [allMindProgrammingLogs, setAllMindProgrammingLogs] = useState<DatedWorkout[]>([]);
-  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
-
-  useEffect(() => {
-    if (currentUser?.username) {
-        const saved = localStorage.getItem(`lifeos_data_${currentUser.username}`);
-        if(saved) {
-            const data = JSON.parse(saved);
-            setSchedule(data.schedule || {});
-            setAllUpskillLogs(data.allUpskillLogs || []);
-            setAllDeepWorkLogs(data.allDeepWorkLogs || []);
-            setAllWorkoutLogs(data.allWorkoutLogs || []);
-            setBrandingLogs(data.brandingLogs || []);
-            setAllLeadGenLogs(data.allLeadGenLogs || []);
-            setAllMindProgrammingLogs(data.allMindProgrammingLogs || []);
-            setWeightLogs(data.weightLogs || []);
-        }
-    }
-  }, [currentUser]);
   
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -217,7 +197,7 @@ function MyPlatePageContent() {
   const [currentSlotForMeal, setCurrentSlotForMeal] = useState<string | null>(null);
 
   const [currentTimetableWeek, setCurrentTimetableWeek] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
-
+  
   const populatedSchedule = useMemo(() => {
     const newSchedule = JSON.parse(JSON.stringify(schedule));
   
@@ -350,8 +330,6 @@ function MyPlatePageContent() {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
   
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, d]));
-  
     const formatDuration = (totalMinutes: number, suffix: string) => {
         if (totalMinutes <= 0) return '';
         const h = Math.floor(totalMinutes / 60);
@@ -375,8 +353,7 @@ function MyPlatePageContent() {
         }
         suffix = ' logged';
       } else if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.details) {
-        const getNodeType = activity.type === 'upskill' ? getUpskillNodeType : getDeepWorkNodeType;
-        const nodeType = (activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention') ? activity.linkedEntityType : null;
+        const nodeType = activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention' ? activity.linkedEntityType : null;
         const isHighLevel = nodeType === 'intention' || nodeType === 'curiosity';
 
         if(isHighLevel) {
@@ -407,7 +384,7 @@ function MyPlatePageContent() {
     });
   
     return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getUpskillNodeType, getDeepWorkNodeType, allMindProgrammingLogs, allWorkoutLogs, allLeadGenLogs]);
+  }, [schedule, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
 
 
   const slotDurations = useMemo(() => {
@@ -418,8 +395,8 @@ function MyPlatePageContent() {
     const parseDurationToMinutes = (durationStr: string | undefined): number => {
         if (!durationStr || typeof durationStr !== 'string') return 0;
         let totalMinutes = 0;
-        const hourMatch = durationStr.match(/(\d+)\s*h/);
-        const minMatch = durationStr.match(/(\d+)\s*m/);
+        const hourMatch = durationStr.match(/(\d+)h/);
+        const minMatch = durationStr.match(/(\d+)m/);
         if (hourMatch) totalMinutes += parseInt(hourMatch[1]) * 60;
         if (minMatch) totalMinutes += parseInt(minMatch[1]);
         if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
@@ -700,41 +677,6 @@ function MyPlatePageContent() {
     setCurrentSlotForMeal(null);
   };
 
-  const onRemoveActivity = (slotName: string, activityId: string) => {
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        if (newSchedule[selectedDateKey]) {
-            const daySchedule = { ...newSchedule[selectedDateKey] };
-            if (daySchedule[slotName]) {
-                daySchedule[slotName] = (daySchedule[slotName] as any[]).filter(act => act.id !== activityId);
-                newSchedule[selectedDateKey] = daySchedule;
-            }
-        }
-        return newSchedule;
-    });
-  };
-
-  const handleToggleComplete = (slotName: string, activityId: string, isCompleted: boolean) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        const daySchedule = { ...(newSchedule[todayKey] || {}) };
-        const activities = Array.isArray(daySchedule[slotName]) ? [...(daySchedule[slotName] as Activity[])] : [];
-        const activityIndex = activities.findIndex(act => act.id === activityId);
-
-        if (activityIndex > -1) {
-            activities[activityIndex] = { 
-                ...activities[activityIndex], 
-                completed: isCompleted,
-                completedAt: isCompleted ? Date.now() : undefined,
-             };
-            daySchedule[slotName] = activities;
-            newSchedule[todayKey] = daySchedule;
-        }
-        
-        return newSchedule;
-    });
-  };
 
   const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
     if (activity.completed) return;
@@ -1288,15 +1230,13 @@ function MyPlatePageContent() {
                           activityDurations={activityDurations}
                           isAgendaDocked={isAgendaDocked}
                           onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                          onLogLearning={() => {}}
+                          onLogLearning={useAuth().handleLogLearning}
                           onStartWorkoutLog={handleStartWorkoutLog}
                           onStartLeadGenLog={handleStartLeadGenLog}
-                          onToggleComplete={handleToggleComplete}
                           onOpenFocusModal={onOpenFocusModal}
                           onOpenTaskContext={openTaskContextPopup}
                           onOpenHabitPopup={openRuleDetailPopup}
                           currentSlot={currentSlot}
-                          onRemoveActivity={onRemoveActivity}
                       />
                   ) : (
                       <Card>
@@ -1341,13 +1281,7 @@ function MyPlatePageContent() {
                 currentSlot={currentSlot}
                 remainingTime={remainingTime}
                 onAddActivity={handleAddActivity}
-                onRemoveActivity={onRemoveActivity}
-                onToggleComplete={handleToggleComplete}
-                onActivityClick={handleActivityClick}
                 slotDurations={slotDurations}
-                setRoutine={toggleRoutine}
-                deepWorkDefinitions={deepWorkDefinitions}
-                upskillDefinitions={upskillDefinitions}
               />
             </CardContent>
           </Card>
@@ -1362,11 +1296,11 @@ function MyPlatePageContent() {
             onOpenChange={setIsTodaysWorkoutModalOpen}
             activityToLog={workoutActivityToLog}
             dateForWorkout={selectedDate}
-            onActivityComplete={handleToggleComplete}
+            onActivityComplete={useAuth().handleToggleComplete}
             logWorkoutSet={logWorkoutSet}
             updateWorkoutSet={updateWorkoutSet}
             deleteWorkoutSet={deleteWorkoutSet}
-            removeExerciseFromWorkout={removeExerciseFromWorkout}
+            removeExerciseFromWorkout={useAuth().removeExerciseFromWorkout}
             swapWorkoutExercise={swapWorkoutExercise}
         />
       )}
@@ -1377,7 +1311,7 @@ function MyPlatePageContent() {
           onOpenChange={setIsTodaysMindsetModalOpen}
           activityToLog={mindsetActivityToLog}
           dateForWorkout={selectedDate}
-          onActivityComplete={handleToggleComplete}
+          onActivityComplete={useAuth().handleToggleComplete}
         />
       )}
 
@@ -1386,7 +1320,7 @@ function MyPlatePageContent() {
               isOpen={isLeadGenModalOpen}
               onOpenChange={setIsLeadGenModalOpen}
               activityToLog={workoutActivityToLog}
-              onActivityComplete={handleToggleComplete}
+              onActivityComplete={useAuth().handleToggleComplete}
           />
       )}
       
@@ -1599,8 +1533,8 @@ function MyPlatePageContent() {
                                         </AlertDialogTrigger>
                                         <AlertDialogContent>
                                             <AlertDialogHeader>
-                                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                                <AlertDialogDescription>This will permanently delete this abandonment reason.</AlertDialogDescription>
+                                                <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
+                                                <AlertDialogDescriptionComponent>This will permanently delete this abandonment reason.</AlertDialogDescriptionComponent>
                                             </AlertDialogHeader>
                                             <AlertDialogFooter>
                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -1669,7 +1603,8 @@ function MyPlatePageContent() {
                 <h4 className="font-semibold text-lg">Why You Started</h4>
                 <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={() => setIsNewReasonModalOpen(true)}>
-                        <PlusCircle className="mr-2 h-4 w-4" /> Log New Reason
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Log New Reason
                      </Button>
                     <Popover>
                         <PopoverTrigger asChild>
@@ -1712,8 +1647,8 @@ function MyPlatePageContent() {
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                      <AlertDialogDescription>This will permanently delete this reason.</AlertDialogDescription>
+                                      <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
+                                      <AlertDialogDescriptionComponent>This will permanently delete this reason.</AlertDialogDescriptionComponent>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -1759,3 +1694,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
+
+    
