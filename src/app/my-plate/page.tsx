@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import { AuthGuard } from '@/components/AuthGuard';
@@ -295,7 +294,7 @@ function MyPlatePageContent() {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
 
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [d.id, d]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
 
     const formatDuration = (totalMinutes: number, suffix: string) => {
         if (totalMinutes <= 0) return '';
@@ -323,19 +322,16 @@ function MyPlatePageContent() {
             switch(activity.type) {
                 case 'upskill':
                 case 'deepwork':
-                    if (activity.linkedEntityType === 'specialization') {
-                      totalMinutes = 120; // Default for high-level tasks
-                    } else if (activity.taskIds && activity.taskIds.length > 0) {
-                        const mainLogInstanceId = activity.taskIds[0];
-                        const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-                        const mainDefId = allLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId)?.definitionId;
-                        
-                        if (mainDefId) {
+                    if (activity.linkedEntityType === 'intention' || activity.linkedEntityType === 'curiosity') {
+                        const mainDefId = allDefs.get(activity.taskIds?.[0] || '')?.definitionId;
+                         if (mainDefId) {
                             const taskDef = allDefs.get(mainDefId);
                             if (taskDef) {
                                 totalMinutes = calculateTotalEstimate(taskDef);
                             }
                         }
+                    } else if (activity.linkedEntityType === 'specialization') {
+                         totalMinutes = 120; // Default for high-level tasks
                     } else {
                         totalMinutes = 120; // Fallback
                     }
