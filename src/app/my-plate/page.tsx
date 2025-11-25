@@ -54,7 +54,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { TodaysDietCard } from '@/components/ui/TodaysDietCard';
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog, SkillAcquisitionPlan, HabitEquation } from '@/types/workout';
@@ -141,17 +140,8 @@ function MyPlatePageContent() {
   const [remainingTime, setRemainingTime] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
   
-  const [schedule, setSchedule] = useState<FullSchedule>(() => {
-    if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem(`lifeos_data_${currentUser?.username}`)
-        if (saved) {
-            const data = JSON.parse(saved);
-            return data.schedule || {};
-        }
-    }
-    return {};
-  });
-
+  // Local state for logs, previously in AuthContext
+  const [schedule, setSchedule] = useState<FullSchedule>({});
   const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
   const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
   const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
@@ -165,6 +155,7 @@ function MyPlatePageContent() {
         const saved = localStorage.getItem(`lifeos_data_${currentUser.username}`);
         if(saved) {
             const data = JSON.parse(saved);
+            setSchedule(data.schedule || {});
             setAllUpskillLogs(data.allUpskillLogs || []);
             setAllDeepWorkLogs(data.allDeepWorkLogs || []);
             setAllWorkoutLogs(data.allWorkoutLogs || []);
@@ -175,8 +166,6 @@ function MyPlatePageContent() {
         }
     }
   }, [currentUser]);
-
-
   
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -361,7 +350,7 @@ function MyPlatePageContent() {
     const newDurations: Record<string, string> = {};
     if (!schedule) return newDurations;
   
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
+    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, d]));
   
     const formatDuration = (totalMinutes: number, suffix: string) => {
         if (totalMinutes <= 0) return '';
@@ -1257,32 +1246,6 @@ function MyPlatePageContent() {
     toast({ title: 'Reason Deleted', description: 'The reason has been removed from this plan.' });
   };
   
-  const onLogWeight = (weight: number, date: Date) => {
-    if (!currentUser || isNaN(weight) || weight <= 0) {
-      toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
-      return;
-    }
-    const year = getISOWeekYear(date);
-    const week = getISOWeek(date).toString().padStart(2, '0');
-    const weekKey = `${year}-W${week}`;
-
-    setWeightLogs(prevLogs => {
-        const logIndex = prevLogs.findIndex(log => log.date === weekKey);
-        const newLog: WeightLog = { date: weekKey, weight: weight };
-        
-        if (logIndex > -1) {
-            const updatedLogs = [...prevLogs];
-            updatedLogs[logIndex] = newLog;
-            return updatedLogs;
-        } else {
-            return [...prevLogs, newLog].sort((a,b) => a.date.localeCompare(b.date));
-        }
-    });
-
-    toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
-  };
-
-
   return (
     <>
       <DragDropContext onDragEnd={onDragEnd}>
@@ -1325,7 +1288,7 @@ function MyPlatePageContent() {
                           activityDurations={activityDurations}
                           isAgendaDocked={isAgendaDocked}
                           onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                          onLogLearning={handleLogLearning}
+                          onLogLearning={() => {}}
                           onStartWorkoutLog={handleStartWorkoutLog}
                           onStartLeadGenLog={handleStartLeadGenLog}
                           onToggleComplete={handleToggleComplete}
@@ -1794,4 +1757,5 @@ function MyPlatePageContent() {
 }
 
 export default function MyPlatePage() {
-    return <
+    return <AuthGuard><MyPlatePageContent/></AuthGuard>
+}
