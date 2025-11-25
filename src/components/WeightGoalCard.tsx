@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -30,7 +29,6 @@ import { Badge } from './ui/badge';
 interface WeightGoalCardProps {
   weightLogs: WeightLog[];
   goalWeight: number | null;
-  onLogWeight: (weight: number, date: Date) => void;
   height: number | null;
   dateOfBirth: string | null;
   gender: Gender | null;
@@ -74,7 +72,6 @@ const SimpleTooltip = ({ active, payload }: any) => {
 export function WeightGoalCard({ 
     weightLogs, 
     goalWeight, 
-    onLogWeight,
     height,
     dateOfBirth,
     gender,
@@ -315,18 +312,6 @@ export function WeightGoalCard({
         };
     }, [goalWeight, weightLogs, areDetailsSet]);
 
-    const handleLogWeightClick = () => {
-        const weightValue = parseFloat(newWeight);
-        if (!isNaN(weightValue) && weightValue > 0 && weightDate) {
-          onLogWeight(weightValue, weightDate);
-          setNewWeight('');
-          setShowLogForm(false); // Hide form after logging
-          toast({ title: "Weight Logged", description: `Your weight has been recorded for this week.` });
-        } else {
-          toast({ title: "Invalid Input", description: "Please enter a valid weight and select a date.", variant: "destructive" });
-        }
-    };
-    
     const handleSaveDetails = () => {
         let hasError = false;
 
@@ -445,6 +430,9 @@ export function WeightGoalCard({
                                             {(plan.audioVideoResources || []).map(res => {
                                                 const dailyHours = calculateDailyTarget(res.totalHours, completed.hours, res.startDate, res.completionDate);
                                                 const dailyItems = calculateDailyTarget(res.totalItems, completed.items, res.startDate, res.completionDate);
+                                                let dailyTarget = [];
+                                                if (dailyItems) dailyTarget.push(`${dailyItems} items/day`);
+                                                if (dailyHours) dailyTarget.push(`${dailyHours} h/day`);
                                                 const daysRemaining = res.completionDate ? differenceInDays(parseISO(res.completionDate), new Date()) : null;
                                                 return (
                                                 <li key={res.id} className="text-muted-foreground p-2 bg-muted/30 rounded-md">
@@ -465,9 +453,7 @@ export function WeightGoalCard({
                                                         {(dailyItems || dailyHours) && (
                                                             <div className="text-right">
                                                                 <p className="text-xs font-medium text-primary">
-                                                                    {dailyItems && `${dailyItems} items/day`}
-                                                                    {dailyItems && dailyHours && " | "}
-                                                                    {dailyHours && `${dailyHours} h/day`}
+                                                                    {dailyTarget.join(' & ')}
                                                                 </p>
                                                                 {daysRemaining !== null && daysRemaining >= 0 && <p className="font-bold text-xs">({daysRemaining}d left)</p>}
                                                             </div>
@@ -737,7 +723,6 @@ export function WeightGoalCard({
                                         className="h-9 flex-grow"
                                     />
                                 </div>
-                                <Button onClick={handleLogWeightClick} disabled={!newWeight || !weightDate} className="w-full">Log Weight</Button>
                             </div>
                         )}
                         

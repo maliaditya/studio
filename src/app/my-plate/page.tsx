@@ -135,22 +135,48 @@ function MyPlatePageContent() {
         setMissedSlotReviews,
         dailyReviewLogs,
         handleToggleDailyGoalCompletion,
-        weightLogs,
-        setWeightLogs,
     } = useAuth();
   
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
   
-  // Local state management for logs
-  const [schedule, setSchedule] = useAuth().scheduleState;
-  const [allUpskillLogs, setAllUpskillLogs] = useAuth().upskillLogsState;
-  const [allDeepWorkLogs, setAllDeepWorkLogs] = useAuth().deepWorkLogsState;
-  const [allWorkoutLogs, setAllWorkoutLogs] = useAuth().workoutLogsState;
-  const [brandingLogs, setBrandingLogs] = useAuth().brandingLogsState;
-  const [allLeadGenLogs, setAllLeadGenLogs] = useAuth().leadGenLogsState;
-  const [allMindProgrammingLogs, setAllMindProgrammingLogs] = useAuth().mindProgrammingLogsState;
+  const [schedule, setSchedule] = useState<FullSchedule>(() => {
+    if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem(`lifeos_data_${currentUser?.username}`)
+        if (saved) {
+            const data = JSON.parse(saved);
+            return data.schedule || {};
+        }
+    }
+    return {};
+  });
+
+  const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
+  const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
+  const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
+  const [brandingLogs, setBrandingLogs] = useState<DatedWorkout[]>([]);
+  const [allLeadGenLogs, setAllLeadGenLogs] = useState<DatedWorkout[]>([]);
+  const [allMindProgrammingLogs, setAllMindProgrammingLogs] = useState<DatedWorkout[]>([]);
+  const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
+
+  useEffect(() => {
+    if (currentUser?.username) {
+        const saved = localStorage.getItem(`lifeos_data_${currentUser.username}`);
+        if(saved) {
+            const data = JSON.parse(saved);
+            setAllUpskillLogs(data.allUpskillLogs || []);
+            setAllDeepWorkLogs(data.allDeepWorkLogs || []);
+            setAllWorkoutLogs(data.allWorkoutLogs || []);
+            setBrandingLogs(data.brandingLogs || []);
+            setAllLeadGenLogs(data.allLeadGenLogs || []);
+            setAllMindProgrammingLogs(data.allMindProgrammingLogs || []);
+            setWeightLogs(data.weightLogs || []);
+        }
+    }
+  }, [currentUser]);
+
+
   
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -360,13 +386,11 @@ function MyPlatePageContent() {
         }
         suffix = ' logged';
       } else if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.details) {
-        const isUpskill = activity.type === 'upskill';
-        const getNodeType = isUpskill ? getUpskillNodeType : getDeepWorkNodeType;
-        const nodeType = activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention' 
-            ? activity.linkedEntityType 
-            : null;
+        const getNodeType = activity.type === 'upskill' ? getUpskillNodeType : getDeepWorkNodeType;
+        const nodeType = (activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention') ? activity.linkedEntityType : null;
+        const isHighLevel = nodeType === 'intention' || nodeType === 'curiosity';
 
-        if(nodeType) {
+        if(isHighLevel) {
             const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.name === activity.details);
             if (def) {
                 totalMinutes = calculateTotalEstimate(def);
@@ -783,7 +807,6 @@ function MyPlatePageContent() {
     
     const logForDay = logSource.find(log => log.date === selectedDateKey);
     
-    // Find definitions for the selected IDs.
     const selectedDefinitions = finalSelectedDefIds.map(id => definitionSource.find(d => d.id === id)).filter((d): d is ExerciseDefinition => !!d);
 
     const newExercises: WorkoutExercise[] = selectedDefinitions
@@ -1144,7 +1167,6 @@ function MyPlatePageContent() {
 
     const sourceDefs = activityInfo.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
     
-    // Find the core skill that this activity is for.
     const coreSkill = coreSkills.find(cs => cs.name === activityInfo.details && cs.type === 'Specialization');
     if (!coreSkill) return [];
     
@@ -1234,6 +1256,32 @@ function MyPlatePageContent() {
 
     toast({ title: 'Reason Deleted', description: 'The reason has been removed from this plan.' });
   };
+  
+  const onLogWeight = (weight: number, date: Date) => {
+    if (!currentUser || isNaN(weight) || weight <= 0) {
+      toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
+      return;
+    }
+    const year = getISOWeekYear(date);
+    const week = getISOWeek(date).toString().padStart(2, '0');
+    const weekKey = `${year}-W${week}`;
+
+    setWeightLogs(prevLogs => {
+        const logIndex = prevLogs.findIndex(log => log.date === weekKey);
+        const newLog: WeightLog = { date: weekKey, weight: weight };
+        
+        if (logIndex > -1) {
+            const updatedLogs = [...prevLogs];
+            updatedLogs[logIndex] = newLog;
+            return updatedLogs;
+        } else {
+            return [...prevLogs, newLog].sort((a,b) => a.date.localeCompare(b.date));
+        }
+    });
+
+    toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
+  };
+
 
   return (
     <>
@@ -1304,7 +1352,6 @@ function MyPlatePageContent() {
                   <WeightGoalCard 
                     weightLogs={weightLogs}
                     goalWeight={goalWeight}
-                    onLogWeight={onLogWeight}
                     height={height}
                     dateOfBirth={dateOfBirth}
                     gender={gender}
@@ -1664,7 +1711,7 @@ function MyPlatePageContent() {
                     <Popover>
                         <PopoverTrigger asChild>
                             <Button variant="outline" size="sm">
-                                <LinkIconLucide className="mr-2 h-4 w-4" /> Link Rules
+                                <LinkIcon className="mr-2 h-4 w-4" /> Link Rules
                             </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-80">
@@ -1747,5 +1794,4 @@ function MyPlatePageContent() {
 }
 
 export default function MyPlatePage() {
-    return <AuthGuard><MyPlatePageContent/></AuthGuard>
-}
+    return <
