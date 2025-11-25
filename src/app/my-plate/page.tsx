@@ -79,6 +79,7 @@ const activityColorMapping: Record<string, string> = {
     'Distractions': 'hsl(var(--destructive))',
     'Nutrition': 'hsl(340, 82%, 56%)',
     'Free Time': 'hsl(var(--muted))',
+    'Mindset': 'hsl(var(--chart-5))',
 };
 
 const parseDurationToMinutes = (durationStr: string | undefined): number => {
@@ -115,12 +116,7 @@ function MyPlatePageContent() {
     gender, setGender,
     dietPlan, setDietPlan,
     schedule, setSchedule,
-    allUpskillLogs, setAllUpskillLogs,
-    allDeepWorkLogs, setAllDeepWorkLogs,
-    allWorkoutLogs,
-    allMindProgrammingLogs,
-    allLeadGenLogs,
-    brandingLogs, setBrandingLogs,
+    
     isAgendaDocked, setIsAgendaDocked,
     handleToggleComplete, handleLogLearning,
     workoutMode, workoutPlans, exerciseDefinitions,
@@ -152,6 +148,7 @@ function MyPlatePageContent() {
     deleteWorkoutSet,
     removeExerciseFromWorkout,
     swapWorkoutExercise,
+    swapWorkoutForDay,
     resources,
     patterns,
     openRuleDetailPopup,
@@ -168,6 +165,32 @@ function MyPlatePageContent() {
     pillarEquations,
     setPillarEquations,
   } = useAuth();
+  
+  // Local state that was previously in AuthContext
+  const [allUpskillLogs, setAllUpskillLogs] = useState<DatedWorkout[]>([]);
+  const [allDeepWorkLogs, setAllDeepWorkLogs] = useState<DatedWorkout[]>([]);
+  const [allWorkoutLogs, setAllWorkoutLogs] = useState<DatedWorkout[]>([]);
+  const [brandingLogs, setBrandingLogs] = useState<DatedWorkout[]>([]);
+  const [allLeadGenLogs, setAllLeadGenLogs] = useState<DatedWorkout[]>([]);
+  const [allMindProgrammingLogs, setAllMindProgrammingLogs] = useState<DatedWorkout[]>([]);
+  
+  // This effect will load the logs from localStorage once, when the component mounts
+  useEffect(() => {
+    if (currentUser?.username) {
+        const dataString = localStorage.getItem(`lifeos_data_${currentUser.username}`);
+        if (dataString) {
+            const data = JSON.parse(dataString);
+            setAllUpskillLogs(data.allUpskillLogs || data.upskillLogs || []);
+            setAllDeepWorkLogs(data.allDeepWorkLogs || data.deepWorkLogs || []);
+            setAllWorkoutLogs(data.allWorkoutLogs || data.workoutLogs || []);
+            setBrandingLogs(data.brandingLogs || []);
+            setAllLeadGenLogs(data.allLeadGenLogs || []);
+            setAllMindProgrammingLogs(data.allMindProgrammingLogs || []);
+        }
+    }
+  }, [currentUser]);
+
+
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
@@ -291,67 +314,65 @@ function MyPlatePageContent() {
   }, [deepWorkDefinitions, upskillDefinitions]);
   
     const activityDurations = useMemo(() => {
-    const newDurations: Record<string, string> = {};
-    if (!schedule) return newDurations;
-
-    const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
-
-    const formatDuration = (totalMinutes: number, suffix: string) => {
-        if (totalMinutes <= 0) return '';
-        const h = Math.floor(totalMinutes / 60);
-        const m = Math.round(totalMinutes % 60);
-        return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() + suffix;
-    };
-
-    Object.values(schedule).flat().flatMap(day => Object.values(day).flat()).forEach(activity => {
-        if (!activity || !activity.id) return;
-        
-        let totalMinutes = 0;
-        let suffix = '';
-
-        if (activity.completed) {
-            if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-                const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
-                const pauseDurationsMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
-                totalMinutes = Math.round((totalSessionMs - pauseDurationsMs) / 60000);
-            } else {
-                totalMinutes = activity.duration || 0;
-            }
-            suffix = ' logged';
-        } else { // Not completed, calculate estimate
-            switch(activity.type) {
-                case 'upskill':
-                case 'deepwork':
-                    if (activity.linkedEntityType === 'intention' || activity.linkedEntityType === 'curiosity') {
-                        const mainDefId = allDefs.get(activity.taskIds?.[0] || '')?.definitionId;
-                         if (mainDefId) {
-                            const taskDef = allDefs.get(mainDefId);
+      const newDurations: Record<string, string> = {};
+      if (!schedule) return newDurations;
+  
+      const allDefs = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def]));
+  
+      const formatDuration = (totalMinutes: number, suffix: string) => {
+          if (totalMinutes <= 0) return '';
+          const h = Math.floor(totalMinutes / 60);
+          const m = Math.round(totalMinutes % 60);
+          return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() + suffix;
+      };
+  
+      Object.values(schedule).flat().flatMap(day => Object.values(day).flat()).forEach(activity => {
+          if (!activity || !activity.id) return;
+          
+          let totalMinutes = 0;
+          let suffix = '';
+  
+          if (activity.completed) {
+              if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+                  const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
+                  const pauseDurationsMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
+                  totalMinutes = Math.round((totalSessionMs - pauseDurationsMs) / 60000);
+              } else {
+                  totalMinutes = activity.duration || 0;
+              }
+              suffix = ' logged';
+          } else {
+              switch(activity.type) {
+                  case 'upskill':
+                  case 'deepwork':
+                      if (activity.linkedEntityType === 'intention' || activity.linkedEntityType === 'curiosity') {
+                          const mainLogInstance = [...allUpskillLogs, ...allDeepWorkLogs].flatMap(l => l.exercises).find(ex => activity.taskIds?.includes(ex.id));
+                          if (mainLogInstance) {
+                            const taskDef = allDefs.get(mainLogInstance.definitionId);
                             if (taskDef) {
                                 totalMinutes = calculateTotalEstimate(taskDef);
                             }
-                        }
-                    } else if (activity.linkedEntityType === 'specialization') {
-                         totalMinutes = 120; // Default for high-level tasks
-                    } else {
-                        totalMinutes = 120; // Fallback
-                    }
-                    break;
-                case 'workout': totalMinutes = 90; break;
-                case 'mindset': totalMinutes = 15; break;
-                case 'branding': totalMinutes = 120; break;
-                case 'planning': case 'tracking': totalMinutes = 30; break;
-                case 'lead-generation': totalMinutes = 45; break;
-                default: totalMinutes = activity.duration || 0;
-            }
-        }
-        
-        if (totalMinutes > 0) {
-            newDurations[activity.id] = formatDuration(totalMinutes, suffix);
-        }
-    });
-
-    return newDurations;
-  }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
+                          }
+                      } else {
+                          totalMinutes = 120;
+                      }
+                      break;
+                  case 'workout': totalMinutes = 90; break;
+                  case 'mindset': totalMinutes = 15; break;
+                  case 'branding': totalMinutes = 120; break;
+                  case 'planning': case 'tracking': totalMinutes = 30; break;
+                  case 'lead-generation': totalMinutes = 45; break;
+                  default: totalMinutes = activity.duration || 0;
+              }
+          }
+          
+          if (totalMinutes > 0) {
+              newDurations[activity.id] = formatDuration(totalMinutes, suffix);
+          }
+      });
+  
+      return newDurations;
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, brandingLogs, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate, getDescendantLeafNodes, microSkillMap, allMindProgrammingLogs, allWorkoutLogs, allLeadGenLogs]);
 
 
   const slotDurations = useMemo(() => {
