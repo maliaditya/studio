@@ -40,14 +40,14 @@ export function TodaysScheduleCard({
   currentSlot,
 }: TodaysScheduleCardProps) {
   const { 
-      currentUser, 
-      carryForwardTask, 
-      settings, 
-      setSettings,
-      handleToggleComplete,
-      onRemoveActivity,
-      toggleRoutine,
-      schedule
+    currentUser, 
+    carryForwardTask, 
+    settings, 
+    setSettings,
+    handleToggleComplete,
+    onRemoveActivity,
+    toggleRoutine,
+    schedule
   } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
@@ -163,6 +163,14 @@ export function TodaysScheduleCard({
     };
   }, [isDragging, dragStartOffset, isAgendaDocked, position, positionKey]);
 
+  const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
+    if (activity.completed) return;
+    if (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'branding') {
+        onOpenFocusModal(activity);
+    }
+  };
+
+
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
         <CardHeader
@@ -199,7 +207,7 @@ export function TodaysScheduleCard({
                                                 variant="ghost"
                                                 className="justify-start h-8 text-sm"
                                                 onClick={() => {
-                                                carryForwardTask(task, slot);
+                                                carryForwardTask(task, slot as string);
                                                 }}
                                             >
                                                 {slot}
@@ -257,11 +265,7 @@ export function TodaysScheduleCard({
                         activity={{...activity, slot: activity.slot as SlotName}}
                         date={date}
                         onToggleComplete={handleToggleComplete}
-                        onActivityClick={(slot, act, e) => {
-                            if (act.type === 'deepwork' || act.type === 'upskill' || act.type === 'branding') {
-                                onOpenFocusModal(act);
-                            }
-                        }}
+                        onActivityClick={handleActivityClick}
                         onRemoveActivity={(slot, id) => onRemoveActivity(slot, id, date)}
                         setRoutine={toggleRoutine}
                         onOpenTaskContext={onOpenTaskContext}

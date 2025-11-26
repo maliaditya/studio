@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project } from '@/types/workout';
@@ -29,8 +29,8 @@ import { TimesheetPageContent } from '@/app/timesheet/page';
 import { TimetablePageContent } from '@/app/timetable/page';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { Link as LinkIconLucide } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { AuthGuard } from '@/components/AuthGuard';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const slotEndHours: Record<string, number> = {
@@ -38,7 +38,6 @@ const slotEndHours: Record<string, number> = {
 };
 
 function MyPlatePageContent() {
-    const auth = useAuth();
     const {
         settings,
         allUpskillLogs,
@@ -81,10 +80,10 @@ function MyPlatePageContent() {
         deleteMindsetSet,
         onOpenTaskContext,
         onOpenHabitPopup,
-        toggleRoutine: authToggleRoutine,
+        toggleRoutine,
         schedule,
-        setSchedule,
-    } = auth;
+        handleToggleComplete,
+    } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
     
@@ -102,80 +101,6 @@ function MyPlatePageContent() {
     const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
     const [mindsetActivityToLog, setMindsetActivityToLog] = useState<Activity | null>(null);
 
-    const onRemoveActivity = (slotName: string, activityId: string, date: Date) => {
-        const dateKey = format(date, 'yyyy-MM-dd');
-        setSchedule(prev => {
-            const newSchedule = { ...prev };
-            if (newSchedule[dateKey]) {
-                const daySchedule = { ...newSchedule[dateKey] };
-                if (daySchedule[slotName]) {
-                    daySchedule[slotName] = (daySchedule[slotName] as any[]).filter(act => act.id !== activityId);
-                    newSchedule[dateKey] = daySchedule;
-                }
-            }
-            return newSchedule;
-        });
-    };
-
-    const handleToggleComplete = (slot: string, id: string, completed: boolean) => {
-        const dateKey = format(selectedDate, 'yyyy-MM-dd');
-        setSchedule(prev => {
-            const newSchedule = { ...prev };
-            if (newSchedule[dateKey] && newSchedule[dateKey][slot]) {
-                newSchedule[dateKey][slot] = (newSchedule[dateKey][slot] as Activity[]).map(act => 
-                    act.id === id ? { ...act, completed, completedAt: completed ? Date.now() : undefined } : act
-                );
-            }
-            return newSchedule;
-        });
-    }
-    
-    const handleAddActivity = (slotName: string, type: ActivityType, details: string) => {
-        const dateKey = format(selectedDate, 'yyyy-MM-dd');
-        const newActivity: Activity = {
-            id: `${type}-${Date.now()}-${Math.random()}`,
-            type,
-            details,
-            completed: false,
-            slot: slotName,
-        };
-        setSchedule(prev => ({
-            ...prev,
-            [dateKey]: {
-                ...(prev[dateKey] || {}),
-                [slotName]: [...((prev[dateKey]?.[slotName as SlotName] as Activity[]) || []), newActivity],
-            }
-        }));
-    };
-    
-    const onDragEnd = (result: DropResult) => {
-        const { source, destination } = result;
-        if (!destination) return;
-        const sourceDroppableId = source.droppableId;
-        const destinationDroppableId = destination.droppableId;
-        if (sourceDroppableId === destinationDroppableId && source.index === destination.index) {
-            return;
-        }
-        const [sourceDateKey, sourceSlotName] = sourceDroppableId.split('_');
-        const [destDateKey, destSlotName] = destinationDroppableId.split('_');
-        setSchedule(currentSchedule => {
-            const sourceDaySchedule = { ...(currentSchedule[sourceDateKey] || {}) };
-            const sourceActivities = [...((sourceDaySchedule[sourceSlotName as SlotName] as Activity[]) || [])];
-            const [movedActivity] = sourceActivities.splice(source.index, 1);
-            if (!movedActivity) return currentSchedule;
-            movedActivity.slot = destSlotName;
-            
-            const newSchedule = { ...currentSchedule, [sourceDateKey]: { ...sourceDaySchedule, [sourceSlotName as SlotName]: sourceActivities } };
-
-            const destDaySchedule = { ...(newSchedule[destDateKey] || {}) };
-            const destActivities = [...((destDaySchedule[destSlotName as SlotName] as Activity[]) || [])];
-            destActivities.splice(destination.index, 0, movedActivity);
-            newSchedule[destDateKey] = { ...destDaySchedule, [destSlotName as SlotName]: destActivities };
-
-            return newSchedule;
-        });
-    };
-    
     const onOpenFocusModal = useCallback((activity: Activity) => {
         const estDurationStr = activity.duration?.toString();
         let minutes = 0;
@@ -489,7 +414,7 @@ function MyPlatePageContent() {
             message,
             subMessage
         };
-      }, [brandingLogs, populatedSchedule, selectedDateKey, deepWorkDefinitions]);
+      }, [populatedSchedule, selectedDateKey, deepWorkDefinitions]);
     
     const timeAllocationData = useMemo(() => {
         const dailyActivities = todaysSchedule ? Object.values(todaysSchedule).flat() : [];
@@ -564,7 +489,7 @@ function MyPlatePageContent() {
 
 
     return (
-        <DragDropContext onDragEnd={onDragEnd}>
+        <>
             <div className="container mx-auto p-4 sm:p-6 lg:p-8">
                 <Card className="max-w-5xl mx-auto shadow-lg bg-card/60 border-border/20 backdrop-blur-sm">
                     <CardHeader className="flex flex-row items-center justify-between text-center py-4">
@@ -629,11 +554,8 @@ function MyPlatePageContent() {
                         </div>
                         <TimeSlots
                             date={selectedDate}
-                            schedule={todaysSchedule}
                             currentSlot={currentSlot}
                             remainingTime={remainingTime}
-                            onAddActivity={handleAddActivity}
-                            onActivityClick={handleActivityClick}
                         />
                     </CardContent>
                 </Card>
@@ -649,7 +571,7 @@ function MyPlatePageContent() {
                 logWorkoutSet={logWorkoutSet}
                 updateWorkoutSet={updateWorkoutSet} 
                 deleteWorkoutSet={deleteWorkoutSet} 
-                removeExerciseFromWorkout={(id) => onRemoveActivity(workoutActivityToLog!.slot, id, selectedDate)}
+                removeExerciseFromWorkout={removeExerciseFromWorkout}
                 swapWorkoutExercise={swapWorkoutExercise}
             />
              <TodaysMindsetModal
@@ -717,7 +639,7 @@ function MyPlatePageContent() {
                     </div>
                 </DialogContent>
             </Dialog>
-        </DragDropContext>
+        </>
     );
 }
 
