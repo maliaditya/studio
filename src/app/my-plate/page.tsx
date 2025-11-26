@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -318,7 +319,6 @@ function MyPlatePageContent() {
 
     const activityDurations = useMemo(() => {
     const newDurations: Record<string, string> = {};
-    if (!schedule) return newDurations;
   
     const formatDuration = (totalMinutes: number, suffix: string) => {
         if (totalMinutes <= 0) return '';
@@ -326,55 +326,57 @@ function MyPlatePageContent() {
         const m = Math.round(totalMinutes % 60);
         return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() + suffix;
     };
-  
-    Object.values(schedule).flat().flatMap(day => Object.values(day).flat()).forEach(activity => {
-      if (!activity || !activity.id) return;
-      
-      let totalMinutes = 0;
-      let suffix = '';
-  
-      if (activity.completed) {
-        if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-          const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
-          const pauseDurationsMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
-          totalMinutes = Math.round((totalSessionMs - pauseDurationsMs) / 60000);
-        } else if (activity.duration) {
-          totalMinutes = activity.duration;
-        }
-        suffix = ' logged';
-      } else if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.details) {
-        const nodeType = activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention' ? activity.linkedEntityType : null;
-        const isHighLevel = nodeType === 'intention' || nodeType === 'curiosity';
+    
+    // Only iterate over the current day's activities
+    const dailySchedule = populatedSchedule[selectedDateKey] || {};
+    Object.values(dailySchedule).flat().forEach((activity: Activity) => {
+        if (!activity || !activity.id) return;
         
-        if(isHighLevel) {
-            const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.name === activity.details);
-            if (def) {
-                totalMinutes = calculateTotalEstimate(def);
+        let totalMinutes = 0;
+        let suffix = '';
+        
+        if (activity.completed) {
+            if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+                const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
+                const pauseDurationsMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
+                totalMinutes = Math.round((totalSessionMs - pauseDurationsMs) / 60000);
             } else {
-                totalMinutes = 120;
+                totalMinutes = activity.duration || 0;
             }
+            suffix = ' logged';
+        } else if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.details) {
+          const nodeType = activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention' ? activity.linkedEntityType : null;
+          const isHighLevel = nodeType === 'intention' || nodeType === 'curiosity';
+          
+          if(isHighLevel) {
+              const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.name === activity.details);
+              if (def) {
+                  totalMinutes = calculateTotalEstimate(def);
+              } else {
+                  totalMinutes = 120;
+              }
+          } else {
+               totalMinutes = 120;
+          }
+  
         } else {
-             totalMinutes = 120;
+          switch(activity.type) {
+              case 'workout': totalMinutes = 90; break;
+              case 'mindset': totalMinutes = 15; break;
+              case 'branding': totalMinutes = 120; break;
+              case 'planning': case 'tracking': totalMinutes = 30; break;
+              case 'lead-generation': totalMinutes = 45; break;
+              default: totalMinutes = activity.duration || 0;
+          }
         }
-
-      } else {
-        switch(activity.type) {
-            case 'workout': totalMinutes = 90; break;
-            case 'mindset': totalMinutes = 15; break;
-            case 'branding': totalMinutes = 120; break;
-            case 'planning': case 'tracking': totalMinutes = 30; break;
-            case 'lead-generation': totalMinutes = 45; break;
-            default: totalMinutes = activity.duration || 0;
+        
+        if (totalMinutes > 0) {
+          newDurations[activity.id] = formatDuration(totalMinutes, suffix);
         }
-      }
-      
-      if (totalMinutes > 0) {
-        newDurations[activity.id] = formatDuration(totalMinutes, suffix);
-      }
     });
   
     return newDurations;
-  }, [schedule, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
+  }, [populatedSchedule, selectedDateKey, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
 
     const slotDurations = useMemo(() => {
         const durations: Record<string, { logged: number; total: number }> = {};
@@ -1211,10 +1213,7 @@ function MyPlatePageContent() {
                     <ProductivitySnapshot 
                       stats={dashboardStats} 
                       timeAllocationData={timeAllocationData}
-                      onOpenTimeAllocationModal={() => setIsTimeAllocationModalOpen(true)}
-                      todaysSchedule={populatedSchedule[selectedDateKey] || {}}
-                      activityDurations={activityDurations}
-                      showTimeAllocation={isAgendaDocked}
+                      onOpenTimeAllocationModal={() => {}}
                   />
                 </div>
                  <div className="lg:col-span-2 space-y-6">
@@ -1233,7 +1232,7 @@ function MyPlatePageContent() {
                       <Card>
                           <CardHeader className="flex flex-row items-center justify-between">
                               <CardTitle className="flex items-center gap-2"><PieChartIcon /> Daily Time Allocation</CardTitle>
-                               <Button variant="outline" size="icon" onClick={() => setIsTimeAllocationModalOpen(true)}>
+                               <Button variant="outline" size="icon" onClick={() => {}}>
                                   <Expand className="h-4 w-4" />
                                   <span className="sr-only">Open Time Allocation in Modal</span>
                               </Button>
