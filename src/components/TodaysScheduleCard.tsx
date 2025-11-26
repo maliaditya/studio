@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -28,6 +27,7 @@ interface TodaysScheduleCardProps {
   onOpenFocusModal: (activity: Activity) => boolean;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
+  onRemoveActivity: (slotName: string, activityId: string) => void;
   currentSlot: string;
 }
 
@@ -38,6 +38,7 @@ export function TodaysScheduleCard({
   onOpenFocusModal,
   onOpenTaskContext,
   onOpenHabitPopup,
+  onRemoveActivity,
   currentSlot,
 }: TodaysScheduleCardProps) {
   const { 
@@ -46,7 +47,6 @@ export function TodaysScheduleCard({
     settings, 
     setSettings,
     handleToggleComplete,
-    onRemoveActivity,
     toggleRoutine,
     schedule
   } = useAuth();
@@ -267,7 +267,7 @@ export function TodaysScheduleCard({
                         date={date}
                         onToggleComplete={handleToggleComplete}
                         onActivityClick={handleActivityClick}
-                        onRemoveActivity={(slot, id) => onRemoveActivity(slot, id, date)}
+                        onRemoveActivity={onRemoveActivity}
                         setRoutine={toggleRoutine}
                         onOpenTaskContext={onOpenTaskContext}
                         onOpenHabitPopup={onOpenHabitPopup}
