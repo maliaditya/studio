@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -10,6 +9,7 @@ import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Shar
 import type { Activity, ActivityType, RecurrenceRule } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, DropdownMenuPortal } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
+import { Textarea } from './ui/textarea';
 
 
 const activityIcons: Record<ActivityType, React.ReactNode> = {
@@ -27,19 +27,81 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     mindset: <Brain className="h-4 w-4" />,
 };
 
+const EditableActivityText = ({ activity, onUpdate }: { activity: Activity, onUpdate: (activityId: string, newDetails: string) => void }) => {
+    const [isEditing, setIsEditing] = useState(activity.details === '');
+    const [text, setText] = useState(activity.details);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    useEffect(() => {
+        setText(activity.details);
+        if (activity.details === '') {
+            setIsEditing(true);
+        }
+    }, [activity.details]);
+
+    useEffect(() => {
+        if (isEditing && textareaRef.current) {
+            textareaRef.current.focus();
+            textareaRef.current.select();
+        }
+    }, [isEditing]);
+    
+    const handleBlur = () => {
+        setIsEditing(false);
+        if (text.trim() !== activity.details) {
+            onUpdate(activity.id, text.trim());
+        }
+    };
+    
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleBlur();
+        } else if (e.key === 'Escape') {
+            setIsEditing(false);
+            setText(activity.details);
+        }
+    };
+
+    if (isEditing) {
+        return (
+            <Textarea
+                ref={textareaRef}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onBlur={handleBlur}
+                onKeyDown={handleKeyDown}
+                placeholder="Type a description..."
+                className="text-sm font-medium p-1 h-auto min-h-[2.5rem] resize-none"
+            />
+        );
+    }
+
+    return (
+         <p 
+            className={cn("text-sm font-medium", activity.completed && "line-through text-muted-foreground")}
+            onClick={() => setIsEditing(true)}
+         >
+            {activity.details}
+         </p>
+    );
+};
+
+
 interface AgendaWidgetItemProps {
     activity: Activity & { slot: string };
     date: Date;
     onToggleComplete: (slot: string, activityId: string, isCompleted: boolean) => void;
     onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
     onRemoveActivity: (slotName: string, activityId: string) => void;
+    onUpdateActivity: (activityId: string, newDetails: string) => void;
     setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
     onOpenTaskContext: (activityId: string, event: React.MouseEvent) => void;
     onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
     context: 'agenda' | 'timeslot';
 }
 
-export const AgendaWidgetItem = React.memo(({ activity, date, onToggleComplete, onActivityClick, onRemoveActivity, setRoutine, onOpenTaskContext, onOpenHabitPopup, context }: AgendaWidgetItemProps) => {
+export const AgendaWidgetItem = React.memo(({ activity, date, onToggleComplete, onActivityClick, onRemoveActivity, onUpdateActivity, setRoutine, onOpenTaskContext, onOpenHabitPopup, context }: AgendaWidgetItemProps) => {
     const { habitCards } = useAuth();
     const isClickable = !activity.completed && (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'branding' || activity.type === 'workout' || activity.type === 'mindset' || activity.type === 'essentials' || activity.type === 'nutrition');
 
@@ -56,7 +118,7 @@ export const AgendaWidgetItem = React.memo(({ activity, date, onToggleComplete, 
                 {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
             </button>
             <div className="flex-grow min-w-0">
-                <p className={cn("text-sm font-medium", activity.completed && "line-through text-muted-foreground")}>{activity.details}</p>
+                 <EditableActivityText activity={activity} onUpdate={onUpdateActivity} />
                  <div className="flex flex-wrap items-center gap-2 mt-1">
                     <div className="flex items-center gap-1 text-xs text-muted-foreground capitalize">
                         {activityIcons[activity.type]} {activity.type.replace('-', ' ')}

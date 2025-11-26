@@ -12,7 +12,7 @@ import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Shar
 import { isToday, format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
-import { DragDropContext, DropResult } from '@hello-pangea/dnd';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useToast } from '@/hooks/use-toast';
 
 
@@ -66,7 +66,7 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
                     );
                 }
                 return (
-                    <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, `New ${type.replace('-', ' ')}`)}>
+                    <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, '')}>
                         {icon}
                         <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
                     </DropdownMenuItem>
@@ -163,7 +163,29 @@ export function TimeSlots({
             [slotName]: [...((prev[dateKey]?.[slotName as SlotName] as Activity[]) || []), newActivity],
         }
     }));
-    toast({ title: "Activity Added", description: `Added "${details}" to ${format(date, 'MMM d')}, ${slotName}.` });
+    toast({ title: "Activity Added", description: `Added a new task to ${format(date, 'MMM d')}, ${slotName}.` });
+  };
+  
+  const handleUpdateActivity = (activityId: string, newDetails: string) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    setSchedule(prev => {
+        const newSchedule = {...prev};
+        if (newSchedule[dateKey]) {
+            const daySchedule = {...newSchedule[dateKey]};
+            for (const slotName in daySchedule) {
+                const activities = (daySchedule[slotName as SlotName] as Activity[]) || [];
+                const activityIndex = activities.findIndex(a => a.id === activityId);
+                if (activityIndex > -1) {
+                    const newActivities = [...activities];
+                    newActivities[activityIndex] = { ...newActivities[activityIndex], details: newDetails };
+                    daySchedule[slotName as SlotName] = newActivities;
+                    newSchedule[dateKey] = daySchedule;
+                    break;
+                }
+            }
+        }
+        return newSchedule;
+    });
   };
 
   const onRemoveActivity = (slotName: string, activityId: string) => {
@@ -237,6 +259,7 @@ export function TimeSlots({
                           onToggleComplete={handleToggleComplete}
                           onActivityClick={handleActivityClick}
                           onRemoveActivity={(slotName, id) => onRemoveActivity(slotName, id)}
+                          onUpdateActivity={handleUpdateActivity}
                           setRoutine={toggleRoutine}
                           onOpenTaskContext={onOpenTaskContext}
                           onOpenHabitPopup={onOpenHabitPopup}
