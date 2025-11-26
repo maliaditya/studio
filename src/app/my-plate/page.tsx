@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project } from '@/types/workout';
@@ -41,9 +41,9 @@ function MyPlatePageContent() {
         settings,
         allUpskillLogs,
         allDeepWorkLogs,
+        brandingLogs,
         upskillDefinitions,
         deepWorkDefinitions,
-        brandingLogs,
         weightLogs,
         goalWeight,
         height,
@@ -83,11 +83,12 @@ function MyPlatePageContent() {
     const router = useRouter();
     const { toast } = useToast();
 
-    const [schedule, setSchedule] = useState<FullSchedule>(useAuth().schedule);
+    const auth = useAuth();
+    const [schedule, setSchedule] = useState<FullSchedule>(auth.schedule);
     
     useEffect(() => {
-        setSchedule(useAuth().schedule);
-    }, [useAuth().schedule]);
+        setSchedule(auth.schedule);
+    }, [auth.schedule]);
 
 
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
@@ -623,6 +624,7 @@ function MyPlatePageContent() {
                             remainingTime={remainingTime}
                             onAddActivity={handleAddActivity}
                             onActivityClick={handleActivityClick}
+                            slotDurations={{}}
                         />
                     </CardContent>
                 </Card>
@@ -638,7 +640,7 @@ function MyPlatePageContent() {
                 logWorkoutSet={logWorkoutSet}
                 updateWorkoutSet={updateWorkoutSet} 
                 deleteWorkoutSet={deleteWorkoutSet} 
-                removeExerciseFromWorkout={removeExerciseFromWorkout}
+                removeExerciseFromWorkout={(id) => onRemoveActivity(workoutActivityToLog!.slot, id, selectedDate)}
                 swapWorkoutExercise={swapWorkoutExercise}
             />
              <TodaysMindsetModal
@@ -717,6 +719,3 @@ export default function MyPlatePage() {
         </AuthGuard>
     );
 }
-
-
-
