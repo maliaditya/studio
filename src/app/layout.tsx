@@ -103,7 +103,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     openGeneralPopup, handleUpdateResource, closeGeneralPopup,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     pillarPopupState, closePillarPopup, handlePillarPopupDragEnd,
-    habitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
+    habitDetailPopup, openHabitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
     taskContextPopups, closeTaskContextPopup, handleTaskContextPopupDragEnd, openTaskContextPopup,
     handlePdfViewerPopupDragEnd,
     drawingCanvasState, setDrawingCanvasState, handleDrawingCanvasPopupDragEnd,
@@ -123,7 +123,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handleStartWorkoutLog,
     handleStartLeadGenLog,
     onOpenFocusModal,
-    openHabitDetailPopup,
     focusSessionModalOpen,
     setFocusSessionModalOpen,
     focusActivity,
@@ -141,7 +140,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   } = authContext;
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
-  const [remainingTime, setRemainingTime] = React.useState('');
+  const [remainingTime, setRemainingTime] = React.useState<string | null>(null);
   
   const [interruptModalState, setInterruptModalState] = React.useState<{isOpen: boolean, slotName: string | null, activityType: 'interrupt' | 'distraction' | null}>({ isOpen: false, slotName: null, activityType: null });
   const [interruptDetails, setInterruptDetails] = React.useState('');
@@ -437,50 +436,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           onOpenChange={(isOpen) => setMissedSlotModalState(prev => ({ ...prev, isOpen }))}
           onSave={handleSaveMissedSlotReview}
       />
-      <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ isOpen, slotName: null, activityType: null })}>
-          <DialogContent>
-              <DialogHeader>
-                  <DialogTitle>Log an Interruption or Distraction</DialogTitle>
-                  <DialogDescription>What pulled you away from your planned tasks?</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                  <div className="space-y-1">
-                      <Label>Type</Label>
-                       <RadioGroup value={interruptModalState.activityType || ""} onValueChange={(value) => setInterruptModalState(prev => ({...prev, activityType: value as 'interrupt' | 'distraction'}))} className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-2"><RadioGroupItem value="interrupt" id="type-interrupt" /><Label htmlFor="type-interrupt">Interruption</Label></div>
-                            <div className="flex items-center space-x-2"><RadioGroupItem value="distraction" id="type-distraction" /><Label htmlFor="type-distraction">Distraction</Label></div>
-                        </RadioGroup>
-                  </div>
-                  <div className="space-y-1">
-                      <Label htmlFor="interrupt-details">Description</Label>
-                      <Textarea id="interrupt-details" value={interruptDetails} onChange={(e) => setInterruptDetails(e.target.value)} placeholder="e.g., Unexpected phone call, browsing social media..." />
-                  </div>
-                  <div className="space-y-1">
-                      <Label htmlFor="interrupt-duration">Duration (minutes)</Label>
-                      <Input 
-                        id="interrupt-duration" 
-                        type="number" 
-                        value={applyInterruptToFutureSlots ? '240' : interruptDuration} 
-                        onChange={(e) => setInterruptDuration(e.target.value)} 
-                        placeholder="e.g., 30"
-                        disabled={applyInterruptToFutureSlots}
-                      />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                      <Checkbox 
-                          id="apply-all-slots" 
-                          checked={applyInterruptToFutureSlots} 
-                          onCheckedChange={(checked) => setApplyInterruptToFutureSlots(!!checked)}
-                      />
-                      <Label htmlFor="apply-all-slots" className="font-normal">Apply to all future slots for today (sets duration to 240 mins)</Label>
-                  </div>
-              </div>
-              <DialogFooter>
-                  <Button variant="outline" onClick={() => setInterruptModalState({ isOpen: false, slotName: null, activityType: null })}>Cancel</Button>
-                  <Button onClick={handleSaveInterrupt}>Save</Button>
-              </DialogFooter>
-          </DialogContent>
-      </Dialog>
+      <InterruptModal
+        isOpen={interruptModalState.isOpen}
+        onOpenChange={(isOpen) => setInterruptModalState(prev => ({...prev, isOpen}))}
+        slotName={interruptModalState.slotName}
+        onSave={handleSaveInterrupt}
+      />
       {isBrowser && document.getElementById('global-popup-root') &&
         createPortal(
           <>
@@ -597,5 +558,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-    
