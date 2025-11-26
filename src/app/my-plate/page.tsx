@@ -9,21 +9,18 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
-import { Calendar as CalendarIcon, ArrowRight, Shield, PlusCircle, Trash2 } from 'lucide-react';
-import { KanbanPageContent } from '@/app/kanban/page';
+import { Calendar as CalendarIcon, ArrowRight, Shield, PlusCircle, Trash2, PieChart as PieChartIcon, Expand, GitMerge, Kanban, Clock, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { TimesheetPageContent } from '@/app/timesheet/page';
 import { Badge } from '@/components/ui/badge';
-import { format, addDays, parseISO, subDays, startOfToday, isAfter, isBefore, isSameDay, startOfWeek, max, min, isValid, eachDayOfInterval, getDay, getISOWeek, getISOWeekYear } from 'date-fns';
+import { format, addDays, parseISO, subDays, startOfToday, isAfter, isBefore, isSameDay, startOfWeek, max, min, isValid, eachDayOfInterval, getDay, getHours } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { MindMapViewer } from '@/components/MindMapViewer';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
@@ -58,6 +55,12 @@ import { DialogTitle as DialogTitleComponent, DialogDescription as DialogDescrip
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog, SkillAcquisitionPlan, HabitEquation } from '@/types/workout';
 import { getExercisesForDay } from '@/lib/workoutUtils';
+import { KanbanPageContent } from '@/app/kanban/page';
+import { ChartsPageContent as ChartsPageContentActual } from '@/app/charts/page';
+import { TimesheetPageContent } from '@/app/timesheet/page';
+import { TimetablePageContent } from '@/app/timetable/page';
+import { MindMapViewer } from '@/components/MindMapViewer';
+import { Link as LinkIconLucide } from 'lucide-react';
 
 
 const slotEndHours: Record<string, number> = {
@@ -83,6 +86,7 @@ function MyPlatePageContent() {
         workoutPlans,
         exerciseDefinitions,
         allWorkoutLogs,
+        brandingLogs,
         workoutPlanRotation,
         strengthTrainingMode,
         upskillDefinitions,
@@ -140,7 +144,8 @@ function MyPlatePageContent() {
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
-  const [isTimeAllocationModalOpen, setIsTimeAllocationModalOpen] = useState(false);
+  const [isChartModalOpen, setIsChartModalOpen] = useState(false);
+  const [isTimesheetModalOpen, setIsTimesheetModalOpen] = useState(false);
   const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<{ slotName: string; activity: Activity } | null>(null);
   const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
@@ -311,41 +316,96 @@ function MyPlatePageContent() {
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
 
+    const activityDurations = useMemo(() => {
+    const newDurations: Record<string, string> = {};
+    if (!schedule) return newDurations;
+  
+    const formatDuration = (totalMinutes: number, suffix: string) => {
+        if (totalMinutes <= 0) return '';
+        const h = Math.floor(totalMinutes / 60);
+        const m = Math.round(totalMinutes % 60);
+        return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() + suffix;
+    };
+  
+    Object.values(schedule).flat().flatMap(day => Object.values(day).flat()).forEach(activity => {
+      if (!activity || !activity.id) return;
+      
+      let totalMinutes = 0;
+      let suffix = '';
+  
+      if (activity.completed) {
+        if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+          const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
+          const pauseDurationsMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
+          totalMinutes = Math.round((totalSessionMs - pauseDurationsMs) / 60000);
+        } else if (activity.duration) {
+          totalMinutes = activity.duration;
+        }
+        suffix = ' logged';
+      } else if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.details) {
+        const nodeType = activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention' ? activity.linkedEntityType : null;
+        const isHighLevel = nodeType === 'intention' || nodeType === 'curiosity';
+        
+        if(isHighLevel) {
+            const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.name === activity.details);
+            if (def) {
+                totalMinutes = calculateTotalEstimate(def);
+            } else {
+                totalMinutes = 120;
+            }
+        } else {
+             totalMinutes = 120;
+        }
+
+      } else {
+        switch(activity.type) {
+            case 'workout': totalMinutes = 90; break;
+            case 'mindset': totalMinutes = 15; break;
+            case 'branding': totalMinutes = 120; break;
+            case 'planning': case 'tracking': totalMinutes = 30; break;
+            case 'lead-generation': totalMinutes = 45; break;
+            default: totalMinutes = activity.duration || 0;
+        }
+      }
+      
+      if (totalMinutes > 0) {
+        newDurations[activity.id] = formatDuration(totalMinutes, suffix);
+      }
+    });
+  
+    return newDurations;
+  }, [schedule, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
+
     const slotDurations = useMemo(() => {
         const durations: Record<string, { logged: number; total: number }> = {};
         const daySchedule = populatedSchedule[selectedDateKey];
         if (!daySchedule) return durations;
 
         const parseDurationToMinutes = (activity: Activity): number => {
-            if (activity.completed) {
-                if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-                    const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
-                    const pauseDurationsMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
-                    return Math.round((totalSessionMs - pauseDurationsMs) / 60000);
-                }
-                return activity.duration || 0;
+            const durationStr = activityDurations[activity.id];
+            if (!durationStr) return 0;
+            if (durationStr.includes('logged')) {
+                const numStr = durationStr.replace(' logged', '');
+                let totalMinutes = 0;
+                const hourMatch = numStr.match(/(\d+)h/);
+                const minMatch = numStr.match(/(\d+)m/);
+                if (hourMatch) totalMinutes += parseInt(hourMatch[1]) * 60;
+                if (minMatch) totalMinutes += parseInt(minMatch[1]);
+                return totalMinutes;
             }
+            return 0; // Not logged, so contributes 0 to logged time
+        };
 
-            if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.details) {
-              const nodeType = activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention' ? activity.linkedEntityType : null;
-              const isHighLevel = nodeType === 'intention' || nodeType === 'curiosity';
-      
-              if(isHighLevel) {
-                  const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.name === activity.details);
-                  if (def) return calculateTotalEstimate(def);
-                  return 120;
-              }
-              return 120;
-            }
-
-            switch(activity.type) {
-                case 'workout': return 90;
-                case 'mindset': return 15;
-                case 'branding': return 120;
-                case 'planning': case 'tracking': return 30;
-                case 'lead-generation': return 45;
-                default: return activity.duration || 0;
-            }
+        const parseTotalDuration = (activity: Activity): number => {
+             const durationStr = activityDurations[activity.id];
+            if (!durationStr) return 0;
+            const numStr = durationStr.replace(' logged', '');
+            let totalMinutes = 0;
+            const hourMatch = numStr.match(/(\d+)h/);
+            const minMatch = numStr.match(/(\d+)m/);
+            if (hourMatch) totalMinutes += parseInt(hourMatch[1]) * 60;
+            if (minMatch) totalMinutes += parseInt(minMatch[1]);
+            return totalMinutes;
         };
 
         for (const slotName of slotOrder) {
@@ -355,17 +415,14 @@ function MyPlatePageContent() {
             const activities = (daySchedule[slotName as keyof DailySchedule] as Activity[]) || [];
             
             activities.forEach(activity => {
-                const durationMinutes = parseDurationToMinutes(activity);
-                if (activity.completed) {
-                  loggedTime += durationMinutes;
-                }
-                totalTime += durationMinutes;
+                loggedTime += parseDurationToMinutes(activity);
+                totalTime += parseTotalDuration(activity);
             });
 
             durations[slotName] = { logged: loggedTime, total: totalTime };
         }
         return durations;
-    }, [populatedSchedule, selectedDateKey, upskillDefinitions, deepWorkDefinitions, calculateTotalEstimate]);
+    }, [populatedSchedule, selectedDateKey, activityDurations]);
 
 
     const handleAddActivity = (slotName: string, type: ActivityType, detailsOverride?: string) => {
@@ -930,9 +987,8 @@ function MyPlatePageContent() {
       if (activity && typeof activity === 'object' && 'type' in activity) {
         const mappedName = activityNameMap[activity.type as ActivityType];
         if (mappedName) {
-          const isCompletedOrLogged = activity.completed || ['interrupt', 'distraction', 'planning', 'tracking', 'essentials', 'nutrition'].includes(activity.type);
-          if (isCompletedOrLogged) {
-            const duration = activity.duration || 0;
+          const duration = activity.completed && activity.duration ? activity.duration : 0;
+          if (duration > 0) {
             if (!totals[mappedName]) {
               totals[mappedName] = { time: 0, activities: [] };
             }
@@ -1168,9 +1224,6 @@ function MyPlatePageContent() {
                           date={selectedDate}
                           isAgendaDocked={isAgendaDocked}
                           onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                          onLogLearning={useAuth().handleLogLearning}
-                          onStartWorkoutLog={handleStartWorkoutLog}
-                          onStartLeadGenLog={handleStartLeadGenLog}
                           onOpenFocusModal={onOpenFocusModal}
                           onOpenTaskContext={openTaskContextPopup}
                           onOpenHabitPopup={openTaskContextPopup as any} // needs fixing
@@ -1235,7 +1288,6 @@ function MyPlatePageContent() {
             onOpenChange={setIsTodaysWorkoutModalOpen}
             activityToLog={workoutActivityToLog}
             dateForWorkout={selectedDate}
-            onActivityComplete={handleToggleComplete}
         />
       )}
       
@@ -1245,7 +1297,6 @@ function MyPlatePageContent() {
           onOpenChange={setIsTodaysMindsetModalOpen}
           activityToLog={mindsetActivityToLog}
           dateForWorkout={selectedDate}
-          onActivityComplete={handleToggleComplete}
         />
       )}
 
@@ -1254,7 +1305,6 @@ function MyPlatePageContent() {
               isOpen={isLeadGenModalOpen}
               onOpenChange={setIsLeadGenModalOpen}
               activityToLog={workoutActivityToLog}
-              onActivityComplete={handleToggleComplete}
           />
       )}
       
@@ -1285,41 +1335,28 @@ function MyPlatePageContent() {
         onOpenChange={setIsDietPlanModalOpen}
       />
 
-      <Dialog open={isTimeAllocationModalOpen} onOpenChange={setIsTimeAllocationModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Daily Time Allocation</DialogTitle>
-            <DialogDescription>A breakdown of your logged time for {format(selectedDate, 'PPP')}.</DialogDescription>
-          </DialogHeader>
-          <div className="py-4 h-[400px]">
-            <TimeAllocationChart timeAllocationData={timeAllocationData} />
-          </div>
+      <Dialog open={isChartModalOpen} onOpenChange={setIsChartModalOpen}>
+        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+            <DialogHeader className="p-4 border-b">
+                <DialogTitle>Charts</DialogTitle>
+            </DialogHeader>
+            <div className="flex-grow min-h-0">
+                <ScrollArea className="h-full">
+                    <ChartsPageContentActual />
+                </ScrollArea>
+            </div>
         </DialogContent>
       </Dialog>
-
-      <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
-          <DialogContent className="max-w-full w-screen h-screen p-0 flex flex-col">
-              <DialogHeader className="p-4 border-b">
-                  <DialogTitle>Strategic Mind Map</DialogTitle>
-              </DialogHeader>
-              <div className="flex-grow min-h-0">
-                <MindMapViewer />
-              </div>
-          </DialogContent>
-      </Dialog>
-
-      <Dialog open={isKanbanModalOpen} onOpenChange={setIsKanbanModalOpen}>
-        <DialogContent className="max-w-7xl h-[80vh] flex flex-col p-0">
+      <Dialog open={isTimesheetModalOpen} onOpenChange={setIsTimesheetModalOpen}>
+        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
           <DialogHeader className="p-4 border-b">
-            <DialogTitle>Task Board</DialogTitle>
-            <DialogDescription>A Kanban-style view of all your tasks for today.</DialogDescription>
+            <DialogTitle>Timesheet</DialogTitle>
           </DialogHeader>
           <div className="flex-grow min-h-0">
-              <KanbanPageContent isModal={true} />
+              <TimesheetPageContent isModal={true} />
           </div>
         </DialogContent>
       </Dialog>
-      
       <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
         <DialogContent className="h-[90vh] max-w-full w-full grid grid-rows-[auto,1fr] p-0">
           <DialogHeader className="p-4 border-b flex flex-row items-center justify-between">
@@ -1332,11 +1369,11 @@ function MyPlatePageContent() {
               <div className="flex items-center gap-2">
                   <Button variant="outline" size="icon" onClick={() => setCurrentTimetableWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
                   <Button variant="outline" onClick={() => setCurrentTimetableWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
-                  <Button variant="outline" size="icon" onClick={() => setCurrentTimetableWeek(prev => addDays(prev, 7))}><ChevronRight className="h-4 w-4" /></Button>
+                  <Button variant="outline" size="icon" onClick={() => setCurrentTimetableWeek(prev => addDays(prev, 7))}><ChevronRightIcon className="h-4 w-4" /></Button>
               </div>
           </DialogHeader>
           <div className="min-h-0">
-              <TimesheetPageContent isModal={true} />
+              <TimetablePageContent isModal={true} currentWeek={currentTimetableWeek} onWeekChange={setCurrentTimetableWeek} />
           </div>
         </DialogContent>
       </Dialog>
@@ -1472,7 +1509,7 @@ function MyPlatePageContent() {
                                             </AlertDialogHeader>
                                             <AlertDialogFooter>
                                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => handleDeleteExcuse(excuseModalState.planId!, log.id)}>Delete</AlertDialogAction>
+                                                <AlertDialogAction onClick={() => {}}>Delete</AlertDialogAction>
                                             </AlertDialogFooter>
                                         </AlertDialogContent>
                                     </AlertDialog>
@@ -1492,7 +1529,7 @@ function MyPlatePageContent() {
                                                 />
                                                 <div className="flex justify-end gap-2">
                                                     <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditingExcuseLogId(null); }}>Cancel</Button>
-                                                    <Button size="sm" onClick={(e) => { e.stopPropagation(); handleUpdateExcuse(log.id); }}>Save Strategy</Button>
+                                                    <Button size="sm" onClick={(e) => { e.stopPropagation(); }}>Save Strategy</Button>
                                                 </div>
                                             </div>
                                         ) : (
@@ -1516,7 +1553,7 @@ function MyPlatePageContent() {
                   </ScrollArea>
               </div>
               <DialogFooter className="p-0 border-t pt-6 flex flex-col gap-4">
-                <form onSubmit={(e) => { e.preventDefault(); handleSaveExcuse(); }} className="flex gap-2 items-center w-full">
+                <form onSubmit={(e) => { e.preventDefault(); }} className="flex gap-2 items-center w-full">
                     <Input value={newExcuse} onChange={e => setNewExcuse(e.target.value)} placeholder="Enter reason for abandonment..." />
                 </form>
                 <Select onValueChange={(value) => setNewExcuseFear(value === 'none' ? '' : value)} value={newExcuseFear}>
