@@ -123,7 +123,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handleToggleComplete,
     handleStartWorkoutLog,
     handleStartLeadGenLog,
-    openTaskContextPopup: authOpenTaskContextPopup,
     onOpenFocusModal,
     openHabitDetailPopup,
     focusSessionModalOpen,
@@ -412,20 +411,13 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         )}
       {(!isAgendaDocked && authContext.settings.widgetVisibility.agenda) && (
         <TodaysScheduleCard
-            schedule={schedule}
             date={new Date()}
-            activityDurations={activityDurations}
             isAgendaDocked={isAgendaDocked}
             onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-            onLogLearning={handleLogLearning}
-            onStartWorkoutLog={handleStartWorkoutLog}
-            onStartLeadGenLog={handleStartLeadGenLog}
-            onToggleComplete={handleToggleComplete}
             onOpenFocusModal={onOpenFocusModal}
             onOpenTaskContext={openTaskContextPopup}
             onOpenHabitPopup={openHabitDetailPopup}
             currentSlot={currentSlot}
-            onRemoveActivity={(slot, id) => authContext.onRemoveActivity(slot, id, new Date())}
         />
       )}
       {authContext.settings.widgetVisibility.smartLogging && (

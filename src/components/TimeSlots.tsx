@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -87,34 +88,23 @@ export function TimeSlots({
   date,
   currentSlot,
   remainingTime,
-  onOpenTaskContext,
+  onOpenTaskContext
 }: TimeSlotsProps) {
-  const { 
-    schedule: globalSchedule, 
-    setSchedule: setGlobalSchedule,
-    handleToggleComplete,
-    toggleRoutine,
-    onOpenHabitPopup,
-    onOpenFocusModal,
-    settings
-  } = useAuth();
-  const { toast } = useToast();
+    const { toast } = useToast();
+    const { schedule: globalSchedule, setSchedule: setGlobalSchedule, settings, onOpenHabitPopup, handleToggleComplete, toggleRoutine, onOpenFocusModal } = useAuth();
+    const [schedule, setSchedule] = useState<FullSchedule>(globalSchedule);
+    
+    useEffect(() => {
+        setSchedule(globalSchedule);
+    }, [globalSchedule]);
 
-  const [schedule, setSchedule] = useState<FullSchedule>(globalSchedule);
+    useEffect(() => {
+        if (JSON.stringify(schedule) !== JSON.stringify(globalSchedule)) {
+            setGlobalSchedule(schedule);
+        }
+    }, [schedule, globalSchedule, setGlobalSchedule]);
 
-  useEffect(() => {
-    setSchedule(globalSchedule);
-  }, [globalSchedule]);
-
-  useEffect(() => {
-    // This effect ensures that any local changes to the schedule are propagated back to the global state.
-    // This is a temporary measure until all schedule logic is fully self-contained.
-    if (JSON.stringify(schedule) !== JSON.stringify(globalSchedule)) {
-        setGlobalSchedule(schedule);
-    }
-  }, [schedule, globalSchedule, setGlobalSchedule]);
-  
-  const todaysSchedule = useMemo(() => schedule[format(date, 'yyyy-MM-dd')] || {}, [schedule, date]);
+    const todaysSchedule = useMemo(() => schedule[format(date, 'yyyy-MM-dd')] || {}, [schedule, date]);
 
   const slots = [
     { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },

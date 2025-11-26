@@ -26,7 +26,7 @@ interface TodaysScheduleCardProps {
   isAgendaDocked: boolean;
   onToggleDock: () => void;
   onOpenFocusModal: (activity: Activity) => boolean;
-  onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
+  onOpenTaskContext: (activityId: string, event: React.MouseEvent) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
   currentSlot: string;
 }
