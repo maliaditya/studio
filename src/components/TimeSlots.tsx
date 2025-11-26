@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition } from '@/types/workout';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,8 @@ import { isToday, format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
+import { useToast } from '@/hooks/use-toast';
+
 
 const activityIcons: Record<ActivityType, React.ReactNode> = {
     workout: <Dumbbell className="h-4 w-4" />,
@@ -94,8 +96,7 @@ export function TimeSlots({
     toggleRoutine,
     onOpenHabitPopup,
     onOpenFocusModal,
-    settings,
-    useToast
+    settings
   } = useAuth();
   const { toast } = useToast();
 
@@ -106,8 +107,12 @@ export function TimeSlots({
   }, [globalSchedule]);
 
   useEffect(() => {
-    setGlobalSchedule(schedule);
-  }, [schedule, setGlobalSchedule]);
+    // This effect ensures that any local changes to the schedule are propagated back to the global state.
+    // This is a temporary measure until all schedule logic is fully self-contained.
+    if (JSON.stringify(schedule) !== JSON.stringify(globalSchedule)) {
+        setGlobalSchedule(schedule);
+    }
+  }, [schedule, globalSchedule, setGlobalSchedule]);
   
   const todaysSchedule = useMemo(() => schedule[format(date, 'yyyy-MM-dd')] || {}, [schedule, date]);
 
@@ -156,6 +161,9 @@ export function TimeSlots({
         details,
         completed: false,
         slot: slotName,
+        habitEquationIds: settings.defaultHabitLinks?.[type] ? [settings.defaultHabitLinks[type]!] : [],
+        taskIds: [],
+        linkedEntityType: (type === 'deepwork' || type === 'upskill') ? 'specialization' : undefined,
     };
     setSchedule(prev => ({
         ...prev,
@@ -164,6 +172,7 @@ export function TimeSlots({
             [slotName]: [...((prev[dateKey]?.[slotName as SlotName] as Activity[]) || []), newActivity],
         }
     }));
+    toast({ title: "Activity Added", description: `Added "${details}" to ${format(date, 'MMM d')}, ${slotName}.` });
   };
 
   const onRemoveActivity = (slotName: string, activityId: string) => {
