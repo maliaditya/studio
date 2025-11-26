@@ -56,7 +56,6 @@ interface ProductivitySnapshotProps {
   timeAllocationData: { name: string; time: number; activities: { name: string, duration: number }[] }[];
   onOpenTimeAllocationModal: () => void;
   todaysSchedule: DailySchedule;
-  activityDurations: Record<string, string>;
   showTimeAllocation?: boolean;
 }
 
@@ -264,7 +263,7 @@ export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData
 };
 
 
-export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllocationModal, todaysSchedule, activityDurations, showTimeAllocation = true }: ProductivitySnapshotProps) {
+export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllocationModal, todaysSchedule, showTimeAllocation = true }: ProductivitySnapshotProps) {
   const router = useRouter();
   const [isProjectDetailsModalOpen, setIsProjectDetailsModalOpen] = useState(false);
   const [selectedReleaseInfo, setSelectedReleaseInfo] = useState<{ release: Release, topic: string, type: 'product' | 'service', project?: Project } | null>(null);

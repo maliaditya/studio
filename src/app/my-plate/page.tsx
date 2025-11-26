@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project } from '@/types/workout';
@@ -81,20 +81,13 @@ function MyPlatePageContent() {
         deleteMindsetSet,
         onOpenTaskContext,
         onOpenHabitPopup,
-        handleToggleComplete: authHandleToggleComplete,
-        onRemoveActivity: authOnRemoveActivity,
         toggleRoutine: authToggleRoutine,
+        schedule,
+        setSchedule,
     } = auth;
     const router = useRouter();
     const { toast } = useToast();
-
-    const [schedule, setSchedule] = useState<FullSchedule>(auth.schedule);
     
-    useEffect(() => {
-        setSchedule(auth.schedule);
-    }, [auth.schedule]);
-
-
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
     const [remainingTime, setRemainingTime] = useState<string | null>(null);
     const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -185,15 +178,19 @@ function MyPlatePageContent() {
     
     const onOpenFocusModal = useCallback((activity: Activity) => {
         const estDurationStr = activity.duration?.toString();
-        let minutes = 45;
+        let minutes = 0;
         if (estDurationStr) {
             const hMatch = estDurationStr.match(/(\d+)h/);
             const mMatch = estDurationStr.match(/(\d+)m/);
-            minutes = (hMatch ? parseInt(hMatch[1]) * 60 : 0) + (mMatch ? parseInt(mMatch[1]) : 0);
+            const h = hMatch ? parseInt(hMatch[1]) * 60 : 0;
+            const m = mMatch ? parseInt(mMatch[1]) : 0;
+            minutes = h + m;
             if (minutes === 0 && /^\d+$/.test(estDurationStr.trim())) {
                 minutes = parseInt(estDurationStr.trim());
             }
         }
+        if (isNaN(minutes) || minutes <= 0) minutes = 45;
+        
         setFocusSessionModalOpen(true);
         return true;
     }, [setFocusSessionModalOpen]);
@@ -241,7 +238,45 @@ function MyPlatePageContent() {
     }, [currentSlot]);
 
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
-    const todaysSchedule = useMemo(() => schedule[selectedDateKey] || {}, [schedule, selectedDateKey]);
+    
+    const { activityDurations, populatedSchedule } = useMemo(() => {
+        const durations: Record<string, string> = {};
+        const newPopulatedSchedule: FullSchedule = {};
+
+        const getDurationForActivity = (activity: Activity): number => {
+            if (activity.completed && activity.duration) {
+                return activity.duration;
+            }
+            if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+                const pauseTime = (activity.focusSessionPauses || []).reduce((acc, p) => acc + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
+                return Math.round((activity.focusSessionEndTime - activity.focusSessionInitialStartTime - pauseTime) / 60000);
+            }
+            return activity.duration || 0;
+        };
+
+        for (const dateKey in schedule) {
+            newPopulatedSchedule[dateKey] = {};
+            for (const slotName in schedule[dateKey]) {
+                const activities = schedule[dateKey][slotName as SlotName] as Activity[];
+                if (Array.isArray(activities)) {
+                    newPopulatedSchedule[dateKey][slotName as SlotName] = activities.map(act => {
+                        const duration = getDurationForActivity(act);
+                        if (duration > 0) {
+                            const hours = Math.floor(duration / 60);
+                            const minutes = duration % 60;
+                            durations[act.id] = `${hours > 0 ? `${hours}h ` : ''}${minutes} min`;
+                        } else {
+                            durations[act.id] = '';
+                        }
+                        return { ...act, duration };
+                    });
+                }
+            }
+        }
+        return { activityDurations: durations, populatedSchedule: newPopulatedSchedule };
+    }, [schedule]);
+
+    const todaysSchedule = useMemo(() => populatedSchedule[selectedDateKey] || {}, [populatedSchedule, selectedDateKey]);
 
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
@@ -274,39 +309,6 @@ function MyPlatePageContent() {
         return total;
     }, [deepWorkDefinitions, upskillDefinitions]);
     
-    const getDurationForActivity = useCallback((activity: Activity): number => {
-        if (activity.completed && activity.duration) {
-            return activity.duration;
-        }
-        if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-            const pauseTime = (activity.focusSessionPauses || []).reduce((acc, p) => acc + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
-            return Math.round((activity.focusSessionEndTime - activity.focusSessionInitialStartTime - pauseTime) / 60000);
-        }
-        return activity.duration || 0;
-    }, []);
-    
-    const activityDurations: Record<string, string> = useMemo(() => {
-        const durations: Record<string, string> = {};
-        for (const dateKey in schedule) {
-            for (const slotName in schedule[dateKey]) {
-                const activities = schedule[dateKey][slotName as SlotName] as Activity[];
-                if (Array.isArray(activities)) {
-                    activities.forEach(act => {
-                        const duration = getDurationForActivity(act);
-                        if (duration > 0) {
-                            const hours = Math.floor(duration / 60);
-                            const minutes = duration % 60;
-                            durations[act.id] = `${hours > 0 ? `${hours}h ` : ''}${minutes} min`;
-                        } else {
-                            durations[act.id] = '';
-                        }
-                    });
-                }
-            }
-        }
-        return durations;
-    }, [schedule, getDurationForActivity]);
-
     const productivityStats = useMemo(() => {
         const today = startOfToday();
         const todayKey = format(today, 'yyyy-MM-dd');
@@ -428,23 +430,6 @@ function MyPlatePageContent() {
         return allReleases.sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime());
     }, [productizationPlans, offerizationPlans, projects, coreSkills]);
     
-    const populatedSchedule = useMemo(() => {
-        const newPopulatedSchedule: FullSchedule = {};
-        for (const dateKey in schedule) {
-            newPopulatedSchedule[dateKey] = {};
-            for (const slotName in schedule[dateKey]) {
-                const activities = schedule[dateKey][slotName as SlotName] as Activity[];
-                if (Array.isArray(activities)) {
-                    newPopulatedSchedule[dateKey][slotName as SlotName] = activities.map(act => ({
-                        ...act,
-                        duration: getDurationForActivity(act)
-                    }));
-                }
-            }
-        }
-        return newPopulatedSchedule;
-    }, [schedule, getDurationForActivity]);
-    
     const brandingStatus = useMemo(() => {
         const todayLog = brandingLogs.find(log => log.date === selectedDateKey);
         const todaysBrandingTasks = populatedSchedule[selectedDateKey]?.branding || [];
@@ -507,7 +492,7 @@ function MyPlatePageContent() {
       }, [brandingLogs, populatedSchedule, selectedDateKey, deepWorkDefinitions]);
     
     const timeAllocationData = useMemo(() => {
-        const dailyActivities = populatedSchedule[selectedDateKey] ? Object.values(populatedSchedule[selectedDateKey]).flat() : [];
+        const dailyActivities = todaysSchedule ? Object.values(todaysSchedule).flat() : [];
         const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
         const activityNameMap: Record<ActivityType, string> = { 
           deepwork: 'Deep Work', 
@@ -541,7 +526,7 @@ function MyPlatePageContent() {
         });
       
         return Object.entries(totals).map(([name, data]) => ({ name, time: data.time, activities: data.activities }));
-    }, [populatedSchedule, selectedDateKey]);
+    }, [todaysSchedule]);
     
     const dashboardStats = useMemo(() => {
         const {
@@ -601,7 +586,6 @@ function MyPlatePageContent() {
                             <div className="lg:col-span-2 space-y-6">
                                 {isAgendaDocked ? (
                                     <TodaysScheduleCard
-                                        schedule={populatedSchedule}
                                         date={selectedDate}
                                         isAgendaDocked={isAgendaDocked}
                                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
@@ -650,7 +634,6 @@ function MyPlatePageContent() {
                             remainingTime={remainingTime}
                             onAddActivity={handleAddActivity}
                             onActivityClick={handleActivityClick}
-                            slotDurations={activityDurations}
                         />
                     </CardContent>
                 </Card>
@@ -662,7 +645,7 @@ function MyPlatePageContent() {
                 onOpenChange={setIsTodaysWorkoutModalOpen}
                 activityToLog={workoutActivityToLog}
                 dateForWorkout={selectedDate}
-                onActivityComplete={(slot, id) => handleToggleComplete(slot, id, true)}
+                onActivityComplete={handleToggleComplete}
                 logWorkoutSet={logWorkoutSet}
                 updateWorkoutSet={updateWorkoutSet} 
                 deleteWorkoutSet={deleteWorkoutSet} 
@@ -674,14 +657,14 @@ function MyPlatePageContent() {
                 onOpenChange={setIsTodaysMindsetModalOpen}
                 activityToLog={mindsetActivityToLog}
                 dateForWorkout={selectedDate}
-                onActivityComplete={(slot, id) => handleToggleComplete(slot, id, true)}
+                onActivityComplete={handleToggleComplete}
             />
 
             <TodaysLeadGenModal 
                 isOpen={isLeadGenModalOpen} 
                 onOpenChange={setIsLeadGenModalOpen} 
                 activityToLog={workoutActivityToLog}
-                onActivityComplete={(slot, id) => handleToggleComplete(slot, id, true)}
+                onActivityComplete={handleToggleComplete}
             />
             
             <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
@@ -741,5 +724,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
-
-    

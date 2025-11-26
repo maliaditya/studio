@@ -21,7 +21,6 @@ import { AgendaWidgetItem } from './AgendaWidgetItem';
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
 interface TodaysScheduleCardProps {
-  schedule: FullSchedule;
   date: Date;
   isAgendaDocked: boolean;
   onToggleDock: () => void;
@@ -32,7 +31,6 @@ interface TodaysScheduleCardProps {
 }
 
 export function TodaysScheduleCard({ 
-  schedule, 
   date,
   isAgendaDocked, 
   onToggleDock,
@@ -48,7 +46,8 @@ export function TodaysScheduleCard({
       setSettings,
       handleToggleComplete,
       onRemoveActivity,
-      toggleRoutine
+      toggleRoutine,
+      schedule
   } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   

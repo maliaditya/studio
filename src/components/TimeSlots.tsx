@@ -1,17 +1,18 @@
 
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, SlotName, RecurrenceRule } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, SlotName, RecurrenceRule, FullSchedule } from '@/types/workout';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from './ui/scroll-area';
 import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle } from 'lucide-react';
-import { isToday } from 'date-fns';
+import { isToday, format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
+import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 
 const activityIcons: Record<ActivityType, React.ReactNode> = {
     workout: <Dumbbell className="h-4 w-4" />,
@@ -75,25 +76,76 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
 
 interface TimeSlotsProps {
   date: Date;
-  schedule: DailySchedule;
   currentSlot: string;
   remainingTime: string | null;
-  onAddActivity: (slotName: string, type: ActivityType, details: string) => void;
   onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
-  slotDurations: Record<string, string>;
 }
 
 export function TimeSlots({
   date,
-  schedule,
   currentSlot,
   remainingTime,
-  onAddActivity,
   onActivityClick,
-  slotDurations,
 }: TimeSlotsProps) {
-  const { onRemoveActivity, handleToggleComplete, toggleRoutine, onOpenTaskContext, onOpenHabitPopup } = useAuth();
-  
+  const { schedule: globalSchedule, setSchedule: setGlobalSchedule, onRemoveActivity, handleToggleComplete, toggleRoutine, onOpenTaskContext, onOpenHabitPopup } = useAuth();
+  const [schedule, setSchedule] = useState<FullSchedule>(globalSchedule);
+
+  useEffect(() => {
+    setSchedule(globalSchedule);
+  }, [globalSchedule]);
+
+  const onDragEnd = (result: DropResult) => {
+    const { source, destination } = result;
+    if (!destination) return;
+    const sourceDroppableId = source.droppableId;
+    const destinationDroppableId = destination.droppableId;
+    if (sourceDroppableId === destinationDroppableId && source.index === destination.index) {
+        return;
+    }
+    const [sourceDateKey, sourceSlotName] = sourceDroppableId.split('_');
+    const [destDateKey, destSlotName] = destinationDroppableId.split('_');
+    setSchedule(currentSchedule => {
+        const sourceDaySchedule = { ...(currentSchedule[sourceDateKey] || {}) };
+        const sourceActivities = [...((sourceDaySchedule[sourceSlotName as SlotName] as Activity[]) || [])];
+        const [movedActivity] = sourceActivities.splice(source.index, 1);
+        if (!movedActivity) return currentSchedule;
+        movedActivity.slot = destSlotName;
+        
+        const newSchedule = { ...currentSchedule, [sourceDateKey]: { ...sourceDaySchedule, [sourceSlotName as SlotName]: sourceActivities } };
+
+        const destDaySchedule = { ...(newSchedule[destDateKey] || {}) };
+        const destActivities = [...((destDaySchedule[destSlotName as SlotName] as Activity[]) || [])];
+        destActivities.splice(destination.index, 0, movedActivity);
+        newSchedule[destDateKey] = { ...destDaySchedule, [destSlotName as SlotName]: destActivities };
+
+        return newSchedule;
+    });
+  };
+
+  const handleAddActivity = (slotName: string, type: ActivityType, details: string) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const newActivity: Activity = {
+        id: `${type}-${Date.now()}-${Math.random()}`,
+        type,
+        details,
+        completed: false,
+        slot: slotName,
+    };
+    setSchedule(prev => ({
+        ...prev,
+        [dateKey]: {
+            ...(prev[dateKey] || {}),
+            [slotName]: [...((prev[dateKey]?.[slotName as SlotName] as Activity[]) || []), newActivity],
+        }
+    }));
+  };
+
+  useEffect(() => {
+    setGlobalSchedule(schedule);
+  }, [schedule, setGlobalSchedule]);
+
+  const todaysSchedule = useMemo(() => schedule[format(date, 'yyyy-MM-dd')] || {}, [schedule, date]);
+
   const slots = [
     { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
     { name: 'Dawn', time: '4am - 8am', endHour: 8, icon: <Sunrise className="h-5 w-5 text-orange-400" /> },
@@ -104,12 +156,10 @@ export function TimeSlots({
   ];
 
   return (
-    <>
+    <DragDropContext onDragEnd={onDragEnd}>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {slots.map((slot) => {
-        const activities = (schedule[slot.name as keyof DailySchedule] as Activity[]) || [];
-        const slotDurationText = slotDurations[slot.name] || '';
-        
+        const activities = (todaysSchedule[slot.name as keyof DailySchedule] as Activity[]) || [];
         const isCurrentSlotToday = isToday(date) && currentSlot === slot.name;
 
         return (
@@ -129,7 +179,7 @@ export function TimeSlots({
                 <CardDescription>{slot.time}</CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                {isCurrentSlotToday ? (
+                {isCurrentSlotToday && remainingTime !== null ? (
                   <div className="font-mono text-lg text-primary/80 tracking-wider animate-subtle-pulse">
                     {remainingTime}
                   </div>
@@ -183,7 +233,7 @@ export function TimeSlots({
                                 <PlusCircle className="mr-2 h-4 w-4" /> Add Activity
                             </Button>
                         </DropdownMenuTrigger>
-                        <AddActivityMenu onAddActivity={(type, details) => onAddActivity(slot.name, type, details)} />
+                        <AddActivityMenu onAddActivity={(type, details) => handleAddActivity(slot.name, type, details)} />
                     </DropdownMenu>
                 </div>
               </div>
@@ -192,8 +242,6 @@ export function TimeSlots({
         )
       })}
     </div>
-    </>
+    </DragDropContext>
   );
 }
-
-    
