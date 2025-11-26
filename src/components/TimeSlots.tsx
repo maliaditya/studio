@@ -77,10 +77,10 @@ interface TimeSlotsProps {
   date: Date;
   schedule: DailySchedule;
   currentSlot: string;
-  remainingTime: string;
+  remainingTime: string | null;
   onAddActivity: (slotName: string, type: ActivityType, details: string) => void;
   onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
-  slotDurations: Record<string, { logged: number; total: number }>;
+  slotDurations: Record<string, string>;
 }
 
 export function TimeSlots({
@@ -108,7 +108,7 @@ export function TimeSlots({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {slots.map((slot) => {
         const activities = (schedule[slot.name as keyof DailySchedule] as Activity[]) || [];
-        const slotData = slotDurations[slot.name] || { logged: 0, total: 0 };
+        const slotDurationText = slotDurations[slot.name] || '';
         
         const isCurrentSlotToday = isToday(date) && currentSlot === slot.name;
 
@@ -195,3 +195,5 @@ export function TimeSlots({
     </>
   );
 }
+
+    

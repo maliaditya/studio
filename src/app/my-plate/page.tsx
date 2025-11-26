@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project } from '@/types/workout';
@@ -30,6 +30,7 @@ import { TimetablePageContent } from '@/app/timetable/page';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { Link as LinkIconLucide } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { AuthGuard } from '@/components/AuthGuard';
 
 
 const slotEndHours: Record<string, number> = {
@@ -37,6 +38,7 @@ const slotEndHours: Record<string, number> = {
 };
 
 function MyPlatePageContent() {
+    const auth = useAuth();
     const {
         settings,
         allUpskillLogs,
@@ -79,11 +81,13 @@ function MyPlatePageContent() {
         deleteMindsetSet,
         onOpenTaskContext,
         onOpenHabitPopup,
-    } = useAuth();
+        handleToggleComplete: authHandleToggleComplete,
+        onRemoveActivity: authOnRemoveActivity,
+        toggleRoutine: authToggleRoutine,
+    } = auth;
     const router = useRouter();
     const { toast } = useToast();
 
-    const auth = useAuth();
     const [schedule, setSchedule] = useState<FullSchedule>(auth.schedule);
     
     useEffect(() => {
@@ -92,7 +96,7 @@ function MyPlatePageContent() {
 
 
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
-    const [remainingTime, setRemainingTime] = useState('');
+    const [remainingTime, setRemainingTime] = useState<string | null>(null);
     const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
     const [isTodaysMindsetModalOpen, setIsTodaysMindsetModalOpen] = useState(false);
     const [isLeadGenModalOpen, setIsLeadGenModalOpen] = useState(false);
@@ -234,7 +238,7 @@ function MyPlatePageContent() {
             setRemainingTime('00:00:00');
         }, 1000);
         return () => clearInterval(timerInterval);
-    }, []);
+    }, [currentSlot]);
 
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
     const todaysSchedule = useMemo(() => schedule[selectedDateKey] || {}, [schedule, selectedDateKey]);
@@ -509,7 +513,6 @@ function MyPlatePageContent() {
           deepwork: 'Deep Work', 
           upskill: 'Learning', 
           workout: 'Workout', 
-          mindset: 'Mindset', 
           branding: 'Branding', 
           essentials: 'Essentials', 
           planning: 'Planning', 
@@ -518,6 +521,7 @@ function MyPlatePageContent() {
           interrupt: 'Interrupts',
           distraction: 'Distractions', 
           nutrition: 'Nutrition',
+          mindset: 'Mindset',
         };
       
         (dailyActivities as Activity[]).forEach((activity) => {
@@ -735,5 +739,7 @@ function MyPlatePageContent() {
 }
 
 export default function MyPlatePage() {
-    return <MyPlatePageContent />;
+    return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
+
+    
