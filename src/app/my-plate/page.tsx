@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project } from '@/types/workout';
@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { TimeSlots } from '@/components/TimeSlots';
 import { ProductivitySnapshot, TimeAllocationChart } from '@/components/ProductivitySnapshot';
+import { DashboardStats } from '@/components/DashboardStats';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
@@ -42,16 +43,7 @@ function MyPlatePageContent() {
         allDeepWorkLogs,
         upskillDefinitions,
         deepWorkDefinitions,
-        workoutMode,
-        workoutPlans,
-        exerciseDefinitions,
-        allWorkoutLogs,
-        workoutPlanRotation,
         brandingLogs,
-        allLeadGenLogs,
-        allMindProgrammingLogs,
-        onOpenTaskContext,
-        onOpenHabitPopup,
         weightLogs,
         goalWeight,
         height,
@@ -85,15 +77,18 @@ function MyPlatePageContent() {
         swapWorkoutExercise,
         logMindsetSet,
         deleteMindsetSet,
-        schedule, 
-        setSchedule,
-        handleToggleComplete: authHandleToggleComplete,
-        onRemoveActivity: authOnRemoveActivity,
-        carryForwardTask: authCarryForwardTask,
-        toggleRoutine: authToggleRoutine
+        onOpenTaskContext,
+        onOpenHabitPopup,
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
+
+    const [schedule, setSchedule] = useState<FullSchedule>(useAuth().schedule);
+    
+    useEffect(() => {
+        setSchedule(useAuth().schedule);
+    }, [useAuth().schedule]);
+
 
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
     const [remainingTime, setRemainingTime] = useState('');
@@ -110,15 +105,31 @@ function MyPlatePageContent() {
     const [mindsetActivityToLog, setMindsetActivityToLog] = useState<Activity | null>(null);
 
     const onRemoveActivity = (slotName: string, activityId: string, date: Date) => {
-        authOnRemoveActivity(slotName, activityId, date);
+        const dateKey = format(date, 'yyyy-MM-dd');
+        setSchedule(prev => {
+            const newSchedule = { ...prev };
+            if (newSchedule[dateKey]) {
+                const daySchedule = { ...newSchedule[dateKey] };
+                if (daySchedule[slotName]) {
+                    daySchedule[slotName] = (daySchedule[slotName] as any[]).filter(act => act.id !== activityId);
+                    newSchedule[dateKey] = daySchedule;
+                }
+            }
+            return newSchedule;
+        });
     };
 
     const handleToggleComplete = (slot: string, id: string, completed: boolean) => {
-        authHandleToggleComplete(slot, id, completed);
-    }
-
-    const toggleRoutine = (activity: Activity, rule: any) => {
-        authToggleRoutine(activity, rule);
+        const dateKey = format(selectedDate, 'yyyy-MM-dd');
+        setSchedule(prev => {
+            const newSchedule = { ...prev };
+            if (newSchedule[dateKey] && newSchedule[dateKey][slot]) {
+                newSchedule[dateKey][slot] = (newSchedule[dateKey][slot] as Activity[]).map(act => 
+                    act.id === id ? { ...act, completed, completedAt: completed ? Date.now() : undefined } : act
+                );
+            }
+            return newSchedule;
+        });
     }
     
     const handleAddActivity = (slotName: string, type: ActivityType, details: string) => {
@@ -179,7 +190,6 @@ function MyPlatePageContent() {
             }
         }
         setFocusSessionModalOpen(true);
-        // This is a simplified logic, actual prop setting would be in useAuth hook or here based on full implementation
         return true;
     }, [setFocusSessionModalOpen]);
     
@@ -214,13 +224,13 @@ function MyPlatePageContent() {
                 if (currentHour < slot.endHour) {
                     const diff = new Date().setHours(slot.endHour, 0, 0, 0) - now.getTime();
                     const hours = Math.floor(diff / (1000 * 60 * 60));
-                    const minutes = Math.floor((diff / (1000 * 60)) % 60);
+                    const minutes = Math.floor((diff / 1000 * 60) % 60);
                     const seconds = Math.floor((diff / 1000) % 60);
                     setRemainingTime(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
                     return;
                 }
             }
-            setRemainingTime('00:00:00'); // For Night slot past its end
+            setRemainingTime('00:00:00');
         }, 1000);
         return () => clearInterval(timerInterval);
     }, []);
@@ -379,7 +389,7 @@ function MyPlatePageContent() {
         
         return allReleases.sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime());
     }, [productizationPlans, offerizationPlans, projects, coreSkills]);
-
+    
     const getDurationForActivity = useCallback((activity: Activity) => {
         if (activity.completed && activity.duration) {
             return activity.duration;
@@ -613,7 +623,6 @@ function MyPlatePageContent() {
                             remainingTime={remainingTime}
                             onAddActivity={handleAddActivity}
                             onActivityClick={handleActivityClick}
-                            slotDurations={{}}
                         />
                     </CardContent>
                 </Card>
@@ -708,5 +717,6 @@ export default function MyPlatePage() {
         </AuthGuard>
     );
 }
+
 
 
