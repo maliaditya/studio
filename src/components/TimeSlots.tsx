@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, SlotName, RecurrenceRule, FullSchedule } from '@/types/workout';
 import { Button } from '@/components/ui/button';
@@ -78,21 +78,43 @@ interface TimeSlotsProps {
   date: Date;
   currentSlot: string;
   remainingTime: string | null;
-  onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
 }
 
 export function TimeSlots({
   date,
   currentSlot,
   remainingTime,
-  onActivityClick,
 }: TimeSlotsProps) {
-  const { schedule: globalSchedule, setSchedule: setGlobalSchedule, onRemoveActivity, handleToggleComplete, toggleRoutine, onOpenTaskContext, onOpenHabitPopup } = useAuth();
+  const { 
+    schedule: globalSchedule, 
+    setSchedule: setGlobalSchedule,
+    handleToggleComplete,
+    toggleRoutine,
+    onOpenTaskContext,
+    onOpenHabitPopup,
+    onOpenFocusModal,
+  } = useAuth();
   const [schedule, setSchedule] = useState<FullSchedule>(globalSchedule);
 
   useEffect(() => {
     setSchedule(globalSchedule);
   }, [globalSchedule]);
+
+  // Save back to global state whenever local schedule changes
+  useEffect(() => {
+    setGlobalSchedule(schedule);
+  }, [schedule, setGlobalSchedule]);
+
+  const todaysSchedule = useMemo(() => schedule[format(date, 'yyyy-MM-dd')] || {}, [schedule, date]);
+
+  const slots = [
+    { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
+    { name: 'Dawn', time: '4am - 8am', endHour: 8, icon: <Sunrise className="h-5 w-5 text-orange-400" /> },
+    { name: 'Morning', time: '8am - 12pm', endHour: 12, icon: <Sun className="h-5 w-5 text-yellow-400" /> },
+    { name: 'Afternoon', time: '12pm - 4pm', endHour: 16, icon: <CloudSun className="h-5 w-5 text-sky-500" /> },
+    { name: 'Evening', time: '4pm - 8pm', endHour: 20, icon: <Sunset className="h-5 w-5 text-purple-500" /> },
+    { name: 'Night', time: '8pm - 12am', endHour: 24, icon: <MoonStar className="h-5 w-5 text-indigo-500" /> }
+  ];
 
   const onDragEnd = (result: DropResult) => {
     const { source, destination } = result;
@@ -140,20 +162,28 @@ export function TimeSlots({
     }));
   };
 
-  useEffect(() => {
-    setGlobalSchedule(schedule);
-  }, [schedule, setGlobalSchedule]);
+  const onRemoveActivity = (slotName: string, activityId: string, date: Date) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        if (newSchedule[dateKey]) {
+            const daySchedule = { ...newSchedule[dateKey] };
+            if (daySchedule[slotName]) {
+                daySchedule[slotName] = (daySchedule[slotName] as any[]).filter(act => act.id !== activityId);
+                newSchedule[dateKey] = daySchedule;
+            }
+        }
+        return newSchedule;
+    });
+  };
 
-  const todaysSchedule = useMemo(() => schedule[format(date, 'yyyy-MM-dd')] || {}, [schedule, date]);
+  const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
+    if (activity.completed) return;
+    if (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'branding') {
+        onOpenFocusModal(activity);
+    }
+  };
 
-  const slots = [
-    { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
-    { name: 'Dawn', time: '4am - 8am', endHour: 8, icon: <Sunrise className="h-5 w-5 text-orange-400" /> },
-    { name: 'Morning', time: '8am - 12pm', endHour: 12, icon: <Sun className="h-5 w-5 text-yellow-400" /> },
-    { name: 'Afternoon', time: '12pm - 4pm', endHour: 16, icon: <CloudSun className="h-5 w-5 text-sky-500" /> },
-    { name: 'Evening', time: '4pm - 8pm', endHour: 20, icon: <Sunset className="h-5 w-5 text-purple-500" /> },
-    { name: 'Night', time: '8pm - 12am', endHour: 24, icon: <MoonStar className="h-5 w-5 text-indigo-500" /> }
-  ];
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
@@ -201,7 +231,7 @@ export function TimeSlots({
                           activity={{...activity, slot: slot.name as SlotName}}
                           date={date}
                           onToggleComplete={handleToggleComplete}
-                          onActivityClick={onActivityClick}
+                          onActivityClick={handleActivityClick}
                           onRemoveActivity={(slotName, id) => onRemoveActivity(slotName, id, date)}
                           setRoutine={toggleRoutine}
                           onOpenTaskContext={onOpenTaskContext}
