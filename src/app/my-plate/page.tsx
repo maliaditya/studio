@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition } from '@/types/workout';
+import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project } from '@/types/workout';
 import { format, startOfToday, isAfter, parseISO, differenceInDays, subDays, isSameDay } from 'date-fns';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 
@@ -15,7 +15,7 @@ import { ProductivitySnapshot, TimeAllocationChart } from '@/components/Producti
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysMindsetModal } from '@/components/TodaysMindsetModal';
@@ -27,6 +27,9 @@ import { ChartsPageContent } from '@/app/charts/page';
 import { TimesheetPageContent } from '@/app/timesheet/page';
 import { TimetablePageContent } from '@/app/timetable/page';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
+import { AuthGuard } from '@/components/AuthGuard';
+import { Link as LinkIconLucide } from 'lucide-react';
+
 
 const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
@@ -47,9 +50,6 @@ function MyPlatePageContent() {
         brandingLogs,
         allLeadGenLogs,
         allMindProgrammingLogs,
-        handleToggleComplete,
-        onRemoveActivity: authOnRemoveActivity, // Renaming to avoid conflict
-        toggleRoutine,
         onOpenTaskContext,
         onOpenHabitPopup,
         weightLogs,
@@ -84,12 +84,17 @@ function MyPlatePageContent() {
         removeExerciseFromWorkout, 
         swapWorkoutExercise,
         logMindsetSet,
-        deleteMindsetSet
+        deleteMindsetSet,
+        schedule, 
+        setSchedule,
+        handleToggleComplete: authHandleToggleComplete,
+        onRemoveActivity: authOnRemoveActivity,
+        carryForwardTask: authCarryForwardTask,
+        toggleRoutine: authToggleRoutine
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
 
-    const [schedule, setSchedule] = useState<FullSchedule>({});
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
     const [remainingTime, setRemainingTime] = useState('');
     const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -105,10 +110,18 @@ function MyPlatePageContent() {
     const [mindsetActivityToLog, setMindsetActivityToLog] = useState<Activity | null>(null);
 
     const onRemoveActivity = (slotName: string, activityId: string, date: Date) => {
-        authOnRemoveActivity(slotName, activityId, date, setSchedule);
+        authOnRemoveActivity(slotName, activityId, date);
     };
+
+    const handleToggleComplete = (slot: string, id: string, completed: boolean) => {
+        authHandleToggleComplete(slot, id, completed);
+    }
+
+    const toggleRoutine = (activity: Activity, rule: any) => {
+        authToggleRoutine(activity, rule);
+    }
     
-    const handleAddActivity = (slotName: string, type: ActivityType, details: string, onAddActivity: (slotName: string, type: ActivityType, details: string) => void) => {
+    const handleAddActivity = (slotName: string, type: ActivityType, details: string) => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
         const newActivity: Activity = {
             id: `${type}-${Date.now()}-${Math.random()}`,
@@ -185,12 +198,21 @@ function MyPlatePageContent() {
     };
     
     useEffect(() => {
+        const slotOrder = [
+            { name: 'Late Night', endHour: 4 },
+            { name: 'Dawn', endHour: 8 },
+            { name: 'Morning', endHour: 12 },
+            { name: 'Afternoon', endHour: 16 },
+            { name: 'Evening', endHour: 20 },
+            { name: 'Night', endHour: 24 }
+        ];
+
         const timerInterval = setInterval(() => {
             const now = new Date();
             const currentHour = now.getHours();
-            for (const slot of Object.values(slotOrder)) {
-                if (currentHour < slot) {
-                    const diff = new Date().setHours(slot, 0, 0, 0) - now.getTime();
+            for (const slot of slotOrder) {
+                if (currentHour < slot.endHour) {
+                    const diff = new Date().setHours(slot.endHour, 0, 0, 0) - now.getTime();
                     const hours = Math.floor(diff / (1000 * 60 * 60));
                     const minutes = Math.floor((diff / (1000 * 60)) % 60);
                     const seconds = Math.floor((diff / 1000) % 60);
@@ -204,19 +226,8 @@ function MyPlatePageContent() {
     }, []);
 
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
-    const selectedDaySchedule = schedule[selectedDateKey] || {};
+    const todaysSchedule = useMemo(() => schedule[selectedDateKey] || {}, [schedule, selectedDateKey]);
 
-    const activityDurations = useMemo(() => {
-        const durations: Record<string, string> = {};
-        // Placeholder for potentially complex duration logic
-        return durations;
-    }, [schedule, selectedDateKey]);
-
-    const slotDurations = useMemo(() => {
-        // Placeholder for slot duration calculation logic
-        return {};
-    }, [schedule, selectedDateKey]);
-    
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
         const visited = new Set<string>();
@@ -368,10 +379,38 @@ function MyPlatePageContent() {
         
         return allReleases.sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime());
     }, [productizationPlans, offerizationPlans, projects, coreSkills]);
+
+    const getDurationForActivity = useCallback((activity: Activity) => {
+        if (activity.completed && activity.duration) {
+            return activity.duration;
+        }
+        if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+            const pauseTime = (activity.focusSessionPauses || []).reduce((acc, p) => acc + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
+            return Math.round((activity.focusSessionEndTime - activity.focusSessionInitialStartTime - pauseTime) / 60000);
+        }
+        return activity.duration || 0;
+    }, []);
+    
+    const populatedSchedule = useMemo(() => {
+        const newPopulatedSchedule: FullSchedule = {};
+        for (const dateKey in schedule) {
+            newPopulatedSchedule[dateKey] = {};
+            for (const slotName in schedule[dateKey]) {
+                const activities = schedule[dateKey][slotName as SlotName] as Activity[];
+                if (Array.isArray(activities)) {
+                    newPopulatedSchedule[dateKey][slotName as SlotName] = activities.map(act => ({
+                        ...act,
+                        duration: getDurationForActivity(act)
+                    }));
+                }
+            }
+        }
+        return newPopulatedSchedule;
+    }, [schedule, getDurationForActivity]);
     
     const brandingStatus = useMemo(() => {
         const todayLog = brandingLogs.find(log => log.date === selectedDateKey);
-        const todaysBrandingTasks = selectedDaySchedule.branding || [];
+        const todaysBrandingTasks = populatedSchedule[selectedDateKey]?.branding || [];
         
         const inProgressItems = (todaysBrandingTasks as Activity[] || [])
             .filter(act => !act.completed)
@@ -428,10 +467,10 @@ function MyPlatePageContent() {
             message,
             subMessage
         };
-    }, [brandingLogs, selectedDaySchedule, selectedDateKey, deepWorkDefinitions]);
+      }, [brandingLogs, populatedSchedule, selectedDateKey, deepWorkDefinitions]);
     
     const timeAllocationData = useMemo(() => {
-        const dailyActivities = selectedDaySchedule ? Object.values(selectedDaySchedule).flat() : [];
+        const dailyActivities = populatedSchedule[selectedDateKey] ? Object.values(populatedSchedule[selectedDateKey]).flat() : [];
         const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
         const activityNameMap: Record<ActivityType, string> = { 
           deepwork: 'Deep Work', 
@@ -452,7 +491,7 @@ function MyPlatePageContent() {
           if (activity && typeof activity === 'object' && 'type' in activity) {
             const mappedName = activityNameMap[activity.type as ActivityType];
             if (mappedName) {
-              const duration = activity.completed && activity.duration ? activity.duration : 0;
+              const duration = activity.duration || 0;
               if (duration > 0) {
                 if (!totals[mappedName]) {
                   totals[mappedName] = { time: 0, activities: [] };
@@ -465,7 +504,7 @@ function MyPlatePageContent() {
         });
       
         return Object.entries(totals).map(([name, data]) => ({ name, time: data.time, activities: data.activities }));
-    }, [selectedDaySchedule]);
+    }, [populatedSchedule, selectedDateKey]);
     
     const dashboardStats = useMemo(() => {
         const {
@@ -479,7 +518,7 @@ function MyPlatePageContent() {
             productivityLevel,
         } = productivityStats;
       
-        const todaysActivities = selectedDaySchedule || {};
+        const todaysActivities = populatedSchedule[selectedDateKey] || {};
         const hasPlannedOrCompleted = Object.values(todaysActivities).flat().length > 0;
         const allCompleted = hasPlannedOrCompleted && Object.values(todaysActivities).flat().every(a => (a as Activity).completed);
       
@@ -499,7 +538,7 @@ function MyPlatePageContent() {
             brandingStatus,
             productivityLevel,
         };
-    }, [productivityStats, selectedDaySchedule, upcomingReleases, brandingStatus]);
+    }, [productivityStats, populatedSchedule, selectedDateKey, upcomingReleases, brandingStatus]);
 
 
     return (
@@ -519,14 +558,13 @@ function MyPlatePageContent() {
                                     stats={dashboardStats}
                                     timeAllocationData={timeAllocationData}
                                     onOpenTimeAllocationModal={() => {}}
-                                    todaysSchedule={selectedDaySchedule}
-                                    activityDurations={activityDurations}
+                                    todaysSchedule={todaysSchedule}
                                 />
                             </div>
                             <div className="lg:col-span-2 space-y-6">
                                 {isAgendaDocked ? (
                                     <TodaysScheduleCard
-                                        schedule={schedule}
+                                        schedule={populatedSchedule}
                                         date={selectedDate}
                                         isAgendaDocked={isAgendaDocked}
                                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
@@ -570,12 +608,12 @@ function MyPlatePageContent() {
                         </div>
                         <TimeSlots
                             date={selectedDate}
-                            schedule={selectedDaySchedule}
+                            schedule={todaysSchedule}
                             currentSlot={currentSlot}
                             remainingTime={remainingTime}
                             onAddActivity={handleAddActivity}
                             onActivityClick={handleActivityClick}
-                            slotDurations={slotDurations}
+                            slotDurations={{}}
                         />
                     </CardContent>
                 </Card>
@@ -587,26 +625,26 @@ function MyPlatePageContent() {
                 onOpenChange={setIsTodaysWorkoutModalOpen}
                 activityToLog={workoutActivityToLog}
                 dateForWorkout={selectedDate}
-                onActivityComplete={(slot, id) => handleToggleComplete(slot, id, true, setSchedule)}
-                logWorkoutSet={(date, exId, reps, weight) => console.log('logWorkoutSet', date, exId, reps, weight)}
-                updateWorkoutSet={(date, exId, setId, reps, weight) => console.log('updateWorkoutSet', date, exId, setId, reps, weight)}
-                deleteWorkoutSet={(date, exId, setId) => console.log('deleteWorkoutSet', date, exId, setId)}
-                removeExerciseFromWorkout={(date, exId) => console.log('removeExerciseFromWorkout', date, exId)}
-                swapWorkoutExercise={(date, oldExId, newDef) => console.log('swapWorkoutExercise', date, oldExId, newDef)}
+                onActivityComplete={(slot, id) => handleToggleComplete(slot, id, true)}
+                logWorkoutSet={logWorkoutSet}
+                updateWorkoutSet={updateWorkoutSet} 
+                deleteWorkoutSet={deleteWorkoutSet} 
+                removeExerciseFromWorkout={removeExerciseFromWorkout}
+                swapWorkoutExercise={swapWorkoutExercise}
             />
              <TodaysMindsetModal
                 isOpen={isTodaysMindsetModalOpen}
                 onOpenChange={setIsTodaysMindsetModalOpen}
                 activityToLog={mindsetActivityToLog}
                 dateForWorkout={selectedDate}
-                onActivityComplete={(slot, id) => handleToggleComplete(slot, id, true, setSchedule)}
+                onActivityComplete={(slot, id) => handleToggleComplete(slot, id, true)}
             />
 
             <TodaysLeadGenModal 
                 isOpen={isLeadGenModalOpen} 
                 onOpenChange={setIsLeadGenModalOpen} 
                 activityToLog={workoutActivityToLog}
-                onActivityComplete={(slot, id) => handleToggleComplete(slot, id, true, setSchedule)}
+                onActivityComplete={(slot, id) => handleToggleComplete(slot, id, true)}
             />
             
             <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
@@ -647,9 +685,12 @@ function MyPlatePageContent() {
                 </DialogContent>
             </Dialog>
             <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-                <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+                <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-4 border-b">
-                        <DialogTitle>Timetable</DialogTitle>
+                        <DialogTitle>Weekly Timetable</DialogTitle>
+                        <DialogDescription>
+                            Plan your week at a glance.
+                        </DialogDescription>
                     </DialogHeader>
                     <div className="flex-grow min-h-0">
                         <TimetablePageContent isModal={true} />
@@ -668,4 +709,4 @@ export default function MyPlatePage() {
     );
 }
 
-    
+
