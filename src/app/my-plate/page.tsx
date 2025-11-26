@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -515,6 +514,7 @@ function MyPlatePageContent() {
                             currentSlot={currentSlot}
                             remainingTime={remainingTime}
                             onOpenTaskContext={onOpenTaskContext}
+                            onOpenHabitPopup={onOpenHabitPopup}
                         />
                     </CardContent>
                 </Card>

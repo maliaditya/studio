@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -82,16 +81,18 @@ interface TimeSlotsProps {
   currentSlot: string;
   remainingTime: string | null;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent) => void;
+  onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
 }
 
 export function TimeSlots({
   date,
   currentSlot,
   remainingTime,
-  onOpenTaskContext
+  onOpenTaskContext,
+  onOpenHabitPopup,
 }: TimeSlotsProps) {
     const { toast } = useToast();
-    const { schedule: globalSchedule, setSchedule: setGlobalSchedule, settings, onOpenHabitPopup, handleToggleComplete, toggleRoutine, onOpenFocusModal } = useAuth();
+    const { schedule: globalSchedule, setSchedule: setGlobalSchedule, settings, onOpenFocusModal, handleToggleComplete, toggleRoutine } = useAuth();
     const [schedule, setSchedule] = useState<FullSchedule>(globalSchedule);
     
     useEffect(() => {
