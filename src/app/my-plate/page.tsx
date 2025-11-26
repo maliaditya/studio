@@ -89,7 +89,6 @@ function MyPlatePageContent() {
     const { toast } = useToast();
     
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
-    const [remainingTime, setRemainingTime] = useState<string | null>(null);
     const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
     const [isTodaysMindsetModalOpen, setIsTodaysMindsetModalOpen] = useState(false);
     const [isLeadGenModalOpen, setIsLeadGenModalOpen] = useState(false);
@@ -135,7 +134,10 @@ function MyPlatePageContent() {
         }
     };
     
+    const [remainingTime, setRemainingTime] = useState<string | null>(null);
+    
     useEffect(() => {
+        if(!currentSlot) return;
         const timerInterval = setInterval(() => {
             const now = new Date();
             const slotEndHour = slotEndHours[currentSlot];
@@ -605,3 +607,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
+

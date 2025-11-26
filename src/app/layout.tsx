@@ -142,10 +142,10 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
   const [remainingTime, setRemainingTime] = React.useState<string | null>(null);
   
-  const [interruptModalState, setInterruptModalState] = React.useState<{isOpen: boolean, slotName: string | null, activityType: 'interrupt' | 'distraction' | null}>({ isOpen: false, slotName: null, activityType: null });
-  const [interruptDetails, setInterruptDetails] = React.useState('');
-  const [interruptDuration, setInterruptDuration] = React.useState('');
-  const [applyInterruptToFutureSlots, setApplyInterruptToFutureSlots] = React.useState(false);
+  const [interruptModalState, setInterruptModalState] = useState<{isOpen: boolean, slotName: string | null, activityType: 'interrupt' | 'distraction' | null}>({ isOpen: false, slotName: null, activityType: null });
+  const [interruptDetails, setInterruptDetails] = useState('');
+  const [interruptDuration, setInterruptDuration] = useState('');
+  const [applyInterruptToFutureSlots, setApplyInterruptToFutureSlots] = useState(false);
 
   // State for end-of-slot modal
   const [missedSlotModalState, setMissedSlotModalState] = React.useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
@@ -161,6 +161,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   }, []);
   
   useEffect(() => {
+    if (!currentSlot) return;
     const timerInterval = setInterval(() => {
         const now = new Date();
         const slotEndHour = slotEndHours[currentSlot];
@@ -428,7 +429,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
               activeFocusSession={activeFocusSession}
               lastSessionReview={lastSessionReview}
               openMindsetTechniquePopup={openMindsetTechniquePopup}
-              openHabitDetailPopup={authContext.openHabitDetailPopup}
+              openHabitDetailPopup={openHabitDetailPopup}
           />
       )}
       <MissedSlotModal 
@@ -440,7 +441,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         isOpen={interruptModalState.isOpen}
         onOpenChange={(isOpen) => setInterruptModalState(prev => ({...prev, isOpen}))}
         slotName={interruptModalState.slotName}
-        onSave={handleSaveInterrupt}
+        onSave={() => handleSaveInterrupt()}
       />
       {isBrowser && document.getElementById('global-popup-root') &&
         createPortal(
@@ -474,7 +475,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                     popupState={ruleDetailPopup}
                     onClose={closeRuleDetailPopup}
                 />
-            )}
+             )}
              {pillarPopupState && (
                 <PillarPopup
                   popupState={pillarPopupState}
@@ -558,3 +559,4 @@ export default function RootLayout({
     </html>
   );
 }
+
