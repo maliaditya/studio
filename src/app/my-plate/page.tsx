@@ -28,8 +28,8 @@ import { ChartsPageContent } from '@/app/charts/page';
 import { TimesheetPageContent } from '@/app/timesheet/page';
 import { TimetablePageContent } from '@/app/timetable/page';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
-import { AuthGuard } from '@/components/AuthGuard';
 import { Link as LinkIconLucide } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const slotEndHours: Record<string, number> = {
@@ -269,6 +269,39 @@ function MyPlatePageContent() {
         recurse(def);
         return total;
     }, [deepWorkDefinitions, upskillDefinitions]);
+    
+    const getDurationForActivity = useCallback((activity: Activity): number => {
+        if (activity.completed && activity.duration) {
+            return activity.duration;
+        }
+        if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+            const pauseTime = (activity.focusSessionPauses || []).reduce((acc, p) => acc + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
+            return Math.round((activity.focusSessionEndTime - activity.focusSessionInitialStartTime - pauseTime) / 60000);
+        }
+        return activity.duration || 0;
+    }, []);
+    
+    const activityDurations: Record<string, string> = useMemo(() => {
+        const durations: Record<string, string> = {};
+        for (const dateKey in schedule) {
+            for (const slotName in schedule[dateKey]) {
+                const activities = schedule[dateKey][slotName as SlotName] as Activity[];
+                if (Array.isArray(activities)) {
+                    activities.forEach(act => {
+                        const duration = getDurationForActivity(act);
+                        if (duration > 0) {
+                            const hours = Math.floor(duration / 60);
+                            const minutes = duration % 60;
+                            durations[act.id] = `${hours > 0 ? `${hours}h ` : ''}${minutes} min`;
+                        } else {
+                            durations[act.id] = '';
+                        }
+                    });
+                }
+            }
+        }
+        return durations;
+    }, [schedule, getDurationForActivity]);
 
     const productivityStats = useMemo(() => {
         const today = startOfToday();
@@ -390,17 +423,6 @@ function MyPlatePageContent() {
         
         return allReleases.sort((a, b) => new Date(a.release.launchDate).getTime() - new Date(b.release.launchDate).getTime());
     }, [productizationPlans, offerizationPlans, projects, coreSkills]);
-    
-    const getDurationForActivity = useCallback((activity: Activity) => {
-        if (activity.completed && activity.duration) {
-            return activity.duration;
-        }
-        if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-            const pauseTime = (activity.focusSessionPauses || []).reduce((acc, p) => acc + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
-            return Math.round((activity.focusSessionEndTime - activity.focusSessionInitialStartTime - pauseTime) / 60000);
-        }
-        return activity.duration || 0;
-    }, []);
     
     const populatedSchedule = useMemo(() => {
         const newPopulatedSchedule: FullSchedule = {};
@@ -624,7 +646,7 @@ function MyPlatePageContent() {
                             remainingTime={remainingTime}
                             onAddActivity={handleAddActivity}
                             onActivityClick={handleActivityClick}
-                            slotDurations={{}}
+                            slotDurations={activityDurations}
                         />
                     </CardContent>
                 </Card>
@@ -713,9 +735,5 @@ function MyPlatePageContent() {
 }
 
 export default function MyPlatePage() {
-    return (
-        <AuthGuard>
-            <MyPlatePageContent />
-        </AuthGuard>
-    );
+    return <MyPlatePageContent />;
 }
