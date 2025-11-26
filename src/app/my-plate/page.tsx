@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -81,8 +82,8 @@ function MyPlatePageContent() {
         onOpenTaskContext,
         onOpenHabitPopup,
         toggleRoutine,
-        schedule,
         handleToggleComplete,
+        schedule,
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
@@ -164,28 +165,14 @@ function MyPlatePageContent() {
 
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
     
-    const { activityDurations, populatedSchedule } = useMemo(() => {
+    const activityDurations: Record<string, string> = useMemo(() => {
         const durations: Record<string, string> = {};
-        const newPopulatedSchedule: FullSchedule = {};
-
-        const getDurationForActivity = (activity: Activity): number => {
-            if (activity.completed && activity.duration) {
-                return activity.duration;
-            }
-            if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-                const pauseTime = (activity.focusSessionPauses || []).reduce((acc, p) => acc + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
-                return Math.round((activity.focusSessionEndTime - activity.focusSessionInitialStartTime - pauseTime) / 60000);
-            }
-            return activity.duration || 0;
-        };
-
         for (const dateKey in schedule) {
-            newPopulatedSchedule[dateKey] = {};
             for (const slotName in schedule[dateKey]) {
                 const activities = schedule[dateKey][slotName as SlotName] as Activity[];
                 if (Array.isArray(activities)) {
-                    newPopulatedSchedule[dateKey][slotName as SlotName] = activities.map(act => {
-                        const duration = getDurationForActivity(act);
+                    activities.forEach(act => {
+                        const duration = act.duration || 0;
                         if (duration > 0) {
                             const hours = Math.floor(duration / 60);
                             const minutes = duration % 60;
@@ -193,15 +180,15 @@ function MyPlatePageContent() {
                         } else {
                             durations[act.id] = '';
                         }
-                        return { ...act, duration };
                     });
                 }
             }
         }
-        return { activityDurations: durations, populatedSchedule: newPopulatedSchedule };
+        return durations;
     }, [schedule]);
 
-    const todaysSchedule = useMemo(() => populatedSchedule[selectedDateKey] || {}, [populatedSchedule, selectedDateKey]);
+
+    const todaysSchedule = useMemo(() => schedule[selectedDateKey] || {}, [schedule, selectedDateKey]);
 
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
@@ -357,7 +344,7 @@ function MyPlatePageContent() {
     
     const brandingStatus = useMemo(() => {
         const todayLog = brandingLogs.find(log => log.date === selectedDateKey);
-        const todaysBrandingTasks = populatedSchedule[selectedDateKey]?.branding || [];
+        const todaysBrandingTasks = schedule[selectedDateKey]?.branding || [];
         
         const inProgressItems = (todaysBrandingTasks as Activity[] || [])
             .filter(act => !act.completed)
@@ -414,7 +401,7 @@ function MyPlatePageContent() {
             message,
             subMessage
         };
-      }, [populatedSchedule, selectedDateKey, deepWorkDefinitions]);
+    }, [brandingLogs, schedule, selectedDateKey, deepWorkDefinitions]);
     
     const timeAllocationData = useMemo(() => {
         const dailyActivities = todaysSchedule ? Object.values(todaysSchedule).flat() : [];
@@ -465,9 +452,8 @@ function MyPlatePageContent() {
             productivityLevel,
         } = productivityStats;
       
-        const todaysActivities = populatedSchedule[selectedDateKey] || {};
-        const hasPlannedOrCompleted = Object.values(todaysActivities).flat().length > 0;
-        const allCompleted = hasPlannedOrCompleted && Object.values(todaysActivities).flat().every(a => (a as Activity).completed);
+        const hasPlannedOrCompleted = Object.values(todaysSchedule).flat().length > 0;
+        const allCompleted = hasPlannedOrCompleted && Object.values(todaysSchedule).flat().every(a => (a as Activity).completed);
       
         return {
             latestConsistency: 0,
@@ -485,7 +471,7 @@ function MyPlatePageContent() {
             brandingStatus,
             productivityLevel,
         };
-    }, [productivityStats, populatedSchedule, selectedDateKey, upcomingReleases, brandingStatus]);
+    }, [productivityStats, todaysSchedule, upcomingReleases, brandingStatus]);
 
 
     return (
@@ -556,6 +542,7 @@ function MyPlatePageContent() {
                             date={selectedDate}
                             currentSlot={currentSlot}
                             remainingTime={remainingTime}
+                            onOpenTaskContext={onOpenTaskContext}
                         />
                     </CardContent>
                 </Card>
@@ -646,3 +633,4 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
+
