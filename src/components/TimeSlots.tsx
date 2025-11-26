@@ -1,10 +1,9 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, SlotName, RecurrenceRule, FullSchedule } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition } from '@/types/workout';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
@@ -96,7 +95,9 @@ export function TimeSlots({
     onOpenHabitPopup,
     onOpenFocusModal,
     settings,
+    useToast
   } = useAuth();
+  const { toast } = useToast();
 
   const [schedule, setSchedule] = useState<FullSchedule>(globalSchedule);
 
@@ -104,11 +105,10 @@ export function TimeSlots({
     setSchedule(globalSchedule);
   }, [globalSchedule]);
 
-  // Save back to global state whenever local schedule changes
   useEffect(() => {
     setGlobalSchedule(schedule);
   }, [schedule, setGlobalSchedule]);
-
+  
   const todaysSchedule = useMemo(() => schedule[format(date, 'yyyy-MM-dd')] || {}, [schedule, date]);
 
   const slots = [
@@ -166,7 +166,7 @@ export function TimeSlots({
     }));
   };
 
-  const onRemoveActivity = (slotName: string, activityId: string, date: Date) => {
+  const onRemoveActivity = (slotName: string, activityId: string) => {
     const dateKey = format(date, 'yyyy-MM-dd');
     setSchedule(prev => {
         const newSchedule = { ...prev };
@@ -236,7 +236,7 @@ export function TimeSlots({
                           date={date}
                           onToggleComplete={handleToggleComplete}
                           onActivityClick={handleActivityClick}
-                          onRemoveActivity={(slotName, id) => onRemoveActivity(slotName, id, date)}
+                          onRemoveActivity={(slotName, id) => onRemoveActivity(slotName, id)}
                           setRoutine={toggleRoutine}
                           onOpenTaskContext={onOpenTaskContext}
                           onOpenHabitPopup={onOpenHabitPopup}

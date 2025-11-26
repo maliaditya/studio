@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project } from '@/types/workout';
@@ -84,6 +83,7 @@ function MyPlatePageContent() {
         toggleRoutine,
         handleToggleComplete,
         schedule,
+        activityDurations
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
@@ -136,58 +136,29 @@ function MyPlatePageContent() {
     };
     
     useEffect(() => {
-        const slotOrder = [
-            { name: 'Late Night', endHour: 4 },
-            { name: 'Dawn', endHour: 8 },
-            { name: 'Morning', endHour: 12 },
-            { name: 'Afternoon', endHour: 16 },
-            { name: 'Evening', endHour: 20 },
-            { name: 'Night', endHour: 24 }
-        ];
-
         const timerInterval = setInterval(() => {
             const now = new Date();
-            const currentHour = now.getHours();
-            for (const slot of slotOrder) {
-                if (currentHour < slot.endHour) {
-                    const diff = new Date().setHours(slot.endHour, 0, 0, 0) - now.getTime();
-                    const hours = Math.floor(diff / (1000 * 60 * 60));
-                    const minutes = Math.floor((diff / 1000 * 60) % 60);
-                    const seconds = Math.floor((diff / 1000) % 60);
-                    setRemainingTime(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
-                    return;
-                }
+            const slotEndHour = slotEndHours[currentSlot];
+            if (slotEndHour === undefined) {
+                setRemainingTime(null);
+                return;
             }
-            setRemainingTime('00:00:00');
+            const slotEndTime = new Date(); slotEndTime.setHours(slotEndHour, 0, 0, 0);
+            const diff = slotEndTime.getTime() - now.getTime();
+            
+            if (diff > 0) {
+                const hours = Math.floor(diff / (1000 * 60 * 60));
+                const minutes = Math.floor((diff / 1000 * 60) % 60);
+                const seconds = Math.floor((diff / 1000) % 60);
+                setRemainingTime(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
+            } else { 
+                setRemainingTime('00:00:00'); 
+            }
         }, 1000);
         return () => clearInterval(timerInterval);
     }, [currentSlot]);
 
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
-    
-    const activityDurations: Record<string, string> = useMemo(() => {
-        const durations: Record<string, string> = {};
-        for (const dateKey in schedule) {
-            for (const slotName in schedule[dateKey]) {
-                const activities = schedule[dateKey][slotName as SlotName] as Activity[];
-                if (Array.isArray(activities)) {
-                    activities.forEach(act => {
-                        const duration = act.duration || 0;
-                        if (duration > 0) {
-                            const hours = Math.floor(duration / 60);
-                            const minutes = duration % 60;
-                            durations[act.id] = `${hours > 0 ? `${hours}h ` : ''}${minutes} min`;
-                        } else {
-                            durations[act.id] = '';
-                        }
-                    });
-                }
-            }
-        }
-        return durations;
-    }, [schedule]);
-
-
     const todaysSchedule = useMemo(() => schedule[selectedDateKey] || {}, [schedule, selectedDateKey]);
 
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
@@ -633,4 +604,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
-
