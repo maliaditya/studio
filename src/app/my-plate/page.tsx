@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -95,8 +94,8 @@ function MyPlatePageContent() {
         topicGoals,
         deepWorkDefinitions,
         setDeepWorkDefinitions,
-        allDeepWorkLogs,
         allUpskillLogs,
+        allDeepWorkLogs,
         leadGenDefinitions,
         allLeadGenLogs,
         projects,
@@ -127,15 +126,12 @@ function MyPlatePageContent() {
         setMissedSlotReviews,
         dailyReviewLogs,
         handleToggleDailyGoalCompletion,
-        schedule, 
-        setSchedule,
-        handleToggleComplete,
-        onRemoveActivity,
     } = useAuth();
     
   const { toast } = useToast();
   const [remainingTime, setRemainingTime] = useState('');
   const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
+  const [schedule, setSchedule] = useState<FullSchedule>({});
   
   // State for Modals
   const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -317,66 +313,7 @@ function MyPlatePageContent() {
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
 
-    const activityDurations = useMemo(() => {
-    const newDurations: Record<string, string> = {};
-  
-    const formatDuration = (totalMinutes: number, suffix: string) => {
-        if (totalMinutes <= 0) return '';
-        const h = Math.floor(totalMinutes / 60);
-        const m = Math.round(totalMinutes % 60);
-        return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() + suffix;
-    };
-    
-    // Only iterate over the current day's activities
-    const dailySchedule = populatedSchedule[selectedDateKey] || {};
-    Object.values(dailySchedule).flat().forEach((activity: Activity) => {
-        if (!activity || !activity.id) return;
-        
-        let totalMinutes = 0;
-        let suffix = '';
-        
-        if (activity.completed) {
-            if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-                const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
-                const pauseDurationsMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
-                totalMinutes = Math.round((totalSessionMs - pauseDurationsMs) / 60000);
-            } else {
-                totalMinutes = activity.duration || 0;
-            }
-            suffix = ' logged';
-        } else if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.details) {
-          const nodeType = activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention' ? activity.linkedEntityType : null;
-          const isHighLevel = nodeType === 'intention' || nodeType === 'curiosity';
-          
-          if(isHighLevel) {
-              const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.name === activity.details);
-              if (def) {
-                  totalMinutes = calculateTotalEstimate(def);
-              } else {
-                  totalMinutes = 120;
-              }
-          } else {
-               totalMinutes = 120;
-          }
-  
-        } else {
-          switch(activity.type) {
-              case 'workout': totalMinutes = 90; break;
-              case 'mindset': totalMinutes = 15; break;
-              case 'branding': totalMinutes = 120; break;
-              case 'planning': case 'tracking': totalMinutes = 30; break;
-              case 'lead-generation': totalMinutes = 45; break;
-              default: totalMinutes = activity.duration || 0;
-          }
-        }
-        
-        if (totalMinutes > 0) {
-          newDurations[activity.id] = formatDuration(totalMinutes, suffix);
-        }
-    });
-  
-    return newDurations;
-  }, [populatedSchedule, selectedDateKey, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
+  const activityDurations: Record<string, string> = {};
 
     const slotDurations = useMemo(() => {
         const durations: Record<string, { logged: number; total: number }> = {};
@@ -427,7 +364,7 @@ function MyPlatePageContent() {
     }, [populatedSchedule, selectedDateKey, activityDurations]);
 
 
-    const handleAddActivity = (slotName: string, type: ActivityType, detailsOverride?: string) => {
+  const handleAddActivity = (slotName: string, type: ActivityType, detailsOverride?: string) => {
         if (!currentUser?.username) return;
 
         if (type === 'interrupt' || type === 'distraction') {
@@ -1280,383 +1217,6 @@ function MyPlatePageContent() {
           <ActivityHeatmap schedule={populatedSchedule} onDateSelect={(date) => setSelectedDate(parseISO(date))} />
         </div>
       </DragDropContext>
-      
-      {currentUser && (
-        <TodaysWorkoutModal
-            isOpen={isTodaysWorkoutModalOpen}
-            onOpenChange={setIsTodaysWorkoutModalOpen}
-            activityToLog={workoutActivityToLog}
-            dateForWorkout={selectedDate}
-        />
-      )}
-      
-      {currentUser && (
-        <TodaysMindsetModal
-          isOpen={isTodaysMindsetModalOpen}
-          onOpenChange={setIsTodaysMindsetModalOpen}
-          activityToLog={mindsetActivityToLog}
-          dateForWorkout={selectedDate}
-        />
-      )}
-
-      {currentUser && (
-          <TodaysLeadGenModal
-              isOpen={isLeadGenModalOpen}
-              onOpenChange={setIsLeadGenModalOpen}
-              activityToLog={workoutActivityToLog}
-          />
-      )}
-      
-      {currentUser && editingActivity && (
-        <TodaysLearningModal
-            isOpen={isLearningModalOpen}
-            onOpenChange={(isOpen) => {
-                if (!isOpen) setEditingActivity(null);
-                setIsLearningModalOpen(isOpen);
-            }}
-            availableTasks={availableTasksForModal as WorkoutExercise[]}
-            initialSelectedIds={editingActivity.activity.taskIds || []}
-            onSave={handleSaveTaskSelection}
-            pageType={editingActivity.activity.type as 'upskill' | 'deepwork' | 'branding'}
-            disabledTaskIds={[]}
-            deepWorkDefinitions={deepWorkDefinitions}
-            upskillDefinitions={upskillDefinitions}
-            setDeepWorkDefinitions={setDeepWorkDefinitions}
-            projects={projects}
-            offerizationPlans={offerizationPlans}
-            productizationPlans={productizationPlans}
-            activeProjectIds={activeProjectIds}
-        />
-      )}
-
-      <DietPlanModal
-        isOpen={isDietPlanModalOpen}
-        onOpenChange={setIsDietPlanModalOpen}
-      />
-
-      <Dialog open={isChartModalOpen} onOpenChange={setIsChartModalOpen}>
-        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
-            <DialogHeader className="p-4 border-b">
-                <DialogTitle>Charts</DialogTitle>
-            </DialogHeader>
-            <div className="flex-grow min-h-0">
-                <ScrollArea className="h-full">
-                    <ChartsPageContentActual />
-                </ScrollArea>
-            </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={isTimesheetModalOpen} onOpenChange={setIsTimesheetModalOpen}>
-        <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
-          <DialogHeader className="p-4 border-b">
-            <DialogTitle>Timesheet</DialogTitle>
-          </DialogHeader>
-          <div className="flex-grow min-h-0">
-              <TimesheetPageContent isModal={true} />
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent className="h-[90vh] max-w-full w-full grid grid-rows-[auto,1fr] p-0">
-          <DialogHeader className="p-4 border-b flex flex-row items-center justify-between">
-              <div>
-                  <DialogTitle>Weekly Timetable</DialogTitle>
-                  <DialogDescription>
-                      Plan your week at a glance.
-                  </DialogDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                  <Button variant="outline" size="icon" onClick={() => setCurrentTimetableWeek(prev => addDays(prev, -7))}><ChevronLeft className="h-4 w-4" /></Button>
-                  <Button variant="outline" onClick={() => setCurrentTimetableWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}>Today</Button>
-                  <Button variant="outline" size="icon" onClick={() => setCurrentTimetableWeek(prev => addDays(prev, 7))}><ChevronRightIcon className="h-4 w-4" /></Button>
-              </div>
-          </DialogHeader>
-          <div className="min-h-0">
-              <TimetablePageContent isModal={true} currentWeek={currentTimetableWeek} onWeekChange={setCurrentTimetableWeek} />
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={interruptModalState.isOpen} onOpenChange={(isOpen) => setInterruptModalState({ ...interruptModalState, isOpen })}>
-          <DialogContent>
-              <DialogHeader>
-                  <DialogTitle>Log an {interruptModalState.type === 'distraction' ? 'Distraction' : 'Interruption'}</DialogTitle>
-                  <DialogDescription>What pulled you away from your planned tasks?</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                  <div className="space-y-1">
-                      <Label>Type</Label>
-                       <RadioGroup value={interruptModalState.type || ''} onValueChange={(value) => setInterruptModalState(prev => ({...prev, type: value as 'interrupt' | 'distraction'}))} className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-2"><RadioGroupItem value="interrupt" id="type-interrupt" /><Label htmlFor="type-interrupt">Interruption</Label></div>
-                            <div className="flex items-center space-x-2"><RadioGroupItem value="distraction" id="type-distraction" /><Label htmlFor="type-distraction">Distraction</Label></div>
-                        </RadioGroup>
-                  </div>
-                  <div className="space-y-1">
-                      <Label htmlFor="interrupt-details">Description</Label>
-                      <Textarea id="interrupt-details" value={interruptDetails} onChange={(e) => setInterruptDetails(e.target.value)} placeholder="e.g., Unexpected phone call, browsing social media..." />
-                  </div>
-                  <div className="space-y-1">
-                      <Label htmlFor="interrupt-duration">Duration (minutes)</Label>
-                      <Input 
-                        id="interrupt-duration" 
-                        type="number" 
-                        value={applyInterruptToFutureSlots ? '240' : interruptDuration} 
-                        onChange={(e) => setInterruptDuration(e.target.value)} 
-                        placeholder="e.g., 30"
-                        disabled={applyInterruptToFutureSlots}
-                      />
-                  </div>
-                  <div className="flex items-center space-x-2">
-                      <Checkbox 
-                          id="apply-all-slots" 
-                          checked={applyInterruptToFutureSlots} 
-                          onCheckedChange={(checked) => setApplyInterruptToFutureSlots(!!checked)}
-                      />
-                      <Label htmlFor="apply-all-slots" className="font-normal">Apply to all future slots for today (sets duration to 240 mins)</Label>
-                  </div>
-              </div>
-              <DialogFooter>
-                  <Button variant="outline" onClick={() => setInterruptModalState({ isOpen: false, slotName: null, type: null })}>Cancel</Button>
-                  <Button onClick={handleSaveInterrupt}>Save</Button>
-              </DialogFooter>
-          </DialogContent>
-      </Dialog>
-      
-       <Dialog open={essentialsModalState.isOpen} onOpenChange={(isOpen) => { if(!isOpen) setEssentialsModalState({ isOpen: false, slotName: null, activity: null }); }}>
-          <DialogContent>
-              <DialogHeader>
-                  <DialogTitle>{essentialsModalState.activity ? 'Edit' : 'Log a'} Daily Essential</DialogTitle>
-                  <DialogDescription>Add a recurring or essential one-off task.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                  <div className="space-y-1">
-                      <Label htmlFor="essential-details">Description</Label>
-                      <Textarea id="essential-details" value={essentialDetails} onChange={(e) => setEssentialDetails(e.target.value)} placeholder="e.g., Meditate, Journal..." />
-                  </div>
-                  <div className="space-y-1">
-                      <Label htmlFor="essential-duration">Est. Duration (minutes)</Label>
-                      <Input id="essential-duration" type="number" value={essentialDuration} onChange={(e) => setEssentialDuration(e.target.value)} placeholder="e.g., 15" />
-                  </div>
-                  <div className="space-y-1">
-                      <Label htmlFor="essential-habit">Link Habit (Optional)</Label>
-                      <Select
-                          value={essentialLinkedHabitId || ''}
-                          onValueChange={(value) => setEssentialLinkedHabitId(value === 'none' ? null : value)}
-                      >
-                          <SelectTrigger id="essential-habit">
-                              <SelectValue placeholder="Select a habit..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                              <SelectItem value="none">-- None --</SelectItem>
-                              {habitResources.map(habit => (
-                                  <SelectItem key={habit.id} value={habit.id}>{habit.name}</SelectItem>
-                              ))}
-                          </SelectContent>
-                      </Select>
-                  </div>
-              </div>
-              <DialogFooter>
-                  <Button variant="outline" onClick={() => setEssentialsModalState({ isOpen: false, slotName: null, activity: null })}>Cancel</Button>
-                  <Button onClick={handleSaveEssential}>Save Task</Button>
-              </DialogFooter>
-          </DialogContent>
-      </Dialog>
-
-      <Dialog open={isMealModalOpen} onOpenChange={setIsMealModalOpen}>
-          <DialogContent className="sm:max-w-xs">
-              <DialogHeader>
-                  <DialogTitle>Select Meal</DialogTitle>
-                  <DialogDescription>Which meal are you logging?</DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-2 py-4">
-                  <Button variant="outline" onClick={() => handleSelectMeal('meal1')}>Meal 1</Button>
-                  <Button variant="outline" onClick={() => handleSelectMeal('meal2')}>Meal 2</Button>
-                  <Button variant="outline" onClick={() => handleSelectMeal('meal3')}>Meal 3</Button>
-                  <Button variant="outline" onClick={() => handleSelectMeal('supplements')}>Supplements</Button>
-              </div>
-          </DialogContent>
-      </Dialog>
-      <Dialog open={excuseModalState.isOpen} onOpenChange={(isOpen) => {
-          if (!isOpen) {
-            setExcuseModalState({isOpen: false, planId: null, planName: null});
-            setNewExcuse('');
-            setNewExcuseFear('');
-          }
-      }}>
-        <DialogContent className="h-full max-h-[90vh] sm:max-w-7xl grid grid-cols-1 md:grid-cols-2 gap-6 p-0">
-          <div className="flex flex-col gap-6 p-6 min-h-0">
-              <DialogHeader>
-                  <DialogTitle>Log Abandonment Reason for "{excuseModalState.planName}"</DialogTitle>
-                  <DialogDescription>Why did you stop pursuing this plan? Reflecting helps clarify future direction.</DialogDescription>
-              </DialogHeader>
-              <div className="flex flex-col gap-4 flex-grow min-h-0">
-                  <h4 className="font-semibold text-lg">Previous Reasons</h4>
-                   <ScrollArea className="flex-grow">
-                      <div className="space-y-3 pr-4">
-                          {(abandonmentLogs[excuseModalState.planId!] || []).map(log => (
-                                <Card key={log.id} className="cursor-pointer group relative" onClick={() => { setEditingExcuseLogId(log.id); setEditedHandlingStrategy(log.handlingStrategy || ''); }}>
-                                    <AlertDialog>
-                                        <AlertDialogTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
-                                                <Trash2 className="h-4 w-4 text-destructive"/>
-                                            </Button>
-                                        </AlertDialogTrigger>
-                                        <AlertDialogContent>
-                                            <AlertDialogHeader>
-                                                <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
-                                                <AlertDialogDescriptionComponent>This will permanently delete this abandonment reason.</AlertDialogDescriptionComponent>
-                                            </AlertDialogHeader>
-                                            <AlertDialogFooter>
-                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                <AlertDialogAction onClick={() => {}}>Delete</AlertDialogAction>
-                                            </AlertDialogFooter>
-                                        </AlertDialogContent>
-                                    </AlertDialog>
-                                    <CardContent className="p-3">
-                                        <p className="text-sm font-medium">{log.reason}</p>
-                                        {log.fear && (<Badge variant="outline" className="mt-1">{log.fear}</Badge>)}
-                                        <p className="text-xs text-muted-foreground mt-1">{format(new Date(log.timestamp), 'PPP')}</p>
-                                        {editingExcuseLogId === log.id ? (
-                                            <div className="mt-2 pt-2 border-t space-y-2">
-                                                <Textarea
-                                                    value={editedHandlingStrategy}
-                                                    onChange={(e) => setEditedHandlingStrategy(e.target.value)}
-                                                    placeholder="How will you handle this next time?"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    autoFocus
-                                                    className="text-xs"
-                                                />
-                                                <div className="flex justify-end gap-2">
-                                                    <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setEditingExcuseLogId(null); }}>Cancel</Button>
-                                                    <Button size="sm" onClick={(e) => { e.stopPropagation(); }}>Save Strategy</Button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            log.handlingStrategy && (
-                                                <div className="mt-2 pt-2 border-t">
-                                                    <p className="text-xs mt-1 text-green-600 dark:text-green-400 italic">
-                                                        {log.handlingStrategy}
-                                                    </p>
-                                                </div>
-                                            )
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            ))}
-                          {(abandonmentLogs[excuseModalState.planId!] || []).length === 0 && (
-                              <div className="flex items-center justify-center h-24 border rounded-md">
-                                  <p className="text-sm text-muted-foreground">No reasons logged for this plan yet.</p>
-                              </div>
-                          )}
-                      </div>
-                  </ScrollArea>
-              </div>
-              <DialogFooter className="p-0 border-t pt-6 flex flex-col gap-4">
-                <form onSubmit={(e) => { e.preventDefault(); }} className="flex gap-2 items-center w-full">
-                    <Input value={newExcuse} onChange={e => setNewExcuse(e.target.value)} placeholder="Enter reason for abandonment..." />
-                </form>
-                <Select onValueChange={(value) => setNewExcuseFear(value === 'none' ? '' : value)} value={newExcuseFear}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select an underlying fear (optional)..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="none">-- No Fear Category --</SelectItem>
-                      {FEAR_CATEGORIES.map(fear => (
-                          <SelectItem key={fear} value={fear}>{fear}</SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
-              </DialogFooter>
-          </div>
-          <div className="flex flex-col gap-6 bg-muted/30 p-6 border-l min-h-0">
-             <div className="flex justify-between items-center">
-                <h4 className="font-semibold text-lg">Why You Started</h4>
-                <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setIsNewReasonModalOpen(true)}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Log New Reason
-                     </Button>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" size="sm">
-                                <LinkIconLucide className="mr-2 h-4 w-4" /> Link Rules
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80">
-                            <ScrollArea className="h-60">
-                                <div className="space-y-2 p-1">
-                                    {Object.values(pillarEquations).flat().map(eq => (
-                                        <div key={eq.id} className="flex items-center space-x-2">
-                                            <Checkbox
-                                                id={`why-${eq.id}`}
-                                                checked={(skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.linkedRuleEquationIds || []).includes(eq.id)}
-                                                onCheckedChange={() => handleWhyYouStartedRuleToggle(eq.id)}
-                                            />
-                                            <Label htmlFor={`why-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
-                                        </div>
-                                    ))}
-                                </div>
-                            </ScrollArea>
-                        </PopoverContent>
-                    </Popover>
-                </div>
-            </div>
-            <ScrollArea className="h-full">
-               <div className="space-y-3 pr-4">
-                   {(skillAcquisitionPlans.find(p => p.specializationId === excuseModalState.planId)?.linkedRuleEquationIds || []).map(id => {
-                       const equation = Object.values(pillarEquations).flat().find(eq => eq.id === id);
-                       if (!equation) return null;
-                       return (
-                           <div key={id} className="text-sm p-3 rounded-lg bg-background border flex justify-between items-center group">
-                               <p className="font-semibold">{equation.outcome}</p>
-                               <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
-                                      <AlertDialogDescriptionComponent>This will permanently delete this reason.</AlertDialogDescriptionComponent>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction onClick={() => handleDeleteWhyYouStartedRule(id)}>Delete</AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                               </AlertDialog>
-                           </div>
-                       );
-                   })}
-               </div>
-           </ScrollArea>
-          </div>
-        </DialogContent>
-      </Dialog>
-      
-      <Dialog open={isNewReasonModalOpen} onOpenChange={setIsNewReasonModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Log New Reason for Starting</DialogTitle>
-            <DialogDescription>
-              What was the core motivation or "why" behind starting this skill plan?
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4">
-            <Textarea
-              value={newReasonText}
-              onChange={e => setNewReasonText(e.target.value)}
-              placeholder="e.g., To gain financial freedom, to build innovative tools..."
-              autoFocus
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsNewReasonModalOpen(false)}>Cancel</Button>
-            <Button onClick={handleSaveNewReason}>Save Reason</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

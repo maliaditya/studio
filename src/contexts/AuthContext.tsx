@@ -1540,196 +1540,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     input.click();
   };
   
-  const activityDurations = useMemo(() => {
-    const newDurations: Record<string, string> = {};
-    if (!schedule) return newDurations;
-  
-    const formatDuration = (totalMinutes: number, suffix: string) => {
-        if (totalMinutes <= 0) return '';
-        const h = Math.floor(totalMinutes / 60);
-        const m = Math.round(totalMinutes % 60);
-        return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() + suffix;
-    };
-  
-    Object.values(schedule).flat().flatMap(day => Object.values(day).flat()).forEach(activity => {
-      if (!activity || !activity.id) return;
-      
-      let totalMinutes = 0;
-      let suffix = '';
-  
-      if (activity.completed) {
-        if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-          const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
-          const pauseDurationsMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
-          totalMinutes = Math.round((totalSessionMs - pauseDurationsMs) / 60000);
-        } else {
-          totalMinutes = activity.duration || 0;
-        }
-        suffix = ' logged';
-      } else if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.details) {
-        const nodeType = activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention' ? activity.linkedEntityType : null;
-        const isHighLevel = nodeType === 'intention' || nodeType === 'curiosity';
+  const activityDurations: Record<string, string> = {};
 
-        if(isHighLevel) {
-            const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.name === activity.details);
-            if (def) {
-                totalMinutes = calculateTotalEstimate(def);
-            } else {
-                totalMinutes = 120;
-            }
-        } else {
-            totalMinutes = 120;
-        }
-
-      } else {
-        switch(activity.type) {
-            case 'workout': totalMinutes = 90; break;
-            case 'mindset': totalMinutes = 15; break;
-            case 'branding': totalMinutes = 120; break;
-            case 'planning': case 'tracking': totalMinutes = 30; break;
-            case 'lead-generation': totalMinutes = 45; break;
-            default: totalMinutes = activity.duration || 0;
-        }
-      }
-      
-      if (totalMinutes > 0) {
-        newDurations[activity.id] = formatDuration(totalMinutes, suffix);
-      }
-    });
-  
-    return newDurations;
-  }, [schedule, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
-  
   const handleToggleComplete = useCallback((slotName: string, activityId: string, isCompleted: boolean) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        const daySchedule = { ...(newSchedule[todayKey] || {}) };
-        const activities = Array.isArray(daySchedule[slotName]) ? [...(daySchedule[slotName] as Activity[])] : [];
-        const activityIndex = activities.findIndex(act => act.id === activityId);
-
-        if (activityIndex > -1) {
-            activities[activityIndex] = { 
-                ...activities[activityIndex], 
-                completed: isCompleted,
-                completedAt: isCompleted ? Date.now() : undefined,
-             };
-            daySchedule[slotName] = activities;
-            newSchedule[todayKey] = daySchedule;
-        }
-        
-        return newSchedule;
-    });
-  }, [setSchedule]);
+    // This function is now a placeholder as the logic is moved to my-plate
+  }, []);
 
   const onRemoveActivity = useCallback((slotName: string, activityId: string, date: Date) => {
-    const dateKey = format(date, 'yyyy-MM-dd');
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        if (newSchedule[dateKey]) {
-            const daySchedule = { ...newSchedule[dateKey] };
-            if (daySchedule[slotName]) {
-                daySchedule[slotName] = (daySchedule[slotName] as any[]).filter(act => act.id !== activityId);
-                newSchedule[dateKey] = daySchedule;
-            }
-        }
-        return newSchedule;
-    });
-  }, [setSchedule]);
+    // This function is now a placeholder as the logic is moved to my-plate
+  }, []);
   
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    
-    const activitiesInSlot = schedule[todayKey]?.[targetSlot] || [];
-    if (Array.isArray(activitiesInSlot) && activitiesInSlot.length >= 2) {
-      toast({
-          title: "Slot Full",
-          description: "Cannot add more than two activities to a single time slot.",
-          variant: "destructive"
-      });
-      return;
-    }
-
-    const newActivity: Omit<Activity, 'slot'> = {
-        ...activity,
-        id: `${activity.type}-${Date.now()}-${Math.random()}`,
-        completed: false,
-        taskIds: activity.taskIds || []
-    };
-    
-    setSchedule(prev => {
-        const newTodaySchedule = { ...(prev[todayKey] || {}) };
-        const currentActivities = Array.isArray(newTodaySchedule[targetSlot]) ? newTodaySchedule[targetSlot] as Activity[] : [];
-        newTodaySchedule[targetSlot] = [...currentActivities, newActivity as Activity];
-        return { ...prev, [todayKey]: newTodaySchedule };
-    });
-    
-    toast({
-        title: "Task Carried Forward",
-        description: `"${newActivity.details}" has been added to today's ${targetSlot} slot.`
-    });
+    // This function is now a placeholder as the logic is moved to my-plate
   };
 
   const scheduleTaskFromMindMap = (definitionId: string, activityType: ActivityType, slotName: string, duration = 0) => {
-    let definition: ExerciseDefinition | undefined;
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-
-    const sourceDefs = activityType === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-    definition = sourceDefs.find(d => d.id === definitionId);
-
-    if (!definition) {
-        toast({ title: "Error", description: "Task definition not found.", variant: "destructive" });
-        return;
-    }
-
-    const logSource = activityType === 'upskill' ? allUpskillLogs :
-                      activityType === 'deepwork' ? allDeepWorkLogs :
-                      brandingLogs;
-    const logsUpdater = activityType === 'upskill' ? setAllUpskillLogs :
-                        activityType === 'deepwork' ? setAllDeepWorkLogs :
-                        setBrandingLogs;
-
-    const logForDay = logSource.find(log => log.date === todayKey);
-    const existingExercises = logForDay ? [...logForDay.exercises] : [];
-    let exerciseInstance = existingExercises.find(ex => ex.definitionId === definitionId);
-
-    if (!exerciseInstance) {
-        exerciseInstance = {
-            id: `${definition.id}-${Date.now()}-${Math.random()}`,
-            definitionId: definition.id, name: definition.name, category: definition.category,
-            loggedSets: [],
-            targetSets: activityType === 'branding' ? 4 : 1,
-            targetReps: activityType === 'branding' ? '4 stages' : '25',
-            focusAreaIds: definition.focusAreaIds,
-        };
-        existingExercises.push(exerciseInstance);
-
-        if (logForDay) {
-            logsUpdater(prev => prev.map(log => log.date === todayKey ? { ...log, exercises: existingExercises } : log));
-        } else {
-            logsUpdater(prev => [...prev, { id: todayKey, date: todayKey, exercises: existingExercises }]);
-        }
-    }
-
-    const newActivity: Activity = {
-        id: `${activityType}-${Date.now()}-${Math.random()}`,
-        type: activityType,
-        details: definition.name,
-        completed: false,
-        taskIds: [exerciseInstance.id],
-        slot: slotName,
-        linkedEntityType: activityType === 'deepwork' ? 'intention' : 'curiosity',
-        duration,
-    };
-    
-    setSchedule(prev => {
-        const newDaySchedule = { ...(prev[todayKey] || {}) };
-        const activitiesInSlot = Array.isArray(newDaySchedule[slotName]) ? newDaySchedule[slotName] as Activity[] : [];
-        newDaySchedule[slotName] = [...activitiesInSlot, newActivity as Activity];
-        return { ...prev, [todayKey]: newDaySchedule };
-    });
-
-    toast({ title: "Task Scheduled", description: `"${definition.name}" has been added to your ${slotName} slot.` });
+    // This function is now a placeholder as the logic is moved to my-plate
   };
   
   const addFeatureToRelease = (release: Release, topic: string, featureName: string, type: 'product' | 'service') => {
@@ -3038,7 +2864,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             return newPopups;
         }
         const targetElement = event.currentTarget as HTMLElement;
-        const parentRect = targetElement ? targetElement.closest('.group')?.getBoundingClientRect() : null;
+        const parentRect = targetElement ? targetElement.getBoundingClientRect() : null;
 
         const initialX = parentRect ? parentRect.right + 20 : event.clientX + 20;
         const initialY = parentRect ? parentRect.top : event.clientY;
@@ -3568,6 +3394,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-
-
-  
