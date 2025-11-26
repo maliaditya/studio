@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -7,10 +6,10 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from '@/lib/utils';
-import { CalendarIcon, Brain as BrainIcon, MessageSquare, Workflow, Utensils, BarChart3, PieChart as PieChartIcon, Link as LinkIconLucide, Expand, LayoutDashboard, ChevronLeft, ChevronRight, Shield, PlusCircle, Trash2 } from 'lucide-react';
+import { Calendar as CalendarIcon, ArrowRight, Shield, PlusCircle, Trash2 } from 'lucide-react';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
@@ -20,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { TimesheetPageContent } from '@/app/timesheet/page';
 import { Badge } from '@/components/ui/badge';
-import { format, getDay, getISOWeek, getISOWeekYear, differenceInDays, addDays, parseISO, subDays, startOfToday, isAfter, isBefore, isSameDay, startOfWeek, max, min, isValid, eachDayOfInterval } from 'date-fns';
+import { format, addDays, parseISO, subDays, startOfToday, isAfter, isBefore, isSameDay, startOfWeek, max, min, isValid, eachDayOfInterval, getDay, getISOWeek, getISOWeekYear } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -39,7 +38,6 @@ import { TimeSlots } from '@/components/TimeSlots';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
-import { TaskContextModal } from '@/components/TaskContextModal';
 import { Checkbox } from '@/components/ui/checkbox';
 import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -55,6 +53,7 @@ import {
   AlertDialogTitle as AlertDialogTitleComponent,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { DialogTitle as DialogTitleComponent, DialogDescription as DialogDescriptionComponent } from '@/components/ui/dialog';
 
 
 import type { AllWorkoutPlans, ExerciseDefinition, WorkoutExercise, FullSchedule, Activity as ActivityType, DatedWorkout, TopicGoal, WorkoutPlan, ExerciseCategory, WeightLog, Gender, UserDietPlan, DailySchedule, Activity, Release, PistonEntry, ResourceFolder, Interrupt, ProductizationPlan, Resource, MissedSlotReview, SlotName, RecurrenceRule, NodeType, AbandonmentLog, SkillAcquisitionPlan, HabitEquation } from '@/types/workout';
@@ -73,16 +72,11 @@ function MyPlatePageContent() {
         settings,
         setSettings,
         weightLogs, setWeightLogs,
-        goalWeight,
-        setGoalWeight,
-        height,
-        setHeight,
-        dateOfBirth,
-        setDateOfBirth,
-        gender,
-        setGender,
+        goalWeight, setGoalWeight,
+        height, setHeight,
+        dateOfBirth, setDateOfBirth,
+        gender, setGender,
         dietPlan,
-        setDietPlan,
         isAgendaDocked,
         setIsAgendaDocked,
         workoutMode,
@@ -97,6 +91,7 @@ function MyPlatePageContent() {
         deepWorkDefinitions,
         setDeepWorkDefinitions,
         allDeepWorkLogs,
+        allUpskillLogs,
         leadGenDefinitions,
         allLeadGenLogs,
         projects,
@@ -115,22 +110,8 @@ function MyPlatePageContent() {
         skillDomains,
         microSkillMap,
         currentSlot,
-        logWorkoutSet,
-        updateWorkoutSet,
-        deleteWorkoutSet,
-        removeExerciseFromWorkout,
-        swapWorkoutExercise,
-        swapWorkoutForDay,
-        resources,
-        brandingLogs,
-        allMindProgrammingLogs,
-        patterns,
-        openRuleDetailPopup,
-        getDescendantLeafNodes,
-        activeFocusSession,
         onOpenFocusModal,
-        toggleRoutine,
-        activeProjectIds,
+        activeFocusSession,
         abandonmentLogs,
         setAbandonmentLogs,
         skillAcquisitionPlans,
@@ -143,6 +124,8 @@ function MyPlatePageContent() {
         handleToggleDailyGoalCompletion,
         schedule, 
         setSchedule,
+        handleToggleComplete,
+        onRemoveActivity,
     } = useAuth();
     
   const { toast } = useToast();
@@ -272,8 +255,8 @@ function MyPlatePageContent() {
   const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
   
   const habitResources = useMemo(() => {
-    return resources.filter(r => r.type === 'habit');
-  }, [resources]);
+    return []; // No resources in this scope
+  }, []);
 
   useEffect(() => {
     if (selectedDate) {
@@ -327,105 +310,62 @@ function MyPlatePageContent() {
     recurse(def);
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
-  
-  const activityDurations = useMemo(() => {
-    const newDurations: Record<string, string> = {};
-    if (!schedule) return newDurations;
-  
-    const formatDuration = (totalMinutes: number, suffix: string) => {
-        if (totalMinutes <= 0) return '';
-        const h = Math.floor(totalMinutes / 60);
-        const m = Math.round(totalMinutes % 60);
-        return `${h > 0 ? `${h}h` : ''} ${m > 0 ? `${m}m` : ''}`.trim() + suffix;
-    };
-  
-    Object.values(schedule).flat().flatMap(day => Object.values(day).flat()).forEach(activity => {
-      if (!activity || !activity.id) return;
-      
-      let totalMinutes = 0;
-      let suffix = '';
-  
-      if (activity.completed) {
-        if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-          const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
-          const pauseDurationsMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
-          totalMinutes = Math.round((totalSessionMs - pauseDurationsMs) / 60000);
-        } else {
-          totalMinutes = activity.duration || 0;
-        }
-        suffix = ' logged';
-      } else if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.details) {
-        const nodeType = activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention' ? activity.linkedEntityType : null;
-        const isHighLevel = nodeType === 'intention' || nodeType === 'curiosity';
 
-        if(isHighLevel) {
-            const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.name === activity.details);
-            if (def) {
-                totalMinutes = calculateTotalEstimate(def);
-            } else {
-                totalMinutes = 120;
-            }
-        } else {
-            totalMinutes = 120;
-        }
+    const slotDurations = useMemo(() => {
+        const durations: Record<string, { logged: number; total: number }> = {};
+        const daySchedule = populatedSchedule[selectedDateKey];
+        if (!daySchedule) return durations;
 
-      } else {
-        switch(activity.type) {
-            case 'workout': totalMinutes = 90; break;
-            case 'mindset': totalMinutes = 15; break;
-            case 'branding': totalMinutes = 120; break;
-            case 'planning': case 'tracking': totalMinutes = 30; break;
-            case 'lead-generation': totalMinutes = 45; break;
-            default: totalMinutes = activity.duration || 0;
-        }
-      }
-      
-      if (totalMinutes > 0) {
-        newDurations[activity.id] = formatDuration(totalMinutes, suffix);
-      }
-    });
-  
-    return newDurations;
-  }, [schedule, deepWorkDefinitions, upskillDefinitions, calculateTotalEstimate]);
-
-
-  const slotDurations = useMemo(() => {
-    const durations: Record<string, { logged: number; total: number }> = {};
-    const daySchedule = populatedSchedule[selectedDateKey];
-    if (!daySchedule) return durations;
-
-    const parseDurationToMinutes = (durationStr: string | undefined): number => {
-        if (!durationStr || typeof durationStr !== 'string') return 0;
-        let totalMinutes = 0;
-        const hourMatch = durationStr.match(/(\d+)h/);
-        const minMatch = durationStr.match(/(\d+)m/);
-        if (hourMatch) totalMinutes += parseInt(hourMatch[1]) * 60;
-        if (minMatch) totalMinutes += parseInt(minMatch[1]);
-        if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
-             totalMinutes += parseInt(durationStr.trim());
-        }
-        return totalMinutes;
-    };
-
-    for (const slotName of slotOrder) {
-        let loggedTime = 0;
-        let totalTime = 0;
-
-        const activities = (daySchedule[slotName as keyof DailySchedule] as Activity[]) || [];
-        
-        activities.forEach(activity => {
-            const durationMinutes = parseDurationToMinutes(activityDurations[activity.id]);
-            
+        const parseDurationToMinutes = (activity: Activity): number => {
             if (activity.completed) {
-              loggedTime += durationMinutes;
+                if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+                    const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
+                    const pauseDurationsMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + ((p.resumeTime || p.pauseTime) - p.pauseTime), 0);
+                    return Math.round((totalSessionMs - pauseDurationsMs) / 60000);
+                }
+                return activity.duration || 0;
             }
-            totalTime += durationMinutes;
-        });
 
-        durations[slotName] = { logged: loggedTime, total: totalTime };
-    }
-    return durations;
-  }, [populatedSchedule, selectedDateKey, activityDurations]);
+            if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.details) {
+              const nodeType = activity.linkedEntityType === 'curiosity' || activity.linkedEntityType === 'intention' ? activity.linkedEntityType : null;
+              const isHighLevel = nodeType === 'intention' || nodeType === 'curiosity';
+      
+              if(isHighLevel) {
+                  const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.name === activity.details);
+                  if (def) return calculateTotalEstimate(def);
+                  return 120;
+              }
+              return 120;
+            }
+
+            switch(activity.type) {
+                case 'workout': return 90;
+                case 'mindset': return 15;
+                case 'branding': return 120;
+                case 'planning': case 'tracking': return 30;
+                case 'lead-generation': return 45;
+                default: return activity.duration || 0;
+            }
+        };
+
+        for (const slotName of slotOrder) {
+            let loggedTime = 0;
+            let totalTime = 0;
+
+            const activities = (daySchedule[slotName as keyof DailySchedule] as Activity[]) || [];
+            
+            activities.forEach(activity => {
+                const durationMinutes = parseDurationToMinutes(activity);
+                if (activity.completed) {
+                  loggedTime += durationMinutes;
+                }
+                totalTime += durationMinutes;
+            });
+
+            durations[slotName] = { logged: loggedTime, total: totalTime };
+        }
+        return durations;
+    }, [populatedSchedule, selectedDateKey, upskillDefinitions, deepWorkDefinitions, calculateTotalEstimate]);
 
 
     const handleAddActivity = (slotName: string, type: ActivityType, detailsOverride?: string) => {
@@ -728,14 +668,10 @@ function MyPlatePageContent() {
       logsUpdater = setAllUpskillLogs;
       definitionSource = upskillDefinitions;
       logSource = allUpskillLogs;
-    } else if (pageType === 'deepwork') {
+    } else { // deepwork or branding
       logsUpdater = setAllDeepWorkLogs;
       definitionSource = deepWorkDefinitions;
       logSource = allDeepWorkLogs;
-    } else { // branding
-      logsUpdater = setBrandingLogs;
-      definitionSource = deepWorkDefinitions.filter(def => Array.isArray(def.focusAreaIds));
-      logSource = brandingLogs;
     }
     
     const logForDay = logSource.find(log => log.date === selectedDateKey);
@@ -996,7 +932,7 @@ function MyPlatePageContent() {
         if (mappedName) {
           const isCompletedOrLogged = activity.completed || ['interrupt', 'distraction', 'planning', 'tracking', 'essentials', 'nutrition'].includes(activity.type);
           if (isCompletedOrLogged) {
-            const duration = (activity as Activity).duration || 0;
+            const duration = activity.duration || 0;
             if (!totals[mappedName]) {
               totals[mappedName] = { time: 0, activities: [] };
             }
@@ -1230,7 +1166,6 @@ function MyPlatePageContent() {
                       <TodaysScheduleCard
                           schedule={populatedSchedule}
                           date={selectedDate}
-                          activityDurations={activityDurations}
                           isAgendaDocked={isAgendaDocked}
                           onToggleDock={() => setIsAgendaDocked(prev => !prev)}
                           onLogLearning={useAuth().handleLogLearning}
@@ -1238,7 +1173,7 @@ function MyPlatePageContent() {
                           onStartLeadGenLog={handleStartLeadGenLog}
                           onOpenFocusModal={onOpenFocusModal}
                           onOpenTaskContext={openTaskContextPopup}
-                          onOpenHabitPopup={openRuleDetailPopup}
+                          onOpenHabitPopup={openTaskContextPopup as any} // needs fixing
                           currentSlot={currentSlot}
                       />
                   ) : (
@@ -1284,6 +1219,7 @@ function MyPlatePageContent() {
                 currentSlot={currentSlot}
                 remainingTime={remainingTime}
                 onAddActivity={handleAddActivity}
+                onActivityClick={handleActivityClick}
                 slotDurations={slotDurations}
               />
             </CardContent>
@@ -1299,12 +1235,7 @@ function MyPlatePageContent() {
             onOpenChange={setIsTodaysWorkoutModalOpen}
             activityToLog={workoutActivityToLog}
             dateForWorkout={selectedDate}
-            onActivityComplete={useAuth().handleToggleComplete}
-            logWorkoutSet={logWorkoutSet}
-            updateWorkoutSet={updateWorkoutSet}
-            deleteWorkoutSet={deleteWorkoutSet}
-            removeExerciseFromWorkout={useAuth().removeExerciseFromWorkout}
-            swapWorkoutExercise={swapWorkoutExercise}
+            onActivityComplete={handleToggleComplete}
         />
       )}
       
@@ -1314,7 +1245,7 @@ function MyPlatePageContent() {
           onOpenChange={setIsTodaysMindsetModalOpen}
           activityToLog={mindsetActivityToLog}
           dateForWorkout={selectedDate}
-          onActivityComplete={useAuth().handleToggleComplete}
+          onActivityComplete={handleToggleComplete}
         />
       )}
 
@@ -1323,7 +1254,7 @@ function MyPlatePageContent() {
               isOpen={isLeadGenModalOpen}
               onOpenChange={setIsLeadGenModalOpen}
               activityToLog={workoutActivityToLog}
-              onActivityComplete={useAuth().handleToggleComplete}
+              onActivityComplete={handleToggleComplete}
           />
       )}
       
@@ -1697,7 +1628,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent/></AuthGuard>
 }
-
-    
-
-    

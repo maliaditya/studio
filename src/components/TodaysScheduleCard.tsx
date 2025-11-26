@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition } from '@/types/workout';
 import {
-  CheckCircle2, Circle, Grab, Dock, Move, Save, History, PlusCircle, BrainCircuit, Timer, GitBranch, Focus, Repeat, Link as LinkIcon
+  Grab, Dock, Move, History, PlusCircle, BrainCircuit
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -13,29 +13,18 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays, isToday } from 'date-fns';
+import { format, addDays } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
-import { useRouter } from 'next/navigation';
-import { getExercisesForDay } from '@/lib/workoutUtils';
-import { useToast } from '@/hooks/use-toast';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent } from '@/components/ui/dropdown-menu';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from './ui/separator';
-import { Progress } from './ui/progress';
-import { Badge } from './ui/badge';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
+
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
 interface TodaysScheduleCardProps {
   schedule: FullSchedule;
   date: Date;
-  activityDurations: Record<string, string>;
   isAgendaDocked: boolean;
   onToggleDock: () => void;
-  onLogLearning: (activity: Activity, duration: number) => void;
-  onStartWorkoutLog: (activity: Activity) => void;
-  onStartLeadGenLog: (activity: Activity) => void;
   onOpenFocusModal: (activity: Activity) => boolean;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent<HTMLButtonElement>) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
@@ -45,18 +34,22 @@ interface TodaysScheduleCardProps {
 export function TodaysScheduleCard({ 
   schedule, 
   date,
-  activityDurations, 
   isAgendaDocked, 
   onToggleDock,
-  onLogLearning,
-  onStartWorkoutLog,
-  onStartLeadGenLog,
   onOpenFocusModal,
   onOpenTaskContext,
   onOpenHabitPopup,
   currentSlot,
 }: TodaysScheduleCardProps) {
-  const { currentUser, carryForwardTask, settings, setSettings, handleToggleComplete, onRemoveActivity, toggleRoutine } = useAuth();
+  const { 
+      currentUser, 
+      carryForwardTask, 
+      settings, 
+      setSettings,
+      handleToggleComplete,
+      onRemoveActivity,
+      toggleRoutine
+  } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
@@ -104,8 +97,6 @@ export function TodaysScheduleCard({
       .flat()
       .filter((activity): activity is Activity => !!activity && !activity.completed);
   }, [schedule, date]);
-
-  const slotNames: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 20, y: 80 });
@@ -182,9 +173,6 @@ export function TodaysScheduleCard({
             <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                 <div className="flex items-center">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSettings(prev => ({...prev, agendaShowCurrentSlotOnly: !prev.agendaShowCurrentSlotOnly}))}>
-                        <Focus className={cn("h-4 w-4", settings.agendaShowCurrentSlotOnly ? "text-primary" : "text-muted-foreground")} />
-                    </Button>
                     <Popover>
                         <PopoverTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -206,7 +194,7 @@ export function TodaysScheduleCard({
                                         </PopoverTrigger>
                                         <PopoverContent className="w-48 p-1">
                                         <div className="flex flex-col">
-                                            {slotNames.map(slot => (
+                                            {slotOrder.map(slot => (
                                             <Button
                                                 key={slot}
                                                 variant="ghost"
@@ -267,7 +255,7 @@ export function TodaysScheduleCard({
                     {scheduledActivities.map((activity) => (
                     <AgendaWidgetItem
                         key={activity.id}
-                        activity={activity}
+                        activity={{...activity, slot: activity.slot as SlotName}}
                         date={date}
                         onToggleComplete={handleToggleComplete}
                         onActivityClick={(slot, act, e) => {

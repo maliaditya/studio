@@ -6,15 +6,12 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { DailySchedule, Activity, ActivityType, SlotName, RecurrenceRule } from '@/types/workout';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useAuth } from '@/contexts/AuthContext';
-import { isToday, format } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from './ui/scroll-area';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, History, PlusCircle } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle } from 'lucide-react';
+import { isToday } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
-
-const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
 const activityIcons: Record<ActivityType, React.ReactNode> = {
     workout: <Dumbbell className="h-4 w-4" />,
@@ -112,7 +109,6 @@ export function TimeSlots({
       {slots.map((slot) => {
         const activities = (schedule[slot.name as keyof DailySchedule] as Activity[]) || [];
         const slotData = slotDurations[slot.name] || { logged: 0, total: 0 };
-        const { logged: loggedTime } = slotData;
         
         const isCurrentSlotToday = isToday(date) && currentSlot === slot.name;
 
