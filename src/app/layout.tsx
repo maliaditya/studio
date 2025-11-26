@@ -422,9 +422,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onToggleComplete={handleToggleComplete}
             onOpenFocusModal={onOpenFocusModal}
             onOpenTaskContext={openTaskContextPopup}
-            onOpenHabitPopup={openRuleDetailPopup}
+            onOpenHabitPopup={openHabitDetailPopup}
             currentSlot={currentSlot}
-            onRemoveActivity={() => {}}
+            onRemoveActivity={(slot, id) => authContext.onRemoveActivity(slot, id, new Date())}
         />
       )}
       {authContext.settings.widgetVisibility.smartLogging && (
