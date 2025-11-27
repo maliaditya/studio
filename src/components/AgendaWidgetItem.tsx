@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -12,6 +11,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useAuth } from '@/contexts/AuthContext';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
+import { EditableActivityText } from './EditableActivityText';
 
 
 const activityIcons: Record<ActivityType, React.ReactNode> = {
@@ -58,23 +58,42 @@ export const AgendaWidgetItem = React.memo(({
 }: AgendaWidgetItemProps) => {
     const { habitCards } = useAuth();
     const isClickable = !['interrupt', 'distraction'].includes(activity.type);
+    const isTimeslot = context === 'timeslot';
 
     const linkedHabits = React.useMemo(() => 
         (activity.habitEquationIds || []).map(id => habitCards.find(h => h.id === id)).filter((h): h is NonNullable<typeof h> => !!h)
     , [activity.habitEquationIds, habitCards]);
     
+    const handleItemClick = (e: React.MouseEvent) => {
+        if (isClickable && !isTimeslot) {
+            onActivityClick(activity, e);
+        }
+    };
+
     return (
         <li 
-            className={cn("flex items-start gap-2 p-2 rounded-lg group transition-all", isClickable && "cursor-pointer hover:bg-muted/50", context === 'timeslot' && 'bg-background')}
-            onClick={(e) => isClickable && onActivityClick(activity, e)}
+            className={cn(
+                "flex items-start gap-2 p-2 rounded-lg group transition-all",
+                isClickable && !isTimeslot && "cursor-pointer hover:bg-muted/50",
+                isTimeslot && 'bg-background'
+            )}
+            onClick={handleItemClick}
         >
             <button onClick={(e) => { e.stopPropagation(); onToggleComplete(activity.slot, activity.id); }} className="mt-0.5">
                 {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
             </button>
             <div className="flex-grow min-w-0">
-                <p className={cn("text-sm font-medium", activity.completed && "line-through text-muted-foreground")}>
-                    {activity.details}
-                </p>
+                {isTimeslot ? (
+                    <EditableActivityText
+                        initialValue={activity.details}
+                        onUpdate={(newDetails) => onUpdateActivity(activity.id, newDetails)}
+                        className={cn("text-sm font-medium w-full block", activity.completed && "line-through text-muted-foreground")}
+                    />
+                ) : (
+                    <p className={cn("text-sm font-medium", activity.completed && "line-through text-muted-foreground")}>
+                        {activity.details}
+                    </p>
+                )}
                  <div className="flex flex-wrap items-center gap-2 mt-1">
                     <div className="flex items-center gap-1 text-xs text-muted-foreground capitalize">
                         {activityIcons[activity.type]} {activity.type.replace('-', ' ')}

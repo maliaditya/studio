@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -67,7 +66,7 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
                     );
                 }
                 return (
-                    <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, 'New activity')}>
+                    <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, '')}>
                         {icon}
                         <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
                     </DropdownMenuItem>
@@ -96,8 +95,9 @@ export function TimeSlots({
 }: TimeSlotsProps) {
     const { toast } = useToast();
     const { setSchedule: setGlobalSchedule, settings, handleToggleComplete, toggleRoutine, activityDurations } = useAuth();
+    const dateKey = useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
+    const todaysSchedule = useMemo(() => schedule[dateKey] || {}, [schedule, dateKey]);
 
-    const todaysSchedule = useMemo(() => schedule[format(date, 'yyyy-MM-dd')] || {}, [schedule, date]);
 
   const slots = [
     { name: 'Late Night', time: '12am - 4am', endHour: 4, icon: <Moon className="h-5 w-5 text-indigo-400" /> },
@@ -115,7 +115,6 @@ export function TimeSlots({
     const destinationSlotName = destination.droppableId;
 
     setGlobalSchedule(currentSchedule => {
-        const dateKey = format(date, 'yyyy-MM-dd');
         const daySchedule = { ...(currentSchedule[dateKey] || {}) };
 
         const sourceActivities = [...((daySchedule[sourceSlotName as SlotName] as Activity[]) || [])];
@@ -139,7 +138,6 @@ export function TimeSlots({
   };
 
   const handleAddActivity = (slotName: string, type: ActivityType, details: string) => {
-    const dateKey = format(date, 'yyyy-MM-dd');
     const newActivity: Activity = {
         id: `${type}-${Date.now()}-${Math.random()}`,
         type,
@@ -161,7 +159,6 @@ export function TimeSlots({
   };
   
   const handleUpdateActivity = (activityId: string, newDetails: string) => {
-    const dateKey = format(date, 'yyyy-MM-dd');
     setGlobalSchedule(prev => {
         const newSchedule = {...prev};
         if (newSchedule[dateKey]) {
@@ -183,7 +180,6 @@ export function TimeSlots({
   };
 
   const onRemoveActivity = (slotName: string, activityId: string) => {
-    const dateKey = format(date, 'yyyy-MM-dd');
     setGlobalSchedule(prev => {
         const newSchedule = { ...prev };
         if (newSchedule[dateKey]) {
@@ -198,6 +194,7 @@ export function TimeSlots({
   };
 
   const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
+    if (activity.type === 'interrupt' || activity.type === 'distraction') return;
     onOpenFocusModal(activity);
   };
 
