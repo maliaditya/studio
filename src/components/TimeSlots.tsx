@@ -193,8 +193,10 @@ export function TimeSlots({
     });
   };
 
-  const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
-    onOpenFocusModal(activity);
+  const handleActivityClick = (activity: Activity, event: React.MouseEvent) => {
+    if (activity.type === 'upskill' || activity.type === 'deepwork') {
+      onOpenFocusModal(activity);
+    }
   };
 
 
@@ -240,7 +242,7 @@ export function TimeSlots({
                                     activity={{...activity, slot: slot.name as SlotName}}
                                     date={date}
                                     onToggleComplete={handleToggleComplete}
-                                    onActivityClick={(act, e) => handleActivityClick(slot.name, act, e)}
+                                    onActivityClick={(act, e) => handleActivityClick(act, e)}
                                     onRemoveActivity={(slotName, id) => onRemoveActivity(slotName, id)}
                                     onUpdateActivity={handleUpdateActivity}
                                     setRoutine={toggleRoutine}

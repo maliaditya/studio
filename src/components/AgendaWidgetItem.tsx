@@ -58,9 +58,10 @@ export const AgendaWidgetItem = React.memo(({
 }: AgendaWidgetItemProps) => {
     const { habitCards } = useAuth();
     const isTimeslot = context === 'timeslot';
-    const isSpecialClickableTask = ['upskill', 'deepwork', 'workout', 'mindset', 'lead-generation', 'branding'].includes(activity.type);
     
-    // All user-schedulable activities are clickable.
+    // Only 'upskill' and 'deepwork' are special non-editable tasks now.
+    const isSpecialNonEditableTask = activity.type === 'upskill' || activity.type === 'deepwork';
+    
     const isClickable = true;
 
     const linkedHabits = React.useMemo(() => 
@@ -77,7 +78,7 @@ export const AgendaWidgetItem = React.memo(({
         <li 
             className={cn(
                 "flex items-start gap-2 p-2 rounded-lg group transition-all",
-                (isClickable || isSpecialClickableTask) && "cursor-pointer hover:bg-muted/50",
+                isClickable && "cursor-pointer hover:bg-muted/50",
                 isTimeslot && 'bg-background'
             )}
             onClick={handleItemClick}
@@ -86,7 +87,7 @@ export const AgendaWidgetItem = React.memo(({
                 {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
             </button>
             <div className="flex-grow min-w-0">
-                {(isTimeslot && !isSpecialClickableTask) ? (
+                {isTimeslot && !isSpecialNonEditableTask ? (
                     <EditableActivityText
                         initialValue={activity.details}
                         onUpdate={(newDetails) => onUpdateActivity(activity.id, newDetails)}
