@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -14,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { TimeSlots } from '@/components/TimeSlots';
 import { ProductivitySnapshot, TimeAllocationChart } from '@/components/ProductivitySnapshot';
 import { DashboardStats } from '@/components/DashboardStats';
-import { WeightGoalCard } from '@/components/WeightGoalCard';
+import { WeightGoalCard } from '@/components/ui/WeightGoalCard';
 import { VisionCard } from '@/components/VisionCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -672,3 +671,6 @@ export default function MyPlatePage() {
 
     
 
+
+
+    
