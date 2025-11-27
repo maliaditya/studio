@@ -28,6 +28,8 @@ interface TodaysScheduleCardProps {
   onOpenTaskContext: (activityId: string, event: React.MouseEvent) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
   currentSlot: string;
+  schedule: FullSchedule;
+  activityDurations: Record<string, string>;
 }
 
 export function TodaysScheduleCard({ 
@@ -38,6 +40,8 @@ export function TodaysScheduleCard({
   onOpenTaskContext,
   onOpenHabitPopup,
   currentSlot,
+  schedule,
+  activityDurations,
 }: TodaysScheduleCardProps) {
   const { 
     currentUser, 
@@ -46,9 +50,7 @@ export function TodaysScheduleCard({
     setSettings,
     handleToggleComplete,
     toggleRoutine,
-    schedule,
-    setSchedule,
-    activityDurations,
+    setSchedule: setGlobalSchedule,
   } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
@@ -165,7 +167,7 @@ export function TodaysScheduleCard({
   }, [isDragging, dragStartOffset, isAgendaDocked, position, positionKey]);
 
   const onRemoveActivity = (slotName: string, activityId: string) => {
-    setSchedule(prev => {
+    setGlobalSchedule(prev => {
         const newSchedule = { ...prev };
         if (newSchedule[dayKey]) {
             const daySchedule = { ...newSchedule[dayKey] };
@@ -179,7 +181,7 @@ export function TodaysScheduleCard({
   };
   
   const handleUpdateActivity = (activityId: string, newDetails: string) => {
-    setSchedule(prev => {
+    setGlobalSchedule(prev => {
         const newSchedule = {...prev};
         if (newSchedule[dayKey]) {
             const daySchedule = {...newSchedule[dayKey]};

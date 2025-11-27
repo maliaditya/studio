@@ -417,6 +417,8 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onOpenTaskContext={openTaskContextPopup}
             onOpenHabitPopup={openHabitDetailPopup}
             currentSlot={currentSlot}
+            schedule={schedule}
+            activityDurations={activityDurations}
         />
       )}
       {authContext.settings.widgetVisibility.smartLogging && (
