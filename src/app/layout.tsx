@@ -415,9 +415,8 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onToggleDock={() => setIsAgendaDocked(prev => !prev)}
             onOpenFocusModal={onOpenFocusModal}
             onOpenTaskContext={openTaskContextPopup}
-            onOpenHabitPopup={openHabitDetailPopup}
+            onOpenHabitPopup={onOpenHabitPopup}
             currentSlot={currentSlot}
-            onRemoveActivity={(slot, id) => authContext.onRemoveActivity(slot, id, new Date())}
         />
       )}
       {authContext.settings.widgetVisibility.smartLogging && (
@@ -559,6 +558,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-
-    
