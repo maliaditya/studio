@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { TimeSlots } from '@/components/TimeSlots';
 import { ProductivitySnapshot, TimeAllocationChart } from '@/components/ProductivitySnapshot';
 import { DashboardStats } from '@/components/DashboardStats';
-import { WeightGoalCard } from '@/components/ui/WeightGoalCard';
+import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { VisionCard } from '@/components/VisionCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -666,11 +666,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
-
-    
-
-    
-
-
-
-    
