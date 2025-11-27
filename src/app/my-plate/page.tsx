@@ -423,38 +423,32 @@ function MyPlatePageContent() {
                                         onOpenTaskContext={onOpenTaskContext}
                                         onOpenHabitPopup={onOpenHabitPopup}
                                         currentSlot={currentSlot}
+                                        schedule={schedule}
+                                        activityDurations={activityDurations}
                                     />
                                 ) : (
-                                    <Card>
-                                        <CardHeader className="flex flex-row items-center justify-between">
-                                            <CardTitle className="flex items-center gap-2">Daily Time Allocation</CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <TimeAllocationChart timeAllocationData={timeAllocationData} />
-                                        </CardContent>
-                                    </Card>
+                                    <WeightGoalCard
+                                        weightLogs={weightLogs}
+                                        goalWeight={goalWeight}
+                                        height={height}
+                                        dateOfBirth={dateOfBirth}
+                                        gender={gender}
+                                        onSetHeight={onSetHeight}
+                                        onSetDateOfBirth={onSetDateOfBirth}
+                                        onSetGender={onSetGender}
+                                        onSetGoalWeight={onSetGoalWeight}
+                                        dietPlan={dietPlan}
+                                        onEditDietClick={() => setIsDietPlanModalOpen(true)}
+                                        deepWorkDefinitions={deepWorkDefinitions}
+                                        upskillDefinitions={upskillDefinitions}
+                                        onOpenIntentionPopup={onOpenIntentionPopup}
+                                        metaRules={[]}
+                                        productizationPlans={{}}
+                                        offerizationPlans={{}}
+                                        projects={[]}
+                                        onOpenExcuseModal={() => {}}
+                                    />
                                 )}
-                                <WeightGoalCard
-                                    weightLogs={weightLogs}
-                                    goalWeight={goalWeight}
-                                    height={height}
-                                    dateOfBirth={dateOfBirth}
-                                    gender={gender}
-                                    onSetHeight={onSetHeight}
-                                    onSetDateOfBirth={onSetDateOfBirth}
-                                    onSetGender={onSetGender}
-                                    onSetGoalWeight={onSetGoalWeight}
-                                    dietPlan={dietPlan}
-                                    onEditDietClick={() => setIsDietPlanModalOpen(true)}
-                                    deepWorkDefinitions={deepWorkDefinitions}
-                                    upskillDefinitions={upskillDefinitions}
-                                    onOpenIntentionPopup={onOpenIntentionPopup}
-                                    metaRules={[]}
-                                    productizationPlans={{}}
-                                    offerizationPlans={{}}
-                                    projects={[]}
-                                    onOpenExcuseModal={() => {}}
-                                />
                             </div>
                         </div>
                         <TimeSlots
