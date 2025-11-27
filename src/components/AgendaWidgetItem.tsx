@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -7,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2 } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule } from '@/types/workout';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, DropdownMenuPortal } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
@@ -59,8 +60,8 @@ export const AgendaWidgetItem = React.memo(({
     const { habitCards } = useAuth();
     const isTimeslot = context === 'timeslot';
     
-    // Only 'upskill' and 'deepwork' are special non-editable tasks now.
-    const isSpecialNonEditableTask = activity.type === 'upskill' || activity.type === 'deepwork';
+    // upskill and deepwork should open a modal, not be editable inline
+    const isInlineEditable = activity.type !== 'upskill' && activity.type !== 'deepwork';
     
     const isClickable = true;
 
@@ -87,7 +88,7 @@ export const AgendaWidgetItem = React.memo(({
                 {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
             </button>
             <div className="flex-grow min-w-0">
-                {isTimeslot && !isSpecialNonEditableTask ? (
+                {isTimeslot && isInlineEditable ? (
                     <EditableActivityText
                         initialValue={activity.details}
                         onUpdate={(newDetails) => onUpdateActivity(activity.id, newDetails)}

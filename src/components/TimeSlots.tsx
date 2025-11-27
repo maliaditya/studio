@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -83,6 +84,7 @@ interface TimeSlotsProps {
   onOpenTaskContext: (activityId: string, event: React.MouseEvent) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
   onOpenFocusModal: (activity: Activity) => boolean;
+  onOpenLearningModal: (activity: Activity) => void;
 }
 
 export function TimeSlots({
@@ -92,6 +94,7 @@ export function TimeSlots({
   onOpenTaskContext,
   onOpenHabitPopup,
   onOpenFocusModal,
+  onOpenLearningModal,
 }: TimeSlotsProps) {
     const { toast } = useToast();
     const { setSchedule: setGlobalSchedule, settings, handleToggleComplete, toggleRoutine, activityDurations } = useAuth();
@@ -195,6 +198,8 @@ export function TimeSlots({
 
   const handleActivityClick = (activity: Activity, event: React.MouseEvent) => {
     if (activity.type === 'upskill' || activity.type === 'deepwork') {
+      onOpenLearningModal(activity);
+    } else {
       onOpenFocusModal(activity);
     }
   };

@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysMindsetModal } from '@/components/TodaysMindsetModal';
 import { TodaysLeadGenModal } from '@/components/TodaysLeadGenModal';
+import { TodaysLearningModal } from '@/components/TodaysLearningModal';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { MindMapViewer } from '@/components/MindMapViewer';
 import { KanbanPageContent } from '@/app/kanban/page';
@@ -91,6 +92,8 @@ function MyPlatePageContent() {
         onOpenFocusModal,
         onUpdateWeightLog,
         onDeleteWeightLog,
+        setSchedule,
+        updateActivity,
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
@@ -99,6 +102,8 @@ function MyPlatePageContent() {
     const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
     const [isTodaysMindsetModalOpen, setIsTodaysMindsetModalOpen] = useState(false);
     const [isLeadGenModalOpen, setIsLeadGenModalOpen] = useState(false);
+    const [isTodaysLearningModalOpen, setIsTodaysLearningModalOpen] = useState(false);
+    const [learningActivity, setLearningActivity] = useState<Activity | null>(null);
     const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
     const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
     const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
@@ -219,7 +224,7 @@ function MyPlatePageContent() {
             todayDeepWorkHours: todayDeepWorkMinutes / 60,
             deepWorkChange: calculateChange(todayDeepWorkMinutes, yesterdayDeepWorkMinutes),
             todayUpskillHours: todayUpskillMinutes / 60,
-            upskillChange: calculateChange(todayUpskillMinutes, yesterdayUpskillMinutes),
+            upskillChange: calculateChange(todayUpskillMinutes, yesterdayDeepWorkMinutes),
             totalProductiveHours: totalTodayMinutes / 60,
             avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
             learningStats,
@@ -423,6 +428,21 @@ function MyPlatePageContent() {
       toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
     };
 
+    const handleOpenLearningModal = useCallback((activity: Activity) => {
+        setLearningActivity(activity);
+        setIsTodaysLearningModalOpen(true);
+    }, []);
+
+    const handleSaveLearningTask = (selectedDefIds: string[]) => {
+      if (learningActivity) {
+          const newActivity = {
+              ...learningActivity,
+              taskIds: selectedDefIds,
+          };
+          updateActivity(newActivity);
+      }
+  };
+
     return (
         <>
             <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -447,14 +467,14 @@ function MyPlatePageContent() {
                                 {isAgendaDocked ? (
                                     <TodaysScheduleCard
                                         date={selectedDate}
+                                        schedule={schedule}
+                                        activityDurations={activityDurations}
                                         isAgendaDocked={isAgendaDocked}
                                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
                                         onOpenFocusModal={onOpenFocusModal}
                                         onOpenTaskContext={onOpenTaskContext}
                                         onOpenHabitPopup={onOpenHabitPopup}
                                         currentSlot={currentSlot}
-                                        schedule={schedule}
-                                        activityDurations={activityDurations}
                                     />
                                 ) : (
                                     <>
@@ -485,6 +505,7 @@ function MyPlatePageContent() {
                             onOpenFocusModal={onOpenFocusModal}
                             onOpenTaskContext={onOpenTaskContext}
                             onOpenHabitPopup={onOpenHabitPopup}
+                            onOpenLearningModal={handleOpenLearningModal}
                         />
                     </CardContent>
                 </Card>
@@ -516,6 +537,15 @@ function MyPlatePageContent() {
                 onOpenChange={setIsLeadGenModalOpen} 
                 activityToLog={workoutActivityToLog}
                 onActivityComplete={handleToggleComplete}
+            />
+            
+            <TodaysLearningModal
+                isOpen={isTodaysLearningModalOpen}
+                onOpenChange={setIsTodaysLearningModalOpen}
+                availableTasks={learningActivity ? [learningActivity as any] : []}
+                initialSelectedIds={learningActivity?.taskIds || []}
+                onSave={handleSaveLearningTask}
+                pageType={learningActivity?.type as 'upskill' | 'deepwork' || 'upskill'}
             />
             
             <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
@@ -591,5 +621,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
-
-    
