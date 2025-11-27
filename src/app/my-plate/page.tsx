@@ -6,7 +6,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project } from '@/types/workout';
-import { format, startOfToday, isAfter, parseISO, differenceInDays, subDays, isSameDay } from 'date-fns';
+import { format, startOfToday, isAfter, parseISO, differenceInDays, subDays, isSameDay, getISOWeekYear, getISOWeek } from 'date-fns';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -33,6 +33,7 @@ import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { Link as LinkIconLucide } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import type { WeightLog } from '@/types/workout';
 
 
 const slotEndHours: Record<string, number> = {
@@ -47,7 +48,7 @@ function MyPlatePageContent() {
         brandingLogs,
         upskillDefinitions,
         deepWorkDefinitions,
-        weightLogs,
+        weightLogs, setWeightLogs,
         goalWeight,
         height,
         dateOfBirth,
@@ -393,6 +394,30 @@ function MyPlatePageContent() {
         };
     }, [productivityStats, todaysSchedule, upcomingReleases, brandingStatus]);
 
+    const handleLogWeight = (weight: number, date: Date) => {
+      if (isNaN(weight) || weight <= 0) {
+        toast({ title: "Invalid Input", description: "Please enter a valid weight.", variant: "destructive" });
+        return;
+      }
+      const year = getISOWeekYear(date);
+      const week = getISOWeek(date).toString().padStart(2, '0');
+      const weekKey = `${year}-W${week}`;
+  
+      setWeightLogs(prevLogs => {
+          const logIndex = prevLogs.findIndex(log => log.date === weekKey);
+          const newLog: WeightLog = { date: weekKey, weight: weight };
+          
+          if (logIndex > -1) {
+              const updatedLogs = [...prevLogs];
+              updatedLogs[logIndex] = newLog;
+              return updatedLogs;
+          } else {
+              return [...prevLogs, newLog].sort((a,b) => a.date.localeCompare(b.date));
+          }
+      });
+  
+      toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
+    };
 
     return (
         <>
@@ -439,6 +464,7 @@ function MyPlatePageContent() {
                                             onSetDateOfBirth={onSetDateOfBirth}
                                             onSetGender={onSetGender}
                                             onSetGoalWeight={onSetGoalWeight}
+                                            onLogWeight={handleLogWeight}
                                             dietPlan={dietPlan}
                                             onEditDietClick={() => setIsDietPlanModalOpen(true)}
                                         />
@@ -544,3 +570,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
+
+    

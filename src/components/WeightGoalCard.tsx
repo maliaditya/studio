@@ -9,8 +9,8 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, BookCopy, Briefcase, ArrowRight, Workflow, Lightbulb, Brain, Shield } from 'lucide-react';
-import type { WeightLog, Gender, UserDietPlan, ExerciseDefinition, MetaRule, ProductizationPlan, SkillAcquisitionPlan, CoreSkill } from '@/types/workout';
+import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils } from 'lucide-react';
+import type { WeightLog, Gender, UserDietPlan } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO, isAfter, startOfToday, isBefore } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from './ui/label';
@@ -18,13 +18,6 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { ChartContainer, ChartConfig } from './ui/chart';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, ReferenceLine } from 'recharts';
 import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
-import { ScrollArea } from './ui/scroll-area';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
-import { Textarea } from './ui/textarea';
-import { Badge } from './ui/badge';
 
 interface WeightGoalCardProps {
   weightLogs: WeightLog[];
@@ -36,6 +29,7 @@ interface WeightGoalCardProps {
   onSetDateOfBirth: (dob: string | null) => void;
   onSetGender: (gender: Gender | null) => void;
   onSetGoalWeight: (goal: number | null) => void;
+  onLogWeight: (weight: number, date: Date) => void;
   dietPlan: UserDietPlan;
   onEditDietClick: () => void;
 }
@@ -71,27 +65,21 @@ export function WeightGoalCard({
     onSetDateOfBirth,
     onSetGender,
     onSetGoalWeight,
+    onLogWeight,
     dietPlan,
     onEditDietClick,
 }: WeightGoalCardProps) {
     const { toast } = useToast();
-    const router = useRouter();
     
     const [weightView, setWeightView] = useState<'chart' | 'details'>('details');
-    const [mainView, setMainView] = useState<'weight' | 'diet'>('weight');
     
     const [heightInput, setHeightInput] = useState('');
     const [dobInput, setDobInput] = useState<Date | undefined>();
     const [genderInput, setGenderInput] = useState<Gender | null>(null);
     const [goalWeightInput, setGoalWeightInput] = useState('');
+    const [newWeight, setNewWeight] = useState('');
 
     const areDetailsSet = height && dateOfBirth && gender;
-
-    const todaysDiet = useMemo(() => {
-        if (!dietPlan || dietPlan.length === 0) return null;
-        const dayName = format(new Date(), 'EEEE');
-        return dietPlan.find(plan => plan.day === dayName);
-    }, [dietPlan]);
 
     useEffect(() => {
         if (!areDetailsSet) {
@@ -322,6 +310,16 @@ export function WeightGoalCard({
         toast({ title: "Details Saved", description: "Your profile has been updated." });
     };
 
+    const handleLogWeightClick = () => {
+        const weightValue = parseFloat(newWeight);
+        if (isNaN(weightValue) || weightValue <= 0) {
+            toast({ title: "Invalid Weight", description: "Please enter a valid weight.", variant: "destructive" });
+            return;
+        }
+        onLogWeight(weightValue, new Date());
+        setNewWeight('');
+    };
+
     const renderWeightContent = () => {
         if (weightView === 'chart') {
             return (
@@ -352,6 +350,17 @@ export function WeightGoalCard({
         if (projectionSummary) {
             return (
                 <div className="space-y-4">
+                    <div className="flex gap-2">
+                        <Input
+                            type="number"
+                            placeholder="Log this week's weight..."
+                            value={newWeight}
+                            onChange={e => setNewWeight(e.target.value)}
+                            className="h-9"
+                        />
+                        <Button onClick={handleLogWeightClick} disabled={!newWeight} className="h-9">Log</Button>
+                    </div>
+                    <Separator />
                     <div className="grid grid-cols-3 gap-2 text-center text-sm">
                         <div>
                             <div className="text-muted-foreground">Current</div>
@@ -403,57 +412,6 @@ export function WeightGoalCard({
         );
     };
 
-    const renderDietContent = () => {
-         if (todaysDiet) {
-             return (
-                <div className="space-y-4">
-                    <div className="text-sm">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <h4 className="font-semibold text-foreground">Meal 1</h4>
-                                <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{todaysDiet.meal1 || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <h4 className="font-semibold text-foreground">Meal 2</h4>
-                                <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{todaysDiet.meal2 || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <h4 className="font-semibold text-foreground">Meal 3</h4>
-                                <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{todaysDiet.meal3 || 'N/A'}</p>
-                            </div>
-                            <div>
-                                <h4 className="font-semibold text-foreground">Supplements</h4>
-                                <p className="text-muted-foreground whitespace-pre-wrap mt-1 text-xs">{todaysDiet.supplements || 'N/A'}</p>
-                            </div>
-                        </div>
-                    </div>
-                     {todaysDiet.totalCalories != null && todaysDiet.totalCalories > 0 && (
-                        <div className="pt-4 border-t">
-                            <div className="flex justify-between items-center mb-2">
-                                <span className="text-sm text-muted-foreground">Total Intake</span>
-                                <span className="font-bold text-lg text-primary">{todaysDiet.totalCalories.toLocaleString()} kcal</span>
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-xs text-muted-foreground pt-1">
-                                <div className="flex justify-between"><span>Protein</span> <span className="font-medium text-foreground">{todaysDiet.protein?.toFixed(0) ?? '-'}g</span></div>
-                                <div className="flex justify-between"><span>Carbs</span> <span className="font-medium text-foreground">{todaysDiet.carbs?.toFixed(0) ?? '-'}g</span></div>
-                                <div className="flex justify-between"><span>Fat</span> <span className="font-medium text-foreground">{todaysDiet.fat?.toFixed(0) ?? '-'}g</span></div>
-                                <div className="flex justify-between"><span>Fiber</span> <span className="font-medium text-foreground">{todaysDiet.fiber?.toFixed(0) ?? '-'}g</span></div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )
-         }
-        return <p className="text-muted-foreground text-center py-4">No diet plan set up for today.</p>;
-    }
-    
-    const cardViews = {
-        weight: { icon: <Target />, title: "Weight Goal", description: "Your weekly weight trend and projections.", content: renderWeightContent() },
-        diet: { icon: <Utensils />, title: "Today's Diet", description: `Your planned meals for ${format(new Date(), 'EEEE')}.`, content: renderDietContent() },
-    };
-    
-    const currentViewData = cardViews[mainView];
-
     return (
         <Card className="bg-card/50">
             {areDetailsSet ? (
@@ -461,40 +419,24 @@ export function WeightGoalCard({
                     <CardHeader className="flex flex-row items-start justify-between">
                         <div>
                             <CardTitle className="flex items-center gap-2 text-primary">
-                                {currentViewData.icon}
-                                {currentViewData.title}
+                                <Target />
+                                Weight Goal
                             </CardTitle>
-                            <CardDescription>{currentViewData.description}</CardDescription>
+                            <CardDescription>Your weekly weight trend and projections.</CardDescription>
                         </div>
                         <div className="flex items-center gap-1">
                             <Button 
                                 variant="outline" 
                                 size="icon" 
-                                onClick={() => setMainView('diet')}
-                                className={cn("h-8 w-8", mainView === 'diet' && 'bg-accent')}
+                                onClick={() => setWeightView(v => v === 'chart' ? 'details' : 'chart')}
+                                className="h-8 w-8"
                             >
-                                <Utensils className="h-4 w-4" />
-                            </Button>
-                            <Button 
-                                variant="outline" 
-                                size="icon" 
-                                onClick={() => {
-                                    if (mainView === 'weight') {
-                                        setWeightView(v => v === 'chart' ? 'details' : 'chart');
-                                    } else {
-                                        setMainView('weight');
-                                    }
-                                }} 
-                                className={cn("h-8 w-8", mainView === 'weight' && 'bg-accent')}
-                            >
-                                {mainView === 'weight' 
-                                    ? (weightView === 'chart' ? <Activity className="h-4 w-4" /> : <LineChartIcon className="h-4 w-4" />) 
-                                    : <Target className="h-4 w-4" />}
+                                {weightView === 'chart' ? <Activity className="h-4 w-4" /> : <LineChartIcon className="h-4 w-4" />}
                             </Button>
                         </div>
                     </CardHeader>
                     <CardContent>
-                        {currentViewData.content}
+                        {renderWeightContent()}
                     </CardContent>
                 </>
             ) : (
@@ -580,3 +522,5 @@ export function WeightGoalCard({
         </Card>
     );
 }
+
+    
