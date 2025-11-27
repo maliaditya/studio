@@ -194,7 +194,6 @@ export function TimeSlots({
   };
 
   const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
-    if (activity.type === 'interrupt' || activity.type === 'distraction') return;
     onOpenFocusModal(activity);
   };
 

@@ -52,7 +52,6 @@ export function TodaysScheduleCard({
     toggleRoutine,
     setSchedule: setGlobalSchedule,
   } = useAuth();
-  const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
@@ -65,29 +64,31 @@ export function TodaysScheduleCard({
     setSettings(prev => ({...prev, currentPurpose: purposeText}));
     setPurposePopoverOpen(false);
   };
-
-  // Directly derive schedule and activities inside the render function
-  // to ensure it always uses the latest props.
-  const todaysSchedule = schedule[dayKey] || {};
-  let allActivities = slotOrder.flatMap(slot => {
-    const activities = todaysSchedule[slot];
-    if (activities && Array.isArray(activities) && activities.length > 0) {
-      return activities.map(activity => ({ slot, ...activity }));
-    }
-    return [];
-  });
-
-  if (settings.agendaShowCurrentSlotOnly) {
-    allActivities = allActivities.filter(activity => activity.slot === currentSlot);
-  }
   
-  const scheduledActivities = allActivities.sort((a, b) => {
-    if (a.completed !== b.completed) {
-        return a.completed ? 1 : -1;
-    }
-    return slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot);
-  });
+  const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
+  const scheduledActivities = useMemo(() => {
+    const todaysSchedule = schedule[dayKey] || {};
+    let allActivities = slotOrder.flatMap(slot => {
+        const activities = todaysSchedule[slot];
+        if (activities && Array.isArray(activities) && activities.length > 0) {
+            return activities.map(activity => ({ slot, ...activity }));
+        }
+        return [];
+    });
+
+    if (settings.agendaShowCurrentSlotOnly) {
+        allActivities = allActivities.filter(activity => activity.slot === currentSlot);
+    }
+    
+    return allActivities.sort((a, b) => {
+        if (a.completed !== b.completed) {
+            return a.completed ? 1 : -1;
+        }
+        return slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot);
+    });
+  }, [schedule, dayKey, settings.agendaShowCurrentSlotOnly, currentSlot]);
+
 
   const pendingTasks = React.useMemo(() => {
     const yesterday = addDays(date, -1);

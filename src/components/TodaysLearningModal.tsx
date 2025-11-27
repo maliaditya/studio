@@ -1,5 +1,4 @@
 
-
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -9,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ExerciseDefinition, WorkoutExercise, Project, ProductizationPlan, CoreSkill } from '@/types/workout';
@@ -24,7 +23,7 @@ import { Input } from './ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAuth } from '@/contexts/AuthContext';
-import { isAfter, parseISO, startOfToday, format } from 'date-fns';
+import { isAfter, parseISO, startOfToday } from 'date-fns';
 
 interface TodaysLearningModalProps {
   isOpen: boolean;
