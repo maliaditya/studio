@@ -198,7 +198,7 @@ export function TimeSlots({
 
   const handleActivityClick = (activity: Activity, event: React.MouseEvent) => {
     if (activity.type === 'upskill' || activity.type === 'deepwork') {
-      onOpenLearningModal(activity);
+      onOpenFocusModal(activity);
     } else {
       // For other types, do nothing, allowing inline edit or other default behaviors.
     }
@@ -290,3 +290,5 @@ export function TimeSlots({
     </DragDropContext>
   );
 }
+
+    

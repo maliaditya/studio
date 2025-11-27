@@ -522,7 +522,7 @@ function MyPlatePageContent() {
                             onOpenFocusModal={onOpenFocusModal}
                             onOpenTaskContext={onOpenTaskContext}
                             onOpenHabitPopup={onOpenHabitPopup}
-                            onOpenLearningModal={handleOpenLearningModal}
+                            onOpenLearningModal={onOpenFocusModal}
                         />
                     </CardContent>
                 </Card>
@@ -638,5 +638,7 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
+
+    
 
     
