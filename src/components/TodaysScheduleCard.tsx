@@ -66,30 +66,28 @@ export function TodaysScheduleCard({
     setPurposePopoverOpen(false);
   };
 
-  const todaysSchedule = React.useMemo(() => {
-    return schedule[dayKey] || {};
-  }, [schedule, dayKey]);
-
-  const scheduledActivities = React.useMemo(() => {
-    let allActivities = slotOrder.flatMap(slot => {
-        const activities = todaysSchedule[slot];
-        if (activities && Array.isArray(activities) && activities.length > 0) {
-            return activities.map(activity => ({ slot, ...activity }));
-        }
-        return [];
-    });
-
-    if (settings.agendaShowCurrentSlotOnly) {
-        allActivities = allActivities.filter(activity => activity.slot === currentSlot);
+  // Directly derive schedule and activities inside the render function
+  // to ensure it always uses the latest props.
+  const todaysSchedule = schedule[dayKey] || {};
+  let allActivities = slotOrder.flatMap(slot => {
+    const activities = todaysSchedule[slot];
+    if (activities && Array.isArray(activities) && activities.length > 0) {
+      return activities.map(activity => ({ slot, ...activity }));
     }
-    
-    return allActivities.sort((a, b) => {
-        if (a.completed !== b.completed) {
-            return a.completed ? 1 : -1;
-        }
-        return slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot);
-    });
-  }, [todaysSchedule, settings.agendaShowCurrentSlotOnly, currentSlot]);
+    return [];
+  });
+
+  if (settings.agendaShowCurrentSlotOnly) {
+    allActivities = allActivities.filter(activity => activity.slot === currentSlot);
+  }
+  
+  const scheduledActivities = allActivities.sort((a, b) => {
+    if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1;
+    }
+    return slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot);
+  });
+  
 
   const pendingTasks = React.useMemo(() => {
     const yesterday = addDays(date, -1);
@@ -201,6 +199,11 @@ export function TodaysScheduleCard({
     });
   };
 
+  const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
+    onOpenFocusModal(activity);
+  };
+
+
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
         <CardHeader
@@ -295,7 +298,7 @@ export function TodaysScheduleCard({
                         activity={{...activity, slot: activity.slot as SlotName}}
                         date={date}
                         onToggleComplete={handleToggleComplete}
-                        onActivityClick={(act, e) => onOpenFocusModal(act)}
+                        onActivityClick={(act, e) => handleActivityClick(act.slot, act, e)}
                         onRemoveActivity={onRemoveActivity}
                         onUpdateActivity={handleUpdateActivity}
                         setRoutine={toggleRoutine}
