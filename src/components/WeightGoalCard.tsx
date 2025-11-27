@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -71,7 +71,7 @@ export function WeightGoalCard({
 }: WeightGoalCardProps) {
     const { toast } = useToast();
     
-    const [weightView, setWeightView] = useState<'chart' | 'details'>('details');
+    const [weightView, setWeightView] = useState<'details' | 'chart'>('details');
     
     const [heightInput, setHeightInput] = useState('');
     const [dobInput, setDobInput] = useState<Date | undefined>();
@@ -350,17 +350,6 @@ export function WeightGoalCard({
         if (projectionSummary) {
             return (
                 <div className="space-y-4">
-                    <div className="flex gap-2">
-                        <Input
-                            type="number"
-                            placeholder="Log this week's weight..."
-                            value={newWeight}
-                            onChange={e => setNewWeight(e.target.value)}
-                            className="h-9"
-                        />
-                        <Button onClick={handleLogWeightClick} disabled={!newWeight} className="h-9">Log</Button>
-                    </div>
-                    <Separator />
                     <div className="grid grid-cols-3 gap-2 text-center text-sm">
                         <div>
                             <div className="text-muted-foreground">Current</div>
@@ -438,6 +427,18 @@ export function WeightGoalCard({
                     <CardContent>
                         {renderWeightContent()}
                     </CardContent>
+                    <CardFooter className="pt-4">
+                        <div className="flex gap-2 w-full">
+                            <Input
+                                type="number"
+                                placeholder="Log this week's weight..."
+                                value={newWeight}
+                                onChange={e => setNewWeight(e.target.value)}
+                                className="h-9"
+                            />
+                            <Button onClick={handleLogWeightClick} disabled={!newWeight} className="h-9">Log</Button>
+                        </div>
+                    </CardFooter>
                 </>
             ) : (
                 <>
@@ -522,5 +523,3 @@ export function WeightGoalCard({
         </Card>
     );
 }
-
-    
