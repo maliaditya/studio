@@ -56,18 +56,13 @@ export const AgendaWidgetItem = React.memo(({
     context,
     loggedDuration,
 }: AgendaWidgetItemProps) => {
-    const { habitCards } = useAuth();
     const isTimeslot = context === 'timeslot';
 
     // Only allow inline editing for simple, descriptive tasks.
-    const isInlineEditable = !['upskill', 'deepwork', 'workout', 'mindset', 'lead-generation', 'branding'].includes(activity.type);
+    const isInlineEditable = !['upskill', 'deepwork'].includes(activity.type);
     
     // All items should be clickable to open a relevant modal (focus, learning, etc.)
     const isClickable = true;
-
-    const linkedHabits = React.useMemo(() => 
-        (activity.habitEquationIds || []).map(id => habitCards.find(h => h.id === id)).filter((h): h is NonNullable<typeof h> => !!h)
-    , [activity.habitEquationIds, habitCards]);
     
     const handleItemClick = (e: React.MouseEvent) => {
         if (isClickable) {

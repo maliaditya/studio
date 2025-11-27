@@ -200,7 +200,7 @@ export function TimeSlots({
     if (activity.type === 'upskill' || activity.type === 'deepwork') {
       onOpenLearningModal(activity);
     } else {
-      onOpenFocusModal(activity);
+      // For other types, do nothing, allowing inline edit or other default behaviors.
     }
   };
 
@@ -248,7 +248,7 @@ export function TimeSlots({
                                     date={date}
                                     onToggleComplete={handleToggleComplete}
                                     onActivityClick={(act, e) => handleActivityClick(act, e)}
-                                    onRemoveActivity={(slotName, id) => onRemoveActivity(slotName, id)}
+                                    onRemoveActivity={onRemoveActivity}
                                     onUpdateActivity={handleUpdateActivity}
                                     setRoutine={toggleRoutine}
                                     onOpenTaskContext={onOpenTaskContext}
