@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2 } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule } from '@/types/workout';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
@@ -59,10 +59,11 @@ export const AgendaWidgetItem = React.memo(({
 }: AgendaWidgetItemProps) => {
     const { habitCards } = useAuth();
     const isTimeslot = context === 'timeslot';
+
+    // Only allow inline editing for simple, descriptive tasks.
+    const isInlineEditable = !['upskill', 'deepwork', 'workout', 'mindset', 'lead-generation', 'branding'].includes(activity.type);
     
-    // upskill and deepwork should open a modal, not be editable inline
-    const isInlineEditable = activity.type !== 'upskill' && activity.type !== 'deepwork';
-    
+    // All items should be clickable to open a relevant modal (focus, learning, etc.)
     const isClickable = true;
 
     const linkedHabits = React.useMemo(() => 
