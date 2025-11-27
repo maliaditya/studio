@@ -58,7 +58,7 @@ export const AgendaWidgetItem = React.memo(({
 }: AgendaWidgetItemProps) => {
     const { habitCards } = useAuth();
     const isTimeslot = context === 'timeslot';
-    const isSpecialClickableTask = activity.type === 'upskill' || activity.type === 'deepwork';
+    const isSpecialClickableTask = ['upskill', 'deepwork', 'workout', 'mindset', 'lead-generation', 'branding'].includes(activity.type);
     
     // All user-schedulable activities are clickable.
     const isClickable = true;
