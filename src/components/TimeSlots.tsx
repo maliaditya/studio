@@ -67,7 +67,7 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
                     );
                 }
                 return (
-                    <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, '')}>
+                    <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, 'New activity')}>
                         {icon}
                         <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
                     </DropdownMenuItem>
@@ -198,10 +198,7 @@ export function TimeSlots({
   };
 
   const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
-    if (activity.completed) return;
-    if (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'branding') {
-        onOpenFocusModal(activity);
-    }
+    onOpenFocusModal(activity);
   };
 
 

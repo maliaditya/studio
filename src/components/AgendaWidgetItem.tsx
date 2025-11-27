@@ -29,67 +29,6 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     mindset: <Brain className="h-4 w-4" />,
 };
 
-const EditableActivityText = ({ activity, onUpdate }: { activity: Activity, onUpdate: (activityId: string, newDetails: string) => void }) => {
-    const [isEditing, setIsEditing] = useState(activity.details === '' || activity.details === 'New activity');
-    const [text, setText] = useState(activity.details);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
-
-    useEffect(() => {
-        setText(activity.details);
-        if (activity.details === '' || activity.details === 'New activity') {
-            setIsEditing(true);
-        }
-    }, [activity.details]);
-
-    useEffect(() => {
-        if (isEditing && textareaRef.current) {
-            textareaRef.current.focus();
-            textareaRef.current.select();
-        }
-    }, [isEditing]);
-    
-    const handleBlur = () => {
-        setIsEditing(false);
-        if (text.trim() !== activity.details) {
-            onUpdate(activity.id, text.trim());
-        }
-    };
-    
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleBlur();
-        } else if (e.key === 'Escape') {
-            setIsEditing(false);
-            setText(activity.details);
-        }
-    };
-
-    if (isEditing) {
-        return (
-            <Textarea
-                ref={textareaRef}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onBlur={handleBlur}
-                onKeyDown={handleKeyDown}
-                placeholder="Type a description..."
-                className="text-sm font-medium p-1 h-auto min-h-[2.5rem] resize-none"
-            />
-        );
-    }
-
-    return (
-         <p 
-            className={cn("text-sm font-medium", activity.completed && "line-through text-muted-foreground")}
-            onClick={() => setIsEditing(true)}
-         >
-            {activity.details}
-         </p>
-    );
-};
-
-
 interface AgendaWidgetItemProps {
     activity: Activity & { slot: string };
     date: Date;
@@ -133,7 +72,9 @@ export const AgendaWidgetItem = React.memo(({
                 {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
             </button>
             <div className="flex-grow min-w-0">
-                 <EditableActivityText activity={activity} onUpdate={onUpdateActivity} />
+                <p className={cn("text-sm font-medium", activity.completed && "line-through text-muted-foreground")}>
+                    {activity.details}
+                </p>
                  <div className="flex flex-wrap items-center gap-2 mt-1">
                     <div className="flex items-center gap-1 text-xs text-muted-foreground capitalize">
                         {activityIcons[activity.type]} {activity.type.replace('-', ' ')}
