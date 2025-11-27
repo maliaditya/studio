@@ -15,6 +15,7 @@ import { TimeSlots } from '@/components/TimeSlots';
 import { ProductivitySnapshot, TimeAllocationChart } from '@/components/ProductivitySnapshot';
 import { DashboardStats } from '@/components/DashboardStats';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
+import { VisionCard } from '@/components/VisionCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -427,27 +428,22 @@ function MyPlatePageContent() {
                                         activityDurations={activityDurations}
                                     />
                                 ) : (
-                                    <WeightGoalCard
-                                        weightLogs={weightLogs}
-                                        goalWeight={goalWeight}
-                                        height={height}
-                                        dateOfBirth={dateOfBirth}
-                                        gender={gender}
-                                        onSetHeight={onSetHeight}
-                                        onSetDateOfBirth={onSetDateOfBirth}
-                                        onSetGender={onSetGender}
-                                        onSetGoalWeight={onSetGoalWeight}
-                                        dietPlan={dietPlan}
-                                        onEditDietClick={() => setIsDietPlanModalOpen(true)}
-                                        deepWorkDefinitions={deepWorkDefinitions}
-                                        upskillDefinitions={upskillDefinitions}
-                                        onOpenIntentionPopup={onOpenIntentionPopup}
-                                        metaRules={[]}
-                                        productizationPlans={{}}
-                                        offerizationPlans={{}}
-                                        projects={[]}
-                                        onOpenExcuseModal={() => {}}
-                                    />
+                                    <>
+                                        <WeightGoalCard
+                                            weightLogs={weightLogs}
+                                            goalWeight={goalWeight}
+                                            height={height}
+                                            dateOfBirth={dateOfBirth}
+                                            gender={gender}
+                                            onSetHeight={onSetHeight}
+                                            onSetDateOfBirth={onSetDateOfBirth}
+                                            onSetGender={onSetGender}
+                                            onSetGoalWeight={onSetGoalWeight}
+                                            dietPlan={dietPlan}
+                                            onEditDietClick={() => setIsDietPlanModalOpen(true)}
+                                        />
+                                        <VisionCard />
+                                    </>
                                 )}
                             </div>
                         </div>

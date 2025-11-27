@@ -38,14 +38,6 @@ interface WeightGoalCardProps {
   onSetGoalWeight: (goal: number | null) => void;
   dietPlan: UserDietPlan;
   onEditDietClick: () => void;
-  deepWorkDefinitions: ExerciseDefinition[];
-  upskillDefinitions: ExerciseDefinition[];
-  onOpenIntentionPopup: (intentionId: string) => void;
-  metaRules: MetaRule[];
-  productizationPlans: Record<string, ProductizationPlan>;
-  offerizationPlans: Record<string, ProductizationPlan>;
-  projects: any[];
-  onOpenExcuseModal: (planId: string, planName: string) => void;
 }
 
 const weightChartConfig = {
@@ -81,23 +73,12 @@ export function WeightGoalCard({
     onSetGoalWeight,
     dietPlan,
     onEditDietClick,
-    deepWorkDefinitions,
-    upskillDefinitions,
-    onOpenIntentionPopup,
-    metaRules,
-    productizationPlans,
-    offerizationPlans,
-    projects,
-    onOpenExcuseModal,
 }: WeightGoalCardProps) {
     const { toast } = useToast();
     const router = useRouter();
-    const { openRuleDetailPopup, skillAcquisitionPlans, coreSkills, offerizationPlans: offerizationPlansFromAuth } = useAuth();
-    const [newWeight, setNewWeight] = useState('');
-    const [weightDate, setWeightDate] = useState<Date | undefined>(new Date());
-    const [showLogForm, setShowLogForm] = useState(false);
+    
     const [weightView, setWeightView] = useState<'chart' | 'details'>('details');
-    const [mainView, setMainView] = useState<'projects' | 'weight' | 'diet' | 'rules'>('projects');
+    const [mainView, setMainView] = useState<'weight' | 'diet'>('weight');
     
     const [heightInput, setHeightInput] = useState('');
     const [dobInput, setDobInput] = useState<Date | undefined>();
@@ -121,27 +102,6 @@ export function WeightGoalCard({
         }
     }, [height, dateOfBirth, gender, goalWeight, areDetailsSet]);
 
-
-    useEffect(() => {
-        if (!areDetailsSet) return;
-        
-        if (!weightLogs || weightLogs.length === 0) {
-            setShowLogForm(true);
-            return;
-        }
-
-        const sortedLogs = [...weightLogs].sort((a, b) => a.date.localeCompare(b.date));
-        const lastLog = sortedLogs[sortedLogs.length - 1];
-        
-        const [year, weekNum] = lastLog.date.split('-W');
-        const lastLogDate = startOfISOWeek(setISOWeek(new Date(parseInt(year), 0, 4), parseInt(weekNum)));
-        
-        if (differenceInDays(new Date(), lastLogDate) >= 7) {
-            setShowLogForm(true);
-        } else {
-            setShowLogForm(false);
-        }
-    }, [weightLogs, areDetailsSet]);
 
     const weightChartData = useMemo(() => {
         if (!weightLogs) return [];
@@ -362,139 +322,6 @@ export function WeightGoalCard({
         toast({ title: "Details Saved", description: "Your profile has been updated." });
     };
 
-    const handleDiagramClick = (intention: ExerciseDefinition) => {
-        onOpenIntentionPopup(intention.id);
-    };
-
-    const renderProjectsContent = () => {
-        const plannedSpecializations = Object.entries(offerizationPlans || {})
-            .filter(([, plan]) => plan.learningPlan && ((plan.learningPlan.audioVideoResources?.length || 0) > 0 || (plan.learningPlan.bookWebpageResources?.length || 0) > 0))
-            .map(([specId]) => coreSkills.find(s => s.id === specId))
-            .filter((spec): spec is CoreSkill => !!spec);
-    
-        if (plannedSpecializations.length === 0) {
-            return (
-                <div className="text-center text-sm text-muted-foreground py-4 flex flex-col items-center justify-center h-full">
-                    <p>No learning plans found.</p>
-                    <Link href="/strategic-planning?tab=offerization" className="text-primary hover:underline mt-1">
-                        Create a learning plan to see it here.
-                    </Link>
-                </div>
-            );
-        }
-      
-        return (
-            <ScrollArea className="h-[250px] pr-3">
-                <ul className="space-y-3">
-                    {plannedSpecializations.map(spec => {
-                        const plan = offerizationPlansFromAuth[spec.id]?.learningPlan;
-                        if (!plan) return null;
-    
-                        const completed = spec.skillAreas.flatMap(sa => sa.microSkills).reduce((acc, ms) => {
-                            acc.items += ms.completedItems || 0;
-                            acc.hours += ms.completedHours || 0;
-                            acc.pages += ms.completedPages || 0;
-                            return acc;
-                        }, { items: 0, hours: 0, pages: 0 });
-
-                        const calculateDailyTarget = (total: number | null, completed: number, start: string | null | undefined, end: string | null | undefined) => {
-                            if (!total || !start || !end) return null;
-                            const startDate = parseISO(start);
-                            const endDate = parseISO(end);
-                            const today = startOfToday();
-                        
-                            if (isAfter(startDate, endDate) || isBefore(endDate, today)) return null;
-                        
-                            const remainingWork = total - completed;
-                            const relevantStartDate = isBefore(startDate, today) ? today : startDate;
-                            const remainingDays = differenceInDays(endDate, relevantStartDate) + 1;
-                        
-                            if (remainingWork <= 0 || remainingDays <= 0) return null;
-                        
-                            return (remainingWork / remainingDays).toFixed(1);
-                        };
-    
-                        return (
-                            <li key={spec.id}>
-                                <Card>
-                                    <CardHeader className="p-3">
-                                        <div className="flex justify-between items-start">
-                                            <CardTitle className="text-base">{spec.name}</CardTitle>
-                                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => onOpenExcuseModal(spec.id, spec.name)}>
-                                                <Shield className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </CardHeader>
-                                    <CardContent className="p-3 pt-0 text-xs">
-                                        <ul className="space-y-2">
-                                            {(plan.audioVideoResources || []).map(res => {
-                                                const dailyHours = calculateDailyTarget(res.totalHours, completed.hours, res.startDate, res.completionDate);
-                                                const dailyItems = calculateDailyTarget(res.totalItems, completed.items, res.startDate, res.completionDate);
-                                                let dailyTarget = [];
-                                                if (dailyItems) dailyTarget.push(`${dailyItems} items/day`);
-                                                if (dailyHours) dailyTarget.push(`${dailyHours} h/day`);
-                                                const daysRemaining = res.completionDate ? differenceInDays(parseISO(res.completionDate), new Date()) : null;
-                                                return (
-                                                <li key={res.id} className="text-muted-foreground p-2 bg-muted/30 rounded-md">
-                                                     <div className="flex justify-between items-start">
-                                                        <div className="flex-grow">
-                                                            <p className="font-semibold text-foreground truncate" title={res.name}>{res.name}</p>
-                                                            <p>{res.tutor}</p>
-                                                        </div>
-                                                        {res.completionDate && (
-                                                            <p className="text-xs font-medium flex-shrink-0">{format(parseISO(res.completionDate), 'MMM d, yyyy')}</p>
-                                                        )}
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-x-2 mt-1 pt-1 border-t">
-                                                        <span>
-                                                            {res.totalItems ? `${completed.items}/${res.totalItems} items` : ''}
-                                                            {res.totalHours ? ` / ${completed.hours.toFixed(1)}/${res.totalHours}h` : ''}
-                                                        </span>
-                                                        {(dailyItems || dailyHours) && (
-                                                            <div className="text-right">
-                                                                <p className="text-xs font-medium text-primary">
-                                                                    {dailyTarget.join(' & ')}
-                                                                </p>
-                                                                {daysRemaining !== null && daysRemaining >= 0 && <p className="font-bold text-xs">({daysRemaining}d left)</p>}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </li>
-                                            )})}
-                                            {(plan.bookWebpageResources || []).map(res => {
-                                                const dailyPages = calculateDailyTarget(res.totalPages, completed.pages, res.startDate, res.completionDate);
-                                                const daysRemaining = res.completionDate ? differenceInDays(parseISO(res.completionDate), new Date()) : null;
-                                                return (
-                                                <li key={res.id} className="text-muted-foreground p-2 bg-muted/30 rounded-md">
-                                                    <div className="flex justify-between items-start">
-                                                        <div className="flex-grow">
-                                                          <p className="font-semibold text-foreground truncate" title={res.name}>{res.name}</p>
-                                                          <p>{res.author}</p>
-                                                        </div>
-                                                         {res.completionDate && (
-                                                            <p className="text-xs font-medium flex-shrink-0">{format(parseISO(res.completionDate), 'MMM d, yyyy')}</p>
-                                                        )}
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-x-2 mt-1 pt-1 border-t">
-                                                        <span>{res.totalPages ? `${completed.pages}/${res.totalPages} pgs` : ''}</span>
-                                                        <div className="text-right">
-                                                            {dailyPages && <p className="text-xs font-medium text-primary">{dailyPages} pgs/day</p>}
-                                                            {daysRemaining !== null && daysRemaining >= 0 && <p className="font-bold text-xs">({daysRemaining}d left)</p>}
-                                                        </div>
-                                                    </div>
-                                                </li>
-                                            )})}
-                                        </ul>
-                                    </CardContent>
-                                </Card>
-                            </li>
-                        )
-                    })}
-                </ul>
-            </ScrollArea>
-        );
-    };
-      
     const renderWeightContent = () => {
         if (weightView === 'chart') {
             return (
@@ -620,31 +447,9 @@ export function WeightGoalCard({
         return <p className="text-muted-foreground text-center py-4">No diet plan set up for today.</p>;
     }
     
-    const renderRulesContent = () => {
-        return (
-            <ScrollArea className="h-[250px] pr-2">
-                <ul className="space-y-1">
-                    {metaRules.map(rule => (
-                        <li key={rule.id}>
-                            <button
-                                className="text-left text-xs text-muted-foreground hover:text-foreground w-full p-1 rounded"
-                                onClick={(e) => openRuleDetailPopup(rule.id, e)}
-                            >
-                                {rule.text}
-                            </button>
-                        </li>
-                    ))}
-                    {metaRules.length === 0 && <p className="text-center text-xs text-muted-foreground py-4">No meta rules defined.</p>}
-                </ul>
-            </ScrollArea>
-        );
-    };
-
     const cardViews = {
         weight: { icon: <Target />, title: "Weight Goal", description: "Your weekly weight trend and projections.", content: renderWeightContent() },
         diet: { icon: <Utensils />, title: "Today's Diet", description: `Your planned meals for ${format(new Date(), 'EEEE')}.`, content: renderDietContent() },
-        projects: { icon: <Workflow />, title: "Vision", description: "A high-level view of your current work.", content: renderProjectsContent() },
-        rules: { icon: <Brain />, title: "Meta Rules", description: "Your guiding principles for success.", content: renderRulesContent() },
     };
     
     const currentViewData = cardViews[mainView];
@@ -665,20 +470,9 @@ export function WeightGoalCard({
                             <Button 
                                 variant="outline" 
                                 size="icon" 
-                                onClick={() => setMainView('projects')}
-                                className={cn("h-8 w-8", mainView === 'projects' && 'bg-accent')}
+                                onClick={() => setMainView('diet')}
+                                className={cn("h-8 w-8", mainView === 'diet' && 'bg-accent')}
                             >
-                                <Briefcase className="h-4 w-4" />
-                            </Button>
-                             <Button 
-                                variant="outline" 
-                                size="icon" 
-                                onClick={() => setMainView('rules')}
-                                className={cn("h-8 w-8", mainView === 'rules' && 'bg-accent')}
-                            >
-                                <Brain className="h-4 w-4" />
-                            </Button>
-                            <Button variant="outline" size="icon" onClick={() => setMainView('diet')} className={cn("h-8 w-8", mainView === 'diet' && 'bg-accent')}>
                                 <Utensils className="h-4 w-4" />
                             </Button>
                             <Button 
@@ -700,32 +494,7 @@ export function WeightGoalCard({
                         </div>
                     </CardHeader>
                     <CardContent>
-                    {currentViewData.content}
-
-                        {showLogForm && mainView === 'weight' && (
-                            <div className="mt-4 pt-4 border-t space-y-3">
-                                <CardDescription>It's time for your weekly weigh-in.</CardDescription>
-                                <div className="flex gap-2 items-center">
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button variant={"outline"} className={cn("w-auto justify-start text-left font-normal h-9", !weightDate && "text-muted-foreground")}>
-                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {weightDate ? format(weightDate, "PPP") : <span>Pick a date</span>}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={weightDate} onSelect={(date) => date && setWeightDate(date)} initialFocus /></PopoverContent>
-                                    </Popover>
-                                    <Input
-                                        type="number"
-                                        placeholder="Weight (kg/lb)"
-                                        value={newWeight}
-                                        onChange={(e) => setNewWeight(e.target.value)}
-                                        className="h-9 flex-grow"
-                                    />
-                                </div>
-                            </div>
-                        )}
-                        
+                        {currentViewData.content}
                     </CardContent>
                 </>
             ) : (
