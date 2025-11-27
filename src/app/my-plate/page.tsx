@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -35,6 +36,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { WeightLog } from '@/types/workout';
 import { WeightChartModal } from '@/components/WeightChartModal';
+import { DeepWorkPageContent } from '@/app/deep-work/page';
 
 
 const slotEndHours: Record<string, number> = {
@@ -88,11 +90,13 @@ function MyPlatePageContent() {
         handleToggleComplete,
         schedule,
         activityDurations,
-        onOpenFocusModal,
+        onOpenFocusModal: originalOnOpenFocusModal,
         onUpdateWeightLog,
         onDeleteWeightLog,
         setSchedule,
         updateActivity,
+        setSelectedUpskillTask,
+        setSelectedDeepWorkTask
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
@@ -102,6 +106,7 @@ function MyPlatePageContent() {
     const [isTodaysMindsetModalOpen, setIsTodaysMindsetModalOpen] = useState(false);
     const [isLeadGenModalOpen, setIsLeadGenModalOpen] = useState(false);
     const [isTodaysLearningModalOpen, setIsTodaysLearningModalOpen] = useState(false);
+    const [isDeepWorkModalOpen, setIsDeepWorkModalOpen] = useState(false);
     const [learningActivity, setLearningActivity] = useState<Activity | null>(null);
     const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
     const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
@@ -118,6 +123,23 @@ function MyPlatePageContent() {
 
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
     const todaysSchedule = useMemo(() => schedule[selectedDateKey] || {}, [schedule, selectedDateKey]);
+
+    const onOpenFocusModal = (activity: Activity) => {
+      const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+      const taskDef = allDefs.find(def => activity.details.includes(def.name));
+      if (!taskDef) {
+          console.warn("Could not find definition for activity:", activity.details);
+          return false;
+      }
+  
+      if (activity.type === 'upskill') {
+          setSelectedUpskillTask(taskDef);
+      } else {
+          setSelectedDeepWorkTask(taskDef);
+      }
+      setIsDeepWorkModalOpen(true);
+      return true;
+    };
 
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
@@ -566,6 +588,17 @@ function MyPlatePageContent() {
             />
             
             <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
+            <Dialog open={isDeepWorkModalOpen} onOpenChange={setIsDeepWorkModalOpen}>
+                <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col overflow-hidden">
+                    <DialogHeader className="p-4 border-b">
+                        <DialogTitle>Deep Work</DialogTitle>
+                        <DialogDescription>Select a task to begin a focus session.</DialogDescription>
+                    </DialogHeader>
+                    <div className="flex-grow min-h-0">
+                        <DeepWorkPageContent isModal={true} />
+                    </div>
+                </DialogContent>
+            </Dialog>
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
