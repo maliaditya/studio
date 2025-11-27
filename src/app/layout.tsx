@@ -415,7 +415,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onToggleDock={() => setIsAgendaDocked(prev => !prev)}
             onOpenFocusModal={onOpenFocusModal}
             onOpenTaskContext={openTaskContextPopup}
-            onOpenHabitPopup={onOpenHabitPopup}
+            onOpenHabitPopup={openHabitDetailPopup}
             currentSlot={currentSlot}
         />
       )}
