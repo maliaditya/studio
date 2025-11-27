@@ -17,7 +17,6 @@ import { DashboardStats } from '@/components/DashboardStats';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { VisionCard } from '@/components/VisionCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
-import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
@@ -73,8 +72,6 @@ function MyPlatePageContent() {
         permanentlyLoggedTaskIds,
         currentSlot,
         handleStartFocusSession,
-        setFocusSessionModalOpen,
-        focusSessionModalOpen,
         focusActivity,
         focusDuration,
         logWorkoutSet, 
@@ -90,7 +87,6 @@ function MyPlatePageContent() {
         handleToggleComplete,
         schedule,
         activityDurations,
-        onOpenFocusModal: originalOnOpenFocusModal,
         onUpdateWeightLog,
         onDeleteWeightLog,
         setSchedule,
@@ -675,3 +671,4 @@ export default function MyPlatePage() {
     
 
     
+

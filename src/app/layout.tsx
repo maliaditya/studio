@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -22,7 +23,6 @@ import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
-import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 import { MissedSlotModal } from '@/components/MissedSlotModal';
 import { InterruptModal } from '@/components/InterruptModal';
@@ -123,8 +123,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handleStartWorkoutLog,
     handleStartLeadGenLog,
     onOpenFocusModal,
-    focusSessionModalOpen,
-    setFocusSessionModalOpen,
     focusActivity,
     handleStartFocusSession,
     focusDuration,
@@ -391,15 +389,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         popupState={stopperProgressPopup}
         onOpenChange={(isOpen) => setStopperProgressPopup(prev => ({ ...prev, isOpen }))}
       />
-       <FocusSessionModal
-          isOpen={focusSessionModalOpen}
-          onOpenChange={setFocusSessionModalOpen}
-          activity={focusActivity}
-          onStartSession={handleStartFocusSession}
-          onLogDuration={handleLogLearning}
-          initialDuration={focusDuration}
-        />
-      {activeFocusSession && (
+       {activeFocusSession && (
           <FocusTimerPopup
             activity={activeFocusSession.activity}
             duration={activeFocusSession.duration}
