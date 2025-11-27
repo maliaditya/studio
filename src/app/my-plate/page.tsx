@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project } from '@/types/workout';
@@ -83,7 +83,7 @@ function MyPlatePageContent() {
         toggleRoutine,
         handleToggleComplete,
         schedule,
-        activityDurations
+        activityDurations,
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
@@ -120,45 +120,7 @@ function MyPlatePageContent() {
         return true;
     }, [setFocusSessionModalOpen]);
     
-
-    const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
-        if (activity.completed) return;
-        if (activity.type === 'workout') {
-            setWorkoutActivityToLog(activity);
-            setIsTodaysWorkoutModalOpen(true);
-        } else if (activity.type === 'mindset') {
-            setMindsetActivityToLog(activity);
-            setIsTodaysMindsetModalOpen(true);
-        } else if (activity.type === 'deepwork' || activity.type === 'upskill') {
-            onOpenFocusModal(activity);
-        }
-    };
-    
     const [remainingTime, setRemainingTime] = useState<string | null>(null);
-    
-    useEffect(() => {
-        if(!currentSlot) return;
-        const timerInterval = setInterval(() => {
-            const now = new Date();
-            const slotEndHour = slotEndHours[currentSlot];
-            if (slotEndHour === undefined) {
-                setRemainingTime(null);
-                return;
-            }
-            const slotEndTime = new Date(); slotEndTime.setHours(slotEndHour, 0, 0, 0);
-            const diff = slotEndTime.getTime() - now.getTime();
-            
-            if (diff > 0) {
-                const hours = Math.floor(diff / (1000 * 60 * 60));
-                const minutes = Math.floor((diff / 1000 * 60) % 60);
-                const seconds = Math.floor((diff / 1000) % 60);
-                setRemainingTime(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
-            } else { 
-                setRemainingTime('00:00:00'); 
-            }
-        }, 1000);
-        return () => clearInterval(timerInterval);
-    }, [currentSlot]);
 
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
     const todaysSchedule = useMemo(() => schedule[selectedDateKey] || {}, [schedule, selectedDateKey]);
@@ -514,7 +476,7 @@ function MyPlatePageContent() {
                         <TimeSlots
                             date={selectedDate}
                             currentSlot={currentSlot}
-                            remainingTime={remainingTime}
+                            onOpenFocusModal={onOpenFocusModal}
                             onOpenTaskContext={onOpenTaskContext}
                             onOpenHabitPopup={onOpenHabitPopup}
                         />
@@ -608,3 +570,4 @@ export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
 
+    
