@@ -137,6 +137,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     stopperProgressPopup,
     setStopperProgressPopup,
     openBrainHackPopups,
+    openHabitDetailPopup: openHabitPopup,
   } = authContext;
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
@@ -288,7 +289,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     }
     
     let durationMinutes = parseInt(interruptDuration, 10);
-    if (applyInterruptToFutureSlots) {
+    if (applyToFutureSlots) {
         durationMinutes = 240;
     } else if (isNaN(durationMinutes) || durationMinutes <= 0) {
         toast({ title: 'Invalid Duration', description: 'Please enter a valid number of minutes.', variant: 'destructive' });
@@ -298,7 +299,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     setSchedule(prev => {
         const newDaySchedule = { ...(prev[selectedDateKey] || {}) };
 
-        if (applyInterruptToFutureSlots) {
+        if (applyToFutureSlots) {
             const currentSlotIndex = Object.keys(slotEndHours).indexOf(slotName);
             const slotsToUpdate = Object.keys(slotEndHours).slice(currentSlotIndex);
             
@@ -415,7 +416,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onToggleDock={() => setIsAgendaDocked(prev => !prev)}
             onOpenFocusModal={onOpenFocusModal}
             onOpenTaskContext={openTaskContextPopup}
-            onOpenHabitPopup={openHabitDetailPopup}
+            onOpenHabitPopup={openHabitPopup}
             currentSlot={currentSlot}
             schedule={schedule}
             activityDurations={activityDurations}
@@ -430,7 +431,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
               activeFocusSession={activeFocusSession}
               lastSessionReview={lastSessionReview}
               openMindsetTechniquePopup={openMindsetTechniquePopup}
-              openHabitDetailPopup={openHabitDetailPopup}
+              openHabitDetailPopup={openHabitPopup}
           />
       )}
       <MissedSlotModal 
