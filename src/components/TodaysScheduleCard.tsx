@@ -27,7 +27,6 @@ interface TodaysScheduleCardProps {
   onOpenFocusModal: (activity: Activity) => boolean;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
-  onRemoveActivity: (slotName: string, activityId: string) => void;
   currentSlot: string;
 }
 
@@ -38,7 +37,6 @@ export function TodaysScheduleCard({
   onOpenFocusModal,
   onOpenTaskContext,
   onOpenHabitPopup,
-  onRemoveActivity,
   currentSlot,
 }: TodaysScheduleCardProps) {
   const { 
@@ -48,7 +46,8 @@ export function TodaysScheduleCard({
     setSettings,
     handleToggleComplete,
     toggleRoutine,
-    schedule
+    schedule,
+    setSchedule,
   } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
@@ -164,13 +163,40 @@ export function TodaysScheduleCard({
     };
   }, [isDragging, dragStartOffset, isAgendaDocked, position, positionKey]);
 
-  const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
-    if (activity.completed) return;
-    if (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'branding') {
-        onOpenFocusModal(activity);
-    }
+  const onRemoveActivity = (slotName: string, activityId: string) => {
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        if (newSchedule[dayKey]) {
+            const daySchedule = { ...newSchedule[dayKey] };
+            if (daySchedule[slotName]) {
+                daySchedule[slotName] = (daySchedule[slotName] as any[]).filter(act => act.id !== activityId);
+                newSchedule[dayKey] = daySchedule;
+            }
+        }
+        return newSchedule;
+    });
   };
-
+  
+  const handleUpdateActivity = (activityId: string, newDetails: string) => {
+    setSchedule(prev => {
+        const newSchedule = {...prev};
+        if (newSchedule[dayKey]) {
+            const daySchedule = {...newSchedule[dayKey]};
+            for (const slotName in daySchedule) {
+                const activities = (daySchedule[slotName as SlotName] as Activity[]) || [];
+                const activityIndex = activities.findIndex(a => a.id === activityId);
+                if (activityIndex > -1) {
+                    const newActivities = [...activities];
+                    newActivities[activityIndex] = { ...newActivities[activityIndex], details: newDetails };
+                    daySchedule[slotName as SlotName] = newActivities;
+                    newSchedule[dayKey] = daySchedule;
+                    break;
+                }
+            }
+        }
+        return newSchedule;
+    });
+  };
 
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
@@ -266,8 +292,9 @@ export function TodaysScheduleCard({
                         activity={{...activity, slot: activity.slot as SlotName}}
                         date={date}
                         onToggleComplete={handleToggleComplete}
-                        onActivityClick={handleActivityClick}
+                        onActivityClick={onOpenFocusModal}
                         onRemoveActivity={onRemoveActivity}
+                        onUpdateActivity={handleUpdateActivity}
                         setRoutine={toggleRoutine}
                         onOpenTaskContext={onOpenTaskContext}
                         onOpenHabitPopup={onOpenHabitPopup}

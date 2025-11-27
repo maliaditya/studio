@@ -84,6 +84,7 @@ function MyPlatePageContent() {
         handleToggleComplete,
         schedule,
         activityDurations,
+        onOpenFocusModal,
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
@@ -101,24 +102,6 @@ function MyPlatePageContent() {
     const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
     const [mindsetActivityToLog, setMindsetActivityToLog] = useState<Activity | null>(null);
 
-    const onOpenFocusModal = useCallback((activity: Activity) => {
-        const estDurationStr = activity.duration?.toString();
-        let minutes = 0;
-        if (estDurationStr) {
-            const hMatch = estDurationStr.match(/(\d+)h/);
-            const mMatch = estDurationStr.match(/(\d+)m/);
-            const h = hMatch ? parseInt(hMatch[1]) * 60 : 0;
-            const m = mMatch ? parseInt(mMatch[1]) : 0;
-            minutes = h + m;
-            if (minutes === 0 && /^\d+$/.test(estDurationStr.trim())) {
-                minutes = parseInt(estDurationStr.trim());
-            }
-        }
-        if (isNaN(minutes) || minutes <= 0) minutes = 45;
-        
-        setFocusSessionModalOpen(true);
-        return true;
-    }, [setFocusSessionModalOpen]);
     
     const [remainingTime, setRemainingTime] = useState<string | null>(null);
 
@@ -570,4 +553,3 @@ export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
 
-    

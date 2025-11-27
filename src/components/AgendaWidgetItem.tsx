@@ -28,13 +28,13 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
 };
 
 const EditableActivityText = ({ activity, onUpdate }: { activity: Activity, onUpdate: (activityId: string, newDetails: string) => void }) => {
-    const [isEditing, setIsEditing] = useState(activity.details === '');
+    const [isEditing, setIsEditing] = useState(activity.details === '' || activity.details === 'New activity');
     const [text, setText] = useState(activity.details);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
         setText(activity.details);
-        if (activity.details === '') {
+        if (activity.details === '' || activity.details === 'New activity') {
             setIsEditing(true);
         }
     }, [activity.details]);
@@ -103,7 +103,8 @@ interface AgendaWidgetItemProps {
 
 export const AgendaWidgetItem = React.memo(({ activity, date, onToggleComplete, onActivityClick, onRemoveActivity, onUpdateActivity, setRoutine, onOpenTaskContext, onOpenHabitPopup, context }: AgendaWidgetItemProps) => {
     const { habitCards } = useAuth();
-    const isClickable = !activity.completed && (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'branding' || activity.type === 'workout' || activity.type === 'mindset' || activity.type === 'essentials' || activity.type === 'nutrition');
+    const nonClickableTypes: ActivityType[] = ['interrupt', 'distraction'];
+    const isClickable = !activity.completed && !nonClickableTypes.includes(activity.type);
 
     const linkedHabits = React.useMemo(() => 
         (activity.habitEquationIds || []).map(id => habitCards.find(h => h.id === id)).filter((h): h is NonNullable<typeof h> => !!h)
