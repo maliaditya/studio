@@ -34,6 +34,7 @@ import { Link as LinkIconLucide } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { WeightLog } from '@/types/workout';
+import { WeightChartModal } from '@/components/WeightChartModal';
 
 
 const slotEndHours: Record<string, number> = {
@@ -88,6 +89,8 @@ function MyPlatePageContent() {
         schedule,
         activityDurations,
         onOpenFocusModal,
+        onUpdateWeightLog,
+        onDeleteWeightLog,
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
@@ -105,6 +108,7 @@ function MyPlatePageContent() {
     const [workoutActivityToLog, setWorkoutActivityToLog] = useState<Activity | null>(null);
     const [mindsetActivityToLog, setMindsetActivityToLog] = useState<Activity | null>(null);
 
+    const [isWeightChartModalOpen, setIsWeightChartModalOpen] = useState(false);
     
     const [remainingTime, setRemainingTime] = useState<string | null>(null);
 
@@ -467,6 +471,7 @@ function MyPlatePageContent() {
                                             onLogWeight={handleLogWeight}
                                             dietPlan={dietPlan}
                                             onEditDietClick={() => setIsDietPlanModalOpen(true)}
+                                            onOpenChartModal={() => setIsWeightChartModalOpen(true)}
                                         />
                                         <VisionCard />
                                     </>
@@ -563,6 +568,22 @@ function MyPlatePageContent() {
                     </div>
                 </DialogContent>
             </Dialog>
+            <WeightChartModal
+                isOpen={isWeightChartModalOpen}
+                onOpenChange={setIsWeightChartModalOpen}
+                weightLogs={weightLogs}
+                goalWeight={goalWeight}
+                height={height}
+                dateOfBirth={dateOfBirth}
+                gender={gender}
+                onLogWeight={handleLogWeight}
+                onUpdateWeightLog={onUpdateWeightLog}
+                onDeleteWeightLog={onDeleteWeightLog}
+                onSetGoalWeight={onSetGoalWeight}
+                onSetHeight={onSetHeight}
+                onSetDateOfBirth={onSetDateOfBirth}
+                onSetGender={onSetGender}
+            />
         </>
     );
 }

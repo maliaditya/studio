@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -9,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { Separator } from './ui/separator';
 import { cn } from '@/lib/utils';
-import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils } from 'lucide-react';
+import { CalendarIcon, TrendingUp, Activity, Target, Save, LineChart as LineChartIcon, Utensils, Expand } from 'lucide-react';
 import type { WeightLog, Gender, UserDietPlan } from '@/types/workout';
 import { format, addWeeks, setISOWeek, startOfISOWeek, getISOWeekYear, differenceInDays, parseISO, isAfter, startOfToday, isBefore } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +33,7 @@ interface WeightGoalCardProps {
   onLogWeight: (weight: number, date: Date) => void;
   dietPlan: UserDietPlan;
   onEditDietClick: () => void;
+  onOpenChartModal: () => void;
 }
 
 const weightChartConfig = {
@@ -68,6 +70,7 @@ export function WeightGoalCard({
     onLogWeight,
     dietPlan,
     onEditDietClick,
+    onOpenChartModal,
 }: WeightGoalCardProps) {
     const { toast } = useToast();
     
@@ -414,6 +417,7 @@ export function WeightGoalCard({
                             <CardDescription>Your weekly weight trend and projections.</CardDescription>
                         </div>
                         <div className="flex items-center gap-1">
+                            <Button variant="outline" size="icon" onClick={onOpenChartModal} className="h-8 w-8"><Expand className="h-4 w-4" /></Button>
                             <Button 
                                 variant="outline" 
                                 size="icon" 
