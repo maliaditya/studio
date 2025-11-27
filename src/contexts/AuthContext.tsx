@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -127,7 +128,7 @@ interface AuthContextType {
   isAgendaDocked: boolean;
   setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
   activityDurations: Record<string, string>;
-  handleToggleComplete: (slotName: string, activityId: string, isCompleted: boolean) => void;
+  handleToggleComplete: (slotName: string, activityId: string) => void;
   onRemoveActivity: (slotName: string, activityId: string, date: Date) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
   scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string, duration?: number) => void;
@@ -1540,15 +1541,71 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     input.click();
   };
   
-  const activityDurations: Record<string, string> = {};
+    const activityDurations = useMemo(() => {
+        const durations: Record<string, string> = {};
+        const todayKey = format(new Date(), 'yyyy-MM-dd');
 
-  const handleToggleComplete = useCallback((slotName: string, activityId: string, isCompleted: boolean) => {
-    // This function is now a placeholder as the logic is moved to my-plate
-  }, []);
+        Object.values(schedule[todayKey] || {}).flat().forEach((activity: Activity) => {
+            if (!activity.completed) return;
+            const durationMs = activity.focusSessionEndTime! - activity.focusSessionInitialStartTime!;
+            const pauseMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + (p.resumeTime ? p.resumeTime - p.pauseTime : 0), 0);
+            const netMinutes = Math.round((durationMs - pauseMs) / 60000);
+            if (netMinutes > 0) {
+                const hours = Math.floor(netMinutes / 60);
+                const minutes = netMinutes % 60;
+                durations[activity.id] = hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
+            }
+        });
+        return durations;
+    }, [schedule]);
+
+  const handleToggleComplete = useCallback((slotName: string, activityId: string) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+
+    let activityToUpdate: Activity | undefined;
+
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        const daySchedule = { ...(newSchedule[todayKey] || {}) };
+        
+        if (daySchedule[slotName]) {
+            const activities = [...(daySchedule[slotName] as Activity[])];
+            const activityIndex = activities.findIndex(a => a.id === activityId);
+            
+            if (activityIndex > -1) {
+                activityToUpdate = { 
+                    ...activities[activityIndex], 
+                    completed: !activities[activityIndex].completed,
+                    completedAt: !activities[activityIndex].completed ? Date.now() : undefined
+                };
+                activities[activityIndex] = activityToUpdate;
+                daySchedule[slotName] = activities;
+                newSchedule[todayKey] = daySchedule;
+            }
+        }
+        return newSchedule;
+    });
+
+    if (activityToUpdate?.completed) {
+        toast({
+            title: "Task Complete!",
+            description: `You've completed "${activityToUpdate.details}".`
+        });
+    }
+  }, [setSchedule, toast]);
 
   const onRemoveActivity = useCallback((slotName: string, activityId: string, date: Date) => {
-    // This function is now a placeholder as the logic is moved to my-plate
-  }, []);
+    const dateKey = format(date, 'yyyy-MM-dd');
+    setSchedule(prev => {
+        const newSchedule = { ...prev };
+        if (newSchedule[dateKey] && newSchedule[dateKey][slotName]) {
+            const daySchedule = { ...newSchedule[dateKey] };
+            daySchedule[slotName] = (daySchedule[slotName] as Activity[]).filter(act => act.id !== activityId);
+            newSchedule[dateKey] = daySchedule;
+        }
+        return newSchedule;
+    });
+  }, [setSchedule]);
   
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     // This function is now a placeholder as the logic is moved to my-plate

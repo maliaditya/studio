@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -10,6 +11,7 @@ import type { Activity, ActivityType, RecurrenceRule } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, DropdownMenuPortal } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { Textarea } from './ui/textarea';
+import { Badge } from './ui/badge';
 
 
 const activityIcons: Record<ActivityType, React.ReactNode> = {
@@ -91,20 +93,33 @@ const EditableActivityText = ({ activity, onUpdate }: { activity: Activity, onUp
 interface AgendaWidgetItemProps {
     activity: Activity & { slot: string };
     date: Date;
-    onToggleComplete: (slot: string, activityId: string, isCompleted: boolean) => void;
-    onActivityClick: (slotName: string, activity: Activity, event: React.MouseEvent) => void;
+    onToggleComplete: (slotName: string, activityId: string) => void;
+    onActivityClick: (activity: Activity, event: React.MouseEvent) => void;
     onRemoveActivity: (slotName: string, activityId: string) => void;
     onUpdateActivity: (activityId: string, newDetails: string) => void;
     setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
     onOpenTaskContext: (activityId: string, event: React.MouseEvent) => void;
     onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
     context: 'agenda' | 'timeslot';
+    loggedDuration?: string;
 }
 
-export const AgendaWidgetItem = React.memo(({ activity, date, onToggleComplete, onActivityClick, onRemoveActivity, onUpdateActivity, setRoutine, onOpenTaskContext, onOpenHabitPopup, context }: AgendaWidgetItemProps) => {
+export const AgendaWidgetItem = React.memo(({ 
+    activity,
+    date, 
+    onToggleComplete, 
+    onActivityClick, 
+    onRemoveActivity, 
+    onUpdateActivity, 
+    setRoutine, 
+    onOpenTaskContext, 
+    onOpenHabitPopup, 
+    context,
+    loggedDuration,
+}: AgendaWidgetItemProps) => {
     const { habitCards } = useAuth();
     const nonClickableTypes: ActivityType[] = ['interrupt', 'distraction'];
-    const isClickable = !activity.completed && !nonClickableTypes.includes(activity.type);
+    const isClickable = !nonClickableTypes.includes(activity.type);
 
     const linkedHabits = React.useMemo(() => 
         (activity.habitEquationIds || []).map(id => habitCards.find(h => h.id === id)).filter((h): h is NonNullable<typeof h> => !!h)
@@ -113,9 +128,9 @@ export const AgendaWidgetItem = React.memo(({ activity, date, onToggleComplete, 
     return (
         <li 
             className={cn("flex items-start gap-2 p-2 rounded-lg group transition-all", isClickable && "cursor-pointer hover:bg-muted/50", context === 'timeslot' && 'bg-background')}
-            onClick={(e) => isClickable && onActivityClick(activity.slot, activity, e)}
+            onClick={(e) => isClickable && onActivityClick(activity, e)}
         >
-            <button onClick={(e) => { e.stopPropagation(); onToggleComplete(activity.slot, activity.id, !activity.completed); }} className="mt-0.5">
+            <button onClick={(e) => { e.stopPropagation(); onToggleComplete(activity.slot, activity.id); }} className="mt-0.5">
                 {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
             </button>
             <div className="flex-grow min-w-0">
@@ -129,6 +144,9 @@ export const AgendaWidgetItem = React.memo(({ activity, date, onToggleComplete, 
                             {habit.name}
                         </button>
                     ))}
+                    {activity.completed && loggedDuration && (
+                        <Badge variant="secondary">{loggedDuration}</Badge>
+                    )}
                 </div>
             </div>
             <DropdownMenu>
