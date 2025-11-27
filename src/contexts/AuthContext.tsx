@@ -1,4 +1,5 @@
 
+      
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -127,7 +128,7 @@ interface AuthContextType {
   isAgendaDocked: boolean;
   setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
   activityDurations: Record<string, string>;
-  handleToggleComplete: (slotName: string, activityId: string) => void;
+  handleToggleComplete: (slotName: string, activityId: string, isCompleted?: boolean) => void;
   onRemoveActivity: (slotName: string, activityId: string, date: Date) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
   scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string, duration?: number) => void;
@@ -414,6 +415,7 @@ interface AuthContextType {
   setSelectedDeepWorkTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
   selectedMicroSkill: MicroSkill | null;
   setSelectedMicroSkill: React.Dispatch<React.SetStateAction<MicroSkill | null>>;
+  logSubTaskTime: (taskId: string, durationMinutes: number) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -620,6 +622,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
+
+  const logSubTaskTime = useCallback((taskId: string, durationMinutes: number) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    let taskUpdated = false;
+
+    const updateDefinitions = (definitions: ExerciseDefinition[]) => {
+        return definitions.map(def => {
+            if (def.id === taskId) {
+                taskUpdated = true;
+                return {
+                    ...def,
+                    loggedDuration: (def.loggedDuration || 0) + durationMinutes,
+                    last_logged_date: todayKey,
+                };
+            }
+            return def;
+        });
+    };
+
+    const newUpskillDefs = updateDefinitions(upskillDefinitions);
+    if (taskUpdated) {
+        setUpskillDefinitions(newUpskillDefs);
+        toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes.` });
+        return;
+    }
+
+    const newDeepWorkDefs = updateDefinitions(deepWorkDefinitions);
+    if (taskUpdated) {
+        setDeepWorkDefinitions(newDeepWorkDefs);
+        toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes.` });
+    }
+  }, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, toast]);
 
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
@@ -1515,38 +1549,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return durations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs]);
 
-  const handleToggleComplete = useCallback((slotName: string, activityId: string) => {
+  const handleToggleComplete = useCallback((slotName: string, activityId: string, isCompleted?: boolean) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     let activityToUpdate: Activity | undefined;
 
     setSchedule(prev => {
-      const newSchedule = { ...prev };
-      const daySchedule = { ...(newSchedule[todayKey] || {}) };
-      
-      if (daySchedule[slotName]) {
-        const activities = [...(daySchedule[slotName] as Activity[])];
-        const activityIndex = activities.findIndex(a => a.id === activityId);
+        const newSchedule = { ...prev };
+        const daySchedule = { ...(newSchedule[todayKey] || {}) };
         
-        if (activityIndex > -1) {
-          const originalActivity = activities[activityIndex];
-          activityToUpdate = {
-            ...originalActivity,
-            completed: !originalActivity.completed,
-            completedAt: !originalActivity.completed ? Date.now() : undefined,
-          };
-          activities[activityIndex] = activityToUpdate;
-          daySchedule[slotName] = activities;
-          newSchedule[todayKey] = daySchedule;
+        if (daySchedule[slotName]) {
+            const activities = [...(daySchedule[slotName] as Activity[])];
+            const activityIndex = activities.findIndex(a => a.id === activityId);
+            
+            if (activityIndex > -1) {
+                const originalActivity = activities[activityIndex];
+                activityToUpdate = {
+                    ...originalActivity,
+                    completed: isCompleted !== undefined ? isCompleted : !originalActivity.completed,
+                    completedAt: (isCompleted !== undefined ? isCompleted : !originalActivity.completed) ? Date.now() : undefined,
+                };
+                activities[activityIndex] = activityToUpdate;
+                daySchedule[slotName] = activities;
+                newSchedule[todayKey] = daySchedule;
+            }
         }
-      }
-      return newSchedule;
+        return newSchedule;
     });
 
     if (activityToUpdate?.completed) {
-      toast({
-        title: "Task Complete!",
-        description: `You've completed "${activityToUpdate.details}".`,
-      });
+        toast({
+            title: "Task Complete!",
+            description: `You've completed "${activityToUpdate.details}".`,
+        });
     }
   }, [setSchedule, toast]);
 
