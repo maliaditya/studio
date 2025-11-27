@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -458,6 +459,7 @@ function MyPlatePageContent() {
                         </div>
                         <TimeSlots
                             date={selectedDate}
+                            schedule={schedule}
                             currentSlot={currentSlot}
                             onOpenFocusModal={onOpenFocusModal}
                             onOpenTaskContext={onOpenTaskContext}
@@ -552,4 +554,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
-

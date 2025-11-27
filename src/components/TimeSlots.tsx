@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition } from '@/types/workout';
 import { Button } from '@/components/ui/button';
@@ -78,32 +79,23 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
 
 interface TimeSlotsProps {
   date: Date;
+  schedule: FullSchedule;
   currentSlot: string;
-  remainingTime: string | null;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
+  onOpenFocusModal: (activity: Activity) => boolean;
 }
 
 export function TimeSlots({
   date,
+  schedule,
   currentSlot,
-  remainingTime,
   onOpenTaskContext,
   onOpenHabitPopup,
+  onOpenFocusModal,
 }: TimeSlotsProps) {
     const { toast } = useToast();
-    const { schedule: globalSchedule, setSchedule: setGlobalSchedule, settings, onOpenFocusModal, handleToggleComplete, toggleRoutine } = useAuth();
-    const [schedule, setSchedule] = useState<FullSchedule>(globalSchedule);
-    
-    useEffect(() => {
-        setSchedule(globalSchedule);
-    }, [globalSchedule]);
-
-    useEffect(() => {
-        if (JSON.stringify(schedule) !== JSON.stringify(globalSchedule)) {
-            setGlobalSchedule(schedule);
-        }
-    }, [schedule, globalSchedule, setGlobalSchedule]);
+    const { setSchedule: setGlobalSchedule, settings, handleToggleComplete, toggleRoutine, activityDurations } = useAuth();
 
     const todaysSchedule = useMemo(() => schedule[format(date, 'yyyy-MM-dd')] || {}, [schedule, date]);
 
@@ -119,28 +111,30 @@ export function TimeSlots({
   const onDragEnd = (result: DropResult) => {
     const { source, destination } = result;
     if (!destination) return;
-    const sourceDroppableId = source.droppableId;
-    const destinationDroppableId = destination.droppableId;
-    if (sourceDroppableId === destinationDroppableId && source.index === destination.index) {
-        return;
-    }
-    const [sourceDateKey, sourceSlotName] = sourceDroppableId.split('_');
-    const [destDateKey, destSlotName] = destinationDroppableId.split('_');
-    setSchedule(currentSchedule => {
-        const sourceDaySchedule = { ...(currentSchedule[sourceDateKey] || {}) };
-        const sourceActivities = [...((sourceDaySchedule[sourceSlotName as SlotName] as Activity[]) || [])];
+    const sourceSlotName = source.droppableId;
+    const destinationSlotName = destination.droppableId;
+
+    setGlobalSchedule(currentSchedule => {
+        const dateKey = format(date, 'yyyy-MM-dd');
+        const daySchedule = { ...(currentSchedule[dateKey] || {}) };
+
+        const sourceActivities = [...((daySchedule[sourceSlotName as SlotName] as Activity[]) || [])];
         const [movedActivity] = sourceActivities.splice(source.index, 1);
+
         if (!movedActivity) return currentSchedule;
-        movedActivity.slot = destSlotName;
         
-        const newSchedule = { ...currentSchedule, [sourceDateKey]: { ...sourceDaySchedule, [sourceSlotName as SlotName]: sourceActivities } };
+        movedActivity.slot = destinationSlotName;
 
-        const destDaySchedule = { ...(newSchedule[destDateKey] || {}) };
-        const destActivities = [...((destDaySchedule[destSlotName as SlotName] as Activity[]) || [])];
+        daySchedule[sourceSlotName as SlotName] = sourceActivities;
+
+        const destActivities = sourceSlotName === destinationSlotName 
+            ? sourceActivities 
+            : [...((daySchedule[destinationSlotName as SlotName] as Activity[]) || [])];
+        
         destActivities.splice(destination.index, 0, movedActivity);
-        newSchedule[destDateKey] = { ...destDaySchedule, [destSlotName as SlotName]: destActivities };
+        daySchedule[destinationSlotName as SlotName] = destActivities;
 
-        return newSchedule;
+        return { ...currentSchedule, [dateKey]: daySchedule };
     });
   };
 
@@ -156,7 +150,7 @@ export function TimeSlots({
         taskIds: [],
         linkedEntityType: (type === 'deepwork' || type === 'upskill') ? 'specialization' : undefined,
     };
-    setSchedule(prev => ({
+    setGlobalSchedule(prev => ({
         ...prev,
         [dateKey]: {
             ...(prev[dateKey] || {}),
@@ -168,7 +162,7 @@ export function TimeSlots({
   
   const handleUpdateActivity = (activityId: string, newDetails: string) => {
     const dateKey = format(date, 'yyyy-MM-dd');
-    setSchedule(prev => {
+    setGlobalSchedule(prev => {
         const newSchedule = {...prev};
         if (newSchedule[dateKey]) {
             const daySchedule = {...newSchedule[dateKey]};
@@ -190,7 +184,7 @@ export function TimeSlots({
 
   const onRemoveActivity = (slotName: string, activityId: string) => {
     const dateKey = format(date, 'yyyy-MM-dd');
-    setSchedule(prev => {
+    setGlobalSchedule(prev => {
         const newSchedule = { ...prev };
         if (newSchedule[dateKey]) {
             const daySchedule = { ...newSchedule[dateKey] };
@@ -235,53 +229,47 @@ export function TimeSlots({
                 <CardDescription>{slot.time}</CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                {isCurrentSlotToday && remainingTime !== null ? (
-                  <div className="font-mono text-lg text-primary/80 tracking-wider animate-subtle-pulse">
-                    {remainingTime}
-                  </div>
-                ) : (
-                  <div className="h-7 w-7 flex items-center justify-center">
-                    {slot.icon}
-                  </div>
-                )}
+                <div className="h-7 w-7 flex items-center justify-center">
+                  {slot.icon}
+                </div>
               </div>
             </CardHeader>
             <CardContent className="flex flex-col flex-grow justify-between min-h-[8rem] p-3">
-              <div className="flex-grow min-h-0 mb-2">
-                <ScrollArea className="h-[200px] pr-2">
-                  <ul className="space-y-2">
-                    {activities && activities.length > 0 ? (
-                      activities.map((activity) => (
-                        <AgendaWidgetItem
-                          key={activity.id}
-                          activity={{...activity, slot: slot.name as SlotName}}
-                          date={date}
-                          onToggleComplete={handleToggleComplete}
-                          onActivityClick={handleActivityClick}
-                          onRemoveActivity={(slotName, id) => onRemoveActivity(slotName, id)}
-                          onUpdateActivity={handleUpdateActivity}
-                          setRoutine={toggleRoutine}
-                          onOpenTaskContext={onOpenTaskContext}
-                          onOpenHabitPopup={onOpenHabitPopup}
-                          context="timeslot"
-                        />
-                      ))
-                    ) : (
-                      <div className="flex-grow flex items-center justify-center h-full">
-                        {isCurrentSlotToday ? (
-                          <div className="text-center">
-                            <p className="text-lg text-muted-foreground">Current Focus</p>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground text-center px-4">
-                            Plan an activity for this block.
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </ul>
-                </ScrollArea>
-              </div>
+              <Droppable droppableId={slot.name}>
+                {(provided) => (
+                    <div ref={provided.innerRef} {...provided.droppableProps} className="flex-grow min-h-0 mb-2">
+                        <ScrollArea className="h-[200px] pr-2">
+                            <ul className="space-y-2">
+                                {activities && activities.length > 0 ? (
+                                activities.map((activity, index) => (
+                                    <AgendaWidgetItem
+                                    key={activity.id}
+                                    activity={{...activity, slot: slot.name as SlotName}}
+                                    date={date}
+                                    onToggleComplete={handleToggleComplete}
+                                    onActivityClick={(act, e) => handleActivityClick(slot.name, act, e)}
+                                    onRemoveActivity={(slotName, id) => onRemoveActivity(slotName, id)}
+                                    onUpdateActivity={handleUpdateActivity}
+                                    setRoutine={toggleRoutine}
+                                    onOpenTaskContext={onOpenTaskContext}
+                                    onOpenHabitPopup={onOpenHabitPopup}
+                                    context="timeslot"
+                                    loggedDuration={activityDurations[activity.id]}
+                                    />
+                                ))
+                                ) : (
+                                <div className="flex-grow flex items-center justify-center h-full">
+                                    <p className="text-sm text-muted-foreground text-center px-4">
+                                        Plan an activity for this block.
+                                    </p>
+                                </div>
+                                )}
+                                {provided.placeholder}
+                            </ul>
+                        </ScrollArea>
+                    </div>
+                )}
+              </Droppable>
               <div className="flex-shrink-0 mt-2 space-y-2">
                 <div className="flex justify-between items-center">
                     <DropdownMenu>
