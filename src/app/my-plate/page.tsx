@@ -100,7 +100,6 @@ function MyPlatePageContent() {
     const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
     const [isTodaysMindsetModalOpen, setIsTodaysMindsetModalOpen] = useState(false);
     const [isLeadGenModalOpen, setIsLeadGenModalOpen] = useState(false);
-    const [isTodaysLearningModalOpen, setIsTodaysLearningModalOpen] = useState(false);
     const [isDeepWorkModalOpen, setIsDeepWorkModalOpen] = useState(false);
     const [learningActivity, setLearningActivity] = useState<Activity | null>(null);
     const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
@@ -462,21 +461,6 @@ function MyPlatePageContent() {
       toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
     };
 
-    const handleOpenLearningModal = useCallback((activity: Activity) => {
-        setLearningActivity(activity);
-        setIsTodaysLearningModalOpen(true);
-    }, []);
-
-    const handleSaveLearningTask = (selectedDefIds: string[]) => {
-      if (learningActivity) {
-          const newActivity = {
-              ...learningActivity,
-              taskIds: selectedDefIds,
-          };
-          updateActivity(newActivity);
-      }
-  };
-
     return (
         <>
             <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -573,16 +557,6 @@ function MyPlatePageContent() {
                 onActivityComplete={handleToggleComplete}
             />
             
-            <TodaysLearningModal
-                isOpen={isTodaysLearningModalOpen}
-                onOpenChange={setIsTodaysLearningModalOpen}
-                availableTasks={learningActivity ? [learningActivity as any] : []}
-                initialSelectedIds={learningActivity?.taskIds || []}
-                onSave={handleSaveLearningTask}
-                pageType={learningActivity?.type as 'upskill' | 'deepwork' || 'upskill'}
-            />
-            
-            <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
             <Dialog open={isDeepWorkModalOpen} onOpenChange={setIsDeepWorkModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col overflow-hidden">
                     <DialogHeader className="p-4 border-b">
@@ -666,3 +640,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
+
+    
