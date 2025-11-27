@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -224,7 +223,7 @@ function MyPlatePageContent() {
             todayDeepWorkHours: todayDeepWorkMinutes / 60,
             deepWorkChange: calculateChange(todayDeepWorkMinutes, yesterdayDeepWorkMinutes),
             todayUpskillHours: todayUpskillMinutes / 60,
-            upskillChange: calculateChange(todayUpskillMinutes, yesterdayDeepWorkMinutes),
+            upskillChange: calculateChange(todayUpskillMinutes, yesterdayUpskillMinutes),
             totalProductiveHours: totalTodayMinutes / 60,
             avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
             learningStats,
@@ -333,8 +332,26 @@ function MyPlatePageContent() {
         };
     }, [brandingLogs, schedule, selectedDateKey, deepWorkDefinitions]);
     
+    const parseDurationToMinutes = (durationStr: string | undefined): number => {
+        if (!durationStr || typeof durationStr !== 'string') return 0;
+        let totalMinutes = 0;
+        const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
+        const minMatch = durationStr.match(/(\d+)\s*m/);
+    
+        if (hourMatch) {
+            totalMinutes += parseFloat(hourMatch[1]) * 60;
+        }
+        if (minMatch) {
+            totalMinutes += parseInt(minMatch[1], 10);
+        }
+        if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
+            return parseInt(durationStr.trim(), 10);
+        }
+        return totalMinutes;
+    };
+    
     const timeAllocationData = useMemo(() => {
-        const dailyActivities = todaysSchedule ? Object.values(todaysSchedule).flat() : [];
+        const dailyActivities = todaysSchedule ? Object.values(todaysSchedule).flat() as Activity[] : [];
         const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
         const activityNameMap: Record<ActivityType, string> = { 
           deepwork: 'Deep Work', 
@@ -351,24 +368,24 @@ function MyPlatePageContent() {
           mindset: 'Mindset',
         };
       
-        (dailyActivities as Activity[]).forEach((activity) => {
-          if (activity && typeof activity === 'object' && 'type' in activity) {
-            const mappedName = activityNameMap[activity.type as ActivityType];
+        dailyActivities.forEach((activity) => {
+          if (activity && activity.completed) {
+            const mappedName = activityNameMap[activity.type];
             if (mappedName) {
-              const duration = activity.duration || 0;
+              const duration = parseDurationToMinutes(activityDurations[activity.id]);
               if (duration > 0) {
                 if (!totals[mappedName]) {
                   totals[mappedName] = { time: 0, activities: [] };
                 }
                 totals[mappedName].time += duration;
-                totals[mappedName].activities.push({ name: (activity as Activity).details, duration });
+                totals[mappedName].activities.push({ name: activity.details, duration });
               }
             }
           }
         });
       
         return Object.entries(totals).map(([name, data]) => ({ name, time: data.time, activities: data.activities }));
-    }, [todaysSchedule]);
+    }, [todaysSchedule, activityDurations]);
     
     const dashboardStats = useMemo(() => {
         const {
@@ -621,3 +638,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
+
+    
