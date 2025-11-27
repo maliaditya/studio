@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -104,11 +103,6 @@ export const AgendaWidgetItem = React.memo(({
                     <div className="flex items-center gap-1 text-xs text-muted-foreground capitalize">
                         {activityIcons[activity.type]} {activity.type.replace('-', ' ')}
                     </div>
-                    {linkedHabits.map(habit => (
-                        <button key={habit.id} onClick={(e) => {e.stopPropagation(); onOpenHabitPopup(habit.id, e);}} className="text-xs px-1.5 py-0.5 rounded-full bg-primary/10 text-primary/80 hover:bg-primary/20">
-                            {habit.name}
-                        </button>
-                    ))}
                     {activity.completed && loggedDuration && (
                         <Badge variant="secondary">{loggedDuration}</Badge>
                     )}
