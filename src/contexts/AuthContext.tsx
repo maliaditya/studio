@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -1541,56 +1540,88 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     input.click();
   };
   
-    const activityDurations = useMemo(() => {
-        const durations: Record<string, string> = {};
-        const todayKey = format(new Date(), 'yyyy-MM-dd');
-
-        Object.values(schedule[todayKey] || {}).flat().forEach((activity: Activity) => {
-            if (!activity.completed) return;
-            const durationMs = activity.focusSessionEndTime! - activity.focusSessionInitialStartTime!;
+  const activityDurations = useMemo(() => {
+    const durations: Record<string, string> = {};
+  
+    Object.values(schedule).flat().forEach((dayActivities) => {
+      Object.values(dayActivities).flat().forEach((activity: Activity) => {
+        if (!activity) return;
+        
+        let netMinutes = 0;
+  
+        if (activity.completed) {
+          if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+            const durationMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
             const pauseMs = (activity.focusSessionPauses || []).reduce((sum, p) => sum + (p.resumeTime ? p.resumeTime - p.pauseTime : 0), 0);
-            const netMinutes = Math.round((durationMs - pauseMs) / 60000);
-            if (netMinutes > 0) {
-                const hours = Math.floor(netMinutes / 60);
-                const minutes = netMinutes % 60;
-                durations[activity.id] = hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
-            }
-        });
-        return durations;
-    }, [schedule]);
+            netMinutes = Math.round((durationMs - pauseMs) / 60000);
+          } else if (activity.duration) {
+            netMinutes = activity.duration;
+          } else {
+             const dateKey = Object.keys(schedule).find(key => 
+                Object.values(schedule[key]).flat().some(act => act.id === activity.id)
+             );
+             if (dateKey) {
+                const logsForDay = [
+                    ...allUpskillLogs.find(l => l.date === dateKey)?.exercises || [],
+                    ...allDeepWorkLogs.find(l => l.date === dateKey)?.exercises || [],
+                    ...allWorkoutLogs.find(l => l.date === dateKey)?.exercises || [],
+                    ...brandingLogs.find(l => l.date === dateKey)?.exercises || [],
+                    ...allLeadGenLogs.find(l => l.date === dateKey)?.exercises || [],
+                    ...allMindProgrammingLogs.find(l => l.date === dateKey)?.exercises || [],
+                ];
+                
+                const relevantLogs = logsForDay.filter(ex => activity.taskIds?.includes(ex.id));
+                
+                netMinutes = relevantLogs.reduce((total, ex) => {
+                    const durationPerSet = (activity.type === 'upskill' || activity.type === 'workout') ? ex.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0) : ex.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
+                    return total + durationPerSet;
+                }, 0);
+             }
+          }
+        }
+  
+        if (netMinutes > 0) {
+          const hours = Math.floor(netMinutes / 60);
+          const minutes = netMinutes % 60;
+          durations[activity.id] = hours > 0 ? `${hours}h ${minutes}m` : `${minutes} min`;
+        }
+      });
+    });
+    return durations;
+  }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs]);
 
   const handleToggleComplete = useCallback((slotName: string, activityId: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
-
     let activityToUpdate: Activity | undefined;
 
     setSchedule(prev => {
-        const newSchedule = { ...prev };
-        const daySchedule = { ...(newSchedule[todayKey] || {}) };
+      const newSchedule = { ...prev };
+      const daySchedule = { ...(newSchedule[todayKey] || {}) };
+      
+      if (daySchedule[slotName]) {
+        const activities = [...(daySchedule[slotName] as Activity[])];
+        const activityIndex = activities.findIndex(a => a.id === activityId);
         
-        if (daySchedule[slotName]) {
-            const activities = [...(daySchedule[slotName] as Activity[])];
-            const activityIndex = activities.findIndex(a => a.id === activityId);
-            
-            if (activityIndex > -1) {
-                activityToUpdate = { 
-                    ...activities[activityIndex], 
-                    completed: !activities[activityIndex].completed,
-                    completedAt: !activities[activityIndex].completed ? Date.now() : undefined
-                };
-                activities[activityIndex] = activityToUpdate;
-                daySchedule[slotName] = activities;
-                newSchedule[todayKey] = daySchedule;
-            }
+        if (activityIndex > -1) {
+          const originalActivity = activities[activityIndex];
+          activityToUpdate = {
+            ...originalActivity,
+            completed: !originalActivity.completed,
+            completedAt: !originalActivity.completed ? Date.now() : undefined,
+          };
+          activities[activityIndex] = activityToUpdate;
+          daySchedule[slotName] = activities;
+          newSchedule[todayKey] = daySchedule;
         }
-        return newSchedule;
+      }
+      return newSchedule;
     });
 
     if (activityToUpdate?.completed) {
-        toast({
-            title: "Task Complete!",
-            description: `You've completed "${activityToUpdate.details}".`
-        });
+      toast({
+        title: "Task Complete!",
+        description: `You've completed "${activityToUpdate.details}".`,
+      });
     }
   }, [setSchedule, toast]);
 

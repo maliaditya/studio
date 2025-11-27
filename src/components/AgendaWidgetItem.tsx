@@ -118,8 +118,7 @@ export const AgendaWidgetItem = React.memo(({
     loggedDuration,
 }: AgendaWidgetItemProps) => {
     const { habitCards } = useAuth();
-    const nonClickableTypes: ActivityType[] = ['interrupt', 'distraction'];
-    const isClickable = !nonClickableTypes.includes(activity.type);
+    const isClickable = !['interrupt', 'distraction'].includes(activity.type);
 
     const linkedHabits = React.useMemo(() => 
         (activity.habitEquationIds || []).map(id => habitCards.find(h => h.id === id)).filter((h): h is NonNullable<typeof h> => !!h)

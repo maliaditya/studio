@@ -48,6 +48,7 @@ export function TodaysScheduleCard({
     toggleRoutine,
     schedule,
     setSchedule,
+    activityDurations,
   } = useAuth();
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
   
@@ -292,13 +293,14 @@ export function TodaysScheduleCard({
                         activity={{...activity, slot: activity.slot as SlotName}}
                         date={date}
                         onToggleComplete={handleToggleComplete}
-                        onActivityClick={onOpenFocusModal}
+                        onActivityClick={(act, e) => onOpenFocusModal(act)}
                         onRemoveActivity={onRemoveActivity}
                         onUpdateActivity={handleUpdateActivity}
                         setRoutine={toggleRoutine}
                         onOpenTaskContext={onOpenTaskContext}
                         onOpenHabitPopup={onOpenHabitPopup}
                         context="agenda"
+                        loggedDuration={activityDurations[activity.id]}
                     />
                     ))}
                 </ul>
