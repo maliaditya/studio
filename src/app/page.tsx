@@ -35,7 +35,7 @@ const featureCards = [
       icon: <DollarSign className="h-8 w-8 mb-4 text-yellow-500" />,
       title: 'Monetization Engine',
       description: 'Turn projects into products, services, and content.',
-      link: '/monetization-engine'
+      link: '/strategic-planning'
     }
 ];
 
@@ -163,9 +163,6 @@ export default function LandingPage() {
                                 Launch Your Dock <ArrowRight className="ml-2 h-5 w-5" />
                             </Button>
                         )}
-                        <Link href="/seamless-editing-example">
-                            <Button variant="link">View Seamless Editing Example</Button>
-                        </Link>
                     </div>
                 </motion.div>
             </div>

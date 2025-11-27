@@ -873,89 +873,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setSchedule]);
 
-  const logSubTaskTime = useCallback((subTaskId: string, durationMinutes: number) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    let definitionUpdated = false;
-
-    const findAndUpdate = (defs: ExerciseDefinition[], setter: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>) => {
-        const index = defs.findIndex(d => d.id === subTaskId);
-        if (index > -1) {
-            setter(prev => {
-                const newDefs = [...prev];
-                const newDef = {
-                    ...newDefs[index],
-                    loggedDuration: (newDefs[index].loggedDuration || 0) + durationMinutes,
-                    last_logged_date: todayKey,
-                };
-                newDefs[index] = newDef;
-                return newDefs;
-            });
-            definitionUpdated = true;
-        }
-    };
-    
-    findAndUpdate(deepWorkDefinitions, setDeepWorkDefinitions);
-    if (!definitionUpdated) {
-        findAndUpdate(upskillDefinitions, setUpskillDefinitions);
-    }
-  }, [deepWorkDefinitions, upskillDefinitions, setDeepWorkDefinitions, setUpskillDefinitions]);
-  
   const handleLogLearning = useCallback((activity: Activity, duration: number) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-  
-    const findAndUpdateDefinition = (
-      definitions: ExerciseDefinition[], 
-      setter: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>
-    ) => {
-      let definition: ExerciseDefinition | undefined;
-      let definitionFound = false;
-
-      if (activity.taskIds && activity.taskIds.length > 0) {
-        const mainLogInstanceId = activity.taskIds[0];
-        let mainDefId: string | undefined;
-
-        const allLogs = activity.type === 'upskill' ? allUpskillLogs : allDeepWorkLogs;
-        mainDefId = allLogs.flatMap(l => l.exercises).find(ex => ex.id === mainLogInstanceId)?.definitionId;
-        
-        if (mainDefId) {
-          definition = definitions.find(d => d.id === mainDefId);
-        }
-      }
-      
-      if (!definition) {
-        const microSkill = Array.from(microSkillMap.values()).find(ms => ms.coreSkillName === activity.details || ms.microSkillName === activity.details);
-        const category = microSkill ? microSkill.microSkillName : activity.details;
-        definition = definitions.find(def => def.name === activity.details && def.category === category);
-      }
-      
-      if (definition) {
-        setter(prevDefs => prevDefs.map(def =>
-          def.id === definition!.id ? {
-            ...def,
-            loggedDuration: (def.loggedDuration || 0) + duration,
-            last_logged_date: todayKey,
-          } : def
-        ));
-        definitionFound = true;
-      }
-      return definitionFound;
-    };
-  
-    let updated = false;
-    if (activity.type === 'upskill') {
-      updated = findAndUpdateDefinition(upskillDefinitions, setUpskillDefinitions);
-    } else if (activity.type === 'deepwork' || activity.type === 'branding') {
-      updated = findAndUpdateDefinition(deepWorkDefinitions, setDeepWorkDefinitions);
-    }
-  
-    if (!updated) {
-        console.warn("Could not find a matching definition to log time against for activity:", activity.details);
-        updateActivity({ ...activity, duration: (activity.duration || 0) + duration });
-    }
-    
-    updateActivity({ ...activity, completed: true, completedAt: Date.now() });
-  
-  }, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, microSkillMap, updateActivity, allUpskillLogs, allDeepWorkLogs]);
+    updateActivity({
+      ...activity,
+      duration: (activity.duration || 0) + duration,
+      completed: true,
+      completedAt: Date.now(),
+    });
+  }, [updateActivity]);
   
   const allDefinitionMap = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions]);
 
@@ -1107,7 +1032,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       return definition.loggedDuration || 0;
   }, [getDescendantLeafNodes]);
-
+  
   const getAllUserData = useCallback(() => {
     return {
       main: {
@@ -3482,3 +3407,5 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+    
