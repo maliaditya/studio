@@ -17,7 +17,7 @@ import { DashboardStats } from '@/components/DashboardStats';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { VisionCard } from '@/components/VisionCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysMindsetModal } from '@/components/TodaysMindsetModal';
@@ -71,6 +71,7 @@ function MyPlatePageContent() {
         getDescendantLeafNodes,
         permanentlyLoggedTaskIds,
         currentSlot,
+        onOpenFocusModal,
         handleStartFocusSession,
         focusActivity,
         setFocusActivity,
@@ -102,7 +103,6 @@ function MyPlatePageContent() {
         setSelectedSkillId,
         handleToggleComplete,
         getUpskillNodeType,
-        onOpenFocusModal,
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
@@ -166,8 +166,9 @@ function MyPlatePageContent() {
         return false;
     }, [coreSkills, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, setIsDeepWorkModalOpen]);
 
-    const handleOpenFocusModalForSession = useCallback((activity: Activity) => {
-      onOpenFocusModal(activity);
+    const handleOpenFocusModalForSession = useCallback((activity: Activity, event: React.MouseEvent) => {
+        event.stopPropagation();
+        onOpenFocusModal(activity);
     }, [onOpenFocusModal]);
     
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
@@ -274,7 +275,7 @@ function MyPlatePageContent() {
             todayDeepWorkHours: todayDeepWorkMinutes / 60,
             deepWorkChange: calculateChange(todayDeepWorkMinutes, yesterdayDeepWorkMinutes),
             todayUpskillHours: todayUpskillMinutes / 60,
-            upskillChange: calculateChange(todayUpskillMinutes, yesterdayDeepWorkMinutes),
+            upskillChange: calculateChange(todayUpskillMinutes, yesterdayUpskillMinutes),
             totalProductiveHours: totalTodayMinutes / 60,
             avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
             learningStats,
@@ -586,15 +587,11 @@ function MyPlatePageContent() {
                 >
                     <Card className="w-full h-full p-0 flex flex-col overflow-hidden shadow-2xl">
                         <div 
-                           className="p-4 border-b cursor-grab active:cursor-grabbing"
-                           {...listeners}
-                           {...attributes}
+                           className="p-4 border-b flex justify-end"
                         >
-                            <div className="flex justify-end">
-                                <Button variant="ghost" size="icon" onClick={() => setIsDeepWorkModalOpen(false)}>
-                                    <X className="h-4 w-4" />
-                                </Button>
-                            </div>
+                            <Button variant="ghost" size="icon" onClick={() => setIsDeepWorkModalOpen(false)}>
+                                <X className="h-4 w-4" />
+                            </Button>
                         </div>
                         <div className="flex-grow min-h-0">
                            <DeepWorkPageContent isModal={true} onClose={() => setIsDeepWorkModalOpen(false)} />
