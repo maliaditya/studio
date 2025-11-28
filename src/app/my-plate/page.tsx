@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -73,7 +72,6 @@ function MyPlatePageContent() {
         permanentlyLoggedTaskIds,
         currentSlot,
         onOpenFocusModal,
-        handleStartFocusSession,
         focusActivity,
         setFocusActivity,
         focusDuration,
@@ -146,6 +144,11 @@ function MyPlatePageContent() {
 
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
     const todaysSchedule = useMemo(() => schedule[selectedDateKey] || {}, [schedule, selectedDateKey]);
+
+    const onStartFocus = (activity: Activity, event: React.MouseEvent) => {
+        event.stopPropagation();
+        onOpenFocusModal(activity);
+    };
     
     const handleOpenFocusModalForPlanning = useCallback((activity: Activity) => {
         const { type, details } = activity;
@@ -521,7 +524,7 @@ function MyPlatePageContent() {
                                         activityDurations={activityDurations}
                                         isAgendaDocked={isAgendaDocked}
                                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                                        onActivityClick={onStartFocus}
+                                        onActivityClick={onOpenFocusModal}
                                         onStartFocus={onStartFocus}
                                         onOpenHabitPopup={onOpenHabitPopup}
                                         currentSlot={currentSlot}
@@ -552,14 +555,8 @@ function MyPlatePageContent() {
                             date={selectedDate}
                             schedule={schedule}
                             currentSlot={currentSlot}
-                            onActivityClick={(activity, event) => {
-                                if (onOpenFocusModal(activity)) {
-                                    return; // Modal was opened, don't do anything else.
-                                }
-                                onOpenTaskContext(activity.id, event);
-                            }}
+                            onActivityClick={handleOpenFocusModalForPlanning}
                             onOpenHabitPopup={onOpenHabitPopup}
-                            onOpenLearningModal={handleOpenFocusModalForPlanning}
                             onStartFocus={onStartFocus}
                         />
                     </CardContent>
@@ -693,3 +690,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
+
+    
