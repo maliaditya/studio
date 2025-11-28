@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -25,7 +24,7 @@ interface TodaysScheduleCardProps {
   date: Date;
   isAgendaDocked: boolean;
   onToggleDock: () => void;
-  onActivityClick: (activity: Activity, event: React.MouseEvent) => void;
+  onOpenFocusModal: (activity: Activity, event: React.MouseEvent) => void;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
   currentSlot: string;
@@ -37,7 +36,7 @@ export function TodaysScheduleCard({
   date,
   isAgendaDocked, 
   onToggleDock,
-  onActivityClick,
+  onOpenFocusModal,
   onOpenTaskContext,
   onOpenHabitPopup,
   currentSlot,
@@ -295,7 +294,8 @@ export function TodaysScheduleCard({
                         activity={{...activity, slot: activity.slot as SlotName}}
                         date={date}
                         onToggleComplete={handleToggleComplete}
-                        onActivityClick={onActivityClick}
+                        onActivityClick={(act, e) => onOpenTaskContext(act.id, e)}
+                        onStartFocus={onOpenFocusModal}
                         onRemoveActivity={onRemoveActivity}
                         onUpdateActivity={handleUpdateActivity}
                         setRoutine={toggleRoutine}
@@ -332,6 +332,4 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
-    
-
     

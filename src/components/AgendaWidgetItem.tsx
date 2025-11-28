@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2 } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,6 +35,7 @@ interface AgendaWidgetItemProps {
     date: Date;
     onToggleComplete: (slotName: string, activityId: string) => void;
     onActivityClick: (activity: Activity, event: React.MouseEvent) => void;
+    onStartFocus: (activity: Activity, event: React.MouseEvent) => void;
     onRemoveActivity: (slotName: string, activityId: string) => void;
     onUpdateActivity: (activityId: string, newDetails: string) => void;
     setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
@@ -49,6 +50,7 @@ export const AgendaWidgetItem = React.memo(({
     date, 
     onToggleComplete, 
     onActivityClick, 
+    onStartFocus,
     onRemoveActivity, 
     onUpdateActivity, 
     setRoutine, 
@@ -62,13 +64,8 @@ export const AgendaWidgetItem = React.memo(({
     // Only allow inline editing for simple, descriptive tasks.
     const isInlineEditable = !['upskill', 'deepwork'].includes(activity.type);
     
-    // All items should be clickable to open a relevant modal (focus, learning, etc.)
-    const isClickable = true;
-    
     const handleItemClick = (e: React.MouseEvent) => {
-        if (isClickable) {
-            onActivityClick(activity, e);
-        }
+        onActivityClick(activity, e);
     };
     
     const isPlanningTask = (activity.type === 'upskill' || activity.type === 'deepwork') && activity.linkedEntityType === 'specialization';
@@ -77,7 +74,7 @@ export const AgendaWidgetItem = React.memo(({
         <li 
             className={cn(
                 "flex items-start gap-2 p-2 rounded-lg group transition-all",
-                isClickable && "cursor-pointer hover:bg-muted/50",
+                "cursor-pointer hover:bg-muted/50",
                 isTimeslot && 'bg-background'
             )}
             onClick={handleItemClick}
@@ -107,32 +104,37 @@ export const AgendaWidgetItem = React.memo(({
                     )}
                 </div>
             </div>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0">
-                        <MoreVertical className="h-4 w-4" />
-                    </Button>
-                </DropdownMenuTrigger>
-                 <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenuItem onSelect={() => onOpenTaskContext(activity.id, { clientX: 0, clientY: 0 } as React.MouseEvent)}>View Context</DropdownMenuItem>
-                    <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>Repeat</DropdownMenuSubTrigger>
-                        <DropdownMenuPortal>
-                            <DropdownMenuSubContent>
-                                <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
-                                <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
-                                {activity.routine && <DropdownMenuSeparator />}
-                                {activity.routine && <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">No Repeat</DropdownMenuItem>}
-                            </DropdownMenuSubContent>
-                        </DropdownMenuPortal>
-                    </DropdownMenuSub>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => onRemoveActivity(activity.slot, activity.id)} className="text-destructive">
-                        <Trash2 className="mr-2 h-4 w-4"/>
-                        Remove
-                    </DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center flex-shrink-0">
+                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => {e.stopPropagation(); onStartFocus(activity, e);}}>
+                    <Play className="h-4 w-4" />
+                </Button>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0">
+                            <MoreVertical className="h-4 w-4" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                     <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenuItem onSelect={() => onOpenTaskContext(activity.id, { clientX: 0, clientY: 0 } as React.MouseEvent)}>View Context</DropdownMenuItem>
+                        <DropdownMenuSub>
+                            <DropdownMenuSubTrigger>Repeat</DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                                <DropdownMenuSubContent>
+                                    <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
+                                    {activity.routine && <DropdownMenuSeparator />}
+                                    {activity.routine && <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">No Repeat</DropdownMenuItem>}
+                                </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                        </DropdownMenuSub>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => onRemoveActivity(activity.slot, activity.id)} className="text-destructive">
+                            <Trash2 className="mr-2 h-4 w-4"/>
+                            Remove
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </div>
         </li>
     );
 });
