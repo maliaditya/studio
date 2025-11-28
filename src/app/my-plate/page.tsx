@@ -167,11 +167,8 @@ function MyPlatePageContent() {
     }, [coreSkills, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, setIsDeepWorkModalOpen]);
 
     const handleOpenFocusModalForSession = useCallback((activity: Activity) => {
-        if (activity.type === 'upskill' || activity.type === 'deepwork') {
-          setFocusActivity(activity);
-          setFocusSessionModalOpen(true);
-        }
-    }, [setFocusActivity, setFocusSessionModalOpen]);
+      onOpenFocusModal(activity);
+    }, [onOpenFocusModal]);
     
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
@@ -625,7 +622,7 @@ function MyPlatePageContent() {
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <h3>Mind Map</h3>
+                        <DialogTitle>Mind Map</DialogTitle>
                     </DialogHeader>
                     <div className="flex-grow min-h-0"><MindMapViewer showControls={true} /></div>
                 </DialogContent>
@@ -641,7 +638,7 @@ function MyPlatePageContent() {
             <Dialog open={isChartModalOpen} onOpenChange={setIsChartModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <h3>Charts</h3>
+                       <DialogTitle>Charts</DialogTitle>
                     </DialogHeader>
                     <div className="flex-grow min-h-0">
                         <ScrollArea className="h-full"><ChartsPageContentActual /></ScrollArea>
@@ -651,7 +648,7 @@ function MyPlatePageContent() {
             <Dialog open={isTimesheetModalOpen} onOpenChange={setIsTimesheetModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <h3>Timesheet</h3>
+                        <DialogTitle>Timesheet</DialogTitle>
                     </DialogHeader>
                     <div className="flex-grow min-h-0">
                         <TimesheetPageContent isModal={true} />

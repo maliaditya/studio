@@ -25,7 +25,7 @@ interface TodaysScheduleCardProps {
   date: Date;
   isAgendaDocked: boolean;
   onToggleDock: () => void;
-  onOpenFocusModal: (activity: Activity) => boolean;
+  onOpenFocusModal: (activity: Activity) => void;
   onOpenTaskContext: (activityId: string, event: React.MouseEvent) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
   currentSlot: string;
@@ -300,7 +300,7 @@ export function TodaysScheduleCard({
                         activity={{...activity, slot: activity.slot as SlotName}}
                         date={date}
                         onToggleComplete={handleToggleComplete}
-                        onActivityClick={(act, e) => handleActivityClick(act, e)}
+                        onActivityClick={handleActivityClick}
                         onRemoveActivity={onRemoveActivity}
                         onUpdateActivity={handleUpdateActivity}
                         setRoutine={toggleRoutine}
