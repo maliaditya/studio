@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -33,9 +32,9 @@ interface TodaysScheduleCardProps {
   activityDurations: Record<string, string>;
 }
 
-export function TodaysScheduleCard({ 
+export function TodaysScheduleCard({
   date,
-  isAgendaDocked, 
+  isAgendaDocked,
   onToggleDock,
   onActivityClick,
   onStartFocus,
@@ -44,16 +43,16 @@ export function TodaysScheduleCard({
   schedule,
   activityDurations,
 }: TodaysScheduleCardProps) {
-  const { 
-    currentUser, 
-    carryForwardTask, 
-    settings, 
+  const {
+    currentUser,
+    carryForwardTask,
+    settings,
     setSettings,
     handleToggleComplete,
     toggleRoutine,
     setSchedule: setGlobalSchedule,
   } = useAuth();
-  
+
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
 
@@ -65,9 +64,9 @@ export function TodaysScheduleCard({
     setSettings(prev => ({...prev, currentPurpose: purposeText}));
     setPurposePopoverOpen(false);
   };
-  
+
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
-  
+
   const scheduledActivities = useMemo(() => {
     const todaysSchedule = schedule[dayKey] || {};
     let allActivities = slotOrder.flatMap(slot => {
@@ -81,7 +80,7 @@ export function TodaysScheduleCard({
     if (settings.agendaShowCurrentSlotOnly) {
         allActivities = allActivities.filter(activity => activity.slot === currentSlot);
     }
-    
+
     return allActivities.sort((a, b) => {
         if (a.completed !== b.completed) {
             return a.completed ? 1 : -1;
@@ -179,7 +178,7 @@ export function TodaysScheduleCard({
         return newSchedule;
     });
   };
-  
+
   const handleUpdateActivity = (activityId: string, newDetails: string) => {
     setGlobalSchedule(prev => {
         const newSchedule = {...prev};
@@ -200,6 +199,7 @@ export function TodaysScheduleCard({
         return newSchedule;
     });
   };
+
 
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
