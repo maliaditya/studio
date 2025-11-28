@@ -199,7 +199,7 @@ export function TimeSlots({
   };
 
   const handleActivityClick = (activity: Activity, event: React.MouseEvent) => {
-    if (activity.type === 'upskill' || activity.type === 'deepwork') {
+    if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.linkedEntityType === 'specialization') {
       const handled = onOpenFocusModal(activity);
       if (!handled) {
           onOpenTaskContext(activity.id, event);

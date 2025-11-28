@@ -271,7 +271,7 @@ function MyPlatePageContent() {
             todayDeepWorkHours: todayDeepWorkMinutes / 60,
             deepWorkChange: calculateChange(todayDeepWorkMinutes, yesterdayDeepWorkMinutes),
             todayUpskillHours: todayUpskillMinutes / 60,
-            upskillChange: calculateChange(todayUpskillMinutes, yesterdayUpskillMinutes),
+            upskillChange: calculateChange(todayUpskillMinutes, yesterdayDeepWorkMinutes),
             totalProductiveHours: totalTodayMinutes / 60,
             avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
             learningStats,
@@ -522,7 +522,7 @@ function MyPlatePageContent() {
                                         isAgendaDocked={isAgendaDocked}
                                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
                                         onActivityClick={onOpenTaskContext}
-                                        onStartFocus={onOpenFocusModal}
+                                        onStartFocus={(activity, event) => onOpenFocusModal(activity)}
                                         onOpenHabitPopup={onOpenHabitPopup}
                                         currentSlot={currentSlot}
                                     />
@@ -553,7 +553,7 @@ function MyPlatePageContent() {
                             schedule={schedule}
                             currentSlot={currentSlot}
                             onOpenFocusModal={handleOpenFocusModalForPlanning}
-                            onStartFocus={onOpenFocusModal}
+                            onStartFocus={(activity, event) => onOpenFocusModal(activity)}
                             onOpenTaskContext={onOpenTaskContext}
                             onOpenHabitPopup={onOpenHabitPopup}
                             onOpenLearningModal={handleOpenFocusModalForPlanning}
