@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -84,6 +85,7 @@ interface TimeSlotsProps {
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
   onOpenFocusModal: (activity: Activity) => boolean;
   onOpenLearningModal: (activity: Activity) => void;
+  onStartFocus: (activity: Activity, event: React.MouseEvent) => void;
 }
 
 export function TimeSlots({
@@ -94,8 +96,9 @@ export function TimeSlots({
   onOpenHabitPopup,
   onOpenFocusModal,
   onOpenLearningModal,
+  onStartFocus,
 }: TimeSlotsProps) {
-    const { toast } = useToast();
+    const { toast } = useAuth();
     const { setSchedule: setGlobalSchedule, settings, handleToggleComplete, toggleRoutine, activityDurations } = useAuth();
     const dateKey = useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
     const todaysSchedule = useMemo(() => schedule[dateKey] || {}, [schedule, dateKey]);
@@ -250,7 +253,7 @@ export function TimeSlots({
                                     date={date}
                                     onToggleComplete={handleToggleComplete}
                                     onActivityClick={handleActivityClick}
-                                    onStartFocus={(act, e) => onOpenFocusModal(act)}
+                                    onStartFocus={onStartFocus}
                                     onRemoveActivity={onRemoveActivity}
                                     onUpdateActivity={handleUpdateActivity}
                                     setRoutine={toggleRoutine}

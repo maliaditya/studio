@@ -171,6 +171,11 @@ function MyPlatePageContent() {
         event.stopPropagation();
         onOpenFocusModal(activity);
     }, [onOpenFocusModal]);
+
+    const handleAgendaActivityClick = useCallback((activity: Activity, event: React.MouseEvent) => {
+        event.stopPropagation();
+        onOpenTaskContext(activity.id, event);
+    }, [onOpenTaskContext]);
     
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
@@ -526,7 +531,7 @@ function MyPlatePageContent() {
                                         activityDurations={activityDurations}
                                         isAgendaDocked={isAgendaDocked}
                                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                                        onActivityClick={onOpenTaskContext}
+                                        onActivityClick={handleAgendaActivityClick}
                                         onStartFocus={handleOpenFocusModalForSession}
                                         onOpenHabitPopup={onOpenHabitPopup}
                                         currentSlot={currentSlot}
@@ -558,6 +563,7 @@ function MyPlatePageContent() {
                             schedule={schedule}
                             currentSlot={currentSlot}
                             onOpenFocusModal={handleOpenFocusModalForPlanning}
+                            onStartFocus={handleOpenFocusModalForSession}
                             onOpenTaskContext={onOpenTaskContext}
                             onOpenHabitPopup={onOpenHabitPopup}
                             onOpenLearningModal={handleOpenFocusModalForPlanning}
