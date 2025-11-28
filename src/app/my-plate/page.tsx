@@ -623,7 +623,7 @@ function MyPlatePageContent() {
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <h3>Mind Map</h3>
+                        <DialogTitle>Mind Map</DialogTitle>
                     </DialogHeader>
                     <div className="flex-grow min-h-0"><MindMapViewer showControls={true} /></div>
                 </DialogContent>
