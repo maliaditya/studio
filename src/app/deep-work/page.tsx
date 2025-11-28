@@ -609,7 +609,7 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
 });
 LibraryContent.displayName = 'LibraryContent';
 
-export function DeepWorkPageContent({ isModal = false }: { isModal?: boolean }) {
+export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: boolean, onClose?: () => void }) {
   const { toast } = useToast();
   const { 
     currentUser, 
@@ -1557,6 +1557,25 @@ export function DeepWorkPageContent({ isModal = false }: { isModal?: boolean }) 
     ? "p-4"
     : "container mx-auto p-4 sm:p-6 lg:p-8";
 
+  const mainPanelHeader = isModal 
+    ? ( <div className="flex justify-end">
+          <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4"/></Button>
+        </div>
+      )
+    : ( <CardHeader className="flex flex-row items-center justify-between p-4">
+          <div className="flex-grow">
+            <CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">
+              {viewMode === 'session' ? <ListChecks /> : <Library />}
+              {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : getLibraryTitle()}
+            </CardTitle>
+          </div>
+          <div className='flex items-center gap-2 flex-shrink-0'>
+             <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => { setViewMode('library'); }}>Library</Button>
+             <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent></Popover>
+          </div>
+        </CardHeader>
+    );
+
   return (
     <DndContext sensors={sensors} onDragStart={(e) => setActiveId(e.active.id.toString())} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
         <div className={wrapperClass}>
@@ -1633,18 +1652,7 @@ export function DeepWorkPageContent({ isModal = false }: { isModal?: boolean }) 
 
             <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between p-4">
-                        <div className="flex-grow">
-                          <CardTitle id="main-panel-heading" className="flex items-center gap-2 text-lg">
-                            {viewMode === 'session' ? <ListChecks /> : <Library />}
-                            {viewMode === 'session' ? `Session for: ${format(selectedDate, 'PPP')}` : getLibraryTitle()}
-                          </CardTitle>
-                        </div>
-                        <div className='flex items-center gap-2 flex-shrink-0'>
-                           <Button variant={viewMode === 'library' ? 'default' : 'outline'} size="sm" onClick={() => { setViewMode('library'); }}>Library</Button>
-                           <Popover><PopoverTrigger asChild><Button variant={"outline"} className={cn("w-[150px] justify-start text-left font-normal h-9",!selectedDate && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{selectedDate ? format(selectedDate, "MMM dd") : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus /></PopoverContent></Popover>
-                        </div>
-                    </CardHeader>
+                    {mainPanelHeader}
                     <CardContent className="p-4">
                         {viewMode === 'session' ? (
                             <div className="max-h-[calc(100vh-16rem)] overflow-y-auto pr-2">
@@ -2080,6 +2088,7 @@ export default function DeepWorkPage() {
     
 
     
+
 
 
 

@@ -2,12 +2,13 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project } from '@/types/workout';
 import { format, startOfToday, isAfter, parseISO, differenceInDays, subDays, isSameDay, getISOWeekYear, getISOWeek } from 'date-fns';
-import { DragDropContext, DropResult } from '@hello-pangea/dnd';
+import { DragDropContext, DropResult, useDraggable } from '@hello-pangea/dnd';
+import { motion } from 'framer-motion';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -30,7 +31,7 @@ import { ChartsPageContent } from '@/app/charts/page';
 import { TimesheetPageContent } from '@/app/timesheet/page';
 import { TimetablePageContent } from '@/app/timetable/page';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
-import { Link as LinkIconLucide } from 'lucide-react';
+import { Link as LinkIconLucide, X } from 'lucide-react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { WeightLog } from '@/types/workout';
@@ -93,9 +94,13 @@ function MyPlatePageContent() {
         onDeleteWeightLog,
         setSchedule,
         updateActivity,
+        selectedUpskillTask,
         setSelectedUpskillTask,
+        selectedDeepWorkTask,
         setSelectedDeepWorkTask,
+        selectedDomainId,
         setSelectedDomainId,
+        selectedSkillId,
         setSelectedSkillId
     } = useAuth();
     const router = useRouter();
@@ -120,57 +125,57 @@ function MyPlatePageContent() {
     
     const [remainingTime, setRemainingTime] = useState<string | null>(null);
 
+    const { attributes, listeners, setNodeRef, transform } = useDraggable({
+        id: 'deep-work-modal',
+    });
+    const [dwPosition, setDwPosition] = useState({ x: 100, y: 100 });
+
+    useEffect(() => {
+        if (transform) {
+            setDwPosition(pos => ({ x: pos.x + transform.x, y: pos.y + transform.y }));
+        }
+    }, [transform]);
+
+
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
     const todaysSchedule = useMemo(() => schedule[selectedDateKey] || {}, [schedule, selectedDateKey]);
 
-    const onOpenFocusModal = (activity: Activity) => {
-      const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-      let taskDef: ExerciseDefinition | undefined;
-  
-      // 1. Try to find a direct match for a specific task.
-      if (activity.taskIds && activity.taskIds.length > 0) {
-        const taskId = activity.taskIds[0];
-        const allLogs = [...allUpskillLogs, ...allDeepWorkLogs, ...brandingLogs];
-        const taskInstance = allLogs.flatMap(log => log.exercises).find(ex => ex.id === taskId);
-        if (taskInstance) {
-          taskDef = allDefs.find(def => def.id === taskInstance.definitionId);
+    const onOpenFocusModal = useCallback((activity: Activity) => {
+        const { type, details } = activity;
+        if (type !== 'upskill' && type !== 'deepwork') {
+            return false;
         }
-      }
-  
-      // If still no definition, try by name
-      if (!taskDef) {
-        taskDef = allDefs.find(def => def.name === activity.details);
-      }
-  
-      // 2. If it's a specialization name, handle it
-      if (!taskDef) {
-        const specialization = coreSkills.find(cs => cs.name === activity.details && cs.type === 'Specialization');
-        if (specialization) {
-          setSelectedDomainId(specialization.domainId);
-          setSelectedSkillId(specialization.id);
-          setSelectedUpskillTask(null);
-          setSelectedDeepWorkTask(null);
-          setIsDeepWorkModalOpen(true);
-          return true; // Exit after handling
-        }
-      }
-  
-      // If we found a specific task definition
-      if (taskDef) {
-        if (activity.type === 'upskill') {
-          setSelectedUpskillTask(taskDef);
-        } else {
-          setSelectedDeepWorkTask(taskDef);
-        }
-        setIsDeepWorkModalOpen(true);
-        return true;
-      }
-  
-      console.warn("Could not find the definition for activity:", activity.details);
-      toast({ title: 'Task Not Found', description: `Could not find the definition for "${activity.details}".`, variant: 'destructive' });
-      return false;
-    };
 
+        const coreSkill = coreSkills.find(cs => cs.name === details && cs.type === 'Specialization');
+        
+        if (coreSkill) {
+            setSelectedDomainId(coreSkill.domainId);
+            setSelectedSkillId(coreSkill.id);
+            setSelectedUpskillTask(null);
+            setSelectedDeepWorkTask(null);
+            setIsDeepWorkModalOpen(true);
+            return true;
+        }
+
+        let taskDef: ExerciseDefinition | undefined;
+        const allDefs = [...upskillDefinitions, ...deepWorkDefinitions];
+        taskDef = allDefs.find(def => def.name === details);
+
+        if (taskDef) {
+            if (type === 'upskill') {
+                setSelectedUpskillTask(taskDef);
+            } else {
+                setSelectedDeepWorkTask(taskDef);
+            }
+            setIsDeepWorkModalOpen(true);
+            return true;
+        }
+
+        console.warn("Could not find the definition for activity:", details);
+        toast({ title: 'Task Not Found', description: `Could not find the definition for "${details}".`, variant: 'destructive' });
+        return false;
+    }, [coreSkills, upskillDefinitions, deepWorkDefinitions, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, toast]);
+    
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
         const visited = new Set<string>();
@@ -566,6 +571,41 @@ function MyPlatePageContent() {
                 <ActivityHeatmap schedule={schedule} onDateSelect={(date) => setSelectedDate(parseISO(date))} />
             </div>
 
+            {isDeepWorkModalOpen && (
+                <motion.div
+                    ref={setNodeRef}
+                    style={{
+                        position: 'fixed',
+                        top: dwPosition.y,
+                        left: dwPosition.x,
+                        width: '90vw',
+                        maxWidth: '1200px',
+                        height: '90vh',
+                        zIndex: 50,
+                    }}
+                    drag
+                    dragMomentum={false}
+                    dragControls={listeners}
+                    dragListener={false}
+                    onDragEnd={(e, info) => {
+                        setDwPosition(pos => ({ x: pos.x + info.offset.x, y: pos.y + info.offset.y }));
+                    }}
+                    className="flex flex-col"
+                >
+                    <Card className="w-full h-full p-0 flex flex-col overflow-hidden shadow-2xl">
+                         <CardHeader className="p-4 border-b flex items-center justify-between cursor-grab" {...listeners}>
+                            <DialogTitle>Deep Work</DialogTitle>
+                            <Button variant="ghost" size="icon" onClick={() => setIsDeepWorkModalOpen(false)}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </CardHeader>
+                        <div className="flex-grow min-h-0">
+                           <DeepWorkPageContent isModal={true} />
+                        </div>
+                    </Card>
+                </motion.div>
+            )}
+
             <TodaysWorkoutModal
                 isOpen={isTodaysWorkoutModalOpen}
                 onOpenChange={setIsTodaysWorkoutModalOpen}
@@ -593,17 +633,6 @@ function MyPlatePageContent() {
                 onActivityComplete={handleToggleComplete}
             />
             
-            <Dialog open={isDeepWorkModalOpen} onOpenChange={setIsDeepWorkModalOpen}>
-                <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col overflow-hidden">
-                    <DialogHeader className="p-4 border-b">
-                        <DialogTitle>Deep Work</DialogTitle>
-                        <DialogDescription>Select a task to begin a focus session.</DialogDescription>
-                    </DialogHeader>
-                    <div className="flex-grow min-h-0">
-                        <DeepWorkPageContent isModal={true} />
-                    </div>
-                </DialogContent>
-            </Dialog>
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
@@ -676,6 +705,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
-
-    
-
