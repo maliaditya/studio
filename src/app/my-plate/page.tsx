@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project, CoreSkill } from '@/types/workout';
 import { format, startOfToday, isAfter, parseISO, differenceInDays, subDays, isSameDay, getISOWeekYear, getISOWeek } from 'date-fns';
 import { motion } from 'framer-motion';
-import { DndContext, useDraggable } from '@dnd-kit/core';
+import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -17,7 +17,7 @@ import { DashboardStats } from '@/components/DashboardStats';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { VisionCard } from '@/components/VisionCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
-import { Dialog, DialogContent, DialogHeader, DialogDescription, DialogTitle as DialogTitleComponent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle as DialogTitleComponent, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysMindsetModal } from '@/components/TodaysMindsetModal';
@@ -71,7 +71,7 @@ function MyPlatePageContent() {
         getDescendantLeafNodes,
         permanentlyLoggedTaskIds,
         currentSlot,
-        onOpenFocusModal: openDeepWorkModal,
+        onOpenFocusModal,
         handleStartFocusSession,
         focusActivity,
         setFocusActivity,
@@ -165,11 +165,6 @@ function MyPlatePageContent() {
         
         return false;
     }, [coreSkills, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, setIsDeepWorkModalOpen]);
-    
-    const onOpenFocusModal = (activity: Activity) => {
-      setFocusActivity(activity);
-      setFocusSessionModalOpen(true);
-    };
 
     const handleOpenFocusModalForSession = useCallback((activity: Activity, event: React.MouseEvent) => {
       event.stopPropagation();
