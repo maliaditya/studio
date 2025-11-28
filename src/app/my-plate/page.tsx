@@ -94,7 +94,9 @@ function MyPlatePageContent() {
         setSchedule,
         updateActivity,
         setSelectedUpskillTask,
-        setSelectedDeepWorkTask
+        setSelectedDeepWorkTask,
+        setSelectedDomainId,
+        setSelectedSkillId
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
@@ -131,16 +133,19 @@ function MyPlatePageContent() {
         return activity.details === def.name;
       });
 
+      // Simplified logic: If no direct task match, find the specialization and select it.
       if (!taskDef) {
-        // Fallback to find top-level task by specialization name
-        const spec = coreSkills.find(cs => cs.name === activity.details);
-        if (spec) {
-            const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
-            const nodeTypeToFind = activity.type === 'upskill' ? 'Curiosity' : 'Intention';
-            const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-            const getNodeType = activity.type === 'upskill' ? getUpskillNodeType : getDeepWorkNodeType;
-
-            taskDef = sourceDefs.find(def => microSkillNames.has(def.category) && getNodeType(def) === nodeTypeToFind);
+        const specialization = coreSkills.find(cs => cs.name === activity.details && cs.type === 'Specialization');
+        if (specialization) {
+            setSelectedDomainId(specialization.domainId);
+            setSelectedSkillId(specialization.id);
+            if (activity.type === 'upskill') {
+                setSelectedUpskillTask(null);
+            } else {
+                setSelectedDeepWorkTask(null);
+            }
+            setIsDeepWorkModalOpen(true);
+            return true;
         }
       }
       
