@@ -69,6 +69,8 @@ export const AgendaWidgetItem = React.memo(({
             onActivityClick(activity, e);
         }
     };
+    
+    const isPlanningTask = (activity.type === 'upskill' || activity.type === 'deepwork') && activity.linkedEntityType === 'specialization';
 
     return (
         <li 
@@ -98,6 +100,7 @@ export const AgendaWidgetItem = React.memo(({
                     <div className="flex items-center gap-1 text-xs text-muted-foreground capitalize">
                         {activityIcons[activity.type]} {activity.type.replace('-', ' ')}
                     </div>
+                    {isPlanningTask && <Badge variant="outline">Planning</Badge>}
                     {activity.completed && loggedDuration && (
                         <Badge variant="secondary">{loggedDuration}</Badge>
                     )}
