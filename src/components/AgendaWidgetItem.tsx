@@ -59,13 +59,6 @@ export const AgendaWidgetItem = React.memo(({
 
     const isInlineEditable = !['upskill', 'deepwork'].includes(activity.type);
     
-    const isClickable = activity.type === 'upskill' || activity.type === 'deepwork';
-    
-    const handleItemClick = (e: React.MouseEvent) => {
-        if (isClickable) {
-            onActivityClick(activity, e);
-        }
-    };
     
     const isPlanningTask = (activity.type === 'upskill' || activity.type === 'deepwork') && activity.linkedEntityType === 'specialization';
 
@@ -73,10 +66,8 @@ export const AgendaWidgetItem = React.memo(({
         <li 
             className={cn(
                 "flex items-start gap-2 p-2 rounded-lg group transition-all",
-                isClickable ? "cursor-pointer hover:bg-muted/50" : "",
                 isTimeslot && 'bg-background'
             )}
-            onClick={handleItemClick}
         >
             <button onClick={(e) => { e.stopPropagation(); onToggleComplete(activity.slot, activity.id); }} className="mt-0.5">
                 {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
