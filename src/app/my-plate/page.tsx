@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -99,7 +100,8 @@ function MyPlatePageContent() {
         selectedDomainId,
         setSelectedDomainId,
         selectedSkillId,
-        setSelectedSkillId
+        setSelectedSkillId,
+        handleToggleComplete
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
