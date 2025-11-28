@@ -37,8 +37,8 @@ interface AgendaWidgetItemProps {
     onRemoveActivity: (slotName: string, activityId: string) => void;
     onUpdateActivity: (activityId: string, newDetails: string) => void;
     setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
-    onActivityClick: (activity: Activity, event: React.MouseEvent) => void;
-    onStartFocus: (activity: Activity, event: React.MouseEvent) => void;
+    onActivityClick?: (activity: Activity, event: React.MouseEvent) => void;
+    onStartFocus?: (activity: Activity, event: React.MouseEvent) => void;
     onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
     context: 'agenda' | 'timeslot';
     loggedDuration?: string;
@@ -62,7 +62,9 @@ export const AgendaWidgetItem = React.memo(({
     const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition'].includes(activity.type);
 
     const handleItemClick = (e: React.MouseEvent) => {
-        onActivityClick(activity, e);
+        if (onActivityClick) {
+            onActivityClick(activity, e);
+        }
     };
     
     const isPlanningTask = (activity.type === 'upskill' || activity.type === 'deepwork') && activity.linkedEntityType === 'specialization';
@@ -72,7 +74,7 @@ export const AgendaWidgetItem = React.memo(({
             className={cn(
                 "flex items-start gap-2 p-2 rounded-lg group transition-all",
                 isTimeslot && 'bg-background',
-                (onActivityClick || onStartFocus) && 'cursor-pointer'
+                onActivityClick && 'cursor-pointer'
             )}
             onClick={handleItemClick}
         >
