@@ -1602,8 +1602,51 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const scheduleTaskFromMindMap = (definitionId: string, activityType: ActivityType, slotName: string, duration = 0) => {
-    // This function is now a placeholder as the logic is moved to my-plate
-  };
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const definition = allDefs.find(d => d.id === definitionId);
+    if (!definition) {
+        toast({ title: 'Error', description: 'Could not find the task definition.', variant: 'destructive' });
+        return;
+    }
+
+    if (focusActivity) {
+      // Update the existing activity that opened the modal
+      updateActivity({
+        ...focusActivity,
+        details: definition.name,
+        taskIds: [definition.id],
+        type: activityType,
+        linkedEntityType: activityType === 'deepwork' ? 'intention' : 'curiosity'
+      });
+      setFocusActivity(null);
+      toast({ title: 'Agenda Updated', description: `Set task to "${definition.name}".`});
+    } else {
+      // Create a new activity if no focus activity is set
+      const dateKey = format(new Date(), 'yyyy-MM-dd');
+      const newActivity: Activity = {
+        id: id('act'),
+        type: activityType,
+        details: definition.name,
+        completed: false,
+        slot: slotName,
+        taskIds: [definition.id],
+        linkedEntityType: activityType === 'deepwork' ? 'intention' : 'curiosity'
+      };
+
+      setSchedule(prev => {
+        const daySchedule = prev[dateKey] || {};
+        const slotActivities = (daySchedule[slotName as SlotName] as Activity[] || []);
+        return {
+          ...prev,
+          [dateKey]: {
+            ...daySchedule,
+            [slotName]: [...slotActivities, newActivity],
+          },
+        };
+      });
+      toast({ title: 'Task Scheduled', description: `Added "${definition.name}" to your agenda.` });
+    }
+};
   
   const addFeatureToRelease = (release: Release, topic: string, featureName: string, type: 'product' | 'service') => {
     if (!featureName.trim()) {
