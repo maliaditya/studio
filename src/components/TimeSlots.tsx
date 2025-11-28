@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -247,20 +246,29 @@ export function TimeSlots({
                             <ul className="space-y-2">
                                 {activities && activities.length > 0 ? (
                                 activities.map((activity, index) => (
-                                    <AgendaWidgetItem
-                                    key={activity.id}
-                                    activity={{...activity, slot: slot.name as SlotName}}
-                                    date={date}
-                                    onToggleComplete={handleToggleComplete}
-                                    onActivityClick={handleActivityClick}
-                                    onStartFocus={onStartFocus}
-                                    onRemoveActivity={onRemoveActivity}
-                                    onUpdateActivity={handleUpdateActivity}
-                                    setRoutine={toggleRoutine}
-                                    onOpenHabitPopup={onOpenHabitPopup}
-                                    context="timeslot"
-                                    loggedDuration={activityDurations[activity.id]}
-                                    />
+                                    <Draggable key={activity.id} draggableId={activity.id} index={index}>
+                                    {(provided) => (
+                                      <div
+                                        ref={provided.innerRef}
+                                        {...provided.draggableProps}
+                                        {...provided.dragHandleProps}
+                                      >
+                                        <AgendaWidgetItem
+                                            activity={{...activity, slot: slot.name as SlotName}}
+                                            date={date}
+                                            onToggleComplete={handleToggleComplete}
+                                            onActivityClick={handleActivityClick}
+                                            onStartFocus={onStartFocus}
+                                            onRemoveActivity={onRemoveActivity}
+                                            onUpdateActivity={handleUpdateActivity}
+                                            setRoutine={toggleRoutine}
+                                            onOpenHabitPopup={onOpenHabitPopup}
+                                            context="timeslot"
+                                            loggedDuration={activityDurations[activity.id]}
+                                        />
+                                      </div>
+                                    )}
+                                    </Draggable>
                                 ))
                                 ) : (
                                 <div className="flex-grow flex items-center justify-center h-full">
