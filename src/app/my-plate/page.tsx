@@ -552,7 +552,7 @@ function MyPlatePageContent() {
                             date={selectedDate}
                             schedule={schedule}
                             currentSlot={currentSlot}
-                            onOpenFocusModal={onOpenFocusModal}
+                            onOpenFocusModal={handleOpenFocusModalForPlanning}
                             onStartFocus={onOpenFocusModal}
                             onOpenTaskContext={onOpenTaskContext}
                             onOpenHabitPopup={onOpenHabitPopup}
