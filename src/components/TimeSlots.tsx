@@ -303,5 +303,3 @@ export function TimeSlots({
     </DragDropContext>
   );
 }
-
-    
