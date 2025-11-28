@@ -2,13 +2,13 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project, CoreSkill } from '@/types/workout';
 import { format, startOfToday, isAfter, parseISO, differenceInDays, subDays, isSameDay, getISOWeekYear, getISOWeek } from 'date-fns';
 import { motion } from 'framer-motion';
-import { useDraggable } from '@dnd-kit/core';
+import { useDraggable, DndContext } from '@dnd-kit/core';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -51,8 +51,6 @@ function MyPlatePageContent() {
         brandingLogs,
         upskillDefinitions,
         deepWorkDefinitions,
-        getDeepWorkNodeType,
-        getUpskillNodeType,
         weightLogs, setWeightLogs,
         goalWeight,
         height,
@@ -101,7 +99,8 @@ function MyPlatePageContent() {
         setSelectedDomainId,
         selectedSkillId,
         setSelectedSkillId,
-        handleToggleComplete
+        handleToggleComplete,
+        getUpskillNodeType,
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
@@ -183,7 +182,7 @@ function MyPlatePageContent() {
         console.warn("Could not find the definition for activity:", details);
         toast({ title: 'Task Not Found', description: `Could not find the definition for "${details}".`, variant: 'destructive' });
         return false;
-    }, [coreSkills, upskillDefinitions, deepWorkDefinitions, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, toast, getUpskillNodeType, getDeepWorkNodeType]);
+    }, [coreSkills, upskillDefinitions, deepWorkDefinitions, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, toast, getUpskillNodeType]);
     
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
@@ -600,12 +599,7 @@ function MyPlatePageContent() {
                     className="flex flex-col"
                 >
                     <Card className="w-full h-full p-0 flex flex-col overflow-hidden shadow-2xl">
-                         <CardHeader className="p-4 border-b flex items-center justify-between cursor-grab" {...listeners}>
-                            <h3 className="text-lg font-semibold">Deep Work</h3>
-                            <Button variant="ghost" size="icon" onClick={() => setIsDeepWorkModalOpen(false)}>
-                                <X className="h-4 w-4" />
-                            </Button>
-                        </CardHeader>
+                         
                         <div className="flex-grow min-h-0">
                            <DeepWorkPageContent isModal={true} onClose={() => setIsDeepWorkModalOpen(false)} />
                         </div>
