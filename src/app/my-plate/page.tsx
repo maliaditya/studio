@@ -120,9 +120,19 @@ function MyPlatePageContent() {
 
     const onOpenFocusModal = (activity: Activity) => {
       const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-      const taskDef = allDefs.find(def => activity.details.includes(def.name));
+      
+      const taskDef = allDefs.find(def => {
+        // First, check if a task instance ID is directly the definition ID
+        if (activity.taskIds && activity.taskIds.includes(def.id)) {
+          return true;
+        }
+        // Fallback: check if activity details include the definition name
+        return activity.details.includes(def.name);
+      });
+      
       if (!taskDef) {
           console.warn("Could not find definition for activity:", activity.details);
+          toast({ title: 'Task Not Found', description: `Could not find the definition for "${activity.details}".`, variant: 'destructive' });
           return false;
       }
   
