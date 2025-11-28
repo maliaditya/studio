@@ -127,13 +127,18 @@ function MyPlatePageContent() {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: 'deep-work-modal',
     });
-    const [dwPosition, setDwPosition] = useState({ x: 100, y: 100 });
+    const [dwPosition, setDwPosition] = useState({ x: 0, y: 0 });
 
     useEffect(() => {
-        if (transform) {
-            setDwPosition(pos => ({ x: pos.x + transform.x, y: pos.y + transform.y }));
+        if (isDeepWorkModalOpen) {
+            const popupWidth = Math.min(window.innerWidth * 0.95, 1600); // 95vw or max 1600px
+            const popupHeight = window.innerHeight * 0.9; // 90vh
+            setDwPosition({
+                x: (window.innerWidth - popupWidth) / 2,
+                y: (window.innerHeight - popupHeight) / 2,
+            });
         }
-    }, [transform]);
+    }, [isDeepWorkModalOpen]);
 
 
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
@@ -160,17 +165,8 @@ function MyPlatePageContent() {
         const allDefs = [...upskillDefinitions, ...deepWorkDefinitions];
         taskDef = allDefs.find(def => def.name === details);
         
-        if (!taskDef) {
-            const microSkillNames = new Set(coreSkills.flatMap(cs => cs.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name))));
-            const nodeTypeToFind = activity.type === 'upskill' ? 'Curiosity' : 'Intention';
-            const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
-            const getNodeType = activity.type === 'upskill' ? getUpskillNodeType : getDeepWorkNodeType;
-
-            taskDef = sourceDefs.find(def => microSkillNames.has(def.category) && getNodeType(def) === nodeTypeToFind);
-        }
-
         if (taskDef) {
-            if (activity.type === 'upskill') {
+             if (activity.type === 'upskill') {
                 setSelectedUpskillTask(taskDef);
             } else {
                 setSelectedDeepWorkTask(taskDef);
@@ -178,11 +174,11 @@ function MyPlatePageContent() {
             setIsDeepWorkModalOpen(true);
             return true;
         }
-
+        
         console.warn("Could not find the definition for activity:", details);
         toast({ title: 'Task Not Found', description: `Could not find the definition for "${details}".`, variant: 'destructive' });
         return false;
-    }, [coreSkills, upskillDefinitions, deepWorkDefinitions, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, toast, getUpskillNodeType]);
+    }, [coreSkills, upskillDefinitions, deepWorkDefinitions, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, toast]);
     
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
@@ -586,8 +582,8 @@ function MyPlatePageContent() {
                         position: 'fixed',
                         top: dwPosition.y,
                         left: dwPosition.x,
-                        width: '90vw',
-                        maxWidth: '1200px',
+                        width: '95vw',
+                        maxWidth: '1600px',
                         height: '90vh',
                         zIndex: 50,
                     }}
