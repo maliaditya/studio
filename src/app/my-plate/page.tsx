@@ -83,7 +83,6 @@ function MyPlatePageContent() {
         swapWorkoutExercise,
         logMindsetSet,
         deleteMindsetSet,
-        onOpenTaskContext,
         onOpenHabitPopup,
         toggleRoutine,
         schedule,
@@ -102,6 +101,7 @@ function MyPlatePageContent() {
         setSelectedSkillId,
         handleToggleComplete,
         getUpskillNodeType,
+        onStartFocus,
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
@@ -144,11 +144,6 @@ function MyPlatePageContent() {
 
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
     const todaysSchedule = useMemo(() => schedule[selectedDateKey] || {}, [schedule, selectedDateKey]);
-
-    const onStartFocus = (activity: Activity, event: React.MouseEvent) => {
-        event.stopPropagation();
-        onOpenFocusModal(activity);
-    };
     
     const handleOpenFocusModalForPlanning = useCallback((activity: Activity) => {
         const { type, details } = activity;
@@ -524,8 +519,6 @@ function MyPlatePageContent() {
                                         activityDurations={activityDurations}
                                         isAgendaDocked={isAgendaDocked}
                                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                                        onActivityClick={onOpenFocusModal}
-                                        onStartFocus={onStartFocus}
                                         onOpenHabitPopup={onOpenHabitPopup}
                                         currentSlot={currentSlot}
                                     />

@@ -81,7 +81,7 @@ interface TimeSlotsProps {
   date: Date;
   schedule: FullSchedule;
   currentSlot: string;
-  onActivityClick: (activity: Activity) => boolean;
+  onActivityClick: (activity: Activity, event: React.MouseEvent) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
   onStartFocus: (activity: Activity, event: React.MouseEvent) => void;
 }
@@ -194,16 +194,6 @@ export function TimeSlots({
     });
   };
 
-  const handleItemClick = (activity: Activity, event: React.MouseEvent) => {
-    const handledByModal = onActivityClick(activity);
-    if (!handledByModal) {
-      // If the modal wasn't opened (e.g., not a planning task),
-      // then we can proceed with other click actions like opening the context popup.
-      onOpenTaskContext(activity.id, event);
-    }
-  };
-
-
   return (
     <DragDropContext onDragEnd={onDragEnd}>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -252,7 +242,7 @@ export function TimeSlots({
                                             activity={{...activity, slot: slot.name as SlotName}}
                                             date={date}
                                             onToggleComplete={handleToggleComplete}
-                                            onActivityClick={handleItemClick}
+                                            onActivityClick={onActivityClick}
                                             onStartFocus={onStartFocus}
                                             onRemoveActivity={onRemoveActivity}
                                             onUpdateActivity={handleUpdateActivity}
