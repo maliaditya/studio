@@ -34,7 +34,6 @@ interface AgendaWidgetItemProps {
     activity: Activity & { slot: string };
     date: Date;
     onToggleComplete: (slotName: string, activityId: string) => void;
-    onStartFocus: (activity: Activity, event: React.MouseEvent) => void;
     onRemoveActivity: (slotName: string, activityId: string) => void;
     onUpdateActivity: (activityId: string, newDetails: string) => void;
     setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
@@ -48,7 +47,6 @@ export const AgendaWidgetItem = React.memo(({
     activity,
     date, 
     onToggleComplete, 
-    onStartFocus,
     onRemoveActivity, 
     onUpdateActivity, 
     setRoutine, 
@@ -104,37 +102,6 @@ export const AgendaWidgetItem = React.memo(({
                         <Badge variant="secondary">{loggedDuration}</Badge>
                     )}
                 </div>
-            </div>
-            <div className="flex items-center flex-shrink-0">
-                <Button variant="ghost" size="icon" className="h-6 w-6 group-hover:opacity-100" onClick={(e) => onStartFocus(activity, e)}>
-                    <Timer className="h-4 w-4" />
-                </Button>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 flex-shrink-0">
-                            <MoreVertical className="h-4 w-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                     <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenuItem onSelect={(e) => onActivityClick(activity, e)}>View Context</DropdownMenuItem>
-                        <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>Repeat</DropdownMenuSubTrigger>
-                            <DropdownMenuPortal>
-                                <DropdownMenuSubContent>
-                                    <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'daily' })}>Daily</DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => setRoutine(activity, { type: 'weekly' })}>Weekly</DropdownMenuItem>
-                                    {activity.routine && <DropdownMenuSeparator />}
-                                    {activity.routine && <DropdownMenuItem onSelect={() => setRoutine(activity, null)} className="text-destructive">No Repeat</DropdownMenuItem>}
-                                </DropdownMenuSubContent>
-                            </DropdownMenuPortal>
-                        </DropdownMenuSub>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onSelect={() => onRemoveActivity(activity.slot, activity.id)} className="text-destructive">
-                            <Trash2 className="mr-2 h-4 w-4"/>
-                            Remove
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
             </div>
         </li>
     );
