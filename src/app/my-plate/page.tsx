@@ -1,14 +1,13 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project } from '@/types/workout';
+import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project, CoreSkill } from '@/types/workout';
 import { format, startOfToday, isAfter, parseISO, differenceInDays, subDays, isSameDay, getISOWeekYear, getISOWeek } from 'date-fns';
-import { useDraggable } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
+import { useDraggable } from '@dnd-kit/core';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -18,7 +17,7 @@ import { DashboardStats } from '@/components/DashboardStats';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { VisionCard } from '@/components/VisionCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysMindsetModal } from '@/components/TodaysMindsetModal';
@@ -27,7 +26,7 @@ import { TodaysLearningModal } from '@/components/TodaysLearningModal';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { MindMapViewer } from '@/components/MindMapViewer';
 import { KanbanPageContent } from '@/app/kanban/page';
-import { ChartsPageContent } from '@/app/charts/page';
+import { ChartsPageContent as ChartsPageContentActual } from '@/app/charts/page';
 import { TimesheetPageContent } from '@/app/timesheet/page';
 import { TimetablePageContent } from '@/app/timetable/page';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
@@ -592,7 +591,7 @@ function MyPlatePageContent() {
                 >
                     <Card className="w-full h-full p-0 flex flex-col overflow-hidden shadow-2xl">
                          <CardHeader className="p-4 border-b flex items-center justify-between cursor-grab" {...listeners}>
-                            <DialogTitle>Deep Work</DialogTitle>
+                            <h3 className="text-lg font-semibold">Deep Work</h3>
                             <Button variant="ghost" size="icon" onClick={() => setIsDeepWorkModalOpen(false)}>
                                 <X className="h-4 w-4" />
                             </Button>
@@ -653,7 +652,7 @@ function MyPlatePageContent() {
                         <DialogTitle>Charts</DialogTitle>
                     </DialogHeader>
                     <div className="flex-grow min-h-0">
-                        <ScrollArea className="h-full"><ChartsPageContent /></ScrollArea>
+                        <ScrollArea className="h-full"><ChartsPageContentActual /></ScrollArea>
                     </div>
                 </DialogContent>
             </Dialog>
