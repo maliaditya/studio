@@ -133,8 +133,8 @@ function MyPlatePageContent() {
 
     useEffect(() => {
         if (isDeepWorkModalOpen) {
-            const popupWidth = Math.min(window.innerWidth * 0.95, 1600); // 95vw or max 1600px
-            const popupHeight = window.innerHeight * 0.9; // 90vh
+            const popupWidth = Math.min(window.innerWidth * 0.95, 1600);
+            const popupHeight = window.innerHeight * 0.9;
             setDwPosition({
                 x: (window.innerWidth - popupWidth) / 2,
                 y: (window.innerHeight - popupHeight) / 2,
@@ -586,13 +586,6 @@ function MyPlatePageContent() {
                     className="flex flex-col"
                 >
                     <Card className="w-full h-full p-0 flex flex-col overflow-hidden shadow-2xl">
-                        <div 
-                           className="p-4 border-b flex justify-end"
-                        >
-                            <Button variant="ghost" size="icon" onClick={() => setIsDeepWorkModalOpen(false)}>
-                                <X className="h-4 w-4" />
-                            </Button>
-                        </div>
                         <div className="flex-grow min-h-0">
                            <DeepWorkPageContent isModal={true} onClose={() => setIsDeepWorkModalOpen(false)} />
                         </div>
@@ -630,7 +623,7 @@ function MyPlatePageContent() {
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <DialogTitle>Mind Map</DialogTitle>
+                        <h3>Mind Map</h3>
                     </DialogHeader>
                     <div className="flex-grow min-h-0"><MindMapViewer showControls={true} /></div>
                 </DialogContent>
