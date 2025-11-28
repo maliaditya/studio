@@ -125,43 +125,50 @@ function MyPlatePageContent() {
 
     const onOpenFocusModal = (activity: Activity) => {
       const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-      
-      let taskDef = allDefs.find(def => {
-        if (activity.taskIds && activity.taskIds.includes(def.id)) {
-          return true;
+      let taskDef: ExerciseDefinition | undefined;
+  
+      // 1. Try to find a direct match for a specific task.
+      if (activity.taskIds && activity.taskIds.length > 0) {
+        const taskId = activity.taskIds[0];
+        const allLogs = [...allUpskillLogs, ...allDeepWorkLogs, ...brandingLogs];
+        const taskInstance = allLogs.flatMap(log => log.exercises).find(ex => ex.id === taskId);
+        if (taskInstance) {
+          taskDef = allDefs.find(def => def.id === taskInstance.definitionId);
         }
-        return activity.details === def.name;
-      });
-
-      // Simplified logic: If no direct task match, find the specialization and select it.
+      }
+  
+      // If still no definition, try by name
+      if (!taskDef) {
+        taskDef = allDefs.find(def => def.name === activity.details);
+      }
+  
+      // 2. If it's a specialization name, handle it
       if (!taskDef) {
         const specialization = coreSkills.find(cs => cs.name === activity.details && cs.type === 'Specialization');
         if (specialization) {
-            setSelectedDomainId(specialization.domainId);
-            setSelectedSkillId(specialization.id);
-            if (activity.type === 'upskill') {
-                setSelectedUpskillTask(null);
-            } else {
-                setSelectedDeepWorkTask(null);
-            }
-            setIsDeepWorkModalOpen(true);
-            return true;
+          setSelectedDomainId(specialization.domainId);
+          setSelectedSkillId(specialization.id);
+          setSelectedUpskillTask(null);
+          setSelectedDeepWorkTask(null);
+          setIsDeepWorkModalOpen(true);
+          return true; // Exit after handling
         }
       }
-      
-      if (!taskDef) {
-          console.warn("Could not find the definition for activity:", activity.details);
-          toast({ title: 'Task Not Found', description: `Could not find the definition for "${activity.details}".`, variant: 'destructive' });
-          return false;
+  
+      // If we found a specific task definition
+      if (taskDef) {
+        if (activity.type === 'upskill') {
+          setSelectedUpskillTask(taskDef);
+        } else {
+          setSelectedDeepWorkTask(taskDef);
+        }
+        setIsDeepWorkModalOpen(true);
+        return true;
       }
   
-      if (activity.type === 'upskill') {
-          setSelectedUpskillTask(taskDef);
-      } else {
-          setSelectedDeepWorkTask(taskDef);
-      }
-      setIsDeepWorkModalOpen(true);
-      return true;
+      console.warn("Could not find the definition for activity:", activity.details);
+      toast({ title: 'Task Not Found', description: `Could not find the definition for "${activity.details}".`, variant: 'destructive' });
+      return false;
     };
 
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
@@ -671,3 +678,4 @@ export default function MyPlatePage() {
 }
 
     
+
