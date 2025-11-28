@@ -34,7 +34,6 @@ interface AgendaWidgetItemProps {
     activity: Activity & { slot: string };
     date: Date;
     onToggleComplete: (slotName: string, activityId: string) => void;
-    onActivityClick: (activity: Activity, event: React.MouseEvent) => void;
     onStartFocus: (activity: Activity, event: React.MouseEvent) => void;
     onRemoveActivity: (slotName: string, activityId: string) => void;
     onUpdateActivity: (activityId: string, newDetails: string) => void;
@@ -49,7 +48,6 @@ export const AgendaWidgetItem = React.memo(({
     activity,
     date, 
     onToggleComplete, 
-    onActivityClick, 
     onStartFocus,
     onRemoveActivity, 
     onUpdateActivity, 
@@ -65,7 +63,7 @@ export const AgendaWidgetItem = React.memo(({
     const isInlineEditable = !['upskill', 'deepwork'].includes(activity.type);
     
     const handleItemClick = (e: React.MouseEvent) => {
-        onActivityClick(activity, e);
+        onOpenTaskContext(activity.id, e);
     };
     
     const isPlanningTask = (activity.type === 'upskill' || activity.type === 'deepwork') && activity.linkedEntityType === 'specialization';
