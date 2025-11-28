@@ -246,11 +246,11 @@ export function TimeSlots({
                                     activity={{...activity, slot: slot.name as SlotName}}
                                     date={date}
                                     onToggleComplete={handleToggleComplete}
-                                    onActivityClick={(act, e) => handleActivityClick(act, e)}
+                                    onActivityClick={handleActivityClick}
+                                    onStartFocus={(act, e) => onOpenFocusModal(act)}
                                     onRemoveActivity={onRemoveActivity}
                                     onUpdateActivity={handleUpdateActivity}
                                     setRoutine={toggleRoutine}
-                                    onOpenTaskContext={onOpenTaskContext}
                                     onOpenHabitPopup={onOpenHabitPopup}
                                     context="timeslot"
                                     loggedDuration={activityDurations[activity.id]}
