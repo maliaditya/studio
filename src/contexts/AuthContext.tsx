@@ -1,4 +1,5 @@
 
+
       
 "use client";
 
@@ -137,9 +138,11 @@ interface AuthContextType {
   focusSessionModalOpen: boolean;
   setFocusSessionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   focusActivity: Activity | null;
+  setFocusActivity: React.Dispatch<React.SetStateAction<Activity | null>>;
   focusDuration: number;
   onOpenFocusModal: (activity: Activity) => boolean;
   handleStartFocusSession: (activity: Activity, duration: number) => void;
+  onLogDuration: (activity: Activity, duration: number) => void;
   activeFocusSession: ActiveFocusSession | null;
   setActiveFocusSession: React.Dispatch<React.SetStateAction<ActiveFocusSession | null>>;
   
@@ -1031,17 +1034,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [allDeepWorkLogs, allUpskillLogs, allMindProgrammingLogs]);
 
   const onOpenFocusModal = useCallback((activity: Activity) => {
-    const estDurationStr = activity.duration?.toString(); // use activity.duration first
+    const isPlanningTask = (activity.type === 'upskill' || activity.type === 'deepwork') && activity.linkedEntityType === 'specialization';
+    if (isPlanningTask) {
+        return false; // Let the other handler take over
+    }
+    
+    const estDurationStr = activity.duration?.toString();
     let minutes = 0;
     if (estDurationStr) {
-      const hMatch = estDurationStr.match(/(\d+)h/);
-      const mMatch = estDurationStr.match(/(\d+)m/);
-      const h = hMatch ? parseInt(hMatch[1]) * 60 : 0;
-      const m = mMatch ? parseInt(mMatch[1]) : 0;
-      minutes = h + m;
-      if (minutes === 0 && /^\d+$/.test(estDurationStr.trim())) {
-          minutes = parseInt(estDurationStr.trim());
-      }
+        const hMatch = estDurationStr.match(/(\d+)h/);
+        const mMatch = estDurationStr.match(/(\d+)m/);
+        const h = hMatch ? parseInt(hMatch[1]) * 60 : 0;
+        const m = mMatch ? parseInt(mMatch[1]) : 0;
+        minutes = h + m;
+        if (minutes === 0 && /^\d+$/.test(estDurationStr.trim())) {
+            minutes = parseInt(estDurationStr.trim());
+        }
     }
     if (isNaN(minutes) || minutes <= 0) minutes = 45;
   
@@ -1549,40 +1557,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return durations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs]);
 
+  const onLogDuration = useCallback((activity: Activity, duration: number) => {
+    updateActivity({
+      ...activity,
+      duration,
+      completed: true,
+      completedAt: Date.now(),
+    });
+    toast({ title: 'Duration Logged & Task Completed!' });
+  }, [updateActivity, toast]);
+
   const handleToggleComplete = useCallback((slotName: string, activityId: string, isCompleted?: boolean) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     let activityToUpdate: Activity | undefined;
 
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        const daySchedule = { ...(newSchedule[todayKey] || {}) };
+    const daySchedule = schedule[todayKey] || {};
+    if (daySchedule[slotName]) {
+        const activities = [...(daySchedule[slotName] as Activity[])];
+        const activityIndex = activities.findIndex(a => a.id === activityId);
         
-        if (daySchedule[slotName]) {
-            const activities = [...(daySchedule[slotName] as Activity[])];
-            const activityIndex = activities.findIndex(a => a.id === activityId);
+        if (activityIndex > -1) {
+            activityToUpdate = activities[activityIndex];
+            const shouldBeCompleted = isCompleted !== undefined ? isCompleted : !activityToUpdate.completed;
             
-            if (activityIndex > -1) {
-                const originalActivity = activities[activityIndex];
-                activityToUpdate = {
-                    ...originalActivity,
-                    completed: isCompleted !== undefined ? isCompleted : !originalActivity.completed,
-                    completedAt: (isCompleted !== undefined ? isCompleted : !originalActivity.completed) ? Date.now() : undefined,
-                };
-                activities[activityIndex] = activityToUpdate;
-                daySchedule[slotName] = activities;
-                newSchedule[todayKey] = daySchedule;
+            if (shouldBeCompleted && !activityToUpdate.completed) {
+                // If we are marking it as complete, open the modal
+                onOpenFocusModal(activityToUpdate);
+            } else {
+                // If we are un-completing it, just do it directly
+                 updateActivity({
+                    ...activityToUpdate,
+                    completed: false,
+                    completedAt: undefined,
+                    duration: undefined,
+                    focusSessionEndTime: undefined,
+                    focusSessionInitialStartTime: undefined,
+                    focusSessionPauses: [],
+                    focusSessionStartTime: undefined,
+                });
             }
         }
-        return newSchedule;
-    });
-
-    if (activityToUpdate?.completed) {
-        toast({
-            title: "Task Complete!",
-            description: `You've completed "${activityToUpdate.details}".`,
-        });
     }
-  }, [setSchedule, toast]);
+  }, [schedule, updateActivity, onOpenFocusModal]);
 
   const onRemoveActivity = useCallback((slotName: string, activityId: string, date: Date) => {
     const dateKey = format(date, 'yyyy-MM-dd');
@@ -1590,7 +1606,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const newSchedule = { ...prev };
         if (newSchedule[dateKey] && newSchedule[dateKey][slotName]) {
             const daySchedule = { ...newSchedule[dateKey] };
-            daySchedule[slotName] = (daySchedule[slotName] as Activity[]).filter(act => act.id !== activityId);
+            daySchedule[slotName] = (daySchedule[slotName] as any[]).filter(act => act.id !== activityId);
             newSchedule[dateKey] = daySchedule;
         }
         return newSchedule;
@@ -3362,9 +3378,9 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     allLeadGenLogs, setAllLeadGenLogs,
     allMindProgrammingLogs, setAllMindProgrammingLogs,
     dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked,
-    handleLogLearning, logSubTaskTime,
+    handleLogLearning, onLogDuration, logSubTaskTime,
     findRootTask,
-    focusSessionModalOpen, setFocusSessionModalOpen, focusActivity, focusDuration, onOpenFocusModal, handleStartFocusSession,
+    focusSessionModalOpen, setFocusSessionModalOpen, focusActivity, setFocusActivity, focusDuration, onOpenFocusModal, handleStartFocusSession,
     activeFocusSession, setActiveFocusSession,
     workoutMode, setWorkoutMode, strengthTrainingMode, setStrengthTrainingMode, workoutPlanRotation, setWorkoutPlanRotation, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
@@ -3486,3 +3502,4 @@ export const useAuth = (): AuthContextType => {
 };
 
     
+

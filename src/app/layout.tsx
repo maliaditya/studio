@@ -52,6 +52,7 @@ import { StopperProgressModal } from '@/components/StopperProgressModal';
 import { PillarPopup } from '@/components/PillarPopup';
 import { DrawingCanvas } from '@/components/DrawingCanvas';
 import dynamic from 'next/dynamic';
+import { FocusSessionModal } from '@/components/FocusSessionModal';
 
 const PdfViewerPopup = dynamic(() => import('@/components/PdfViewerPopup'), {
   ssr: false,
@@ -124,6 +125,10 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handleStartLeadGenLog,
     onOpenFocusModal,
     focusActivity,
+    setFocusActivity,
+    focusSessionModalOpen,
+    setFocusSessionModalOpen,
+    onLogDuration,
     handleStartFocusSession,
     focusDuration,
     currentSlot,
@@ -399,6 +404,14 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onToggleMicroSkillRepetition={authContext.handleToggleMicroSkillRepetition}
           />
         )}
+      <FocusSessionModal
+        isOpen={focusSessionModalOpen}
+        onOpenChange={setFocusSessionModalOpen}
+        activity={focusActivity}
+        onStartSession={handleStartFocusSession}
+        onLogDuration={onLogDuration}
+        initialDuration={focusDuration}
+      />
       {(!isAgendaDocked && authContext.settings.widgetVisibility.agenda) && (
         <TodaysScheduleCard
             date={new Date()}
@@ -551,3 +564,4 @@ export default function RootLayout({
     </html>
   );
 }
+

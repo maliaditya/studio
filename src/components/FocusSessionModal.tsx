@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -215,7 +216,7 @@ export function FocusSessionModal({
         </fieldset>
         <DialogFooter className="grid grid-cols-2 gap-2">
           <Button variant="outline" className="w-full" onClick={handleLogDurationClick} disabled={!!activeFocusSession}>
-            <Save className="mr-2 h-4 w-4" /> Log Duration
+            <Save className="mr-2 h-4 w-4" /> Log Duration & Complete
           </Button>
           <Button className="w-full" onClick={handleStartClick} disabled={!!activeFocusSession}>
             <Play className="mr-2 h-4 w-4" /> Start Focus Session
