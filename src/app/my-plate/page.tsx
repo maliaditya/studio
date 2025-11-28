@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -103,6 +102,7 @@ function MyPlatePageContent() {
         setSelectedSkillId,
         handleToggleComplete,
         getUpskillNodeType,
+        onOpenFocusModal,
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
@@ -129,7 +129,7 @@ function MyPlatePageContent() {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: 'deep-work-modal',
     });
-    const [dwPosition, setDwPosition] = useState({ x: 0, y: 0 });
+    const [dwPosition, setDwPosition] = useState({ x: 100, y: 100 });
 
     useEffect(() => {
         if (isDeepWorkModalOpen) {
@@ -564,7 +564,7 @@ function MyPlatePageContent() {
                 </Card>
                 <ActivityHeatmap schedule={schedule} onDateSelect={(date) => setSelectedDate(parseISO(date))} />
             </div>
-
+            
             {isDeepWorkModalOpen && (
                 <motion.div
                     ref={setNodeRef}
@@ -585,6 +585,17 @@ function MyPlatePageContent() {
                     className="flex flex-col"
                 >
                     <Card className="w-full h-full p-0 flex flex-col overflow-hidden shadow-2xl">
+                        <div 
+                           className="p-4 border-b cursor-grab active:cursor-grabbing"
+                           {...listeners}
+                           {...attributes}
+                        >
+                            <div className="flex justify-end">
+                                <Button variant="ghost" size="icon" onClick={() => setIsDeepWorkModalOpen(false)}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
                         <div className="flex-grow min-h-0">
                            <DeepWorkPageContent isModal={true} onClose={() => setIsDeepWorkModalOpen(false)} />
                         </div>
