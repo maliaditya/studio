@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -38,7 +37,7 @@ interface AgendaWidgetItemProps {
     onRemoveActivity: (slotName: string, activityId: string) => void;
     onUpdateActivity: (activityId: string, newDetails: string) => void;
     setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
-    onOpenTaskContext: (activityId: string, event: React.MouseEvent) => void;
+    onActivityClick: (activity: Activity, event: React.MouseEvent) => void;
     onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
     context: 'agenda' | 'timeslot';
     loggedDuration?: string;
@@ -52,18 +51,21 @@ export const AgendaWidgetItem = React.memo(({
     onRemoveActivity, 
     onUpdateActivity, 
     setRoutine, 
-    onOpenTaskContext, 
+    onActivityClick, 
     onOpenHabitPopup, 
     context,
     loggedDuration,
 }: AgendaWidgetItemProps) => {
     const isTimeslot = context === 'timeslot';
 
-    // Only allow inline editing for simple, descriptive tasks.
     const isInlineEditable = !['upskill', 'deepwork'].includes(activity.type);
     
+    const isClickable = activity.type === 'upskill' || activity.type === 'deepwork';
+    
     const handleItemClick = (e: React.MouseEvent) => {
-        onOpenTaskContext(activity.id, e);
+        if (isClickable) {
+            onActivityClick(activity, e);
+        }
     };
     
     const isPlanningTask = (activity.type === 'upskill' || activity.type === 'deepwork') && activity.linkedEntityType === 'specialization';
@@ -72,7 +74,7 @@ export const AgendaWidgetItem = React.memo(({
         <li 
             className={cn(
                 "flex items-start gap-2 p-2 rounded-lg group transition-all",
-                "cursor-pointer hover:bg-muted/50",
+                isClickable ? "cursor-pointer hover:bg-muted/50" : "",
                 isTimeslot && 'bg-background'
             )}
             onClick={handleItemClick}
@@ -113,7 +115,7 @@ export const AgendaWidgetItem = React.memo(({
                         </Button>
                     </DropdownMenuTrigger>
                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenuItem onSelect={() => onOpenTaskContext(activity.id, { clientX: 0, clientY: 0 } as React.MouseEvent)}>View Context</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={(e) => onActivityClick(activity, e)}>View Context</DropdownMenuItem>
                         <DropdownMenuSub>
                             <DropdownMenuSubTrigger>Repeat</DropdownMenuSubTrigger>
                             <DropdownMenuPortal>
