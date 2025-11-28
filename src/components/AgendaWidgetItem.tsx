@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -136,3 +137,5 @@ export const AgendaWidgetItem = React.memo(({
     );
 });
 AgendaWidgetItem.displayName = 'AgendaWidgetItem';
+
+    

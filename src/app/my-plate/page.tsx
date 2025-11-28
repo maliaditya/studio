@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -17,7 +18,7 @@ import { DashboardStats } from '@/components/DashboardStats';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { VisionCard } from '@/components/VisionCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
-import { Dialog, DialogContent, DialogHeader, DialogTitle as DialogTitleComponent, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysMindsetModal } from '@/components/TodaysMindsetModal';
@@ -166,9 +167,9 @@ function MyPlatePageContent() {
         return false;
     }, [coreSkills, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, setIsDeepWorkModalOpen]);
 
-    const handleOpenFocusModalForSession = useCallback((activity: Activity, event: React.MouseEvent) => {
-      event.stopPropagation();
-      onOpenFocusModal(activity);
+    const handleAgendaActivityClick = useCallback((activity: Activity, event: React.MouseEvent) => {
+        event.stopPropagation();
+        onOpenFocusModal(activity);
     }, [onOpenFocusModal]);
     
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
@@ -525,7 +526,7 @@ function MyPlatePageContent() {
                                         activityDurations={activityDurations}
                                         isAgendaDocked={isAgendaDocked}
                                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                                        onActivityClick={handleOpenFocusModalForSession}
+                                        onActivityClick={handleAgendaActivityClick}
                                         onOpenTaskContext={onOpenTaskContext}
                                         onOpenHabitPopup={onOpenHabitPopup}
                                         currentSlot={currentSlot}
@@ -623,7 +624,7 @@ function MyPlatePageContent() {
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <DialogTitleComponent>Mind Map</DialogTitleComponent>
+                        <DialogTitle>Mind Map</DialogTitle>
                     </DialogHeader>
                     <div className="flex-grow min-h-0"><MindMapViewer showControls={true} /></div>
                 </DialogContent>
@@ -631,7 +632,7 @@ function MyPlatePageContent() {
             <Dialog open={isKanbanModalOpen} onOpenChange={setIsKanbanModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <DialogTitleComponent>Kanban Board</DialogTitleComponent>
+                        <DialogTitle>Kanban Board</DialogTitle>
                     </DialogHeader>
                     <div className="flex-grow min-h-0"><KanbanPageContent isModal={true} /></div>
                 </DialogContent>
@@ -639,7 +640,7 @@ function MyPlatePageContent() {
             <Dialog open={isChartModalOpen} onOpenChange={setIsChartModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                       <DialogTitleComponent>Charts</DialogTitleComponent>
+                       <DialogTitle>Charts</DialogTitle>
                     </DialogHeader>
                     <div className="flex-grow min-h-0">
                         <ScrollArea className="h-full"><ChartsPageContentActual /></ScrollArea>
@@ -649,7 +650,7 @@ function MyPlatePageContent() {
             <Dialog open={isTimesheetModalOpen} onOpenChange={setIsTimesheetModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <DialogTitleComponent>Timesheet</DialogTitleComponent>
+                        <DialogTitle>Timesheet</DialogTitle>
                     </DialogHeader>
                     <div className="flex-grow min-h-0">
                         <TimesheetPageContent isModal={true} />
@@ -659,7 +660,7 @@ function MyPlatePageContent() {
             <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-0">
                     <DialogHeader className="p-4 border-b">
-                        <DialogTitleComponent>Weekly Timetable</DialogTitleComponent>
+                        <DialogTitle>Weekly Timetable</DialogTitle>
                         <DialogDescription>
                             Plan your week at a glance.
                         </DialogDescription>
@@ -692,3 +693,5 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
+
+    
