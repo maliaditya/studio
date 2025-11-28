@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -200,7 +201,7 @@ export function TodaysScheduleCard({
     });
   };
 
-  const handleActivityClick = (slotName: string, activity: Activity, event: React.MouseEvent) => {
+  const handleActivityClick = (activity: Activity, event: React.MouseEvent) => {
     onOpenFocusModal(activity);
   };
 
@@ -299,7 +300,7 @@ export function TodaysScheduleCard({
                         activity={{...activity, slot: activity.slot as SlotName}}
                         date={date}
                         onToggleComplete={handleToggleComplete}
-                        onActivityClick={(act, e) => handleActivityClick(act.slot, act, e)}
+                        onActivityClick={(act, e) => handleActivityClick(act, e)}
                         onRemoveActivity={onRemoveActivity}
                         onUpdateActivity={handleUpdateActivity}
                         setRoutine={toggleRoutine}

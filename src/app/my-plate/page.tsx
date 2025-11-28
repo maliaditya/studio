@@ -8,7 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project, CoreSkill } from '@/types/workout';
 import { format, startOfToday, isAfter, parseISO, differenceInDays, subDays, isSameDay, getISOWeekYear, getISOWeek } from 'date-fns';
 import { motion } from 'framer-motion';
-import { useDraggable, DndContext } from '@dnd-kit/core';
+import { DndContext, useDraggable } from '@dnd-kit/core';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -74,7 +74,9 @@ function MyPlatePageContent() {
         currentSlot,
         handleStartFocusSession,
         focusActivity,
+        setFocusActivity,
         focusDuration,
+        setFocusSessionModalOpen,
         logWorkoutSet, 
         updateWorkoutSet, 
         deleteWorkoutSet, 
@@ -143,8 +145,8 @@ function MyPlatePageContent() {
 
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
     const todaysSchedule = useMemo(() => schedule[selectedDateKey] || {}, [schedule, selectedDateKey]);
-
-    const onOpenFocusModal = useCallback((activity: Activity) => {
+    
+    const handleOpenFocusModalForPlanning = useCallback((activity: Activity) => {
         const { type, details } = activity;
         if (type !== 'upskill' && type !== 'deepwork') {
             return false;
@@ -160,25 +162,16 @@ function MyPlatePageContent() {
             setIsDeepWorkModalOpen(true);
             return true;
         }
-
-        let taskDef: ExerciseDefinition | undefined;
-        const allDefs = [...upskillDefinitions, ...deepWorkDefinitions];
-        taskDef = allDefs.find(def => def.name === details);
         
-        if (taskDef) {
-             if (activity.type === 'upskill') {
-                setSelectedUpskillTask(taskDef);
-            } else {
-                setSelectedDeepWorkTask(taskDef);
-            }
-            setIsDeepWorkModalOpen(true);
-            return true;
-        }
-        
-        console.warn("Could not find the definition for activity:", details);
-        toast({ title: 'Task Not Found', description: `Could not find the definition for "${details}".`, variant: 'destructive' });
         return false;
-    }, [coreSkills, upskillDefinitions, deepWorkDefinitions, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, toast]);
+    }, [coreSkills, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, setIsDeepWorkModalOpen]);
+
+    const handleOpenFocusModalForSession = useCallback((activity: Activity) => {
+        if (activity.type === 'upskill' || activity.type === 'deepwork') {
+          setFocusActivity(activity);
+          setFocusSessionModalOpen(true);
+        }
+    }, [setFocusActivity, setFocusSessionModalOpen]);
     
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
@@ -284,7 +277,7 @@ function MyPlatePageContent() {
             todayDeepWorkHours: todayDeepWorkMinutes / 60,
             deepWorkChange: calculateChange(todayDeepWorkMinutes, yesterdayDeepWorkMinutes),
             todayUpskillHours: todayUpskillMinutes / 60,
-            upskillChange: calculateChange(todayUpskillMinutes, yesterdayUpskillMinutes),
+            upskillChange: calculateChange(todayUpskillMinutes, yesterdayDeepWorkMinutes),
             totalProductiveHours: totalTodayMinutes / 60,
             avgProductiveHoursChange: calculateChange(totalTodayMinutes, totalYesterdayMinutes),
             learningStats,
@@ -534,7 +527,7 @@ function MyPlatePageContent() {
                                         activityDurations={activityDurations}
                                         isAgendaDocked={isAgendaDocked}
                                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                                        onOpenFocusModal={onOpenFocusModal}
+                                        onOpenFocusModal={handleOpenFocusModalForSession}
                                         onOpenTaskContext={onOpenTaskContext}
                                         onOpenHabitPopup={onOpenHabitPopup}
                                         currentSlot={currentSlot}
@@ -565,10 +558,10 @@ function MyPlatePageContent() {
                             date={selectedDate}
                             schedule={schedule}
                             currentSlot={currentSlot}
-                            onOpenFocusModal={onOpenFocusModal}
+                            onOpenFocusModal={handleOpenFocusModalForPlanning}
                             onOpenTaskContext={onOpenTaskContext}
                             onOpenHabitPopup={onOpenHabitPopup}
-                            onOpenLearningModal={onOpenFocusModal}
+                            onOpenLearningModal={handleOpenFocusModalForPlanning}
                         />
                     </CardContent>
                 </Card>
@@ -595,7 +588,6 @@ function MyPlatePageContent() {
                     className="flex flex-col"
                 >
                     <Card className="w-full h-full p-0 flex flex-col overflow-hidden shadow-2xl">
-                         
                         <div className="flex-grow min-h-0">
                            <DeepWorkPageContent isModal={true} onClose={() => setIsDeepWorkModalOpen(false)} />
                         </div>
@@ -633,7 +625,7 @@ function MyPlatePageContent() {
             <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <DialogTitle>Mind Map</DialogTitle>
+                        <h3>Mind Map</h3>
                     </DialogHeader>
                     <div className="flex-grow min-h-0"><MindMapViewer showControls={true} /></div>
                 </DialogContent>
@@ -641,7 +633,7 @@ function MyPlatePageContent() {
             <Dialog open={isKanbanModalOpen} onOpenChange={setIsKanbanModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <DialogTitle>Kanban Board</DialogTitle>
+                        <h3>Kanban Board</h3>
                     </DialogHeader>
                     <div className="flex-grow min-h-0"><KanbanPageContent isModal={true} /></div>
                 </DialogContent>
@@ -649,7 +641,7 @@ function MyPlatePageContent() {
             <Dialog open={isChartModalOpen} onOpenChange={setIsChartModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <DialogTitle>Charts</DialogTitle>
+                        <h3>Charts</h3>
                     </DialogHeader>
                     <div className="flex-grow min-h-0">
                         <ScrollArea className="h-full"><ChartsPageContentActual /></ScrollArea>
@@ -659,7 +651,7 @@ function MyPlatePageContent() {
             <Dialog open={isTimesheetModalOpen} onOpenChange={setIsTimesheetModalOpen}>
                 <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <DialogTitle>Timesheet</DialogTitle>
+                        <h3>Timesheet</h3>
                     </DialogHeader>
                     <div className="flex-grow min-h-0">
                         <TimesheetPageContent isModal={true} />
