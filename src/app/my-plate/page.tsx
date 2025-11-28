@@ -17,7 +17,7 @@ import { DashboardStats } from '@/components/DashboardStats';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
 import { VisionCard } from '@/components/VisionCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
-import { Dialog, DialogContent, DialogHeader, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { TodaysWorkoutModal } from '@/components/TodaysWorkoutModal';
 import { TodaysMindsetModal } from '@/components/TodaysMindsetModal';
@@ -86,7 +86,6 @@ function MyPlatePageContent() {
         onOpenTaskContext,
         onOpenHabitPopup,
         toggleRoutine,
-        handleToggleComplete,
         schedule,
         activityDurations,
         onUpdateWeightLog,
@@ -159,9 +158,18 @@ function MyPlatePageContent() {
         let taskDef: ExerciseDefinition | undefined;
         const allDefs = [...upskillDefinitions, ...deepWorkDefinitions];
         taskDef = allDefs.find(def => def.name === details);
+        
+        if (!taskDef) {
+            const microSkillNames = new Set(coreSkills.flatMap(cs => cs.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name))));
+            const nodeTypeToFind = activity.type === 'upskill' ? 'Curiosity' : 'Intention';
+            const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+            const getNodeType = activity.type === 'upskill' ? getUpskillNodeType : getDeepWorkNodeType;
+
+            taskDef = sourceDefs.find(def => microSkillNames.has(def.category) && getNodeType(def) === nodeTypeToFind);
+        }
 
         if (taskDef) {
-            if (type === 'upskill') {
+            if (activity.type === 'upskill') {
                 setSelectedUpskillTask(taskDef);
             } else {
                 setSelectedDeepWorkTask(taskDef);
@@ -173,7 +181,7 @@ function MyPlatePageContent() {
         console.warn("Could not find the definition for activity:", details);
         toast({ title: 'Task Not Found', description: `Could not find the definition for "${details}".`, variant: 'destructive' });
         return false;
-    }, [coreSkills, upskillDefinitions, deepWorkDefinitions, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, toast]);
+    }, [coreSkills, upskillDefinitions, deepWorkDefinitions, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, toast, getUpskillNodeType, getDeepWorkNodeType]);
     
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
