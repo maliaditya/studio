@@ -81,10 +81,8 @@ interface TimeSlotsProps {
   date: Date;
   schedule: FullSchedule;
   currentSlot: string;
-  onOpenTaskContext: (activityId: string, event: React.MouseEvent) => void;
+  onActivityClick: (activity: Activity) => boolean;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
-  onOpenFocusModal: (activity: Activity) => boolean;
-  onOpenLearningModal: (activity: Activity) => void;
   onStartFocus: (activity: Activity, event: React.MouseEvent) => void;
 }
 
@@ -92,10 +90,8 @@ export function TimeSlots({
   date,
   schedule,
   currentSlot,
-  onOpenTaskContext,
+  onActivityClick,
   onOpenHabitPopup,
-  onOpenFocusModal,
-  onOpenLearningModal,
   onStartFocus,
 }: TimeSlotsProps) {
     const { toast } = useAuth();
@@ -198,14 +194,12 @@ export function TimeSlots({
     });
   };
 
-  const handleActivityClick = (activity: Activity, event: React.MouseEvent) => {
-    if ((activity.type === 'upskill' || activity.type === 'deepwork') && activity.linkedEntityType === 'specialization') {
-      const handled = onOpenFocusModal(activity);
-      if (!handled) {
-          onOpenTaskContext(activity.id, event);
-      }
-    } else {
-      // For other types, do nothing, allowing inline edit or other default behaviors.
+  const handleItemClick = (activity: Activity, event: React.MouseEvent) => {
+    const handledByModal = onActivityClick(activity);
+    if (!handledByModal) {
+      // If the modal wasn't opened (e.g., not a planning task),
+      // then we can proceed with other click actions like opening the context popup.
+      onOpenTaskContext(activity.id, event);
     }
   };
 
@@ -258,7 +252,7 @@ export function TimeSlots({
                                             activity={{...activity, slot: slot.name as SlotName}}
                                             date={date}
                                             onToggleComplete={handleToggleComplete}
-                                            onActivityClick={handleActivityClick}
+                                            onActivityClick={handleItemClick}
                                             onStartFocus={onStartFocus}
                                             onRemoveActivity={onRemoveActivity}
                                             onUpdateActivity={handleUpdateActivity}

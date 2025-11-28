@@ -521,8 +521,8 @@ function MyPlatePageContent() {
                                         activityDurations={activityDurations}
                                         isAgendaDocked={isAgendaDocked}
                                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                                        onActivityClick={onOpenTaskContext}
-                                        onStartFocus={(activity, event) => onOpenFocusModal(activity)}
+                                        onActivityClick={onStartFocus}
+                                        onStartFocus={onStartFocus}
                                         onOpenHabitPopup={onOpenHabitPopup}
                                         currentSlot={currentSlot}
                                     />
@@ -552,11 +552,15 @@ function MyPlatePageContent() {
                             date={selectedDate}
                             schedule={schedule}
                             currentSlot={currentSlot}
-                            onOpenFocusModal={handleOpenFocusModalForPlanning}
-                            onStartFocus={(activity, event) => onOpenFocusModal(activity)}
-                            onOpenTaskContext={onOpenTaskContext}
+                            onActivityClick={(activity, event) => {
+                                if (onOpenFocusModal(activity)) {
+                                    return; // Modal was opened, don't do anything else.
+                                }
+                                onOpenTaskContext(activity.id, event);
+                            }}
                             onOpenHabitPopup={onOpenHabitPopup}
                             onOpenLearningModal={handleOpenFocusModalForPlanning}
+                            onStartFocus={onStartFocus}
                         />
                     </CardContent>
                 </Card>
