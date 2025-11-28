@@ -197,7 +197,10 @@ export function TimeSlots({
 
   const handleActivityClick = (activity: Activity, event: React.MouseEvent) => {
     if (activity.type === 'upskill' || activity.type === 'deepwork') {
-      onOpenFocusModal(activity);
+      const handled = onOpenFocusModal(activity);
+      if (!handled) {
+          onOpenTaskContext(activity.id, event);
+      }
     } else {
       // For other types, do nothing, allowing inline edit or other default behaviors.
     }
