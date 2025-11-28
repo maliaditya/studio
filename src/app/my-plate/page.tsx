@@ -2,12 +2,12 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project } from '@/types/workout';
 import { format, startOfToday, isAfter, parseISO, differenceInDays, subDays, isSameDay, getISOWeekYear, getISOWeek } from 'date-fns';
-import { DragDropContext, DropResult, useDraggable } from '@hello-pangea/dnd';
+import { useDraggable } from '@dnd-kit/core';
 import { motion } from 'framer-motion';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -585,8 +585,6 @@ function MyPlatePageContent() {
                     }}
                     drag
                     dragMomentum={false}
-                    dragControls={listeners}
-                    dragListener={false}
                     onDragEnd={(e, info) => {
                         setDwPosition(pos => ({ x: pos.x + info.offset.x, y: pos.y + info.offset.y }));
                     }}
@@ -600,7 +598,7 @@ function MyPlatePageContent() {
                             </Button>
                         </CardHeader>
                         <div className="flex-grow min-h-0">
-                           <DeepWorkPageContent isModal={true} />
+                           <DeepWorkPageContent isModal={true} onClose={() => setIsDeepWorkModalOpen(false)} />
                         </div>
                     </Card>
                 </motion.div>
