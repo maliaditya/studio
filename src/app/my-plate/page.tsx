@@ -50,6 +50,8 @@ function MyPlatePageContent() {
         brandingLogs,
         upskillDefinitions,
         deepWorkDefinitions,
+        getDeepWorkNodeType,
+        getUpskillNodeType,
         weightLogs, setWeightLogs,
         goalWeight,
         height,
@@ -143,7 +145,7 @@ function MyPlatePageContent() {
       }
       
       if (!taskDef) {
-          console.warn("Could not find definition for activity:", activity.details);
+          console.warn("Could not find the definition for activity:", activity.details);
           toast({ title: 'Task Not Found', description: `Could not find the definition for "${activity.details}".`, variant: 'destructive' });
           return false;
       }
