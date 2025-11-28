@@ -167,16 +167,6 @@ function MyPlatePageContent() {
         return false;
     }, [coreSkills, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, setIsDeepWorkModalOpen]);
 
-    const handleOpenFocusModalForSession = useCallback((activity: Activity, event: React.MouseEvent) => {
-        event.stopPropagation();
-        onOpenFocusModal(activity);
-    }, [onOpenFocusModal]);
-
-    const handleAgendaActivityClick = useCallback((activity: Activity, event: React.MouseEvent) => {
-        event.stopPropagation();
-        onOpenTaskContext(activity.id, event);
-    }, [onOpenTaskContext]);
-    
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
         const visited = new Set<string>();
@@ -531,8 +521,8 @@ function MyPlatePageContent() {
                                         activityDurations={activityDurations}
                                         isAgendaDocked={isAgendaDocked}
                                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                                        onActivityClick={handleAgendaActivityClick}
-                                        onStartFocus={handleOpenFocusModalForSession}
+                                        onActivityClick={onOpenTaskContext}
+                                        onStartFocus={onOpenFocusModal}
                                         onOpenHabitPopup={onOpenHabitPopup}
                                         currentSlot={currentSlot}
                                     />
@@ -562,8 +552,8 @@ function MyPlatePageContent() {
                             date={selectedDate}
                             schedule={schedule}
                             currentSlot={currentSlot}
-                            onOpenFocusModal={handleOpenFocusModalForPlanning}
-                            onStartFocus={handleOpenFocusModalForSession}
+                            onOpenFocusModal={onOpenFocusModalForPlanning}
+                            onStartFocus={onOpenFocusModal}
                             onOpenTaskContext={onOpenTaskContext}
                             onOpenHabitPopup={onOpenHabitPopup}
                             onOpenLearningModal={handleOpenFocusModalForPlanning}
