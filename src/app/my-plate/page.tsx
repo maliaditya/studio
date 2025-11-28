@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -121,14 +122,25 @@ function MyPlatePageContent() {
     const onOpenFocusModal = (activity: Activity) => {
       const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
       
-      const taskDef = allDefs.find(def => {
-        // First, check if a task instance ID is directly the definition ID
+      let taskDef = allDefs.find(def => {
         if (activity.taskIds && activity.taskIds.includes(def.id)) {
           return true;
         }
-        // Fallback: check if activity details include the definition name
-        return activity.details.includes(def.name);
+        return activity.details === def.name;
       });
+
+      if (!taskDef) {
+        // Fallback to find top-level task by specialization name
+        const spec = coreSkills.find(cs => cs.name === activity.details);
+        if (spec) {
+            const microSkillNames = new Set(spec.skillAreas.flatMap(sa => sa.microSkills.map(ms => ms.name)));
+            const nodeTypeToFind = activity.type === 'upskill' ? 'Curiosity' : 'Intention';
+            const sourceDefs = activity.type === 'upskill' ? upskillDefinitions : deepWorkDefinitions;
+            const getNodeType = activity.type === 'upskill' ? getUpskillNodeType : getDeepWorkNodeType;
+
+            taskDef = sourceDefs.find(def => microSkillNames.has(def.category) && getNodeType(def) === nodeTypeToFind);
+        }
+      }
       
       if (!taskDef) {
           console.warn("Could not find definition for activity:", activity.details);
