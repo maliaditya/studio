@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -105,7 +106,7 @@ export const AgendaWidgetItem = React.memo(({
                 </div>
             </div>
             <div className="flex items-center flex-shrink-0">
-                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => onStartFocus(activity, e)}>
+                <Button variant="ghost" size="icon" className="h-6 w-6 group-hover:opacity-100" onClick={(e) => onStartFocus(activity, e)}>
                     <Timer className="h-4 w-4" />
                 </Button>
                 <DropdownMenu>

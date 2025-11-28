@@ -167,7 +167,7 @@ function MyPlatePageContent() {
         return false;
     }, [coreSkills, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, setIsDeepWorkModalOpen]);
 
-    const handleAgendaActivityClick = useCallback((activity: Activity, event: React.MouseEvent) => {
+    const handleOpenFocusModalForSession = useCallback((activity: Activity, event: React.MouseEvent) => {
         event.stopPropagation();
         onOpenFocusModal(activity);
     }, [onOpenFocusModal]);
@@ -526,8 +526,8 @@ function MyPlatePageContent() {
                                         activityDurations={activityDurations}
                                         isAgendaDocked={isAgendaDocked}
                                         onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                                        onActivityClick={handleAgendaActivityClick}
-                                        onOpenTaskContext={onOpenTaskContext}
+                                        onActivityClick={onOpenTaskContext}
+                                        onStartFocus={handleOpenFocusModalForSession}
                                         onOpenHabitPopup={onOpenHabitPopup}
                                         currentSlot={currentSlot}
                                     />
@@ -693,5 +693,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
-
-    
