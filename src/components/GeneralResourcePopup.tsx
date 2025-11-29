@@ -23,7 +23,7 @@ import { MindMapViewer } from './MindMapViewer';
 import { VisuallyHidden } from './ui/visually-hidden';
 import { HabitResourceCard } from './HabitResourceCard';
 import { MechanismResourceCard } from './MechanismResourceCard';
-import { DrawingCanvas } from './DrawingCanvas';
+import { SearchPopup } from './DrawingCanvas';
 import ReactPlayer from 'react-player/youtube';
 import { format, parseISO } from 'date-fns';
 
@@ -185,6 +185,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const [duration, setDuration] = useState(0);
     const [newAnnotation, setNewAnnotation] = useState('');
     const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
+    const [isLinkingCanvasOpen, setIsLinkingCanvasOpen] = useState(false);
     
     const resource = resources.find(r => r.id === popupState.resourceId);
     const [audioSrc, setAudioSrc] = useState<string | null>(null);
@@ -455,6 +456,18 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
             initialDrawing: point.drawing,
         });
     }, [resource.id, authOpenDrawingCanvas]);
+    
+    const handleLinkCanvas = (selectedResource: Resource, selectedPoint: ResourcePoint) => {
+        const newPoint: ResourcePoint = {
+            id: `point_${Date.now()}`,
+            type: 'paint',
+            text: selectedPoint.text || 'Linked Canvas',
+            drawing: `canvas://${selectedResource.id}/${selectedPoint.id}`,
+        };
+        const updatedPoints = [...(resource.points || []), newPoint];
+        onUpdate({ ...resource, points: updatedPoints });
+        setIsLinkingCanvasOpen(false);
+    };
 
     const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
     
@@ -538,6 +551,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('code')}><Code className="h-4 w-4 text-green-500" /></Button></TooltipTrigger><TooltipContent><p>Add Code</p></TooltipContent></Tooltip>
                             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('link')}><LinkIcon className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>Add Link</p></TooltipContent></Tooltip>
                             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('paint')}><Paintbrush className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent><p>Add Paint Canvas</p></TooltipContent></Tooltip>
+                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsLinkingCanvasOpen(true)}><LinkIcon className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent><p>Link Canvas</p></TooltipContent></Tooltip>
                             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => createResourceWithHierarchyAuth(resource, undefined, 'brain_hack')}><Brain className="h-4 w-4 text-pink-500" /></Button></TooltipTrigger><TooltipContent><p>Create Brain Hack</p></TooltipContent></Tooltip>
                         </TooltipProvider>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={handleClose}>
@@ -640,6 +654,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                     </DialogContent>
                 </Dialog>
             </div>
+            <SearchPopup open={isLinkingCanvasOpen} setOpen={setIsLinkingCanvasOpen} onSelect={handleLinkCanvas} title="Link an Existing Canvas" />
         </>
     );
 }

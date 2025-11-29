@@ -61,7 +61,7 @@ const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource,
 });
 SearchContent.displayName = 'SearchContent';
 
-const SearchPopup = React.memo(({ open, setOpen, onSelect, title }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void, title: string }) => {
+export const SearchPopup = React.memo(({ open, setOpen, onSelect, title }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void, title: string }) => {
     
     const style: React.CSSProperties = {
         position: 'fixed',
