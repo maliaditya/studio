@@ -680,38 +680,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logSubTaskTime = useCallback((taskId: string, durationMinutes: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     let taskUpdated = false;
-    let parentObjectiveActivity: Activity | null = null;
-    let parentObjective: ExerciseDefinition | null = null;
-    
-    const allDefsMap = new Map([...upskillDefinitions, ...deepWorkDefinitions].map(d => [d.id, d]));
 
-    // Find the parent objective of the task
-    for (const def of allDefsMap.values()) {
-        if ((def.linkedDeepWorkIds || []).includes(taskId) || (def.linkedUpskillIds || []).includes(taskId)) {
-            parentObjective = def;
-            break;
-        }
-    }
-    
-    // Find the activity in the schedule that corresponds to the parent objective
-    if (parentObjective) {
-        for (const date in schedule) {
-            if (date === todayKey) {
-                for (const slot in schedule[date]) {
-                    const activities = schedule[date][slot as SlotName] as Activity[];
-                    if (Array.isArray(activities)) {
-                        const foundActivity = activities.find(a => a.taskIds?.includes(parentObjective!.id));
-                        if (foundActivity) {
-                            parentObjectiveActivity = foundActivity;
-                            break;
-                        }
-                    }
-                }
+    const findParentObjective = (startTaskId: string, allDefs: Map<string, ExerciseDefinition>): ExerciseDefinition | null => {
+        let currentId: string | undefined = startTaskId;
+        let parent: ExerciseDefinition | undefined;
+
+        while (currentId) {
+            const foundParent = Array.from(allDefs.values()).find(p => 
+                (p.linkedDeepWorkIds?.includes(currentId!)) || (p.linkedUpskillIds?.includes(currentId!))
+            );
+
+            if (foundParent) {
+                currentId = foundParent.id;
+                parent = foundParent;
+            } else {
+                currentId = undefined;
             }
-            if (parentObjectiveActivity) break;
         }
-    }
-
+        return parent || null;
+    };
+    
     const updateDefinitions = (definitions: ExerciseDefinition[]) => {
         return definitions.map(def => {
             if (def.id === taskId) {
@@ -727,6 +715,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const newUpskillDefs = updateDefinitions(upskillDefinitions);
+    let finalUpskillDefs = newUpskillDefs;
+
     if (taskUpdated) {
         setUpskillDefinitions(newUpskillDefs);
     } else {
@@ -735,37 +725,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setDeepWorkDefinitions(newDeepWorkDefs);
         }
     }
+    
+    const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
+    const parentObjective = findParentObjective(taskId, allDefsMap);
 
-    // Now, update the parent activity's duration
-    if (parentObjectiveActivity && parentObjective) {
-        const leafNodes = getDescendantLeafNodes(parentObjective.id, parentObjectiveActivity.type as 'deepwork' | 'upskill');
+    if (parentObjective) {
+        const leafNodes = getDescendantLeafNodes(parentObjective.id, upskillDefinitions.some(d => d.id === parentObjective.id) ? 'upskill' : 'deepwork');
         
         let totalLoggedMinutes = 0;
-        const today = new Date().toISOString().split('T')[0];
-
+        
         leafNodes.forEach(node => {
-          const allLogs = [...allDeepWorkLogs, ...allUpskillLogs];
-          const logsForDay = allLogs.find(l => l.date === today);
-          if (logsForDay) {
-            const exerciseLog = logsForDay.exercises.find(ex => ex.definitionId === node.id);
-            if(exerciseLog) {
-              const minutes = exerciseLog.loggedSets.reduce((sum, set) => sum + (exerciseLog.category === 'Upskill' ? set.reps : set.weight), 0);
-              totalLoggedMinutes += minutes;
-            }
+          if (node.id === taskId) {
+              totalLoggedMinutes += (node.loggedDuration || 0) + durationMinutes;
+          } else {
+              totalLoggedMinutes += node.loggedDuration || 0;
           }
         });
-      
-        // Add the duration of the just-completed task.
-        totalLoggedMinutes += durationMinutes;
         
-        updateActivity({
-            ...parentObjectiveActivity,
-            duration: totalLoggedMinutes,
-        });
+        const updateParentDuration = (definitions: ExerciseDefinition[]) => {
+          return definitions.map(def => {
+            if (def.id === parentObjective.id) {
+              return { ...def, loggedDuration: totalLoggedMinutes };
+            }
+            return def;
+          });
+        };
+        
+        if (upskillDefinitions.some(d => d.id === parentObjective.id)) {
+            finalUpskillDefs = updateParentDuration(finalUpskillDefs);
+            setUpskillDefinitions(finalUpskillDefs);
+        } else {
+            setDeepWorkDefinitions(prev => updateParentDuration(prev));
+        }
+
+        const parentObjectiveActivity = Object.values(schedule)
+            .flatMap(day => Object.values(day).flat())
+            .find(act => act.taskIds?.includes(parentObjective!.id));
+
+        if (parentObjectiveActivity) {
+            updateActivity({
+                ...parentObjectiveActivity,
+                duration: totalLoggedMinutes,
+            });
+        }
     }
 
     toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes.` });
-}, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, toast, schedule, getDescendantLeafNodes, updateActivity, allDeepWorkLogs, allUpskillLogs]);
+  }, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, toast, schedule, getDescendantLeafNodes, updateActivity]);
   
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
