@@ -149,6 +149,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     openDrawingCanvas: authOpenDrawingCanvas, 
     settings,
     resources,
+    setFloatingVideoUrl,
   } = useAuth();
   
   const [theme, setTheme] = useState('dark');
@@ -305,11 +306,10 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
             console.error("Linked canvas not found:", resourceId, pointId);
             toast({ title: 'Error', description: 'Could not find the linked canvas.', variant: 'destructive'});
         }
-
     } else if (link) {
-        window.open(link, '_blank', 'noopener,noreferrer');
+        setFloatingVideoUrl(link);
     }
-  }, [authOpenDrawingCanvas, resources, toast, drawingCanvasState, handleTabClick]);
+  }, [authOpenDrawingCanvas, resources, toast, drawingCanvasState, handleTabClick, setFloatingVideoUrl]);
   
   const handleLinkingSearchSelect = (resource: Resource, point: ResourcePoint) => {
     const api = excalidrawAPIRef.current;
@@ -429,3 +429,5 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     </>
   );
 }
+
+    
