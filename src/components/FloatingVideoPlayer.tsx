@@ -62,11 +62,11 @@ export function FloatingVideoPlayer() {
   useEffect(() => {
     if (currentUrl && !pipState.isOpen) {
       const isVideo = isYoutubeUrl(currentUrl);
-      const initialWidth = Math.min(window.innerWidth - 40, isVideo ? 448 : 600);
-      const initialHeight = initialWidth * (isVideo ? 9/16 : 4/3);
+      const initialWidth = Math.min(window.innerWidth - 40, isVideo ? 854 : 1024); // Increased width
+      const initialHeight = isVideo ? (initialWidth * 9) / 16 : 768; // Increased height
       
-      const initialX = window.innerWidth - initialWidth - 20;
-      const initialY = window.innerHeight - initialHeight - 80;
+      const initialX = (window.innerWidth - initialWidth) / 2; // Centered X
+      const initialY = (window.innerHeight - initialHeight) / 2; // Centered Y
       
       setPipState({
         isOpen: true,
@@ -186,7 +186,8 @@ export function FloatingVideoPlayer() {
             className="w-full h-full border-0 bg-background"
             title="Floating Content"
             sandbox="allow-scripts allow-same-origin allow-forms"
-            allow="autoplay; encrypted-media; fullscreen"
+            allow="autoplay; encrypted-media; fullscreen; accelerometer; gyroscope"
+            allowFullScreen
         ></iframe>
     );
   };
