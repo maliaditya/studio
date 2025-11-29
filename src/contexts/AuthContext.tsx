@@ -625,6 +625,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
 
+  const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
+    const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
+    const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
+    
+    const leafNodes: ExerciseDefinition[] = [];
+    const queue: string[] = [startNodeId];
+    const visited = new Set<string>();
+
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+        
+        const node = definitions.find(d => d.id === currentId);
+        if (!node) continue;
+
+        const children = node[linkKey] || [];
+        if (children.length === 0) {
+            leafNodes.push(node);
+        } else {
+            children.forEach(childId => {
+                if (!visited.has(childId)) {
+                    queue.push(childId);
+                }
+            });
+        }
+    }
+    return leafNodes;
+  }, [deepWorkDefinitions, upskillDefinitions]);
+
+  const updateActivity = useCallback((updatedActivity: Activity) => {
+    setSchedule(prevSchedule => {
+      const newSchedule = { ...prevSchedule };
+      let found = false;
+      for (const dateKey in newSchedule) {
+        for (const slotName in newSchedule[dateKey]) {
+          const activities = (newSchedule[dateKey][slotName as SlotName] as Activity[]) || [];
+          const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
+          if (activityIndex > -1) {
+            const newActivities = [...activities];
+            newActivities[activityIndex] = updatedActivity;
+            newSchedule[dateKey][slotName as SlotName] = newActivities;
+            found = true;
+            break;
+          }
+        }
+        if (found) break;
+      }
+      return newSchedule;
+    });
+  }, [setSchedule]);
+
   const logSubTaskTime = useCallback((taskId: string, durationMinutes: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     let taskUpdated = false;
@@ -714,7 +766,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes.` });
 }, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, toast, schedule, getDescendantLeafNodes, updateActivity, allDeepWorkLogs, allUpskillLogs]);
-
+  
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
     setDrawingCanvasState(prev => {
@@ -944,36 +996,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     return map;
   }, [coreSkills]);
-  
-  const updateActivity = useCallback((updatedActivity: Activity) => {
-    setSchedule(prevSchedule => {
-      const newSchedule = { ...prevSchedule };
-      let found = false;
-      for (const dateKey in newSchedule) {
-        for (const slotName in newSchedule[dateKey]) {
-          const activities = (newSchedule[dateKey][slotName as SlotName] as Activity[]) || [];
-          const activityIndex = activities.findIndex(a => a.id === updatedActivity.id);
-          if (activityIndex > -1) {
-            const newActivities = [...activities];
-            newActivities[activityIndex] = updatedActivity;
-            newSchedule[dateKey][slotName as SlotName] = newActivities;
-            found = true;
-            break;
-          }
-        }
-        if (found) break;
-      }
-      return newSchedule;
-    });
-  }, [setSchedule]);
 
-  const handleLogDuration = useCallback((activity: Activity, duration: number) => {
+  const onLogDuration = useCallback((activity: Activity, duration: number) => {
     updateActivity({
       ...activity,
       duration: (activity.duration || 0) + duration,
       completed: true,
       completedAt: Date.now(),
     });
+    toast({ title: 'Duration Logged & Task Completed!' });
   }, [updateActivity, toast]);
   
   const allDefinitionMap = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions]);
@@ -1016,36 +1047,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return isChild ? 'Visualization' : 'Standalone';
   }, [childToParentMap]);
 
-  const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
-    const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
-    const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
-    
-    const leafNodes: ExerciseDefinition[] = [];
-    const queue: string[] = [startNodeId];
-    const visited = new Set<string>();
-
-    while (queue.length > 0) {
-        const currentId = queue.shift()!;
-        if (visited.has(currentId)) continue;
-        visited.add(currentId);
-        
-        const node = definitions.find(d => d.id === currentId);
-        if (!node) continue;
-
-        const children = node[linkKey] || [];
-        if (children.length === 0) {
-            leafNodes.push(node);
-        } else {
-            children.forEach(childId => {
-                if (!visited.has(childId)) {
-                    queue.push(childId);
-                }
-            });
-        }
-    }
-    return leafNodes;
-  }, [deepWorkDefinitions, upskillDefinitions]);
-  
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
     let total = 0;
     const visited = new Set<string>();
@@ -1272,7 +1273,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setBrainHacks(mainData.brainHacks || []);
     setSpacedRepetitionData(mainData.spacedRepetitionData || {});
     setDailyReviewLogs(mainData.dailyReviewLogs || []);
-    setAbandonmentLogs(mainData.abandonmentLogs || {});
+    setAbandonmentLogs(mainData.abandonmentLogs || []);
     
     // UI State
     setPinnedFolderIds(new Set(uiData.pinnedFolderIds || []));
@@ -1613,16 +1614,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     return durations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs]);
-
-  const onLogDuration = useCallback((activity: Activity, duration: number) => {
-    updateActivity({
-      ...activity,
-      duration: (activity.duration || 0) + duration,
-      completed: true,
-      completedAt: Date.now(),
-    });
-    toast({ title: 'Duration Logged & Task Completed!' });
-  }, [updateActivity, toast]);
 
   const handleToggleComplete = useCallback((slotName: string, activityId: string, isCompleted?: boolean) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -3441,7 +3432,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     allLeadGenLogs, setAllLeadGenLogs,
     allMindProgrammingLogs, setAllMindProgrammingLogs,
     dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked,
-    handleLogLearning: handleLogDuration, onLogDuration, logSubTaskTime,
+    onLogDuration, logSubTaskTime,
     findRootTask,
     focusSessionModalOpen, setFocusSessionModalOpen, focusActivity, setFocusActivity, focusDuration, onOpenFocusModal, handleStartFocusSession,
     activeFocusSession, setActiveFocusSession,
@@ -3568,3 +3559,6 @@ export const useAuth = (): AuthContextType => {
 
 
 
+
+
+    
