@@ -349,8 +349,6 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         textAlign: 'center',
         verticalAlign: 'middle',
         baseline: 8,
-        containerId: null,
-        originalText: point.text || "Untitled Canvas",
         lineHeight: 1.2 as any,
         locked: false,
     }
@@ -429,5 +427,3 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     </>
   );
 }
-
-    
