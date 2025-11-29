@@ -1,6 +1,4 @@
 
-
-      
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -910,7 +908,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setSchedule]);
 
-  const handleLogLearning = useCallback((activity: Activity, duration: number) => {
+  const handleLogDuration = useCallback((activity: Activity, duration: number) => {
     updateActivity({
       ...activity,
       duration: (activity.duration || 0) + duration,
@@ -1581,10 +1579,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const shouldBeCompleted = isCompleted !== undefined ? isCompleted : !activityToUpdate.completed;
             
             if (shouldBeCompleted && !activityToUpdate.completed) {
-                // If we are marking it as complete, open the modal
-                onOpenFocusModal(activityToUpdate);
+                if (activityToUpdate.duration) {
+                     updateActivity({
+                        ...activityToUpdate,
+                        completed: true,
+                        completedAt: Date.now(),
+                    });
+                } else {
+                    onOpenFocusModal(activityToUpdate);
+                }
             } else {
-                // If we are un-completing it, just do it directly
                  updateActivity({
                     ...activityToUpdate,
                     completed: false,
@@ -3378,7 +3382,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     allLeadGenLogs, setAllLeadGenLogs,
     allMindProgrammingLogs, setAllMindProgrammingLogs,
     dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked,
-    handleLogLearning, onLogDuration, logSubTaskTime,
+    handleLogLearning: handleLogDuration, onLogDuration, logSubTaskTime,
     findRootTask,
     focusSessionModalOpen, setFocusSessionModalOpen, focusActivity, setFocusActivity, focusDuration, onOpenFocusModal, handleStartFocusSession,
     activeFocusSession, setActiveFocusSession,

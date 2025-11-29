@@ -200,13 +200,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       updateActivity(updatedActivity);
 
       if (completed) {
-        if (!showSubTasks) { // Standalone task
-            const elapsedSeconds = (Date.now() - (updatedActivity.focusSessionInitialStartTime || Date.now())) / 1000;
-            const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-            if (elapsedMinutes > 0) {
-              onLogTime(updatedActivity, elapsedMinutes);
-            }
-        }
         handleToggleComplete(activity.slot, activity.id, true);
         toast({ title: "Objective Complete!", description: `All tasks for "${focusedObjective?.name || activity.details}" are done.` });
       }
@@ -230,8 +223,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     }
     setPromptForCompletion(false);
   
-    // Important: Re-calculate what the next task is AFTER updating state.
-    // We create a temporary updated list of completed IDs to find the correct next task.
     const updatedCompletedIds = new Set(sessionCompletedSubTaskIds).add(activeSubTask.id);
     const nextTask = subTasks.find(st => !updatedCompletedIds.has(st.id) && !(st as ExerciseDefinition).loggedDuration && !('completed' in st && st.completed));
   
