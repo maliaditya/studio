@@ -10,6 +10,32 @@ import { X, GripVertical, ExternalLink } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
+const getYouTubeEmbedUrl = (url: string | null): string | null => {
+    if (!url) return null;
+    try {
+        const urlObj = new URL(url);
+        let videoId: string | null = null;
+
+        if (urlObj.hostname.includes('youtube.com')) {
+            if (urlObj.pathname.startsWith('/shorts/')) {
+                videoId = urlObj.pathname.split('/shorts/')[1];
+            } else {
+                videoId = urlObj.searchParams.get('v');
+            }
+        } else if (urlObj.hostname.includes('youtu.be')) {
+            videoId = urlObj.pathname.slice(1);
+        }
+
+        if (videoId) {
+            return `https://www.youtube.com/embed/${videoId}`;
+        }
+    } catch (e) {
+        // Silently fail for invalid URLs
+    }
+    return null;
+};
+
+
 export function FloatingVideoPlayer() {
   const { 
     floatingVideoUrl, 
@@ -28,7 +54,7 @@ export function FloatingVideoPlayer() {
 
   const isYoutubeUrl = (url: string | null): boolean => {
     if (!url) return false;
-    return /youtube\.com|youtu\.be/.test(url);
+    return getYouTubeEmbedUrl(url) !== null;
   };
   
   const currentUrl = floatingVideoPlaylist.length > 0 ? floatingVideoPlaylist[0] : floatingVideoUrl;
@@ -135,7 +161,7 @@ export function FloatingVideoPlayer() {
     if (isYoutubeUrl(currentUrl)) {
       return (
         <ReactPlayer
-          url={currentUrl}
+          url={getYouTubeEmbedUrl(currentUrl)!}
           width="100%"
           height="100%"
           playing={true}
@@ -160,6 +186,7 @@ export function FloatingVideoPlayer() {
             className="w-full h-full border-0 bg-background"
             title="Floating Content"
             sandbox="allow-scripts allow-same-origin allow-forms"
+            allow="autoplay; encrypted-media; fullscreen"
         ></iframe>
     );
   };

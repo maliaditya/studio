@@ -36,6 +36,7 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
     try {
         const urlObj = new URL(url);
         let videoId: string | null = null;
+
         if (urlObj.hostname.includes('youtube.com')) {
             if (urlObj.pathname.startsWith('/shorts/')) {
                 videoId = urlObj.pathname.split('/shorts/')[1];
@@ -45,8 +46,13 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
         } else if (urlObj.hostname.includes('youtu.be')) {
             videoId = urlObj.pathname.slice(1);
         }
-        if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=0`;
-    } catch (e) {}
+
+        if (videoId) {
+            return `https://www.youtube.com/embed/${videoId}`;
+        }
+    } catch (e) {
+        // Silently fail for invalid URLs
+    }
     return null;
 };
 
