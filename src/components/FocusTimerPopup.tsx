@@ -24,6 +24,7 @@ interface FocusTimerPopupProps {
   initialSecondsLeft: number;
   onClose: () => void;
   onLogTime: (activity: Activity, minutes: number) => void;
+  onToggleMicroSkillRepetition: (coreSkillId: string, areaId: string, microSkillId: string, isReady: boolean) => void;
 }
 
 const EditableStep = React.memo(({ point, onUpdate, onDelete }: { point: { id: string; text: string }, onUpdate: (id: string, newText: string) => void, onDelete: (id: string) => void }) => {
@@ -77,7 +78,7 @@ const EditableStep = React.memo(({ point, onUpdate, onDelete }: { point: { id: s
 EditableStep.displayName = 'EditableStep';
 
 
-export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime }: FocusTimerPopupProps) {
+export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime, onToggleMicroSkillRepetition }: FocusTimerPopupProps) {
   const { 
       activeFocusSession, setActiveFocusSession, 
       updateActivity, handleToggleComplete,
@@ -253,12 +254,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   
   const handleStandaloneTaskComplete = () => {
     const elapsedSeconds = (Date.now() - (activity.focusSessionInitialStartTime || Date.now())) / 1000;
-    const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-    if (elapsedMinutes > 0) {
-      onLogTime(activity, elapsedMinutes);
-    } else {
-      onLogTime(activity, 1);
-    }
+    const elapsedMinutes = Math.max(1, Math.floor(elapsedSeconds / 60));
+    onLogTime(activity, elapsedMinutes);
     handleToggleComplete(activity.slot, activity.id, true);
     toast({ title: "Task Complete!", description: `You've completed "${activity.details}".` });
     onClose();
