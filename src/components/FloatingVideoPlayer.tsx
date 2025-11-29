@@ -62,7 +62,7 @@ export function FloatingVideoPlayer() {
   useEffect(() => {
     if (currentUrl && !pipState.isOpen) {
       const isVideo = isYoutubeUrl(currentUrl);
-      const initialWidth = Math.min(window.innerWidth - 40, isVideo ? 854 : 1024);
+      const initialWidth = Math.min(window.innerWidth - 40, isVideo ? 1280 : 1024);
       const initialHeight = isVideo ? (initialWidth * 9) / 16 : 768;
       
       const initialX = (window.innerWidth - initialWidth) / 2;
