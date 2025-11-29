@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -627,6 +628,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logSubTaskTime = useCallback((taskId: string, durationMinutes: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     let taskUpdated = false;
+    let parentObjectiveActivity: Activity | null = null;
+    let parentObjective: ExerciseDefinition | null = null;
+    
+    const allDefsMap = new Map([...upskillDefinitions, ...deepWorkDefinitions].map(d => [d.id, d]));
+
+    // Find the parent objective of the task
+    for (const def of allDefsMap.values()) {
+        if ((def.linkedDeepWorkIds || []).includes(taskId) || (def.linkedUpskillIds || []).includes(taskId)) {
+            parentObjective = def;
+            break;
+        }
+    }
+    
+    // Find the activity in the schedule that corresponds to the parent objective
+    if (parentObjective) {
+        for (const date in schedule) {
+            if (date === todayKey) {
+                for (const slot in schedule[date]) {
+                    const activities = schedule[date][slot as SlotName] as Activity[];
+                    if (Array.isArray(activities)) {
+                        const foundActivity = activities.find(a => a.taskIds?.includes(parentObjective!.id));
+                        if (foundActivity) {
+                            parentObjectiveActivity = foundActivity;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (parentObjectiveActivity) break;
+        }
+    }
 
     const updateDefinitions = (definitions: ExerciseDefinition[]) => {
         return definitions.map(def => {
@@ -645,16 +677,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const newUpskillDefs = updateDefinitions(upskillDefinitions);
     if (taskUpdated) {
         setUpskillDefinitions(newUpskillDefs);
-        toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes.` });
-        return;
+    } else {
+        const newDeepWorkDefs = updateDefinitions(deepWorkDefinitions);
+        if (taskUpdated) {
+            setDeepWorkDefinitions(newDeepWorkDefs);
+        }
     }
 
-    const newDeepWorkDefs = updateDefinitions(deepWorkDefinitions);
-    if (taskUpdated) {
-        setDeepWorkDefinitions(newDeepWorkDefs);
-        toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes.` });
+    // Now, update the parent activity's duration
+    if (parentObjectiveActivity && parentObjective) {
+        const leafNodes = getDescendantLeafNodes(parentObjective.id, parentObjectiveActivity.type as 'deepwork' | 'upskill');
+        
+        let totalLoggedMinutes = 0;
+        const today = new Date().toISOString().split('T')[0];
+
+        leafNodes.forEach(node => {
+          const allLogs = [...allDeepWorkLogs, ...allUpskillLogs];
+          const logsForDay = allLogs.find(l => l.date === today);
+          if (logsForDay) {
+            const exerciseLog = logsForDay.exercises.find(ex => ex.definitionId === node.id);
+            if(exerciseLog) {
+              const minutes = exerciseLog.loggedSets.reduce((sum, set) => sum + (exerciseLog.category === 'Upskill' ? set.reps : set.weight), 0);
+              totalLoggedMinutes += minutes;
+            }
+          }
+        });
+      
+        // Add the duration of the just-completed task.
+        totalLoggedMinutes += durationMinutes;
+        
+        updateActivity({
+            ...parentObjectiveActivity,
+            duration: totalLoggedMinutes,
+        });
     }
-  }, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, toast]);
+
+    toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes.` });
+}, [upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions, toast, schedule, getDescendantLeafNodes, updateActivity, allDeepWorkLogs, allUpskillLogs]);
 
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
@@ -915,7 +974,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       completed: true,
       completedAt: Date.now(),
     });
-  }, [updateActivity]);
+  }, [updateActivity, toast]);
   
   const allDefinitionMap = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions]);
 
@@ -1558,7 +1617,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const onLogDuration = useCallback((activity: Activity, duration: number) => {
     updateActivity({
       ...activity,
-      duration,
+      duration: (activity.duration || 0) + duration,
       completed: true,
       completedAt: Date.now(),
     });
@@ -3506,4 +3565,6 @@ export const useAuth = (): AuthContextType => {
 };
 
     
+
+
 

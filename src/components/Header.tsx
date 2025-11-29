@@ -26,7 +26,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
 import { getExercisesForDay } from '@/lib/workoutUtils';
-import { TodaysPredictionModal } from './TodaysPredictionModal';
 
 
 const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolean) => void }) => {
@@ -602,7 +601,6 @@ export function Header() {
     syncWithGitHub,
     downloadFromGitHub,
     openMindsetWidget,
-    setIsTodaysPredictionModalOpen,
     openDrawingCanvasFromHeader,
   } = useAuth();
 
@@ -640,11 +638,6 @@ export function Header() {
                   <span className="sr-only">Drawing Canvas</span>
               </Button>
 
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsTodaysPredictionModalOpen(true)}>
-                  <ActivityIcon className="h-4 w-4" />
-                  <span className="sr-only">Today's Prediction</span>
-              </Button>
-
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}>
                 <Github className="h-4 w-4" />
                 <span className="sr-only">Sync with GitHub</span>
@@ -671,7 +664,6 @@ export function Header() {
       <DemoTokenModal isOpen={isDemoTokenModalOpen} onOpenChange={setIsDemoTokenModalOpen} onSubmit={pushDemoDataWithToken} />
       <SettingsModal isOpen={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen} />
       <UpcomingTasksModal isOpen={isUpcomingTasksModalOpen} onOpenChange={setIsUpcomingTasksModalOpen} />
-      <TodaysPredictionModal />
     </>
   );
 }
