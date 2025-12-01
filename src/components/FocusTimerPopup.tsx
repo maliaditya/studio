@@ -241,7 +241,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   
     if (activity.type === 'pomodoro') {
       const stageDuration = activeSubTask.estimatedDuration || 0;
-      setAccumulatedPomodoroTime(prev => prev + stageDuration);
+      const newAccumulatedTime = accumulatedPomodoroTime + stageDuration;
+      setAccumulatedPomodoroTime(newAccumulatedTime);
       
       const nextStage = pomodoroStage + 1;
       if (nextStage < pomodoroSubTasks.length) {
@@ -249,7 +250,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         handleStartSubTask(pomodoroSubTasks[nextStage]);
       } else {
         // Pomodoro finished, log total time
-        onLogDuration(activity, accumulatedPomodoroTime + stageDuration);
+        const finalActivityState: Activity = {
+            ...activity,
+            linkedActivityType: linkedActivityType || undefined
+        };
+        onLogDuration(finalActivityState, newAccumulatedTime);
         onClose();
       }
       return;
@@ -288,7 +293,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     isSubTaskComplete,
     onLogDuration,
     accumulatedPomodoroTime,
-    onClose
+    onClose,
+    linkedActivityType
   ]);
   
   const handleStandaloneTaskComplete = () => {
@@ -589,15 +595,17 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               <h4 className="text-sm font-semibold my-2">Completed</h4>
               <ScrollArea className="h-28">
                 <div className="space-y-2 pr-2">
-                    {completedSubTaskComponents.map((task, index) => (
-                       <div key={task.id || index} className="flex items-center justify-between text-sm p-1 rounded-md bg-green-500/10">
+                    {completedSubTaskComponents.map((task) => {
+                      const loggedTime = 'estimatedDuration' in task ? task.estimatedDuration : ('id' in task ? getLoggedMinutesForTask(task.id) : 0);
+                      return (
+                       <div key={task.id} className="flex items-center justify-between text-sm p-1 rounded-md bg-green-500/10">
                             <div className="flex items-center gap-2 text-muted-foreground">
                                 <Check className="h-4 w-4 text-green-500" />
                                 <span className="line-through">{task.name}</span>
                             </div>
-                            {'loggedDuration' in task && <span className="text-xs text-muted-foreground">{getLoggedMinutesForTask(task.id)}m logged</span>}
+                            {loggedTime && <Badge variant="secondary" className="text-xs">{loggedTime}m logged</Badge>}
                        </div>
-                    ))}
+                    )})}
                     {completedSubTaskComponents.length === 0 && (
                        <p className="text-xs text-center text-muted-foreground py-4">No tasks completed yet.</p>
                     )}
@@ -625,3 +633,5 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
       );
 }
+
+    
