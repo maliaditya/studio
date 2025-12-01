@@ -163,17 +163,29 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isDirty, setIsDirty] = useState(false);
   const isUserChange = useRef(false);
 
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: 'drawing-canvas-popup',
-  });
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    if (isOpen) {
+      const centerCanvas = () => {
+        setPosition({
+          x: window.innerWidth / 2,
+          y: window.innerHeight / 2,
+        });
+      };
+      centerCanvas();
+      window.addEventListener('resize', centerCanvas);
+      return () => window.removeEventListener('resize', centerCanvas);
+    }
+  }, [isOpen]);
   
   const style: React.CSSProperties = {
     position: 'fixed',
-    top: drawingCanvasState?.position.y || '50%',
-    left: drawingCanvasState?.position.x || '50%',
+    top: `${position.y}px`,
+    left: `${position.x}px`,
     width: '95vw',
     height: '95vh',
-    transform: transform ? `translate(calc(-50% + ${transform.x}px), calc(-50% + ${transform.y}px))` : 'translate(-50%, -50%)',
+    transform: 'translate(-50%, -50%)',
     willChange: 'transform',
     zIndex: 110,
   };
@@ -362,14 +374,13 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
 
   return (
     <>
-      <div ref={setNodeRef} style={style} {...attributes}>
+      <div style={style}>
           <Card className="w-full h-full bg-background text-foreground p-0 flex flex-col shadow-2xl border-2 border-primary/50">
               <CardHeader 
                   className="p-2 pl-3 flex flex-row items-center justify-between border-b gap-4"
               >
                   <div 
-                    className="flex items-center gap-2 cursor-grab active:cursor-grabbing flex-shrink-0"
-                    {...listeners}
+                    className="flex items-center gap-2 flex-shrink-0"
                   >
                        <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
                   </div>
