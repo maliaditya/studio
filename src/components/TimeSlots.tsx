@@ -94,7 +94,7 @@ export function TimeSlots({
   onOpenHabitPopup,
   onStartFocus,
 }: TimeSlotsProps) {
-    const { toast } = useAuth();
+    const { toast } = useToast();
     const { setSchedule: setGlobalSchedule, settings, handleToggleComplete, toggleRoutine, activityDurations } = useAuth();
     const dateKey = useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
     const todaysSchedule = useMemo(() => schedule[dateKey] || {}, [schedule, dateKey]);
