@@ -211,7 +211,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     willChange: 'transform',
   };
   
-  const handleStartSubTask = useCallback((subTask: (SubTask | ExerciseDefinition | {id: string; name: string, estimatedDuration: number}))) => {
+  const handleStartSubTask = useCallback((subTask: (SubTask | ExerciseDefinition | {id: string; name: string, estimatedDuration: number})) => {
     const durationMins = 'estimatedDuration' in subTask ? (subTask.estimatedDuration || 25) : 25;
     if (activeFocusSession) {
         let updatedTimings = activeFocusSession.pomodoroStageTimings || {};
@@ -235,7 +235,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     }
     setIsAudioPlaying(true);
     setPromptForCompletion(false);
-  }, [activeFocusSession, setActiveFocusSession, setIsAudioPlaying, activity.type]);
+  }, [activeFocusSession, activity.type, setActiveFocusSession, setIsAudioPlaying]);
 
   const handleStop = useCallback((completed: boolean) => {
     setIsAudioPlaying(false);
@@ -658,4 +658,3 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       );
 }
 
-```
