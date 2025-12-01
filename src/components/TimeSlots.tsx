@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from './ui/scroll-area';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer } from 'lucide-react';
 import { isToday, format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
@@ -30,6 +30,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     interrupt: <AlertCircle className="h-4 w-4 text-red-500" />,
     distraction: <Wind className="h-4 w-4 text-yellow-500" />,
     mindset: <Brain className="h-4 w-4" />,
+    pomodoro: <Timer className="h-4 w-4" />,
 };
 
 const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType, details: string) => void }) => {
@@ -139,10 +140,15 @@ export function TimeSlots({
   };
 
   const handleAddActivity = (slotName: string, type: ActivityType, details: string) => {
+    let activityDetails = details;
+    if (!details) {
+        if (type === 'pomodoro') activityDetails = "New Pomodoro";
+        else activityDetails = `New ${type.replace('-', ' ')}`;
+    }
     const newActivity: Activity = {
         id: `${type}-${Date.now()}-${Math.random()}`,
         type,
-        details,
+        details: activityDetails,
         completed: false,
         slot: slotName,
         habitEquationIds: settings.defaultHabitLinks?.[type] ? [settings.defaultHabitLinks[type]!] : [],

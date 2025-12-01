@@ -28,6 +28,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     interrupt: <AlertCircle className="h-4 w-4 text-red-500" />,
     distraction: <Wind className="h-4 w-4 text-yellow-500" />,
     mindset: <Brain className="h-4 w-4" />,
+    pomodoro: <Timer className="h-4 w-4" />,
 };
 
 interface AgendaWidgetItemProps {
