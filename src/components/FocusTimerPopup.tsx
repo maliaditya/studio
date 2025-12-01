@@ -134,10 +134,10 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     const totalDuration = activeFocusSession?.duration || duration;
     const actionTime = Math.max(5, totalDuration - 3 - 5 - 5);
     return [
-      { id: 'pomodoro_goal', name: "What is the Goal?", completed: false, estimatedDuration: 3 },
-      { id: 'pomodoro_visualize', name: "Visualize the action", completed: false, estimatedDuration: 5 },
-      { id: 'pomodoro_action', name: "Action", completed: false, estimatedDuration: actionTime },
-      { id: 'pomodoro_reflect', name: "Reflect", completed: false, estimatedDuration: 5 },
+      { id: 'pomodoro_goal', name: "What is the Goal?", completed: false, estimatedDuration: 3, loggedDuration: 0 },
+      { id: 'pomodoro_visualize', name: "Visualize the action", completed: false, estimatedDuration: 5, loggedDuration: 0 },
+      { id: 'pomodoro_action', name: "Action", completed: false, estimatedDuration: actionTime, loggedDuration: 0 },
+      { id: 'pomodoro_reflect', name: "Reflect", completed: false, estimatedDuration: 5, loggedDuration: 0 },
     ];
   }, [activity.type, activeFocusSession?.duration, duration]);
   
@@ -188,10 +188,15 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   const completedSubTaskComponents = useMemo(() => {
     if (activity.type === 'pomodoro') {
-        return pomodoroSubTasks.slice(0, pomodoroStage);
+        return pomodoroSubTasks.slice(0, pomodoroStage).map(task => {
+          const startTime = activeFocusSession?.pomodoroStageTimings?.[task.id]?.startTime;
+          const endTime = activeFocusSession?.pomodoroStageTimings?.[task.id]?.endTime;
+          const loggedDuration = startTime && endTime ? Math.round((endTime - startTime) / 60000) : task.estimatedDuration;
+          return {...task, loggedDuration: loggedDuration || 0 };
+        });
     }
     return subTasks.filter(task => isSubTaskComplete(task));
-  }, [subTasks, isSubTaskComplete, activity.type, pomodoroStage, pomodoroSubTasks]);
+  }, [subTasks, isSubTaskComplete, activity.type, pomodoroStage, pomodoroSubTasks, activeFocusSession?.pomodoroStageTimings]);
 
   const showSubTasks = useMemo(() => {
       return (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'pomodoro' || (activity.subTasks && activity.subTasks.length > 0)) && subTasks.length > 0;
@@ -205,9 +210,17 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     willChange: 'transform',
   };
   
-  const handleStartSubTask = useCallback((subTask: (SubTask | ExerciseDefinition)) => {
+  const handleStartSubTask = useCallback((subTask: (SubTask | ExerciseDefinition | {id: string; name: string, estimatedDuration: number})) => {
     const durationMins = 'estimatedDuration' in subTask ? (subTask.estimatedDuration || 25) : 25;
     if (activeFocusSession) {
+        let updatedTimings = activeFocusSession.pomodoroStageTimings || {};
+        if (activity.type === 'pomodoro') {
+            updatedTimings = {
+                ...updatedTimings,
+                [subTask.id]: { startTime: Date.now() }
+            };
+        }
+        
         setActiveFocusSession({
             ...activeFocusSession,
             duration: durationMins,
@@ -216,11 +229,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             startTime: Date.now(),
             subTaskStartTime: Date.now(),
             state: 'running',
+            pomodoroStageTimings: updatedTimings,
         });
     }
     setIsAudioPlaying(true);
     setPromptForCompletion(false);
-  }, [activeFocusSession, setActiveFocusSession, setIsAudioPlaying]);
+  }, [activeFocusSession, setActiveFocusSession, setIsAudioPlaying, activity.type]);
 
   const handleStop = useCallback((completed: boolean) => {
     setIsAudioPlaying(false);
@@ -241,24 +255,34 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (!activeSubTask || !activeFocusSession) return;
   
     if (activity.type === 'pomodoro') {
-      const stageDuration = activeSubTask.estimatedDuration || 0;
-      const newAccumulatedTime = accumulatedPomodoroTime + stageDuration;
-      setAccumulatedPomodoroTime(newAccumulatedTime);
-      
-      const nextStage = pomodoroStage + 1;
-      if (nextStage < pomodoroSubTasks.length) {
-        setPomodoroStage(nextStage);
-        handleStartSubTask(pomodoroSubTasks[nextStage]);
-      } else {
-        // Pomodoro finished, log total time
-        const finalActivityState: Activity = {
-            ...activity,
-            linkedActivityType: linkedActivityType || undefined
-        };
-        onLogDuration(finalActivityState, newAccumulatedTime);
-        onClose();
-      }
-      return;
+        const startTime = activeFocusSession.pomodoroStageTimings?.[activeSubTask.id]?.startTime || activeFocusSession.subTaskStartTime || Date.now();
+        const endTime = Date.now();
+        const durationMinutes = Math.round((endTime - startTime) / 60000);
+        
+        const newAccumulatedTime = accumulatedPomodoroTime + durationMinutes;
+        setAccumulatedPomodoroTime(newAccumulatedTime);
+        
+        setActiveFocusSession(prev => prev ? {
+            ...prev,
+            pomodoroStageTimings: {
+                ...prev.pomodoroStageTimings,
+                [activeSubTask.id]: { startTime, endTime }
+            }
+        } : null);
+
+        const nextStage = pomodoroStage + 1;
+        if (nextStage < pomodoroSubTasks.length) {
+            setPomodoroStage(nextStage);
+            handleStartSubTask(pomodoroSubTasks[nextStage]);
+        } else {
+            const finalActivityState: Activity = {
+                ...activity,
+                linkedActivityType: linkedActivityType || undefined
+            };
+            onLogDuration(finalActivityState, newAccumulatedTime);
+            onClose();
+        }
+        return;
     }
     
     if ('completed' in activeSubTask) {
@@ -295,7 +319,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     onLogDuration,
     accumulatedPomodoroTime,
     onClose,
-    linkedActivityType
+    linkedActivityType,
+    setActiveFocusSession,
   ]);
   
   const handleStandaloneTaskComplete = () => {
@@ -597,14 +622,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               <ScrollArea className="h-28">
                 <div className="space-y-2 pr-2">
                     {completedSubTaskComponents.map((task) => {
-                      const loggedTime = 'estimatedDuration' in task ? task.estimatedDuration : ('id' in task ? getLoggedMinutesForTask(task.id) : 0);
+                      const loggedTime = ('loggedDuration' in task && task.loggedDuration) ? task.loggedDuration : ('id' in task ? getLoggedMinutesForTask(task.id) : 0);
                       return (
                        <div key={task.id} className="flex items-center justify-between text-sm p-1 rounded-md bg-green-500/10">
                             <div className="flex items-center gap-2 text-muted-foreground">
                                 <Check className="h-4 w-4 text-green-500" />
                                 <span className="line-through">{task.name}</span>
                             </div>
-                            {loggedTime && <Badge variant="secondary" className="text-xs">{loggedTime}m logged</Badge>}
+                            {loggedTime > 0 && <Badge variant="secondary" className="text-xs">{loggedTime}m logged</Badge>}
                        </div>
                     )})}
                     {completedSubTaskComponents.length === 0 && (
@@ -634,5 +659,3 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
       );
 }
-
-    
