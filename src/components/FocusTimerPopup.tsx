@@ -3,8 +3,8 @@
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save, Menu, PlusCircle } from 'lucide-react';
+import { Button } from './ui/button';
+import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save, Menu, PlusCircle, Briefcase, BookCopy } from 'lucide-react';
 import type { Activity, PauseEvent, ExerciseDefinition, PostSessionReview, SubTask } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDraggable } from '@dnd-kit/core';
@@ -90,6 +90,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       setSelectedDeepWorkTask,
       setSelectedUpskillTask,
       updateActivitySubtask, deleteActivitySubtask,
+      getUpskillNodeType, getDeepWorkNodeType
   } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
@@ -106,6 +107,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const [subTaskDurationInput, setSubTaskDurationInput] = useState('');
   
   const [isSubTasksVisible, setIsSubTasksVisible] = useState(true);
+
+  // New state for Pomodoro conversion
+  const [isConverting, setIsConverting] = useState(false);
+  const [conversionType, setConversionType] = useState<'upskill' | 'deepwork' | ''>('');
+  const [selectedDefinitionId, setSelectedDefinitionId] = useState<string>('');
+
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `focus-timer-popup-${activity.id}`,
@@ -157,13 +164,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (activity.type === 'pomodoro') {
       return index !== undefined && index < pomodoroStage;
     }
-    if (sessionCompletedSubTaskIds.has(subTask.id)) return true;
     if ('completed' in subTask) {
         return subTask.completed;
     }
     return permanentlyLoggedTaskIds.has(subTask.id) || 
            (subTask.loggedDuration || 0) > 0;
-  }, [permanentlyLoggedTaskIds, sessionCompletedSubTaskIds, activity.type, pomodoroStage]);
+  }, [permanentlyLoggedTaskIds, activity.type, pomodoroStage]);
 
   const activeSubTask = useMemo(() => {
     if (activity.type === 'pomodoro') {
@@ -241,13 +247,15 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         setPomodoroStage(nextStage);
         handleStartSubTask(pomodoroSubTasks[nextStage]);
       } else {
-        handleStop(true);
+        // End of Pomodoro session, start conversion flow
+        const elapsedMs = Date.now() - (activeFocusSession.initialStartTime ?? activeFocusSession.startTime);
+        const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
+        onLogDuration(activity, elapsedMinutes);
+        setIsConverting(true);
       }
       return;
     }
     
-    setSessionCompletedSubTaskIds(prev => new Set(prev).add(activeSubTask.id));
-  
     if ('completed' in activeSubTask) {
       updateActivitySubtask(activity.id, activeSubTask.id, { completed: true });
     } else {
@@ -259,7 +267,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setPromptForCompletion(false);
   
     const updatedCompletedIds = new Set(sessionCompletedSubTaskIds).add(activeSubTask.id);
-    const nextTask = subTasks.find(st => !updatedCompletedIds.has(st.id));
+    const nextTask = subTasks.find(st => !isSubTaskComplete({ id: st.id, text: 'name' in st ? st.name : st.text, completed: false }));
   
     if (nextTask) {
       handleStartSubTask(nextTask);
@@ -278,17 +286,42 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     sessionCompletedSubTaskIds,
     pomodoroStage,
     pomodoroSubTasks,
+    onLogDuration,
+    isSubTaskComplete
   ]);
   
   const handleStandaloneTaskComplete = () => {
     if (activeFocusSession) {
-      const { startTime } = activeFocusSession;
-      const elapsedMs = Date.now() - startTime;
+      const elapsedMs = Date.now() - activeFocusSession.startTime;
       const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
       onLogDuration(activity, elapsedMinutes);
     } else {
       onLogDuration(activity, activity.focusSessionInitialDuration || duration);
     }
+    onClose();
+  };
+
+  const handleConversionSave = () => {
+    if (!conversionType || !selectedDefinitionId) {
+      toast({ title: 'Please select a task type and a specific task.', variant: 'destructive'});
+      return;
+    }
+    
+    const definition = allDefinitions.get(selectedDefinitionId);
+    if (!definition) {
+        toast({ title: 'Error', description: 'Selected task definition not found.', variant: 'destructive'});
+        return;
+    }
+
+    updateActivity({
+        ...activity,
+        type: conversionType,
+        details: definition.name,
+        taskIds: [definition.id],
+        linkedEntityType: conversionType === 'deepwork' ? 'intention' : 'curiosity',
+    });
+
+    toast({ title: 'Task Converted!', description: `Pomodoro session logged as "${definition.name}".`});
     onClose();
   };
 
@@ -395,10 +428,40 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     nowFocusingText = activity.details;
   }
 
-  const doesSubTaskNeedDuration = (task: any) => {
-      return ('completed' in task) || !('estimatedDuration' in task && task.estimatedDuration && task.estimatedDuration > 0);
+  const renderConversionView = () => (
+    <div className="p-4 space-y-4">
+        <h3 className="font-semibold text-center">Session Complete!</h3>
+        <p className="text-sm text-muted-foreground text-center">Log this {formatMinutes(activeFocusSession.duration)} session as:</p>
+        <Select value={conversionType} onValueChange={v => { setConversionType(v as any); setSelectedDefinitionId(''); }}>
+            <SelectTrigger><SelectValue placeholder="Select Activity Type..." /></SelectTrigger>
+            <SelectContent>
+                <SelectItem value="upskill">Upskill</SelectItem>
+                <SelectItem value="deepwork">Deep Work</SelectItem>
+            </SelectContent>
+        </Select>
+        {conversionType && (
+            <Select value={selectedDefinitionId} onValueChange={setSelectedDefinitionId}>
+                <SelectTrigger><SelectValue placeholder="Select a specific task..." /></SelectTrigger>
+                <SelectContent>
+                    {(conversionType === 'upskill' ? upskillDefinitions : deepWorkDefinitions)
+                        .filter(def => getDeepWorkNodeType(def) === 'Intention' || getUpskillNodeType(def) === 'Curiosity')
+                        .map(def => (
+                            <SelectItem key={def.id} value={def.id}>{def.name}</SelectItem>
+                        ))
+                    }
+                </SelectContent>
+            </Select>
+        )}
+        <Button onClick={handleConversionSave} className="w-full">Log Time</Button>
+    </div>
+  );
+  
+  const formatMinutes = (minutes: number) => {
+    if (minutes < 1) return "0m";
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    return `${hours > 0 ? `${hours}h ` : ''}${mins > 0 ? `${mins}m` : ''}`.trim();
   };
-
 
   return (
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
@@ -406,6 +469,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             "shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm transition-[width]",
             showSubTasks && isSubTasksVisible ? "w-[600px]" : "w-[300px]"
         )}>
+           {isConverting ? renderConversionView() : (
             <CardContent className={cn(
                 "p-4 grid gap-4",
                 showSubTasks && isSubTasksVisible ? "grid-cols-2" : "grid-cols-1"
@@ -576,8 +640,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                 </div>
             )}
             </CardContent>
+           )}
         </Card>
         </div>
       );
 }
-
