@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from './ui/button';
-import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save, Menu, PlusCircle, Briefcase, BookCopy, ChevronLeft, Flag, Bolt, Focus, Frame, Lightbulb } from 'lucide-react';
+import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save, Menu, PlusCircle, Briefcase, BookCopy, ChevronLeft, Flag, Bolt, Focus, Frame, Lightbulb, Badge } from 'lucide-react';
 import type { Activity, PauseEvent, ExerciseDefinition, PostSessionReview, SubTask, ActivityType } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDraggable } from '@dnd-kit/core';
@@ -18,7 +18,6 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { format, formatDistanceStrict } from 'date-fns';
-import { Badge } from './ui/badge';
 
 interface FocusTimerPopupProps {
   activity: Activity;
@@ -265,7 +264,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         setAccumulatedPomodoroTime(newAccumulatedTime);
         
         const stageTimings = activeFocusSession.pomodoroStageTimings || {};
-        const currentStageTiming = stageTimings[activeSubTask.id] || {};
 
         setActiveFocusSession(prev => prev ? {
             ...prev,
@@ -297,8 +295,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     }
     setPromptForCompletion(false);
   
-    const updatedCompletedIds = new Set(sessionCompletedSubTaskIds).add(activeSubTask.id);
-    const nextTask = subTasks.find(st => !isSubTaskComplete(st));
+    const nextTask = subTasks.find(st => !isSubTaskComplete(st) && st.id !== activeSubTask.id);
   
     if (nextTask) {
       handleStartSubTask(nextTask);
@@ -314,7 +311,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     activeFocusSession,
     activity,
     updateActivitySubtask,
-    sessionCompletedSubTaskIds,
     pomodoroStage,
     pomodoroSubTasks,
     isSubTaskComplete,
@@ -327,7 +323,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   
   const handleStandaloneTaskComplete = () => {
     if (activeFocusSession) {
-      const elapsedMs = Date.now() - (activeFocusSession.initialStartTime ?? activeFocusSession.startTime);
+      const elapsedMs = Date.now() - (activeFocusSession.subTaskStartTime ?? activeFocusSession.startTime);
       const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
       onLogDuration(activity, elapsedMinutes);
     }
@@ -624,14 +620,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               <ScrollArea className="h-28">
                 <div className="space-y-2 pr-2">
                     {completedSubTaskComponents.map((task) => {
-                      const loggedTime = ('loggedDuration' in task && task.loggedDuration) ? task.loggedDuration : 0;
+                      const loggedTime = 'loggedDuration' in task && task.loggedDuration;
                       return (
                        <div key={task.id} className="flex items-center justify-between text-sm p-1 rounded-md bg-green-500/10">
                             <div className="flex items-center gap-2 text-muted-foreground">
                                 <Check className="h-4 w-4 text-green-500" />
                                 <span className="line-through">{task.name}</span>
                             </div>
-                            {loggedTime > 0 && <Badge variant="secondary" className="text-xs">{loggedTime}m logged</Badge>}
+                            {loggedTime && <Badge variant="secondary" className="text-xs">{loggedTime}m logged</Badge>}
                        </div>
                     )})}
                     {completedSubTaskComponents.length === 0 && (
@@ -662,4 +658,4 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       );
 }
 
-    
+```
