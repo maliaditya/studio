@@ -267,7 +267,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setPromptForCompletion(false);
   
     const updatedCompletedIds = new Set(sessionCompletedSubTaskIds).add(activeSubTask.id);
-    const nextTask = subTasks.find(st => !isSubTaskComplete({ id: st.id, text: 'name' in st ? st.name : st.text, completed: false }));
+    const nextTask = subTasks.find(st => !isSubTaskComplete({ id: 'id' in st ? st.id : '', text: 'name' in st ? st.name : st.text, completed: false }));
   
     if (nextTask) {
       handleStartSubTask(nextTask);
@@ -402,6 +402,16 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       setSelectedDeepWorkTask(focusedObjective);
     }
     router.push('/deep-work');
+  };
+
+  const doesSubTaskNeedDuration = (subTask: (SubTask | ExerciseDefinition)) => {
+    if ('estimatedDuration' in subTask && subTask.estimatedDuration) {
+      return false; // Already has a duration
+    }
+    if ('id' in subTask && (getUpskillNodeType(subTask as ExerciseDefinition) === 'Visualization' || getDeepWorkNodeType(subTask as ExerciseDefinition) === 'Action')) {
+      return true;
+    }
+    return false;
   };
 
   const secondsLeft = Math.floor(activeFocusSession?.secondsLeft ?? 0);
@@ -645,3 +655,5 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
       );
 }
+
+    
