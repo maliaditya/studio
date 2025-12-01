@@ -5,7 +5,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from './ui/button';
 import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save, Menu, PlusCircle, Briefcase, BookCopy, ChevronLeft } from 'lucide-react';
-import type { Activity, PauseEvent, ExerciseDefinition, PostSessionReview, SubTask } from '@/types/workout';
+import type { Activity, PauseEvent, ExerciseDefinition, PostSessionReview, SubTask, ActivityType } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDraggable } from '@dnd-kit/core';
 import { ScrollArea } from './ui/scroll-area';
@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 import { Input } from './ui/input';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from './ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
@@ -108,12 +108,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   
   const [isSubTasksVisible, setIsSubTasksVisible] = useState(true);
 
-  // New state for Pomodoro conversion
-  const [isLinking, setIsLinking] = useState(false);
-  const [linkType, setLinkType] = useState<'upskill' | 'deepwork' | ''>('');
-  const [selectedDefinitionId, setSelectedDefinitionId] = useState<string>('');
+  // State for Pomodoro linking
   const [accumulatedPomodoroTime, setAccumulatedPomodoroTime] = useState(0);
-
+  const [linkedActivityType, setLinkedActivityType] = useState<ActivityType | ''>(activity?.linkedActivityType || '');
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: `focus-timer-popup-${activity.id}`,
@@ -251,7 +248,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         setPomodoroStage(nextStage);
         handleStartSubTask(pomodoroSubTasks[nextStage]);
       } else {
-        setIsLinking(true);
+        // Pomodoro finished, log total time
+        onLogDuration(activity, accumulatedPomodoroTime + stageDuration);
+        onClose();
       }
       return;
     }
@@ -287,6 +286,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     pomodoroStage,
     pomodoroSubTasks,
     isSubTaskComplete,
+    onLogDuration,
+    accumulatedPomodoroTime,
+    onClose
   ]);
   
   const handleStandaloneTaskComplete = () => {
@@ -298,24 +300,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     onClose();
   };
 
-  const handleLinkSave = () => {
-    if (!selectedDefinitionId) {
-      toast({ title: 'Please select a task to link.', variant: 'destructive'});
-      return;
+  useEffect(() => {
+    if (activity.type === 'pomodoro' && linkedActivityType) {
+        updateActivity({ ...activity, linkedActivityType });
     }
-    
-    const updatedActivity = {
-        ...activity,
-        taskIds: [selectedDefinitionId],
-        linkedEntityType: linkType === 'deepwork' ? 'intention' : 'curiosity'
-    };
-    
-    updateActivity(updatedActivity);
-    onLogDuration(activity, accumulatedPomodoroTime);
+  }, [linkedActivityType, activity.type]);
 
-    toast({ title: 'Task Linked!', description: `Pomodoro session logged and linked.`});
-    onClose();
-  };
 
   useEffect(() => {
     if (activeFocusSession?.state === 'idle' && showSubTasks) {
@@ -396,7 +386,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     router.push('/deep-work');
   };
 
-  const doesSubTaskNeedDuration = useCallback((subTask: (SubTask | ExerciseDefinition)) => {
+  const doesSubTaskNeedDuration = (subTask: (SubTask | ExerciseDefinition)) => {
     if ('estimatedDuration' in subTask && subTask.estimatedDuration) {
       return false; // Already has a duration
     }
@@ -410,7 +400,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         }
     }
     return false;
-  }, [allDefinitions, getUpskillNodeType, getDeepWorkNodeType, upskillDefinitions]);
+  };
 
   const secondsLeft = Math.floor(activeFocusSession?.secondsLeft ?? 0);
   const totalSeconds = activeFocusSession?.totalSeconds ?? duration * 60;
@@ -435,41 +425,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   } else {
     nowFocusingText = activity.details;
   }
-
-  const renderLinkingView = () => (
-    <div className="p-4 space-y-4">
-        <h3 className="font-semibold text-center">Session Complete!</h3>
-        <p className="text-sm text-muted-foreground text-center">Log this {formatMinutes(accumulatedPomodoroTime)} session by linking it to a task:</p>
-        <Select value={linkType} onValueChange={v => { setLinkType(v as any); setSelectedDefinitionId(''); }}>
-            <SelectTrigger><SelectValue placeholder="Select Activity Type..." /></SelectTrigger>
-            <SelectContent>
-                <SelectItem value="upskill">Upskill</SelectItem>
-                <SelectItem value="deepwork">Deep Work</SelectItem>
-            </SelectContent>
-        </Select>
-        {linkType && (
-            <Select value={selectedDefinitionId} onValueChange={setSelectedDefinitionId}>
-                <SelectTrigger><SelectValue placeholder="Select a specific task..." /></SelectTrigger>
-                <SelectContent>
-                    {(linkType === 'upskill' ? upskillDefinitions : deepWorkDefinitions)
-                        .filter(def => getDeepWorkNodeType(def) === 'Intention' || getUpskillNodeType(def) === 'Curiosity')
-                        .map(def => (
-                            <SelectItem key={def.id} value={def.id}>{def.name}</SelectItem>
-                        ))
-                    }
-                </SelectContent>
-            </Select>
-        )}
-        <Button onClick={handleLinkSave} className="w-full">Link & Complete</Button>
-    </div>
-  );
   
-  const formatMinutes = (minutes: number) => {
-    if (minutes < 1) return "0m";
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    return `${hours > 0 ? `${hours}h ` : ''}${mins > 0 ? `${mins}m` : ''}`.trim();
-  };
+  const pomodoroActivityTypes: ActivityType[] = ['deepwork', 'upskill', 'essentials', 'distraction'];
+
 
   return (
         <div ref={setNodeRef} style={style} className="fixed z-[100]">
@@ -477,7 +435,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             "shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm transition-[width]",
             showSubTasks && isSubTasksVisible ? "w-[600px]" : "w-[300px]"
         )}>
-           {isLinking ? renderLinkingView() : (
             <CardContent className={cn(
                 "p-4 grid gap-4",
                 showSubTasks && isSubTasksVisible ? "grid-cols-2" : "grid-cols-1"
@@ -569,6 +526,22 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                     </button>
                 </div>
               )}
+               {activity.type === 'pomodoro' && pomodoroStage === 0 && (
+                <div className="mt-2 pt-2 border-t">
+                    <Select value={linkedActivityType} onValueChange={value => setLinkedActivityType(value as ActivityType)}>
+                        <SelectTrigger className="w-full h-8 text-xs">
+                            <SelectValue placeholder="Link to Activity Type..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {pomodoroActivityTypes.map(type => (
+                                <SelectItem key={type} value={type} className="capitalize">
+                                    {type.replace('-', ' ')}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
             </div>
             
             {showSubTasks && isSubTasksVisible && (
@@ -648,7 +621,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                 </div>
             )}
             </CardContent>
-           )}
         </Card>
         </div>
       );
