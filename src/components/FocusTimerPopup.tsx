@@ -132,7 +132,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const pomodoroSubTasks = useMemo(() => {
     if (activity.type !== 'pomodoro') return [];
     const totalDuration = activeFocusSession?.duration || duration;
-    const actionTime = Math.max(5, totalDuration - 3 - 5 - 5); // Goal(3) + Visualize(5) + Reflect(5)
+    const fixedTime = 3 + 5 + 5; // Goal (3) + Visualize(5) + Reflect(5)
+    const actionTime = Math.max(5, totalDuration - fixedTime);
     return [
       { id: 'pomodoro_goal', name: "What is the Goal?", completed: false, estimatedDuration: 3, loggedDuration: 0 },
       { id: 'pomodoro_visualize', name: "Visualize the action", completed: false, estimatedDuration: 5, loggedDuration: 0 },
@@ -211,7 +212,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     willChange: 'transform',
   };
   
-  const handleStartSubTask = useCallback((subTask: (SubTask | ExerciseDefinition | {id: string; name: string, estimatedDuration: number})) => {
+  const handleStartSubTask = useCallback((subTask: (SubTask | ExerciseDefinition | {id: string; name: string, estimatedDuration: number}))) => {
     const durationMins = 'estimatedDuration' in subTask ? (subTask.estimatedDuration || 25) : 25;
     if (activeFocusSession) {
         let updatedTimings = activeFocusSession.pomodoroStageTimings || {};
@@ -657,4 +658,3 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
       );
 }
-
