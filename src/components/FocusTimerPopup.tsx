@@ -126,7 +126,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (!parentId) return null;
 
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-    return allDefs.find(d => taskId.startsWith(d.id));
+    return allDefs.find(d => (activity.taskIds || []).includes(d.id));
   }, [activity.taskIds, deepWorkDefinitions, upskillDefinitions]);
   
   const pomodoroSubTasks = useMemo(() => {
@@ -160,7 +160,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     return childrenIds.map(id => allDefinitions.get(id)).filter((t): t is ExerciseDefinition => !!t);
   }, [activity.type, activity.subTasks, focusedObjective, allDefinitions, pomodoroSubTasks]);
   
-  const isSubTaskComplete = useCallback((subTask: SubTask | ExerciseDefinition, index?: number) => {
+  const isSubTaskComplete = useCallback((subTask: SubTask | ExerciseDefinition | {id: string, name: string, estimatedDuration: number, loggedDuration: number, completed: boolean} | {id: string, name: string, completed: boolean}, index?: number) => {
     if (activity.type === 'pomodoro') {
       return index !== undefined && index < pomodoroStage;
     }
@@ -251,7 +251,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       }
     }
     onClose();
-  }, [activity, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, toast, focusedObjective?.name, activeFocusSession]);
+  }, [activity, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, toast, focusedObjective?.name, activeFocusSession]);
   
   const handleSubTaskComplete = useCallback(() => {
     if (!activeSubTask || !activeFocusSession) return;
@@ -658,3 +658,5 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
       );
 }
+
+    
