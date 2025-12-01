@@ -96,6 +96,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const popupRef = useRef<HTMLDivElement>(null);
   
   const [sessionCompletedSubTaskIds, setSessionCompletedSubTaskIds] = useState<Set<string>>(new Set());
+  const [pomodoroStage, setPomodoroStage] = useState(0);
 
   const [promptForCompletion, setPromptForCompletion] = useState(false);
   const [extendMinutes, setExtendMinutes] = useState(5);
@@ -152,29 +153,40 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     return childrenIds.map(id => allDefinitions.get(id)).filter((t): t is ExerciseDefinition => !!t);
   }, [activity.type, activity.subTasks, focusedObjective, allDefinitions, pomodoroSubTasks]);
   
-  const isSubTaskComplete = useCallback((subTask: SubTask | ExerciseDefinition) => {
-    if ('completed' in subTask) { // It's a generic SubTask
+  const isSubTaskComplete = useCallback((subTask: SubTask | ExerciseDefinition, index?: number) => {
+    if (activity.type === 'pomodoro') {
+      return index !== undefined && index < pomodoroStage;
+    }
+    if (sessionCompletedSubTaskIds.has(subTask.id)) return true;
+    if ('completed' in subTask) {
         return subTask.completed;
     }
-    // It's a deep work/upskill task
     return permanentlyLoggedTaskIds.has(subTask.id) || 
-           sessionCompletedSubTaskIds.has(subTask.id) ||
            (subTask.loggedDuration || 0) > 0;
-  }, [permanentlyLoggedTaskIds, sessionCompletedSubTaskIds]);
+  }, [permanentlyLoggedTaskIds, sessionCompletedSubTaskIds, activity.type, pomodoroStage]);
 
   const activeSubTask = useMemo(() => {
+    if (activity.type === 'pomodoro') {
+        return pomodoroSubTasks[pomodoroStage] || null;
+    }
     return subTasks.find(task => !isSubTaskComplete(task)) || null;
-  }, [subTasks, isSubTaskComplete]);
+  }, [subTasks, isSubTaskComplete, activity.type, pomodoroStage, pomodoroSubTasks]);
   
   const pendingSubTasks = useMemo(() => {
+    if (activity.type === 'pomodoro') {
+        return pomodoroSubTasks.slice(pomodoroStage + 1);
+    }
     return subTasks.filter(task => 
       !isSubTaskComplete(task) && task.id !== activeSubTask?.id
     );
-  }, [subTasks, activeSubTask?.id, isSubTaskComplete]);
+  }, [subTasks, activeSubTask?.id, isSubTaskComplete, activity.type, pomodoroStage, pomodoroSubTasks]);
 
   const completedSubTaskComponents = useMemo(() => {
+    if (activity.type === 'pomodoro') {
+        return pomodoroSubTasks.slice(0, pomodoroStage);
+    }
     return subTasks.filter(task => isSubTaskComplete(task));
-  }, [subTasks, isSubTaskComplete]);
+  }, [subTasks, isSubTaskComplete, activity.type, pomodoroStage, pomodoroSubTasks]);
 
   const showSubTasks = useMemo(() => {
       return (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'pomodoro' || (activity.subTasks && activity.subTasks.length > 0)) && subTasks.length > 0;
@@ -196,7 +208,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             duration: durationMins,
             secondsLeft: durationMins * 60,
             totalSeconds: durationMins * 60,
-            startTime: Date.now(), // Reset start time for the new sub-task
+            startTime: Date.now(),
             subTaskStartTime: Date.now(),
             state: 'running',
         });
@@ -223,21 +235,31 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const handleSubTaskComplete = useCallback(() => {
     if (!activeSubTask || !activeFocusSession) return;
   
-    // Log time for the completed sub-task, even if finished early
+    if (activity.type === 'pomodoro') {
+      const nextStage = pomodoroStage + 1;
+      if (nextStage < pomodoroSubTasks.length) {
+        setPomodoroStage(nextStage);
+        handleStartSubTask(pomodoroSubTasks[nextStage]);
+      } else {
+        handleStop(true);
+      }
+      return;
+    }
+    
+    setSessionCompletedSubTaskIds(prev => new Set(prev).add(activeSubTask.id));
+  
     if ('completed' in activeSubTask) {
       updateActivitySubtask(activity.id, activeSubTask.id, { completed: true });
     } else {
-      // Calculate elapsed time for the current sub-task and log it
       const startTime = activeFocusSession.subTaskStartTime || activeFocusSession.startTime;
       const durationMs = Date.now() - startTime;
       const durationMinutes = Math.max(1, Math.floor(durationMs / 60000));
       logSubTaskTime(activeSubTask.id, durationMinutes);
-      setSessionCompletedSubTaskIds(prev => new Set(prev).add(activeSubTask.id));
     }
     setPromptForCompletion(false);
   
     const updatedCompletedIds = new Set(sessionCompletedSubTaskIds).add(activeSubTask.id);
-    const nextTask = subTasks.find(st => !updatedCompletedIds.has(st.id) && !('completed' in st && st.completed) && !('loggedDuration' in st && (st.loggedDuration || 0 > 0)));
+    const nextTask = subTasks.find(st => !updatedCompletedIds.has(st.id));
   
     if (nextTask) {
       handleStartSubTask(nextTask);
@@ -251,9 +273,11 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     handleStartSubTask,
     handleStop,
     activeFocusSession,
-    activity.id,
+    activity,
     updateActivitySubtask,
     sessionCompletedSubTaskIds,
+    pomodoroStage,
+    pomodoroSubTasks,
   ]);
   
   const handleStandaloneTaskComplete = () => {
@@ -270,14 +294,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
   useEffect(() => {
     if (activeFocusSession?.state === 'idle' && showSubTasks) {
-      const allDone = subTasks.length > 0 && subTasks.every(isSubTaskComplete);
+      const allDone = activity.type === 'pomodoro' ? pomodoroStage >= pomodoroSubTasks.length : subTasks.length > 0 && subTasks.every(t => isSubTaskComplete(t));
       if (allDone) {
         handleStop(true);
       } else if (activeSubTask) {
         handleStartSubTask(activeSubTask);
       }
     }
-  }, [activeFocusSession?.state, showSubTasks, activeSubTask, handleStartSubTask, isSubTaskComplete, subTasks, handleStop]);
+  }, [activeFocusSession?.state, showSubTasks, activeSubTask, handleStartSubTask, isSubTaskComplete, subTasks, handleStop, activity.type, pomodoroStage, pomodoroSubTasks]);
 
   useEffect(() => {
     if (activeFocusSession?.secondsLeft === 0 && activeFocusSession.state === 'running') {
@@ -360,7 +384,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
   const strokeDashoffset = totalSeconds > 0 ? CIRCUMFERENCE - (elapsedSeconds / totalSeconds * CIRCUMFERENCE) : CIRCUMFERENCE;
   
-  const allSubTasksCompleted = showSubTasks && !activeSubTask;
+  const allSubTasksCompleted = showSubTasks && (activity.type === 'pomodoro' ? pomodoroStage >= pomodoroSubTasks.length : !activeSubTask);
   let nowFocusingText: string;
 
   if (allSubTasksCompleted) {
@@ -372,7 +396,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }
 
   const doesSubTaskNeedDuration = (task: any) => {
-      // Check for simple sub-tasks that always need duration, or exercise-based ones without a pre-set duration.
       return ('completed' in task) || !('estimatedDuration' in task && task.estimatedDuration && task.estimatedDuration > 0);
   };
 
@@ -481,7 +504,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               <h4 className="text-sm font-semibold mb-2">Pending Sub-tasks</h4>
               <ScrollArea className="h-48 mb-2">
                 <div className="space-y-2 pr-2">
-                  {pendingSubTasks.map(task => (
+                  {pendingSubTasks.map((task) => (
                     <div key={task.id} className="flex items-center gap-2 text-sm p-1 rounded-md bg-muted/30">
                         <Button
                             variant="ghost"
@@ -521,8 +544,8 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               <h4 className="text-sm font-semibold my-2">Completed</h4>
               <ScrollArea className="h-28">
                 <div className="space-y-2 pr-2">
-                    {completedSubTaskComponents.map(task => (
-                       <div key={task.id} className="flex items-center justify-between text-sm p-1 rounded-md bg-green-500/10">
+                    {completedSubTaskComponents.map((task, index) => (
+                       <div key={task.id || index} className="flex items-center justify-between text-sm p-1 rounded-md bg-green-500/10">
                             <div className="flex items-center gap-2 text-muted-foreground">
                                 <Check className="h-4 w-4 text-green-500" />
                                 <span className="line-through">{task.name}</span>
@@ -558,4 +581,3 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       );
 }
 
-    
