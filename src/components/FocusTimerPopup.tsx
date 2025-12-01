@@ -23,7 +23,7 @@ interface FocusTimerPopupProps {
   duration: number; // in minutes
   initialSecondsLeft: number;
   onClose: () => void;
-  onLogTime: (activity: Activity, minutes: number) => void;
+  onLogDuration: (activity: Activity, minutes: number) => void;
   onToggleMicroSkillRepetition: (coreSkillId: string, areaId: string, microSkillId: string, isReady: boolean) => void;
 }
 
@@ -78,7 +78,7 @@ const EditableStep = React.memo(({ point, onUpdate, onDelete }: { point: { id: s
 EditableStep.displayName = 'EditableStep';
 
 
-export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogTime, onToggleMicroSkillRepetition }: FocusTimerPopupProps) {
+export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClose, onLogDuration, onToggleMicroSkillRepetition }: FocusTimerPopupProps) {
   const { 
       activeFocusSession, setActiveFocusSession, 
       updateActivity, handleToggleComplete,
@@ -122,13 +122,25 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     return allDefs.find(d => parentId.startsWith(d.id));
   }, [activity.taskIds, deepWorkDefinitions, upskillDefinitions]);
   
+  const pomodoroSubTasks = useMemo(() => {
+    if (activity.type !== 'pomodoro') return [];
+    const totalDuration = activeFocusSession?.duration || duration;
+    const remainingTimeForReflect = Math.max(5, totalDuration - 3 - 5);
+    return [
+      { id: 'pomodoro_goal', name: "What is the Goal?", completed: false, estimatedDuration: 3 },
+      { id: 'pomodoro_visualize', name: "Visualize the action", completed: false, estimatedDuration: 5 },
+      { id: 'pomodoro_reflect', name: "Reflect", completed: false, estimatedDuration: remainingTimeForReflect },
+    ];
+  }, [activity.type, activeFocusSession?.duration, duration]);
+  
   const subTasks = useMemo(() => {
+    if (activity.type === 'pomodoro') return pomodoroSubTasks;
     if (activity.subTasks && activity.subTasks.length > 0) {
       return activity.subTasks.map(st => ({
         id: st.id,
         name: st.text,
         completed: st.completed,
-        estimatedDuration: 25, // Default duration for sub-tasks
+        estimatedDuration: 25,
       }));
     }
     if (!focusedObjective) return [];
@@ -137,7 +149,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         ...(focusedObjective.linkedUpskillIds || [])
     ];
     return childrenIds.map(id => allDefinitions.get(id)).filter((t): t is ExerciseDefinition => !!t);
-  }, [activity.subTasks, focusedObjective, allDefinitions]);
+  }, [activity.type, activity.subTasks, focusedObjective, allDefinitions, pomodoroSubTasks]);
   
   const isSubTaskComplete = useCallback((subTask: SubTask | ExerciseDefinition) => {
     if ('completed' in subTask) { // It's a generic SubTask
@@ -164,7 +176,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   }, [subTasks, isSubTaskComplete]);
 
   const showSubTasks = useMemo(() => {
-      return (activity.type === 'deepwork' || activity.type === 'upskill' || (activity.subTasks && activity.subTasks.length > 0)) && subTasks.length > 0;
+      return (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'pomodoro' || (activity.subTasks && activity.subTasks.length > 0)) && subTasks.length > 0;
   }, [activity.type, activity.subTasks, subTasks]);
 
   const style: React.CSSProperties = {
@@ -224,7 +236,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     setPromptForCompletion(false);
   
     const updatedCompletedIds = new Set(sessionCompletedSubTaskIds).add(activeSubTask.id);
-    const nextTask = subTasks.find(st => !updatedCompletedIds.has(st.id) && !(st as ExerciseDefinition).loggedDuration && !('completed' in st && st.completed));
+    const nextTask = subTasks.find(st => !updatedCompletedIds.has(st.id) && !('completed' in st && st.completed) && !('loggedDuration' in st && (st.loggedDuration || 0 > 0)));
   
     if (nextTask) {
       handleStartSubTask(nextTask);
@@ -248,9 +260,9 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       const { startTime } = activeFocusSession;
       const elapsedMs = Date.now() - startTime;
       const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
-      onLogTime(activity, elapsedMinutes);
+      onLogDuration(activity, elapsedMinutes);
     } else {
-      onLogTime(activity, activity.focusSessionInitialDuration || duration);
+      onLogDuration(activity, activity.focusSessionInitialDuration || duration);
     }
     onClose();
   };
@@ -535,7 +547,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                     </div>
                     <Button onClick={handleExtendTimer} className="w-full">Extend Session</Button>
                      <Button onClick={showSubTasks ? handleSubTaskComplete : handleStandaloneTaskComplete} variant="secondary" className="w-full">
-                        Complete & Next
+                        Complete &amp; Next
                     </Button>
                 </div>
             )}
