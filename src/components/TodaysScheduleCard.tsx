@@ -6,7 +6,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition } from '@/types/workout';
 import {
-  Grab, Dock, Move, History, PlusCircle, BrainCircuit
+  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { format, addDays } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
+import { useToast } from '@/hooks/use-toast';
 
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
@@ -53,6 +54,7 @@ export function TodaysScheduleCard({
     toggleRoutine,
     setSchedule: setGlobalSchedule,
   } = useAuth();
+  const { toast } = useToast();
 
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
@@ -200,6 +202,30 @@ export function TodaysScheduleCard({
         return newSchedule;
     });
   };
+  
+  const handleAddPomodoro = () => {
+    const newActivity: Activity = {
+      id: `pomodoro-${Date.now()}`,
+      type: 'pomodoro',
+      details: 'New Pomodoro',
+      completed: false,
+      slot: currentSlot,
+      habitEquationIds: [],
+      taskIds: [],
+    };
+    setGlobalSchedule(prev => {
+      const daySchedule = prev[dayKey] || {};
+      const slotActivities = (daySchedule[currentSlot as SlotName] as Activity[] || []);
+      return {
+        ...prev,
+        [dayKey]: {
+          ...daySchedule,
+          [currentSlot]: [...slotActivities, newActivity],
+        },
+      };
+    });
+    toast({ title: 'Pomodoro Added', description: `A new Pomodoro session has been added to your ${currentSlot} slot.` });
+  };
 
 
   const cardContent = (
@@ -211,6 +237,10 @@ export function TodaysScheduleCard({
             <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                 <div className="flex items-center">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleAddPomodoro}>
+                        <Timer className="h-4 w-4" />
+                        <span className="sr-only">Add Pomodoro</span>
+                    </Button>
                     <Popover>
                         <PopoverTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">
