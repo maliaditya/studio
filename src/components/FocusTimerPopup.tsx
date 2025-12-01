@@ -205,7 +205,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       }
     }
     onClose();
-  }, [activity, onLogTime, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, toast, focusedObjective?.name, activeFocusSession]);
+  }, [activity, onClose, setIsAudioPlaying, updateActivity, handleToggleComplete, showSubTasks, toast, focusedObjective?.name, activeFocusSession]);
   
   const handleSubTaskComplete = useCallback(() => {
     if (!activeSubTask || !activeFocusSession) return;
@@ -244,11 +244,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   ]);
   
   const handleStandaloneTaskComplete = () => {
-    const elapsedSeconds = (Date.now() - (activity.focusSessionInitialStartTime || Date.now())) / 1000;
-    const elapsedMinutes = Math.max(1, Math.floor(elapsedSeconds / 60));
-    onLogTime(activity, elapsedMinutes);
-    handleToggleComplete(activity.slot, activity.id, true);
-    toast({ title: "Task Complete!", description: `You've completed "${activity.details}".` });
+    if (activeFocusSession) {
+      const { startTime } = activeFocusSession;
+      const elapsedMs = Date.now() - startTime;
+      const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
+      onLogTime(activity, elapsedMinutes);
+    } else {
+      onLogTime(activity, activity.focusSessionInitialDuration || duration);
+    }
     onClose();
   };
 
@@ -541,3 +544,5 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
   );
 }
+
+    
