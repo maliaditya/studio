@@ -400,7 +400,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             duration={activeFocusSession.duration}
             initialSecondsLeft={activeFocusSession.secondsLeft}
             onClose={() => setActiveFocusSession(null)}
-            onLogTime={onLogDuration}
+            onLogDuration={onLogDuration}
             onToggleMicroSkillRepetition={authContext.handleToggleMicroSkillRepetition}
           />
         )}
