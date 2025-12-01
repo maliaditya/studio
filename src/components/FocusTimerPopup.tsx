@@ -112,6 +112,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const [isConverting, setIsConverting] = useState(false);
   const [conversionType, setConversionType] = useState<'upskill' | 'deepwork' | ''>('');
   const [selectedDefinitionId, setSelectedDefinitionId] = useState<string>('');
+  const [accumulatedPomodoroTime, setAccumulatedPomodoroTime] = useState(0);
 
 
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -242,15 +243,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (!activeSubTask || !activeFocusSession) return;
   
     if (activity.type === 'pomodoro') {
+      const stageDuration = activeSubTask.estimatedDuration || 0;
+      setAccumulatedPomodoroTime(prev => prev + stageDuration);
+      
       const nextStage = pomodoroStage + 1;
       if (nextStage < pomodoroSubTasks.length) {
         setPomodoroStage(nextStage);
         handleStartSubTask(pomodoroSubTasks[nextStage]);
       } else {
-        // End of Pomodoro session, start conversion flow
-        const elapsedMs = Date.now() - (activeFocusSession.initialStartTime ?? activeFocusSession.startTime);
-        const elapsedMinutes = Math.max(1, Math.round(elapsedMs / 60000));
-        onLogDuration(activity, elapsedMinutes);
         setIsConverting(true);
       }
       return;
@@ -286,7 +286,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     sessionCompletedSubTaskIds,
     pomodoroStage,
     pomodoroSubTasks,
-    onLogDuration,
     isSubTaskComplete
   ]);
   
@@ -312,14 +311,22 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         toast({ title: 'Error', description: 'Selected task definition not found.', variant: 'destructive'});
         return;
     }
-
-    updateActivity({
+    
+    const updatedActivity = {
         ...activity,
         type: conversionType,
         details: definition.name,
         taskIds: [definition.id],
         linkedEntityType: conversionType === 'deepwork' ? 'intention' : 'curiosity',
-    });
+        duration: accumulatedPomodoroTime,
+        completed: true,
+        completedAt: Date.now(),
+        focusSessionInitialStartTime: activeFocusSession?.initialStartTime,
+        focusSessionEndTime: Date.now(),
+    };
+    
+    updateActivity(updatedActivity);
+    onLogDuration(updatedActivity, accumulatedPomodoroTime);
 
     toast({ title: 'Task Converted!', description: `Pomodoro session logged as "${definition.name}".`});
     onClose();
@@ -441,7 +448,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const renderConversionView = () => (
     <div className="p-4 space-y-4">
         <h3 className="font-semibold text-center">Session Complete!</h3>
-        <p className="text-sm text-muted-foreground text-center">Log this {formatMinutes(activeFocusSession.duration)} session as:</p>
+        <p className="text-sm text-muted-foreground text-center">Log this {formatMinutes(accumulatedPomodoroTime)} session as:</p>
         <Select value={conversionType} onValueChange={v => { setConversionType(v as any); setSelectedDefinitionId(''); }}>
             <SelectTrigger><SelectValue placeholder="Select Activity Type..." /></SelectTrigger>
             <SelectContent>
@@ -655,5 +662,3 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
       );
 }
-
-    
