@@ -210,6 +210,7 @@ export interface Activity {
   routine?: RecurrenceRule | null;
   isRoutine?: boolean;
   linkedEntityType?: 'specialization' | 'intention' | 'curiosity';
+  linkedActivityType?: ActivityType;
 };
 
 export interface Interrupt {
