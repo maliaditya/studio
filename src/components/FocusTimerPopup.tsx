@@ -4,7 +4,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from './ui/button';
-import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save, Menu, PlusCircle, Briefcase, BookCopy, ChevronLeft, Badge } from 'lucide-react';
+import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save, Menu, PlusCircle, Briefcase, BookCopy, ChevronLeft, Flag, Bolt, Focus, Frame, Lightbulb } from 'lucide-react';
 import type { Activity, PauseEvent, ExerciseDefinition, PostSessionReview, SubTask, ActivityType } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDraggable } from '@dnd-kit/core';
@@ -18,6 +18,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { format, formatDistanceStrict } from 'date-fns';
+import { Badge } from './ui/badge';
 
 interface FocusTimerPopupProps {
   activity: Activity;
@@ -132,7 +133,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const pomodoroSubTasks = useMemo(() => {
     if (activity.type !== 'pomodoro') return [];
     const totalDuration = activeFocusSession?.duration || duration;
-    const actionTime = Math.max(5, totalDuration - 3 - 5 - 5);
+    const actionTime = Math.max(5, totalDuration - 3 - 5 - 5); // Goal(3) + Visualize(5) + Reflect(5)
     return [
       { id: 'pomodoro_goal', name: "What is the Goal?", completed: false, estimatedDuration: 3, loggedDuration: 0 },
       { id: 'pomodoro_visualize', name: "Visualize the action", completed: false, estimatedDuration: 5, loggedDuration: 0 },
@@ -191,7 +192,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         return pomodoroSubTasks.slice(0, pomodoroStage).map(task => {
             const startTime = activeFocusSession?.pomodoroStageTimings?.[task.id]?.startTime;
             const endTime = activeFocusSession?.pomodoroStageTimings?.[task.id]?.endTime;
-            const loggedDuration = startTime && endTime ? Math.round((endTime - startTime) / 60000) : task.estimatedDuration || 0;
+            const loggedDuration = startTime && endTime ? Math.round((endTime - startTime) / 60000) : 0;
             return { ...task, loggedDuration: loggedDuration };
         });
     }
@@ -211,7 +212,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     willChange: 'transform',
   };
   
-  const handleStartSubTask = useCallback((subTask: (SubTask | ExerciseDefinition | {id: string; name: string, estimatedDuration: number})) => {
+  const handleStartSubTask = useCallback((subTask: (SubTask | ExerciseDefinition | {id: string; name: string, estimatedDuration: number}))) => {
     const durationMins = 'estimatedDuration' in subTask ? (subTask.estimatedDuration || 25) : 25;
     if (activeFocusSession) {
         let updatedTimings = activeFocusSession.pomodoroStageTimings || {};
@@ -270,7 +271,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             ...prev,
             pomodoroStageTimings: {
                 ...stageTimings,
-                [activeSubTask.id]: { ...currentStageTiming, startTime, endTime }
+                [activeSubTask.id]: { startTime, endTime }
             }
         } : null);
 
@@ -337,7 +338,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (activity.type === 'pomodoro' && linkedActivityType) {
         updateActivity({ ...activity, linkedActivityType });
     }
-  }, [linkedActivityType, activity.type, activity, updateActivity]);
+  }, [linkedActivityType, activity, updateActivity]);
 
 
   useEffect(() => {
@@ -623,14 +624,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
               <ScrollArea className="h-28">
                 <div className="space-y-2 pr-2">
                     {completedSubTaskComponents.map((task) => {
-                      const loggedTime = ('loggedDuration' in task && task.loggedDuration) ? task.loggedDuration : ('id' in task ? getLoggedMinutesForTask(task.id) : 0);
+                      const loggedTime = ('loggedDuration' in task && task.loggedDuration) ? task.loggedDuration : 0;
                       return (
                        <div key={task.id} className="flex items-center justify-between text-sm p-1 rounded-md bg-green-500/10">
                             <div className="flex items-center gap-2 text-muted-foreground">
                                 <Check className="h-4 w-4 text-green-500" />
                                 <span className="line-through">{task.name}</span>
                             </div>
-                            {loggedTime && <Badge variant="secondary" className="text-xs">{loggedTime}m logged</Badge>}
+                            {loggedTime > 0 && <Badge variant="secondary" className="text-xs">{loggedTime}m logged</Badge>}
                        </div>
                     )})}
                     {completedSubTaskComponents.length === 0 && (
@@ -660,3 +661,5 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
       );
 }
+
+    
