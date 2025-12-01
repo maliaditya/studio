@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { Badge } from './ui/badge';
 
 interface FocusTimerPopupProps {
   activity: Activity;
@@ -310,7 +311,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
     if (activity.type === 'pomodoro' && linkedActivityType) {
         updateActivity({ ...activity, linkedActivityType });
     }
-  }, [linkedActivityType, activity.type]);
+  }, [linkedActivityType, activity.type, activity, updateActivity]);
 
 
   useEffect(() => {
