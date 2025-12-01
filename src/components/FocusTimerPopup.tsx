@@ -125,11 +125,12 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const pomodoroSubTasks = useMemo(() => {
     if (activity.type !== 'pomodoro') return [];
     const totalDuration = activeFocusSession?.duration || duration;
-    const remainingTimeForReflect = Math.max(5, totalDuration - 3 - 5);
+    const actionTime = Math.max(5, totalDuration - 3 - 5 - 5);
     return [
-      { id: 'pomodoro_goal', name: "What is the Goal?", completed: false, estimatedDuration: 3 },
-      { id: 'pomodoro_visualize', name: "Visualize the action", completed: false, estimatedDuration: 5 },
-      { id: 'pomodoro_reflect', name: "Reflect", completed: false, estimatedDuration: remainingTimeForReflect },
+        { id: 'pomodoro_goal', name: "What is the Goal?", completed: false, estimatedDuration: 3 },
+        { id: 'pomodoro_visualize', name: "Visualize the action", completed: false, estimatedDuration: 5 },
+        { id: 'pomodoro_action', name: "Action", completed: false, estimatedDuration: actionTime },
+        { id: 'pomodoro_reflect', name: "Reflect", completed: false, estimatedDuration: 5 },
     ];
   }, [activity.type, activeFocusSession?.duration, duration]);
   
@@ -547,14 +548,14 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
                     </div>
                     <Button onClick={handleExtendTimer} className="w-full">Extend Session</Button>
                      <Button onClick={showSubTasks ? handleSubTaskComplete : handleStandaloneTaskComplete} variant="secondary" className="w-full">
-                        Complete &amp; Next
+                        Complete & Next
                     </Button>
                 </div>
             )}
             </CardContent>
         </Card>
         </div>
-  );
+      );
 }
 
     
