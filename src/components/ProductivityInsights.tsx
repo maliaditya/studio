@@ -92,9 +92,25 @@ export function ProductivityInsights() {
         const productiveActivities = sortedActivities.filter(a => isProductive[a.name]).slice(0, 2);
         const unproductiveActivities = sortedActivities.filter(a => !isProductive[a.name]).slice(0, 2);
 
+        // Logic for causality chains
+        const keyProductive = ['Planning', 'Learning', 'Deep Work'];
+        const keyUnproductive = ['Interrupts', 'Distractions'];
+
+        const productiveChain = keyProductive.map(name => ({
+            name,
+            up: dailyTotals[name]?.time > 0,
+        }));
+
+        const unproductiveChain = keyUnproductive.map(name => ({
+            name,
+            up: dailyTotals[name]?.time > 0,
+        }));
+
         return {
             productive: productiveActivities,
             unproductive: unproductiveActivities,
+            productiveChain,
+            unproductiveChain,
         };
 
     }, [schedule, activityDurations]);
@@ -103,6 +119,20 @@ export function ProductivityInsights() {
         if (minutes < 60) return `${Math.round(minutes)}m`;
         return `${(minutes / 60).toFixed(1)}h`;
     }
+
+    const ChainDisplay = ({ chain }: { chain: { name: string; up: boolean }[] }) => (
+        <div className="flex items-center gap-1.5 text-xs font-semibold">
+            {chain.map((item, index) => (
+                <React.Fragment key={item.name}>
+                    <div className="flex items-center gap-0.5">
+                        <span className={item.up ? 'text-foreground' : 'text-muted-foreground'}>{item.name}</span>
+                        {item.up ? <ArrowUp className="h-3 w-3 text-green-500" /> : <ArrowDown className="h-3 w-3 text-red-500" />}
+                    </div>
+                    {index < chain.length - 1 && <ArrowRight className="h-3 w-3 text-muted-foreground" />}
+                </React.Fragment>
+            ))}
+        </div>
+    );
 
     return (
         <Card className="bg-transparent border-0 shadow-none">
@@ -114,6 +144,11 @@ export function ProductivityInsights() {
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">
+                    <div className="space-y-2">
+                        <ChainDisplay chain={todaysInsights.productiveChain} />
+                        <ChainDisplay chain={todaysInsights.unproductiveChain} />
+                    </div>
+
                     {todaysInsights.productive.length > 0 && (
                         <div>
                             <h4 className="text-sm font-semibold mb-1">Productive Focus</h4>
