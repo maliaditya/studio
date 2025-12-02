@@ -24,21 +24,22 @@ const activityNameMap: Record<ActivityType, string> = {
     pomodoro: 'Pomodoro',
 };
 
-const isProductive: Record<ActivityType, boolean> = {
-    planning: true,
-    upskill: true,
-    deepwork: true,
-    workout: true,
-    mindset: true,
-    branding: true,
-    'lead-generation': true,
-    essentials: true,
-    tracking: true,
-    nutrition: true,
-    interrupts: false,
-    distractions: false,
-    pomodoro: true,
+const isProductive: Record<string, boolean> = {
+    'Deep Work': true,
+    'Learning': true,
+    'Workout': true,
+    'Mindset': true,
+    'Branding': true,
+    'Essentials': true,
+    'Planning': true,
+    'Tracking': true,
+    'Lead Gen': true,
+    'Nutrition': true,
+    'Pomodoro': true,
+    'Interrupts': false,
+    'Distractions': false,
 };
+
 
 export function ProductivityInsights() {
     const { schedule, activityDurations } = useAuth();
@@ -46,7 +47,7 @@ export function ProductivityInsights() {
     const todaysInsights = useMemo(() => {
         const todayKey = format(new Date(), 'yyyy-MM-dd');
         const daySchedule = schedule[todayKey] || {};
-        const dailyTotals: Record<string, { time: number; tasks: { name: string; duration: number }[] }> = {};
+        const dailyTotals: Record<string, { time: number; tasks: { name: string; duration: number }[], slots: Set<string> }> = {};
 
         const parseDurationToMinutes = (durationStr: string | undefined): number => {
             if (!durationStr) return 0;
@@ -69,20 +70,27 @@ export function ProductivityInsights() {
 
                 if (mappedName && duration > 0) {
                     if (!dailyTotals[mappedName]) {
-                        dailyTotals[mappedName] = { time: 0, tasks: [] };
+                        dailyTotals[mappedName] = { time: 0, tasks: [], slots: new Set() };
                     }
                     dailyTotals[mappedName].time += duration;
                     dailyTotals[mappedName].tasks.push({ name: activity.details, duration });
+                    if (activity.slot) {
+                      dailyTotals[mappedName].slots.add(activity.slot);
+                    }
                 }
             }
         });
         
         const sortedActivities = Object.entries(dailyTotals)
-            .map(([name, data]) => ({ name, ...data }))
+            .map(([name, data]) => ({ 
+                name, 
+                ...data,
+                slots: Array.from(data.slots) 
+            }))
             .sort((a, b) => b.time - a.time);
 
-        const productiveActivities = sortedActivities.filter(a => isProductive[Object.keys(activityNameMap).find(key => activityNameMap[key as ActivityType] === a.name) as ActivityType]).slice(0, 2);
-        const unproductiveActivities = sortedActivities.filter(a => !isProductive[Object.keys(activityNameMap).find(key => activityNameMap[key as ActivityType] === a.name) as ActivityType]).slice(0, 2);
+        const productiveActivities = sortedActivities.filter(a => isProductive[a.name]).slice(0, 2);
+        const unproductiveActivities = sortedActivities.filter(a => !isProductive[a.name]).slice(0, 2);
 
         return {
             productive: productiveActivities,
@@ -110,7 +118,7 @@ export function ProductivityInsights() {
                         <div>
                             <h4 className="text-sm font-semibold mb-1">Productive Focus</h4>
                             <p className="text-sm text-muted-foreground">
-                                Your main efforts today were in: {todaysInsights.productive.map(a => a.name).join(' and ')}.
+                                Your main efforts today were in: {todaysInsights.productive.map(a => `${a.name} (${a.slots.join(', ')})`).join(' and ')}.
                             </p>
                              <ul className="text-xs text-muted-foreground list-disc list-inside pl-2 mt-1">
                                 {todaysInsights.productive.flatMap(a => a.tasks).map((task, i) => (
@@ -123,7 +131,7 @@ export function ProductivityInsights() {
                         <div>
                             <h4 className="text-sm font-semibold mb-1">Main Distractions</h4>
                             <p className="text-sm text-muted-foreground">
-                                Your biggest time sinks were: {todaysInsights.unproductive.map(a => a.name).join(' and ')}.
+                                Your biggest time sinks were: {todaysInsights.unproductive.map(a => `${a.name} (${a.slots.join(', ')})`).join(' and ')}.
                             </p>
                             <ul className="text-xs text-muted-foreground list-disc list-inside pl-2 mt-1">
                                 {todaysInsights.unproductive.flatMap(a => a.tasks).map((task, i) => (
