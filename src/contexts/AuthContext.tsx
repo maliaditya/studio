@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -11,7 +12,7 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import { format, addDays, parseISO, subDays, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay, getHours, startOfToday } from 'date-fns';
+import { format, addDays, parseISO, subDays, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay, getHours, startOfToday, isSameDay } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
@@ -511,8 +512,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [offerizationPlans, setOfferizationPlans] = useState<Record<string, ProductizationPlan>>({});
 
   // Resources State
-  const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
   const [resources, setResources] = useState<Resource[]>([]);
+  const [resourceFolders, setResourceFolders] = useState<ResourceFolder[]>([]);
   const [pinnedFolderIds, setPinnedFolderIds] = useState<Set<string>>(new Set());
   const [activeResourceTabIds, setActiveResourceTabIds] = useState<string[]>([]);
   const [selectedResourceFolderId, setSelectedResourceFolderId] = useState<string | null>(null);
@@ -3568,3 +3569,4 @@ export const useAuth = (): AuthContextType => {
 };
     
     
+
