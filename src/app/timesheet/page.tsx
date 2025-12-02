@@ -20,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Tooltip, Line, LineChart as RechartsLineChart, CartesianGrid, Legend } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart as RechartsPieChart, Tooltip, Line, LineChart as RechartsLineChart, CartesianGrid, Legend, Pie } from 'recharts';
 import { TimeAllocationChart } from '@/components/ProductivitySnapshot';
 import { ProductivityInsights } from '@/components/ProductivityInsights';
 
@@ -306,7 +306,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                     </CardHeader>
                 )}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card className={cn(isModal ? 'bg-transparent border-0 shadow-none' : '')}>
+                     <Card className={cn(isModal ? 'bg-transparent border-0 shadow-none' : '')}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base"><PieChartIcon/> Time Allocation</CardTitle>
                         </CardHeader>
@@ -328,12 +328,10 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                         const activitiesInSlot = activitiesForDay.filter(act => act.slot === slot.name);
                         
                         const productiveTime = activitiesInSlot
-                            .filter(a => ['deepwork', 'upskill', 'branding', 'lead-generation', 'planning', 'tracking'].includes(a.type))
+                            .filter(a => ['deepwork', 'upskill', 'branding', 'lead-generation', 'planning', 'tracking', 'workout', 'mindset', 'essentials', 'nutrition', 'pomodoro'].includes(a.type))
                             .reduce((sum, act) => sum + act.calculatedDuration, 0);
 
-                        const unproductiveTime = activitiesInSlot
-                            .filter(a => ['interrupt', 'distraction'].includes(a.type))
-                            .reduce((sum, act) => sum + act.calculatedDuration, 0);
+                        const unproductiveTime = Math.max(0, 240 - productiveTime);
 
                         const allTasksInSlot = schedule[dateKey]?.[slot.name as keyof typeof schedule[string]] || [];
                         const totalTasks = Array.isArray(allTasksInSlot) ? allTasksInSlot.length : 0;
@@ -429,7 +427,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                         {pieData.length > 0 ? (
                                             <ChartContainer config={{}} className="h-32 w-32">
                                                 <ResponsiveContainer>
-                                                    <PieChart>
+                                                    <RechartsPieChart>
                                                         <ChartTooltip
                                                             content={({ active, payload }) => {
                                                                 if (active && payload && payload.length) {
@@ -456,7 +454,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                                                 <Cell key={`cell-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
                                                             ))}
                                                         </Pie>
-                                                    </PieChart>
+                                                    </RechartsPieChart>
                                                 </ResponsiveContainer>
                                             </ChartContainer>
                                         ) : (
@@ -518,7 +516,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                         <CardContent className="p-2 flex-grow flex items-center justify-center">
                                             <ChartContainer config={{}} className="h-32 w-32">
                                                 <ResponsiveContainer>
-                                                    <PieChart>
+                                                    <RechartsPieChart>
                                                         <ChartTooltip
                                                             content={({ active, payload }) => {
                                                                 if (active && payload && payload.length) {
@@ -545,7 +543,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                                                 <Cell key={`cell-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
                                                             ))}
                                                         </Pie>
-                                                    </PieChart>
+                                                    </RechartsPieChart>
                                                 </ResponsiveContainer>
                                             </ChartContainer>
                                         </CardContent>
@@ -632,4 +630,5 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
+
 
