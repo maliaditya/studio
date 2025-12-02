@@ -522,7 +522,8 @@ export function ChartsPageContent() {
     const allCategoriesData = useMemo(() => {
         const categories = Object.values(activityNameMap);
         const categoryData = categories.map(category => {
-            const historicalData = Object.entries(schedule).map(([date, dailySchedule]) => {
+            const historicalData: { date: string, time: number }[] = [];
+            Object.entries(schedule).forEach(([date, dailySchedule]) => {
                 const dailyTotal = Object.values(dailySchedule).flat().reduce((sum, activity: Activity) => {
                     if (activity && activity.completed && activityNameMap[activity.type] === category) {
                         const durationStr = activityDurations[activity.id]?.replace(' min', '');
@@ -531,14 +532,15 @@ export function ChartsPageContent() {
                     }
                     return sum;
                 }, 0);
-                return { date, time: dailyTotal };
-            })
-            .filter(item => item.time > 0)
-            .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-            
+
+                if (dailyTotal > 0) {
+                    historicalData.push({ date, time: dailyTotal });
+                }
+            });
+
             return {
                 category,
-                historicalData,
+                historicalData: historicalData.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
             };
         });
 
@@ -815,5 +817,3 @@ export default function ChartsPage() {
         </AuthGuard>
     );
 }
-
-    
