@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -10,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
-import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon } from 'lucide-react';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
@@ -19,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Tooltip, Pie } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Tooltip, Line, LineChart as RechartsLineChart, CartesianGrid, Legend } from 'recharts';
 import { ActivityDistributionCard } from '@/components/ActivityDistributionCard';
 
 interface TimesheetPageContentProps {
@@ -52,6 +53,23 @@ interface ProcessedActivity extends Activity {
     calculatedDuration: number; // in minutes
 }
 
+const activityNameMap: Record<ActivityTypeType, string> = {
+    deepwork: 'Deep Work',
+    upskill: 'Learning',
+    workout: 'Workout',
+    mindset: 'Mindset',
+    branding: 'Branding',
+    essentials: 'Essentials',
+    planning: 'Planning',
+    tracking: 'Tracking',
+    'lead-generation': 'Lead Gen',
+    interrupt: 'Interrupts',
+    distraction: 'Distractions',
+    nutrition: 'Nutrition',
+    pomodoro: 'Pomodoro',
+};
+
+
 const activityColorMapping: Record<string, string> = {
     'Deep Work': 'hsl(var(--chart-1))',
     'Learning': 'hsl(var(--chart-2))',
@@ -64,8 +82,10 @@ const activityColorMapping: Record<string, string> = {
     'Interrupts': 'hsl(var(--destructive))',
     'Distractions': 'hsl(var(--destructive))',
     'Nutrition': 'hsl(var(--chart-4))',
-    'Mindset': 'hsl(var(--chart-5))',
+    'Untracked Time': 'hsl(var(--muted))',
+    'Scheduled': 'hsl(var(--muted))',
     'Free Time': 'hsl(var(--muted))',
+    'Mindset': 'hsl(var(--chart-5))',
 };
 
 
@@ -236,23 +256,10 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
             });
 
             const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
-            const activityNameMap: Record<ActivityTypeType, string> = { 
-                deepwork: 'Deep Work', 
-                upskill: 'Learning', 
-                workout: 'Workout', 
-                branding: 'Branding', 
-                essentials: 'Essentials', 
-                planning: 'Planning', 
-                tracking: 'Tracking', 
-                'lead-generation': 'Lead Gen', 
-                interrupt: 'Interrupts',
-                distraction: 'Distractions', 
-                nutrition: 'Nutrition',
-                mindset: 'Mindset',
-             };
             
             processedActivities.forEach(activity => {
-                const mappedName = activityNameMap[activity.type];
+                const effectiveType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+                const mappedName = activityNameMap[effectiveType];
                 if (mappedName) {
                     if (!totals[mappedName]) totals[mappedName] = { time: 0, activities: [] };
                     totals[mappedName].time += activity.calculatedDuration;
@@ -274,26 +281,30 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     }, [selectedDate, viewMode, activityFilter, schedule, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, activityDurations]);
     
     const timeAllocationData = useMemo(() => {
-      const dateKey = format(selectedDate, 'yyyy-MM-dd');
-      const dayData = timeData.dailyData[dateKey];
-      return dayData?.pieData.filter(d => d.name !== 'Free Time') || [];
-    }, [selectedDate, timeData]);
-
-    const pieData = useMemo(() => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
-        return timeData.dailyData[dateKey]?.pieData || [];
+        const dayData = timeData.dailyData[dateKey];
+        return dayData?.pieData.filter(d => d.name !== 'Free Time') || [];
+    }, [selectedDate, timeData]);
+    
+    const activityDistributionData = useMemo(() => {
+        const dateKey = format(selectedDate, 'yyyy-MM-dd');
+        const dayData = timeData.dailyData[dateKey];
+        if (!dayData) return [];
+
+        const PREFERRED_ORDER = ['Untracked Time', 'Free Time', 'Scheduled', 'Distractions'];
+
+        return [...dayData.pieData].sort((a, b) => {
+            const aIndex = PREFERRED_ORDER.indexOf(a.name);
+            const bIndex = PREFERRED_ORDER.indexOf(b.name);
+    
+            if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+            if (aIndex !== -1) return -1;
+            if (bIndex !== -1) return 1;
+            return b.value - a.value;
+        });
+
     }, [selectedDate, timeData]);
 
-    const allActivitiesInView = useMemo(() => {
-        const activities = new Set<string>();
-        Object.values(timeData.dailyData).forEach(day => {
-            day.pieData.forEach(p => {
-                activities.add(p.name);
-            });
-        });
-        return Array.from(activities).sort();
-    }, [timeData.dailyData]);
-    
     const renderDayView = () => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
         const activitiesForDay = timeData.dailyData[dateKey]?.activities || [];
@@ -329,10 +340,12 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     
         return (
             <div className="space-y-6">
-                <CardHeader className="text-center">
-                    <CardTitle>Day View: {format(selectedDate, 'PPP')}</CardTitle>
-                    <CardDescription>A summary of your logged time and attention for the selected day.</CardDescription>
-                </CardHeader>
+                {!isModal && (
+                    <CardHeader className="text-center">
+                        <CardTitle>Day View: {format(selectedDate, 'PPP')}</CardTitle>
+                        <CardDescription>A summary of your logged time and attention for the selected day.</CardDescription>
+                    </CardHeader>
+                )}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <Card>
                         <CardHeader>
@@ -346,8 +359,8 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                             <ChartTooltip
                                                 content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />}
                                             />
-                                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} stroke="hsl(var(--background))" strokeWidth={2} label={({ name, value }) => value > 60 ? `${name}` : ''}>
-                                                {pieData.map((entry) => (
+                                            <Pie data={timeAllocationData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} stroke="hsl(var(--background))" strokeWidth={2} label={({ name, value }) => value > 60 ? `${name}` : ''}>
+                                                {timeAllocationData.map((entry) => (
                                                 <Cell key={`cell-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
                                                 ))}
                                             </Pie>
@@ -359,9 +372,30 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                             )}
                         </CardContent>
                     </Card>
-                    <div className="mt-[-1rem]">
-                      <ActivityDistributionCard />
-                    </div>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base"><LineChartLucide /> Activity Distribution</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ScrollArea className="h-[250px]">
+                                <ul className="space-y-2 pr-4">
+                                    {activityDistributionData.map(item => (
+                                        <li key={item.name}>
+                                            <div className="flex justify-between items-center text-sm w-full text-left group">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[item.name] || 'bg-gray-400' }}></div>
+                                                    <span className="font-medium text-foreground">{item.name}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="font-semibold text-muted-foreground">{formatMinutes(item.value)}</span>
+                                                </div>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {slotOrder.map(slot => {
@@ -436,7 +470,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                 </CardHeader>
                  <CardContent>
                     <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs mb-4">
-                        {allActivitiesInView.map((name) => (
+                        {Object.keys(activityColorMapping).map((name) => (
                             <div key={name} className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[name] || '#8884d8' }}/>
                                 <span>{name}</span>
@@ -523,7 +557,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                 </CardHeader>
                 <CardContent>
                     <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs mb-4">
-                        {allActivitiesInView.map((name) => (
+                        {Object.keys(activityColorMapping).map((name) => (
                             <div key={name} className="flex items-center gap-2">
                                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[name] || '#8884d8' }}/>
                                 <span>{name}</span>
@@ -600,7 +634,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     return (
         <div className={cn("container mx-auto", isModal ? "p-0 h-full flex flex-col" : "p-4 sm:p-6 lg:p-8")}>
             <Card className={cn(isModal && "border-0 shadow-none flex-grow flex flex-col min-h-0")}>
-                {!isModal && (
+                 {!isModal && (
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Clock /> Timesheet</CardTitle>
                         <CardDescription>Review your logged time. Durations for Deep Work and Upskill tasks are calculated from your logged sessions.</CardDescription>
@@ -670,5 +704,6 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
+
 
 
