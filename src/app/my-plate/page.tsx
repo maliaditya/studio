@@ -412,11 +412,13 @@ function MyPlatePageContent() {
           distraction: 'Distractions', 
           nutrition: 'Nutrition',
           mindset: 'Mindset',
+          pomodoro: 'Pomodoro',
         };
       
         dailyActivities.forEach((activity) => {
           if (activity && activity.completed) {
-            const mappedName = activityNameMap[activity.type];
+            const activityType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+            const mappedName = activityNameMap[activityType];
             if (mappedName) {
               const duration = parseDurationToMinutes(activityDurations[activity.id]);
               if (duration > 0) {
@@ -683,5 +685,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
-
-    
