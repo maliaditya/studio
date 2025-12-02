@@ -644,4 +644,3 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
     </>
   );
 }
-

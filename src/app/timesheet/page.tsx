@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -19,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Tooltip, Line, LineChart as RechartsLineChart, CartesianGrid, Legend } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart as RechartsPieChart, Pie, Tooltip, Line, LineChart as RechartsLineChart, CartesianGrid, Legend } from 'recharts';
 import { ActivityDistributionCard, TimeAllocationChart } from '@/components/ProductivitySnapshot';
 
 interface TimesheetPageContentProps {
@@ -346,7 +347,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                     </CardHeader>
                 )}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                     <Card>
+                    <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base"><PieChartIcon/> Time Allocation</CardTitle>
                         </CardHeader>
@@ -483,7 +484,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                         {pieData.length > 0 ? (
                                             <ChartContainer config={{}} className="h-32 w-32">
                                                 <ResponsiveContainer>
-                                                    <PieChart>
+                                                    <RechartsPieChart>
                                                         <ChartTooltip
                                                             content={({ active, payload }) => {
                                                                 if (active && payload && payload.length) {
@@ -510,7 +511,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                                                 <Cell key={`cell-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
                                                             ))}
                                                         </Pie>
-                                                    </PieChart>
+                                                    </RechartsPieChart>
                                                 </ResponsiveContainer>
                                             </ChartContainer>
                                         ) : (
@@ -572,7 +573,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                         <CardContent className="p-2 flex-grow flex items-center justify-center">
                                             <ChartContainer config={{}} className="h-32 w-32">
                                                 <ResponsiveContainer>
-                                                    <PieChart>
+                                                    <RechartsPieChart>
                                                         <ChartTooltip
                                                             content={({ active, payload }) => {
                                                                 if (active && payload && payload.length) {
@@ -599,7 +600,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                                                 <Cell key={`cell-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
                                                             ))}
                                                         </Pie>
-                                                    </PieChart>
+                                                    </RechartsPieChart>
                                                 </ResponsiveContainer>
                                             </ChartContainer>
                                         </CardContent>
@@ -686,6 +687,7 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
+
 
 
 
