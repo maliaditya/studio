@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
-import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide } from 'lucide-react';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide, Check, CheckCircle, XCircle } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
@@ -20,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart as RechartsPieChart, Pie, Tooltip, Line, LineChart as RechartsLineChart, CartesianGrid, Legend } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Tooltip, Line, LineChart as RechartsLineChart, CartesianGrid, Legend } from 'recharts';
 import { TimeAllocationChart } from '@/components/ProductivitySnapshot';
 import { ProductivityInsights } from '@/components/ProductivityInsights';
 
@@ -284,74 +284,29 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     const timeAllocationData = useMemo(() => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
         const dayData = timeData.dailyData[dateKey];
-        const todaysSchedule = schedule[dateKey] || {};
-        const dailyActivities = todaysSchedule ? Object.values(todaysSchedule).flat() as Activity[] : [];
-        const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
-      
-        dailyActivities.forEach((activity) => {
-          if (activity && activity.completed) {
-            const activityType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
-            const mappedName = activityNameMap[activityType];
-            if (mappedName) {
-              const duration = parseDurationToMinutes(activityDurations[activity.id]);
-              if (duration > 0) {
-                if (!totals[mappedName]) {
-                  totals[mappedName] = { time: 0, activities: [] };
-                }
-                totals[mappedName].time += duration;
-                totals[mappedName].activities.push({ name: activity.details, duration });
-              }
-            }
-          }
-        });
-      
-        return Object.entries(totals).map(([name, data]) => ({ name, time: data.time, activities: data.activities }));
-    }, [selectedDate, timeData, schedule, activityDurations]);
+        if (!dayData) return [];
+        return dayData.pieData.map(d => ({
+            name: d.name,
+            time: d.value,
+            activities: d.activities,
+        }));
+    }, [selectedDate, timeData]);
     
 
     const renderDayView = () => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
         const activitiesForDay = timeData.dailyData[dateKey]?.activities || [];
-        
-        const calculateAttentionMetrics = (activity: Activity) => {
-            if (!activity.focusSessionInitialStartTime || !activity.focusSessionEndTime) {
-                return { totalFocusMinutes: 0, totalBreakMinutes: 0 };
-            }
-    
-            const pauses = Array.isArray(activity.focusSessionPauses) ? activity.focusSessionPauses : [];
-    
-            let lastEventTime = activity.focusSessionInitialStartTime;
-            let workIntervalsMs: number[] = [];
-    
-            pauses.forEach(p => {
-                if (p.resumeTime) {
-                    workIntervalsMs.push(p.pauseTime - lastEventTime);
-                    lastEventTime = p.resumeTime;
-                }
-            });
-            workIntervalsMs.push(activity.focusSessionEndTime - lastEventTime);
-    
-            const validWorkIntervalsMs = workIntervalsMs.filter(i => i > 1000); // Ignore intervals less than a second
-            const totalFocusMs = validWorkIntervalsMs.reduce((sum, i) => sum + i, 0);
-            
-            const totalBreakMs = (activity.focusSessionEndTime - activity.focusSessionInitialStartTime) - totalFocusMs;
-    
-            return {
-                totalFocusMinutes: Math.round(totalFocusMs / 60000),
-                totalBreakMinutes: Math.round(totalBreakMs / 60000),
-            };
-        };
     
         return (
             <div className="space-y-6">
-                {!isModal && (
+                 {!isModal && (
                     <CardHeader className="text-center">
                         <CardTitle>Day View: {format(selectedDate, 'PPP')}</CardTitle>
-                        <CardDescription>A summary of your logged time and attention for the selected day.</CardDescription>
+                        <CardDescription>A summary of your logged time for the selected day.</CardDescription>
                     </CardHeader>
                 )}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card className={isModal ? 'bg-transparent border-0 shadow-none' : ''}>
+                    <Card className={cn(isModal ? 'bg-transparent border-0 shadow-none' : '')}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base"><PieChartIcon/> Time Allocation</CardTitle>
                         </CardHeader>
@@ -359,22 +314,31 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                             <TimeAllocationChart timeAllocationData={timeAllocationData} />
                         </CardContent>
                     </Card>
-                    <ProductivityInsights />
+                    <Card className={cn(isModal ? 'bg-transparent border-0 shadow-none' : '')}>
+                         <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base"><Briefcase /> Productivity Insights</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ProductivityInsights />
+                        </CardContent>
+                    </Card>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {slotOrder.map(slot => {
                         const activitiesInSlot = activitiesForDay.filter(act => act.slot === slot.name);
-                        const totalDuration = activitiesInSlot.reduce((sum, act) => sum + act.calculatedDuration, 0);
-                        const { totalFocusMinutes, totalBreakMinutes } = activitiesInSlot.reduce(
-                            (acc, act) => {
-                                const metrics = calculateAttentionMetrics(act);
-                                acc.totalFocusMinutes += metrics.totalFocusMinutes;
-                                acc.totalBreakMinutes += metrics.totalBreakMinutes;
-                                return acc;
-                            },
-                            { totalFocusMinutes: 0, totalBreakMinutes: 0 }
-                        );
-    
+                        
+                        const productiveTime = activitiesInSlot
+                            .filter(a => ['deepwork', 'upskill', 'branding', 'lead-generation', 'planning', 'tracking'].includes(a.type))
+                            .reduce((sum, act) => sum + act.calculatedDuration, 0);
+
+                        const unproductiveTime = activitiesInSlot
+                            .filter(a => ['interrupt', 'distraction'].includes(a.type))
+                            .reduce((sum, act) => sum + act.calculatedDuration, 0);
+
+                        const allTasksInSlot = schedule[dateKey]?.[slot.name as keyof typeof schedule[string]] || [];
+                        const totalTasks = Array.isArray(allTasksInSlot) ? allTasksInSlot.length : 0;
+                        const completedTasks = Array.isArray(allTasksInSlot) ? allTasksInSlot.filter(a => a.completed).length : 0;
+
                         return (
                             <Card key={slot.name}>
                                 <CardHeader>
@@ -383,35 +347,35 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                             {slot.icon}
                                             {slot.name}
                                         </div>
-                                        <div className="text-sm font-medium text-muted-foreground">
-                                            {formatMinutes(totalDuration)} / 4h
-                                        </div>
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between items-baseline">
-                                            <span className="text-sm text-muted-foreground">Total Time</span>
-                                            <span className="text-xl font-bold">{formatMinutes(totalDuration)}</span>
+                                     <div className="space-y-2 text-sm">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-muted-foreground">Productive Time</span>
+                                            <span className="font-bold text-green-500">{formatMinutes(productiveTime)}</span>
                                         </div>
-                                        <div className="flex justify-between items-baseline">
-                                            <span className="text-sm text-muted-foreground flex items-center gap-2"><BrainCircuit className="h-4 w-4" />Focused</span>
-                                            <span className="text-lg font-semibold">{formatMinutes(totalFocusMinutes)}</span>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-muted-foreground">Unproductive Time</span>
+                                            <span className="font-bold text-red-500">{formatMinutes(unproductiveTime)}</span>
                                         </div>
-                                        <div className="flex justify-between items-baseline">
-                                            <span className="text-sm text-muted-foreground flex items-center gap-2"><Coffee className="h-4 w-4" />Breaks</span>
-                                            <span className="text-lg font-semibold">{formatMinutes(totalBreakMinutes)}</span>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-muted-foreground">Tasks Completed</span>
+                                            <span className="font-bold">{completedTasks} / {totalTasks}</span>
                                         </div>
                                     </div>
-                                    {activitiesInSlot.length > 0 && <Separator />}
-                                    <div className="space-y-2">
-                                        {activitiesInSlot.map(act => (
-                                            <div key={act.id} className="text-xs p-2 rounded-md bg-muted/50">
-                                                <p className="font-medium truncate text-foreground">{act.details}</p>
-                                                <p className="text-muted-foreground capitalize">{act.type.replace('-', ' ')} - {formatMinutes(act.calculatedDuration)}</p>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    {activitiesInSlot.length > 0 && (
+                                        <div className="pt-2 border-t">
+                                            <ul className="space-y-1">
+                                                {activitiesInSlot.map(act => (
+                                                    <li key={act.id} className="text-xs flex justify-between">
+                                                        <span className="truncate pr-2" title={act.details}>{act.details}</span>
+                                                        <span className="font-medium text-muted-foreground">{formatMinutes(act.calculatedDuration)}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         );
@@ -465,7 +429,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                         {pieData.length > 0 ? (
                                             <ChartContainer config={{}} className="h-32 w-32">
                                                 <ResponsiveContainer>
-                                                    <RechartsPieChart>
+                                                    <PieChart>
                                                         <ChartTooltip
                                                             content={({ active, payload }) => {
                                                                 if (active && payload && payload.length) {
@@ -492,7 +456,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                                                 <Cell key={`cell-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
                                                             ))}
                                                         </Pie>
-                                                    </RechartsPieChart>
+                                                    </PieChart>
                                                 </ResponsiveContainer>
                                             </ChartContainer>
                                         ) : (
@@ -554,7 +518,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                         <CardContent className="p-2 flex-grow flex items-center justify-center">
                                             <ChartContainer config={{}} className="h-32 w-32">
                                                 <ResponsiveContainer>
-                                                    <RechartsPieChart>
+                                                    <PieChart>
                                                         <ChartTooltip
                                                             content={({ active, payload }) => {
                                                                 if (active && payload && payload.length) {
@@ -581,7 +545,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                                                 <Cell key={`cell-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
                                                             ))}
                                                         </Pie>
-                                                    </RechartsPieChart>
+                                                    </PieChart>
                                                 </ResponsiveContainer>
                                             </ChartContainer>
                                         </CardContent>
@@ -596,7 +560,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     };
 
     return (
-        <div className={cn("container mx-auto", isModal ? "p-0 h-full flex flex-col" : "p-4 sm:p-6 lg:p-8")}>
+        <div className={cn("container mx-auto", isModal ? "p-0 h-full flex flex-col bg-transparent" : "p-4 sm:p-6 lg:p-8")}>
             <Card className={cn(isModal && "border-0 shadow-none flex-grow flex flex-col min-h-0 bg-transparent")}>
                  {!isModal && (
                     <CardHeader>
@@ -668,10 +632,4 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
-
-
-
-
-
-
 
