@@ -21,7 +21,8 @@ import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent,
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart as RechartsPieChart, Pie, Tooltip, Line, LineChart as RechartsLineChart, CartesianGrid, Legend } from 'recharts';
-import { ActivityDistributionCard, TimeAllocationChart } from '@/components/ProductivitySnapshot';
+import { TimeAllocationChart } from '@/components/ProductivitySnapshot';
+import { ProductivityInsights } from '@/components/ProductivityInsights';
 
 interface TimesheetPageContentProps {
   isModal?: boolean;
@@ -283,27 +284,30 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     const timeAllocationData = useMemo(() => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
         const dayData = timeData.dailyData[dateKey];
-        return dayData?.pieData.filter(d => d.name !== 'Free Time') || [];
-    }, [selectedDate, timeData]);
-    
-    const activityDistributionData = useMemo(() => {
-        const dateKey = format(selectedDate, 'yyyy-MM-dd');
-        const dayData = timeData.dailyData[dateKey];
-        if (!dayData) return [];
-
-        const PREFERRED_ORDER = ['Untracked Time', 'Free Time', 'Scheduled', 'Distractions'];
-
-        return [...dayData.pieData].sort((a, b) => {
-            const aIndex = PREFERRED_ORDER.indexOf(a.name);
-            const bIndex = PREFERRED_ORDER.indexOf(b.name);
-    
-            if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
-            if (aIndex !== -1) return -1;
-            if (bIndex !== -1) return 1;
-            return b.value - a.value;
+        const todaysSchedule = schedule[dateKey] || {};
+        const dailyActivities = todaysSchedule ? Object.values(todaysSchedule).flat() as Activity[] : [];
+        const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
+      
+        dailyActivities.forEach((activity) => {
+          if (activity && activity.completed) {
+            const activityType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+            const mappedName = activityNameMap[activityType];
+            if (mappedName) {
+              const duration = parseDurationToMinutes(activityDurations[activity.id]);
+              if (duration > 0) {
+                if (!totals[mappedName]) {
+                  totals[mappedName] = { time: 0, activities: [] };
+                }
+                totals[mappedName].time += duration;
+                totals[mappedName].activities.push({ name: activity.details, duration });
+              }
+            }
+          }
         });
-
-    }, [selectedDate, timeData]);
+      
+        return Object.entries(totals).map(([name, data]) => ({ name, time: data.time, activities: data.activities }));
+    }, [selectedDate, timeData, schedule, activityDurations]);
+    
 
     const renderDayView = () => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -347,7 +351,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                     </CardHeader>
                 )}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card>
+                    <Card className={isModal ? 'bg-transparent border-0 shadow-none' : ''}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base"><PieChartIcon/> Time Allocation</CardTitle>
                         </CardHeader>
@@ -355,30 +359,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                             <TimeAllocationChart timeAllocationData={timeAllocationData} />
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-base"><LineChartLucide /> Activity Distribution</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <ScrollArea className="h-[250px]">
-                                <ul className="space-y-2 pr-4">
-                                    {activityDistributionData.map(item => (
-                                        <li key={item.name}>
-                                            <div className="flex justify-between items-center text-sm w-full text-left group">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[item.name] || 'bg-gray-400' }}></div>
-                                                    <span className="font-medium text-foreground">{item.name}</span>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <span className="font-semibold text-muted-foreground">{formatMinutes(item.value)}</span>
-                                                </div>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </ScrollArea>
-                        </CardContent>
-                    </Card>
+                    <ProductivityInsights />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {slotOrder.map(slot => {
@@ -687,6 +668,7 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
+
 
 
 
