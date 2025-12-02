@@ -46,7 +46,7 @@ export function ProductivityInsights() {
     const todaysInsights = useMemo(() => {
         const todayKey = format(new Date(), 'yyyy-MM-dd');
         const daySchedule = schedule[todayKey] || {};
-        const dailyTotals: Record<ActivityType, number> = {} as any;
+        const dailyTotals: Record<string, { time: number; tasks: { name: string; duration: number }[] }> = {};
 
         const parseDurationToMinutes = (durationStr: string | undefined): number => {
             if (!durationStr) return 0;
@@ -64,21 +64,25 @@ export function ProductivityInsights() {
         Object.values(daySchedule).flat().forEach((activity: Activity) => {
             if (activity?.completed) {
                 const effectiveType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+                const mappedName = activityNameMap[effectiveType];
                 const duration = parseDurationToMinutes(activityDurations[activity.id]);
-                if (duration > 0 && dailyTotals[effectiveType] !== undefined) {
-                    dailyTotals[effectiveType] = (dailyTotals[effectiveType] || 0) + duration;
-                } else if (duration > 0) {
-                    dailyTotals[effectiveType] = duration;
+
+                if (mappedName && duration > 0) {
+                    if (!dailyTotals[mappedName]) {
+                        dailyTotals[mappedName] = { time: 0, tasks: [] };
+                    }
+                    dailyTotals[mappedName].time += duration;
+                    dailyTotals[mappedName].tasks.push({ name: activity.details, duration });
                 }
             }
         });
         
         const sortedActivities = Object.entries(dailyTotals)
-            .map(([type, time]) => ({ type: type as ActivityType, time }))
+            .map(([name, data]) => ({ name, ...data }))
             .sort((a, b) => b.time - a.time);
 
-        const productiveActivities = sortedActivities.filter(a => isProductive[a.type]).slice(0, 2);
-        const unproductiveActivities = sortedActivities.filter(a => !isProductive[a.type]).slice(0, 2);
+        const productiveActivities = sortedActivities.filter(a => isProductive[Object.keys(activityNameMap).find(key => activityNameMap[key as ActivityType] === a.name) as ActivityType]).slice(0, 2);
+        const unproductiveActivities = sortedActivities.filter(a => !isProductive[Object.keys(activityNameMap).find(key => activityNameMap[key as ActivityType] === a.name) as ActivityType]).slice(0, 2);
 
         return {
             productive: productiveActivities,
@@ -87,6 +91,10 @@ export function ProductivityInsights() {
 
     }, [schedule, activityDurations]);
 
+    const formatMinutes = (minutes: number) => {
+        if (minutes < 60) return `${Math.round(minutes)}m`;
+        return `${(minutes / 60).toFixed(1)}h`;
+    }
 
     return (
         <Card className="bg-transparent border-0 shadow-none">
@@ -102,16 +110,26 @@ export function ProductivityInsights() {
                         <div>
                             <h4 className="text-sm font-semibold mb-1">Productive Focus</h4>
                             <p className="text-sm text-muted-foreground">
-                                Your main efforts today were in: {todaysInsights.productive.map(a => activityNameMap[a.type]).join(' and ')}.
+                                Your main efforts today were in: {todaysInsights.productive.map(a => a.name).join(' and ')}.
                             </p>
+                             <ul className="text-xs text-muted-foreground list-disc list-inside pl-2 mt-1">
+                                {todaysInsights.productive.flatMap(a => a.tasks).map((task, i) => (
+                                    <li key={i} className="truncate" title={task.name}>{task.name} ({formatMinutes(task.duration)})</li>
+                                ))}
+                            </ul>
                         </div>
                     )}
                      {todaysInsights.unproductive.length > 0 && (
                         <div>
                             <h4 className="text-sm font-semibold mb-1">Main Distractions</h4>
                             <p className="text-sm text-muted-foreground">
-                                Your biggest time sinks were: {todaysInsights.unproductive.map(a => activityNameMap[a.type]).join(' and ')}.
+                                Your biggest time sinks were: {todaysInsights.unproductive.map(a => a.name).join(' and ')}.
                             </p>
+                            <ul className="text-xs text-muted-foreground list-disc list-inside pl-2 mt-1">
+                                {todaysInsights.unproductive.flatMap(a => a.tasks).map((task, i) => (
+                                    <li key={i} className="truncate" title={task.name}>{task.name} ({formatMinutes(task.duration)})</li>
+                                ))}
+                            </ul>
                         </div>
                     )}
                     {todaysInsights.productive.length === 0 && todaysInsights.unproductive.length === 0 && (
