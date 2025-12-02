@@ -223,7 +223,7 @@ export function ActivityDistributionCard() {
     }, []);
 
     const parseDurationToMinutes = (durationStr: string | undefined): number => {
-        if (!durationStr) return 0;
+        if (!durationStr || typeof durationStr !== 'string') return 0;
         let totalMinutes = 0;
         const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
         const minMatch = durationStr.match(/(\d+)\s*m/);
@@ -324,7 +324,7 @@ export function ActivityDistributionCard() {
     
     const allCategoriesData = useMemo(() => {
         const categories = Object.values(activityNameMap);
-        return categories.map(category => {
+        const calculatedData = categories.map(category => {
           const dailyTotals: Record<string, number> = {};
           
           Object.entries(schedule).forEach(([date, dailySchedule]) => {
@@ -351,6 +351,20 @@ export function ActivityDistributionCard() {
             historicalData,
           };
         }).filter(item => item.historicalData.length > 0);
+
+        const order = ['Planning', 'Learning', 'Deep Work', 'Essentials', 'Distractions', 'Workout', 'Interrupts', 'Nutrition', 'Branding', 'Lead Gen', 'Tracking', 'Mindset', 'Pomodoro'];
+
+        return calculatedData.sort((a, b) => {
+            const indexA = order.indexOf(a.category);
+            const indexB = order.indexOf(b.category);
+
+            if (indexA === -1 && indexB === -1) return 0; // both not in order list, keep original order
+            if (indexA === -1) return 1; // a is not in order list, should come after
+            if (indexB === -1) return -1; // b is not in order list, should come after a
+
+            return indexA - indexB;
+        });
+
     }, [schedule, activityDurations]);
 
 
@@ -362,7 +376,7 @@ export function ActivityDistributionCard() {
         for (const dateKey in schedule) {
             const daySchedule = schedule[dateKey];
             let dailyTotalForCategory = 0;
-            const dailyActivitiesForCategory: { name: string, duration: number }[] = [];
+            const dailyActivitiesForCategory: { name: string; duration: number }[] = [];
     
             for (const slotName in daySchedule) {
                 const activities = daySchedule[slotName as keyof DailySchedule] as Activity[];
