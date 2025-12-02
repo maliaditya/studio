@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, isBefore, startOfDay, parseISO, subDays } from 'date-fns';
-import type { Activity, ActivityType, DailySchedule, DatedWorkout } from '@/types/workout';
+import type { Activity, ActivityType, DailySchedule, DatedWorkout, FullSchedule } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 import { PieChart as PieChartIcon, X, LineChart as LineChartIcon, Expand } from 'lucide-react';
 import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
@@ -16,7 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from './ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Tooltip, Pie, Line, LineChart as RechartsLineChart, CartesianGrid, Legend } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Tooltip, Line, LineChart as RechartsLineChart, CartesianGrid, Legend } from 'recharts';
 
 
 const activityNameMap: Record<ActivityType, string> = {
@@ -439,7 +439,7 @@ export function ActivityDistributionCard() {
           return {
             type: 'slot' as const,
             name: slot.name,
-            time: slot.endHour,
+            time: `${slot.startHour}:00 - ${slot.endHour}:00`,
             hourlyData: combinedHourlyData,
             plannedActivities: todayPlannedActivities.map(a => a.details).join(', ') || 'None'
           };
@@ -568,7 +568,7 @@ export function ActivityDistributionCard() {
                 className="fixed w-full max-w-xs z-50"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
+                exit={{ opacity: 0, y: 20 }}
                 transition={{ duration: 0.3 }}
                 onMouseDown={handleMouseDown}
             >
