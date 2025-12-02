@@ -112,3 +112,4 @@ export const AgendaWidgetItem = React.memo(({
     );
 });
 AgendaWidgetItem.displayName = 'AgendaWidgetItem';
+
