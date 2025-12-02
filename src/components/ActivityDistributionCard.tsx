@@ -9,7 +9,6 @@ import { format, isBefore, startOfDay, parseISO, subDays } from 'date-fns';
 import type { Activity, ActivityType, DailySchedule, DatedWorkout, FullSchedule } from '@/types/workout';
 import { ScrollArea } from './ui/scroll-area';
 import { PieChart as PieChartIcon, X, LineChart as LineChartIcon, Expand } from 'lucide-react';
-import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
 import { Button } from './ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
@@ -139,7 +138,7 @@ const ActivityDetailDialog = ({ dialogState, onClose }: {
 const AllTrendsModal = ({ isOpen, onOpenChange, allCategoriesData }: {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    allCategoriesData: { name: string, hourlyData: { name: string, today: number, yesterday: number, todayTasks: string[], yesterdayTasks: string[] }[] }[];
+    allCategoriesData: { category: string, historicalData: { date: string, time: number }[] }[];
 }) => {
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -153,53 +152,43 @@ const AllTrendsModal = ({ isOpen, onOpenChange, allCategoriesData }: {
                 <div className="flex-grow min-h-0 py-4">
                     <ScrollArea className="h-full pr-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {allCategoriesData.map(({ name, hourlyData }) => (
-                                <Card key={name}>
+                            {allCategoriesData.map(({ category, historicalData }) => (
+                                <Card key={category}>
                                     <CardHeader className="pb-2">
                                         <CardTitle className="text-base flex items-center gap-2">
-                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[name] || '#8884d8' }}/>
-                                            {name}
+                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[category] || '#8884d8' }}/>
+                                            {category}
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
                                         <div className="h-[200px] w-full">
-                                            <ChartContainer config={{today: {label: 'Today', color: 'hsl(var(--chart-1))'}, yesterday: {label: 'Yesterday', color: 'hsl(var(--chart-2))'}}} className="w-full h-full">
+                                        {historicalData.length > 1 ? (
+                                            <ChartContainer config={{ time: { label: 'Time (min)' } }} className="w-full h-full">
                                                 <ResponsiveContainer>
-                                                    <RechartsLineChart data={hourlyData} margin={{top: 5, right: 10, left: -20, bottom: -10}}>
-                                                        <XAxis dataKey="name" fontSize={9} interval={0} />
-                                                        <YAxis fontSize={9} />
+                                                    <RechartsLineChart data={historicalData} margin={{top: 5, right: 10, left: -20, bottom: -10}}>
+                                                        <XAxis dataKey="date" fontSize={9} tickFormatter={(tick) => format(parseISO(tick), 'MMM d')} />
+                                                        <YAxis fontSize={9} domain={[0, 'dataMax + 10']}/>
                                                         <Tooltip 
                                                           content={({ active, payload, label }) => {
                                                             if (active && payload && payload.length) {
                                                               return (
                                                                 <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
-                                                                  <p className="font-bold">{label}</p>
-                                                                  {payload.map((p, i) => {
-                                                                    const dataKey = p.dataKey as 'today' | 'yesterday';
-                                                                    const tasks = p.payload[`${dataKey}Tasks`];
-                                                                    return (
-                                                                      <div key={i} style={{ color: p.color }}>
-                                                                        {p.name}: {Math.round(p.value as number)} min
-                                                                        {tasks && tasks.length > 0 && (
-                                                                            <ul className="list-disc list-inside text-muted-foreground">
-                                                                                {tasks.map((task: string, taskIndex: number) => <li key={taskIndex}>{task}</li>)}
-                                                                            </ul>
-                                                                        )}
-                                                                      </div>
-                                                                    )
-                                                                  })}
+                                                                  <p>{format(parseISO(label), 'PPP')}: <strong>{formatMinutes(payload[0].value as number)}</strong></p>
                                                                 </div>
                                                               )
                                                             }
                                                             return null;
                                                           }}
                                                         />
-                                                        <Legend wrapperStyle={{fontSize: '0.7rem'}}/>
-                                                        <Line type="monotone" dataKey="today" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
-                                                        <Line type="monotone" dataKey="yesterday" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} strokeDasharray="3 3"/>
+                                                        <Line type="monotone" dataKey="time" stroke={activityColorMapping[category]} strokeWidth={2} dot={false} />
                                                     </RechartsLineChart>
                                                 </ResponsiveContainer>
                                             </ChartContainer>
+                                        ) : (
+                                            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                                                <p>Not enough data for trend.</p>
+                                            </div>
+                                        )}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -233,63 +222,24 @@ export function ActivityDistributionCard() {
       setIsClient(true);
     }, []);
 
-    const parseFormattedDuration = (durationStr: string | undefined): number => {
-        if (!durationStr || typeof durationStr !== 'string') return 0;
-        
+    const parseDurationToMinutes = (durationStr: string | undefined): number => {
+        if (!durationStr) return 0;
         let totalMinutes = 0;
-        const hourMatch = durationStr.match(/(\d+)\s*h/);
+        const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
         const minMatch = durationStr.match(/(\d+)\s*m/);
 
-        if (hourMatch) totalMinutes += parseInt(hourMatch[1], 10) * 60;
-        if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
-        
-        if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
-             return parseInt(durationStr.trim(), 10);
+        if (hourMatch) {
+            totalMinutes += parseFloat(hourMatch[1]) * 60;
         }
-
+        if (minMatch) {
+            totalMinutes += parseInt(minMatch[1], 10);
+        }
+        if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
+            return parseInt(durationStr.trim(), 10);
+        }
         return totalMinutes;
     };
-
-    const getHistoricalData = (category: string): { date: string; time: number; activities: { name: string, duration: number }[] }[] => {
-        const activityType = Object.keys(activityNameMap).find(key => activityNameMap[key as ActivityType] === category) as ActivityType | undefined;
-        
-        const dailyData: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
     
-        for (const dateKey in schedule) {
-            const daySchedule = schedule[dateKey];
-            let dailyTotalForCategory = 0;
-            const dailyActivitiesForCategory: { name: string, duration: number }[] = [];
-    
-            for (const slotName in daySchedule) {
-                const activities = daySchedule[slotName as keyof DailySchedule] as Activity[];
-                if (Array.isArray(activities)) {
-                    activities.forEach(activity => {
-                         const effectiveActivityType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
-                         if (activity.completed && ((activityType && effectiveActivityType === activityType) || (!activityType && activityNameMap[effectiveActivityType] === category))) {
-                            const duration = parseFormattedDuration(activityDurations[activity.id]);
-                            if (duration > 0) {
-                                dailyTotalForCategory += duration;
-                                dailyActivitiesForCategory.push({ name: activity.details, duration });
-                            }
-                        }
-                    });
-                }
-            }
-    
-            if (dailyTotalForCategory > 0) {
-                if (!dailyData[dateKey]) {
-                    dailyData[dateKey] = { time: 0, activities: [] };
-                }
-                dailyData[dateKey].time += dailyTotalForCategory;
-                dailyData[dateKey].activities.push(...dailyActivitiesForCategory);
-            }
-        }
-    
-        return Object.entries(dailyData)
-            .map(([date, data]) => ({ date, time: data.time, activities: data.activities }))
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    };
-
     const timeAllocation = useMemo(() => {
         const todayKey = format(new Date(), 'yyyy-MM-dd');
         const dailySchedule = schedule[todayKey] || {};
@@ -310,7 +260,7 @@ export function ActivityDistributionCard() {
             const isPastSlot = currentHour >= slot.endHour;
 
             activities.forEach(activity => {
-                const duration = parseFormattedDuration(activityDurations[activity.id]);
+                const duration = parseDurationToMinutes(activityDurations[activity.id]);
                 
                 if (activity.completed) {
                     const effectiveType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
@@ -372,124 +322,77 @@ export function ActivityDistributionCard() {
         
     }, [schedule, currentSlot, activityDurations]);
     
-    const dailyAnalysis = useMemo(() => {
-        const today = new Date();
-        const todayKey = format(today, 'yyyy-MM-dd');
-        const yesterdayKey = format(subDays(today, 1), 'yyyy-MM-dd');
-        const todaysSchedule = schedule[todayKey] || {};
-        const yesterdaysSchedule = schedule[yesterdayKey] || {};
-      
-        const calculateHourlyData = (dailyScheduleForDay: DailySchedule, slot: { name: string, startHour: number, endHour: number }) => {
-            const hourlyData: { hour: number; name: string; minutes: number; tasks: string[] }[] = Array.from({ length: slot.endHour - slot.startHour }, (_, i) => ({
-                hour: slot.startHour + i,
-                name: `${(slot.startHour + i) % 12 === 0 ? 12 : (slot.startHour + i) % 12}${(slot.startHour + i) < 12 ? 'am' : 'pm'}`,
-                minutes: 0,
-                tasks: []
-            }));
+    const allCategoriesData = useMemo(() => {
+        const categories = Object.values(activityNameMap);
+        return categories.map(category => {
+          const dailyTotals: Record<string, number> = {};
+          
+          Object.entries(schedule).forEach(([date, dailySchedule]) => {
+            if (!dailyTotals[date]) dailyTotals[date] = 0;
+            
+            Object.values(dailySchedule).flat().forEach((activity: Activity) => {
+              if (activity && activity.completed) {
+                const effectiveActivityType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+                if (activityNameMap[effectiveActivityType] === category) {
+                    const duration = parseDurationToMinutes(activityDurations[activity.id]);
+                    dailyTotals[date] += duration;
+                }
+              }
+            });
+          });
+          
+          const historicalData = Object.entries(dailyTotals)
+            .filter(([, time]) => time > 0)
+            .map(([date, time]) => ({ date, time }))
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            
+          return {
+            category,
+            historicalData,
+          };
+        }).filter(item => item.historicalData.length > 0);
+    }, [schedule, activityDurations]);
+
+
+    const getHistoricalData = (category: string): { date: string; time: number; activities: { name: string, duration: number }[] }[] => {
+        const activityType = Object.keys(activityNameMap).find(key => activityNameMap[key as ActivityType] === category) as ActivityType | undefined;
         
-            const activities = (dailyScheduleForDay[slot.name as keyof DailySchedule] as Activity[]) || [];
-            activities.filter(a => a.completed).forEach(activity => {
-                if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-                    let current = new Date(activity.focusSessionInitialStartTime);
-                    while (current < new Date(activity.focusSessionEndTime)) {
-                        const currentHour = current.getHours();
-                        const nextHour = new Date(current);
-                        nextHour.setHours(currentHour + 1, 0, 0, 0);
-        
-                        const endOfInterval = new Date(activity.focusSessionEndTime) < nextHour ? new Date(activity.focusSessionEndTime) : nextHour;
-                        const minutesInHour = Math.max(0, (endOfInterval.getTime() - current.getTime()) / 60000);
-                        
-                        const hourIndex = currentHour - slot.startHour;
-                        if (hourIndex >= 0 && hourIndex < hourlyData.length && minutesInHour > 0) {
-                            hourlyData[hourIndex].minutes += minutesInHour;
-                            if (!hourlyData[hourIndex].tasks.includes(activity.details)) {
-                                hourlyData[hourIndex].tasks.push(activity.details);
+        const dailyData: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
+    
+        for (const dateKey in schedule) {
+            const daySchedule = schedule[dateKey];
+            let dailyTotalForCategory = 0;
+            const dailyActivitiesForCategory: { name: string, duration: number }[] = [];
+    
+            for (const slotName in daySchedule) {
+                const activities = daySchedule[slotName as keyof DailySchedule] as Activity[];
+                if (Array.isArray(activities)) {
+                    activities.forEach(activity => {
+                         const effectiveActivityType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+                         if (activity.completed && ((activityType && effectiveActivityType === activityType) || (!activityType && activityNameMap[effectiveActivityType] === category))) {
+                            const duration = parseDurationToMinutes(activityDurations[activity.id]);
+                            if (duration > 0) {
+                                dailyTotalForCategory += duration;
+                                dailyActivitiesForCategory.push({ name: activity.details, duration });
                             }
                         }
-                        current = nextHour;
-                    }
-                } else if (activity.completedAt && activity.duration) {
-                    const completionHour = new Date(activity.completedAt).getHours();
-                    const hourIndex = completionHour - slot.startHour;
-                    if (hourIndex >= 0 && hourIndex < hourlyData.length) {
-                        hourlyData[hourIndex].minutes += activity.duration;
-                         if (!hourlyData[hourIndex].tasks.includes(activity.details)) {
-                            hourlyData[hourIndex].tasks.push(activity.details);
-                        }
-                    }
+                    });
                 }
-            });
-            return hourlyData;
-        };
-      
-        const slotAnalyses = slotOrder.map(slot => {
-          const todayHourly = calculateHourlyData(todaysSchedule, slot);
-          const yesterdayHourly = calculateHourlyData(yesterdaysSchedule, slot);
-          
-          const combinedHourlyData = todayHourly.map((todayData, index) => ({
-            name: todayData.name,
-            today: todayData.minutes,
-            yesterday: yesterdayHourly[index]?.minutes || 0,
-            todayTasks: todayData.tasks,
-            yesterdayTasks: yesterdayHourly[index]?.tasks || [],
-          }));
+            }
     
-          const todayPlannedActivities = (todaysSchedule[slot.name as keyof DailySchedule] as Activity[]) || [];
-          
-          return {
-            type: 'slot' as const,
-            name: slot.name,
-            time: `${slot.startHour}:00 - ${slot.endHour}:00`,
-            hourlyData: combinedHourlyData,
-            plannedActivities: todayPlannedActivities.map(a => a.details).join(', ') || 'None'
-          };
-        });
-      
-        return {
-          carouselItems: slotAnalyses
-        };
-      }, [schedule]);
-
-
-    const allCategoriesData = useMemo(() => {
-        return Object.values(activityNameMap)
-            .map(category => {
-                const name = category;
-                const { today, yesterday, todayTasks, yesterdayTasks } = slotOrder.reduce((acc, slot) => {
-                   const slotData = dailyAnalysis.carouselItems.find(c => c.name === slot.name);
-                   const todayHourlyData = slotData?.hourlyData || [];
-                   const yesterdayHourlyData = slotData?.hourlyData || [];
-                   todayHourlyData.forEach(hour => {
-                       acc.today[hour.name] = (acc.today[hour.name] || 0) + hour.today;
-                       if(hour.today > 0) acc.todayTasks[hour.name] = [...(acc.todayTasks[hour.name] || []), ...hour.todayTasks];
-                   });
-                   yesterdayHourlyData.forEach(hour => {
-                       acc.yesterday[hour.name] = (acc.yesterday[hour.name] || 0) + hour.yesterday;
-                        if(hour.yesterday > 0) acc.yesterdayTasks[hour.name] = [...(acc.yesterdayTasks[hour.name] || []), ...hour.yesterdayTasks];
-                   });
-                   return acc;
-                }, { today: {} as Record<string, number>, yesterday: {} as Record<string, number>, todayTasks: {} as Record<string, string[]>, yesterdayTasks: {} as Record<string, string[]> });
-
-                const hourlyData = slotOrder.flatMap(slot => 
-                    Array.from({ length: 4 }, (_, i) => slot.startHour + i)
-                    .map(h => {
-                        const hourName = `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? 'am' : 'pm'}`;
-                        return {
-                            name: hourName,
-                            today: today[hourName] || 0,
-                            yesterday: yesterday[hourName] || 0,
-                            todayTasks: todayTasks[hourName] || [],
-                            yesterdayTasks: yesterdayTasks[hourName] || [],
-                        };
-                    })
-                );
-                
-               return {
-                   name,
-                   hourlyData
-               };
-            });
-    }, [dailyAnalysis]);
+            if (dailyTotalForCategory > 0) {
+                if (!dailyData[dateKey]) {
+                    dailyData[dateKey] = { time: 0, activities: [] };
+                }
+                dailyData[dateKey].time += dailyTotalForCategory;
+                dailyData[dateKey].activities.push(...dailyActivitiesForCategory);
+            }
+        }
+    
+        return Object.entries(dailyData)
+            .map(([date, data]) => ({ date, time: data.time, activities: data.activities }))
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    };
 
 
     const handleItemClick = (item: { name: string; activities: { name: string, duration: number }[] }) => {
