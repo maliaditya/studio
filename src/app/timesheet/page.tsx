@@ -19,8 +19,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Pie, Tooltip, Line, LineChart as RechartsLineChart, CartesianGrid, Legend } from 'recharts';
-import { ActivityDistributionCard } from '@/components/ActivityDistributionCard';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Tooltip, Line, LineChart as RechartsLineChart, CartesianGrid, Legend } from 'recharts';
+import { ActivityDistributionCard, TimeAllocationChart } from '@/components/ProductivitySnapshot';
 
 interface TimesheetPageContentProps {
   isModal?: boolean;
@@ -346,29 +346,12 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                     </CardHeader>
                 )}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <Card>
+                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base"><PieChartIcon/> Time Allocation</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {timeAllocationData.length > 0 ? (
-                                <ChartContainer config={{}} className="h-[250px] w-full">
-                                    <ResponsiveContainer>
-                                        <PieChart>
-                                            <ChartTooltip
-                                                content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />}
-                                            />
-                                            <Pie data={timeAllocationData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} stroke="hsl(var(--background))" strokeWidth={2} label={({ name, value }) => value > 60 ? `${name}` : ''}>
-                                                {timeAllocationData.map((entry) => (
-                                                <Cell key={`cell-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
-                                                ))}
-                                            </Pie>
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                </ChartContainer>
-                            ) : (
-                                <p className="text-sm text-center text-muted-foreground py-8">No time logged for this day.</p>
-                            )}
+                            <TimeAllocationChart timeAllocationData={timeAllocationData} />
                         </CardContent>
                     </Card>
                     <Card>
@@ -632,7 +615,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
 
     return (
         <div className={cn("container mx-auto", isModal ? "p-0 h-full flex flex-col" : "p-4 sm:p-6 lg:p-8")}>
-            <Card className={cn(isModal && "border-0 shadow-none flex-grow flex flex-col min-h-0")}>
+            <Card className={cn(isModal && "border-0 shadow-none flex-grow flex flex-col min-h-0 bg-transparent")}>
                  {!isModal && (
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2"><Clock /> Timesheet</CardTitle>
@@ -703,6 +686,7 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
+
 
 
 
