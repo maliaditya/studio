@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -601,10 +600,12 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     return (
         <div className={cn("container mx-auto", isModal ? "p-0 h-full flex flex-col" : "p-4 sm:p-6 lg:p-8")}>
             <Card className={cn(isModal && "border-0 shadow-none flex-grow flex flex-col min-h-0")}>
-                <CardHeader className={cn(isModal ? "p-4 border-b flex-shrink-0" : "")}>
-                    <CardTitle className="flex items-center gap-2"><Clock /> Timesheet</CardTitle>
-                    <CardDescription>Review your logged time. Durations for Deep Work and Upskill tasks are calculated from your logged sessions.</CardDescription>
-                </CardHeader>
+                {!isModal && (
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Clock /> Timesheet</CardTitle>
+                        <CardDescription>Review your logged time. Durations for Deep Work and Upskill tasks are calculated from your logged sessions.</CardDescription>
+                    </CardHeader>
+                )}
                 <CardContent className={cn("space-y-6", isModal ? "p-4 flex-grow min-h-0 flex flex-col" : "")}>
                     <div className="flex flex-wrap items-center gap-4 flex-shrink-0">
                         <Popover>
