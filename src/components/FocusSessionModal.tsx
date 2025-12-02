@@ -17,7 +17,7 @@ import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle, ArrowRight, Minus, Save } from 'lucide-react';
-import type { Activity, HabitEquation, Resource } from '@/types/workout';
+import type { Activity, HabitEquation, Resource, ActivityType } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   ResponsiveContainer,
@@ -39,6 +39,8 @@ interface FocusSessionModalProps {
   initialDuration: number;
 }
 
+const pomodoroActivityTypes: ActivityType[] = ['deepwork', 'upskill', 'essentials', 'distraction'];
+
 export function FocusSessionModal({
   isOpen,
   onOpenChange,
@@ -48,7 +50,7 @@ export function FocusSessionModal({
   initialDuration,
 }: FocusSessionModalProps) {
   const { allDeepWorkLogs, allUpskillLogs, pillarEquations, metaRules, resources, openRuleDetailPopup, openGeneralPopup, setPillarEquations, schedule, setSchedule, activeFocusSession, updateActivity } = useAuth();
-  const [duration, setDuration] = useState(45);
+  const [duration, setDuration] = useState(30);
   const [skipBreaks, setSkipBreaks] = useState(false);
   
   const [isSelectRulesOpen, setIsSelectRulesOpen] = useState(false);
@@ -59,18 +61,14 @@ export function FocusSessionModal({
   const [selectedResourceId, setSelectedResourceId] = useState<string>('');
 
   const [dailyGoalHours, setDailyGoalHours] = useState(8);
+  
+  const [linkedActivityType, setLinkedActivityType] = useState<ActivityType | ''>(activity?.linkedActivityType || '');
 
   useEffect(() => {
-    setDuration(initialDuration > 0 ? initialDuration : 45);
-  }, [initialDuration, isOpen]);
+    setDuration(initialDuration > 0 ? initialDuration : 30);
+    setLinkedActivityType(activity?.linkedActivityType || '');
+  }, [initialDuration, isOpen, activity]);
 
-  useEffect(() => {
-    if (activity?.habitEquationIds) {
-      setTempSelectedRuleIds(activity.habitEquationIds);
-    } else {
-      setTempSelectedRuleIds([]);
-    }
-  }, [activity]);
   
   // These are placeholders for future functionality.
   const [breakMinutes, setBreakMinutes] = useState(5);
@@ -121,6 +119,7 @@ export function FocusSessionModal({
         focusSessionEndTime: undefined,
         focusSessionPauses: [],
         focusSessionInitialDuration: duration,
+        linkedActivityType: activity.type === 'pomodoro' ? (linkedActivityType as ActivityType) : undefined,
       };
       updateActivity(updatedActivity); // Persist the initial start time immediately
       onStartSession(updatedActivity, duration);
@@ -133,60 +132,14 @@ export function FocusSessionModal({
   };
   
   const breaks = Math.floor(duration / (breakAfterMinutes + breakMinutes));
-
-  const allEquations = useMemo(() => Object.values(pillarEquations).flat(), [pillarEquations]);
   
-  const handleSaveRuleSelection = () => {
-    if (!activity) return;
-    const { slot } = activity;
-
-    setSchedule(prevSchedule => {
-        const dateKey = Object.keys(prevSchedule).find(key => 
-            Object.values(prevSchedule[key]).flat().some(act => act.id === activity.id)
-        );
-
-        if (!dateKey) return prevSchedule;
-
-        const newSchedule = { ...prevSchedule };
-        const daySchedule = { ...newSchedule[dateKey] };
-
-        if (daySchedule[slot]) {
-            daySchedule[slot] = (daySchedule[slot] as Activity[]).map(act => 
-                act.id === activity.id ? { ...act, habitEquationIds: tempSelectedRuleIds } : act
-            );
-            newSchedule[dateKey] = daySchedule;
-        }
-        return newSchedule;
-    });
-    setIsSelectRulesOpen(false);
-  };
-  
-  
-  const handleLinkResourceSave = () => {
-    if (!linkingToEquationId || !selectedResourceId) return;
-
-    setPillarEquations(prevPillars => {
-        const newPillars = { ...prevPillars };
-        for (const pillar in newPillars) {
-            newPillars[pillar] = (newPillars[pillar] || []).map(eq =>
-                eq.id === linkingToEquationId ? { ...eq, linkedResourceId: selectedResourceId } : eq
-            );
-        }
-        return newPillars;
-    });
-    setIsLinkResourceOpen(false);
-    setLinkingToEquationId(null);
-    setSelectedResourceId('');
-  };
-  
-  const selectedRules = useMemo(() => {
-    if (!activity?.habitEquationIds) return [];
-    return allEquations.filter(eq => activity.habitEquationIds!.includes(eq.id));
-  }, [activity, allEquations]);
-
   const handleLogDurationClick = () => {
     if (activity) {
-      onLogDuration(activity, duration);
+      const activityToLog: Activity = {
+        ...activity,
+        linkedActivityType: activity.type === 'pomodoro' ? (linkedActivityType as ActivityType) : undefined,
+      };
+      onLogDuration(activityToLog, duration);
       onOpenChange(false);
     }
   };
@@ -209,6 +162,23 @@ export function FocusSessionModal({
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => handleDurationChange(5)}><PlusCircle /></Button>
             </div>
             <p className="text-center text-sm text-muted-foreground -mt-2">minutes</p>
+            {activity.type === 'pomodoro' && (
+                <div className="space-y-1">
+                    <Label htmlFor="link-activity-type">Link to Activity</Label>
+                    <Select value={linkedActivityType} onValueChange={(value) => setLinkedActivityType(value as ActivityType)}>
+                        <SelectTrigger id="link-activity-type">
+                            <SelectValue placeholder="Select activity type..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {pomodoroActivityTypes.map(type => (
+                                <SelectItem key={type} value={type} className="capitalize">
+                                    {type.replace('-', ' ')}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
             <div className="flex items-center space-x-2 justify-center">
                 <Checkbox id="skip-breaks-modal" checked={skipBreaks} onCheckedChange={(checked) => setSkipBreaks(!!checked)} />
                 <Label htmlFor="skip-breaks-modal">Skip breaks</Label>
