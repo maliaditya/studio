@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
@@ -658,3 +659,5 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
         </div>
       );
 }
+
+  
