@@ -1,8 +1,7 @@
 
-
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
@@ -28,7 +27,7 @@ import { MissedSlotModal } from '@/components/MissedSlotModal';
 import { InterruptModal } from '@/components/InterruptModal';
 import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
 import { PistonsHead } from '@/components/PistonsHead';
-import { format, startOfToday, isAfter, parseISO } from 'date-fns';
+import { format, startOfToday, isAfter, parseISO, isBefore } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -36,7 +35,7 @@ import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import type { Project, Activity, MissedSlotReview } from '@/types/workout';
+import type { Project, Activity, MissedSlotReview, SlotName } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { MindsetCategoriesCard } from '@/components/MindsetCategoriesCard';
@@ -154,35 +153,64 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   // State for end-of-slot modal
   const [missedSlotModalState, setMissedSlotModalState] = React.useState<{ isOpen: boolean; slotName: string; allTasks: Activity[]; incompleteTasks: Activity[] }>({ isOpen: false, slotName: '', allTasks: [], incompleteTasks: [] });
 
+  const prevSlotRef = useRef<string | null>(null);
 
   useEffect(() => {
-    document.body.classList.remove('theme-default', 'theme-matrix', 'theme-ad-dark');
-    document.body.classList.add(`theme-${theme}`);
+      document.body.classList.remove('theme-default', 'theme-matrix', 'theme-ad-dark');
+      document.body.classList.add(`theme-${theme}`);
   }, [theme]);
 
   useEffect(() => {
-    setIsBrowser(true);
+      setIsBrowser(true);
   }, []);
+
+  useEffect(() => {
+      if (!currentSlot) return;
+      const timerInterval = setInterval(() => {
+          const now = new Date();
+          const slotEndHour = slotEndHours[currentSlot];
+          const slotEndTime = new Date(); slotEndTime.setHours(slotEndHour, 0, 0, 0);
+          
+          if (now > slotEndTime) {
+            slotEndTime.setDate(slotEndTime.getDate() + 1);
+          }
+
+          const diff = slotEndTime.getTime() - now.getTime();
+          
+          if (diff > 0) {
+              const hours = Math.floor(diff / (1000 * 60 * 60));
+              const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+              const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+              setRemainingTime(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
+          } else { 
+              setRemainingTime('00:00:00'); 
+          }
+      }, 1000);
+      return () => clearInterval(timerInterval);
+  }, [currentSlot]);
   
   useEffect(() => {
-    if (!currentSlot) return;
-    const timerInterval = setInterval(() => {
-        const now = new Date();
-        const slotEndHour = slotEndHours[currentSlot];
-        const slotEndTime = new Date(); slotEndTime.setHours(slotEndHour, 0, 0, 0);
-        const diff = slotEndTime.getTime() - now.getTime();
+    if (prevSlotRef.current && prevSlotRef.current !== currentSlot && authContext.settings.smartLogging) {
+        const slotToReview = prevSlotRef.current;
+        const todayKey = format(new Date(), 'yyyy-MM-dd');
+        const daySchedule = schedule[todayKey] || {};
+        const slotActivities = (daySchedule[slotToReview as keyof DailySchedule] as Activity[]) || [];
+        const reviewKey = `${todayKey}-${slotToReview}`;
         
-        if (diff > 0) {
-            const hours = Math.floor(diff / (1000 * 60 * 60));
-            const minutes = Math.floor((diff / 1000 * 60) % 60);
-            const seconds = Math.floor((diff / 1000) % 60);
-            setRemainingTime(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
-        } else { 
-            setRemainingTime('00:00:00'); 
+        const hasBeenReviewed = missedSlotReviews[reviewKey] && missedSlotReviews[reviewKey].reason;
+        
+        const snoozedUntil = missedSlotReviews[reviewKey]?.snoozedUntil;
+        const isSnoozed = snoozedUntil && snoozedUntil > Date.now();
+
+        if (slotActivities.length > 0 && !hasBeenReviewed && !isSnoozed) {
+            const incompleteTasks = slotActivities.filter(a => !a.completed);
+            if (incompleteTasks.length > 0) {
+                setMissedSlotModalState({ isOpen: true, slotName: slotToReview, allTasks: slotActivities, incompleteTasks });
+            }
         }
-    }, 1000);
-    return () => clearInterval(timerInterval);
-  }, [currentSlot]);
+    }
+    prevSlotRef.current = currentSlot;
+}, [currentSlot, authContext.settings.smartLogging, schedule, missedSlotReviews]);
 
 
   useEffect(() => {
@@ -247,9 +275,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     }
     
     if (!hasIncompleteTasks && remainingTime) {
-        const remainingMinutes = parseDurationToMinutes(remainingTime.replace(/:\\d\\d$/, 'm'));
-        if (remainingMinutes > 15) {
-             return { promptType: 'completed', lastSessionReview: null };
+        const timeParts = remainingTime.split(':').map(Number);
+        if (timeParts.length === 3) {
+            const remainingMinutes = timeParts[0] * 60 + timeParts[1];
+            if (remainingMinutes > 15) {
+                return { promptType: 'completed', lastSessionReview: null };
+            }
         }
     }
   
@@ -292,7 +323,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     }
     
     let durationMinutes = parseInt(interruptDuration, 10);
-    if (applyToFutureSlots) {
+    if (applyInterruptToFutureSlots) {
         durationMinutes = 240;
     } else if (isNaN(durationMinutes) || durationMinutes <= 0) {
         toast({ title: 'Invalid Duration', description: 'Please enter a valid number of minutes.', variant: 'destructive' });
@@ -302,7 +333,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     setSchedule(prev => {
         const newDaySchedule = { ...(prev[selectedDateKey] || {}) };
 
-        if (applyToFutureSlots) {
+        if (applyInterruptToFutureSlots) {
             const currentSlotIndex = Object.keys(slotEndHours).indexOf(slotName);
             const slotsToUpdate = Object.keys(slotEndHours).slice(currentSlotIndex);
             
