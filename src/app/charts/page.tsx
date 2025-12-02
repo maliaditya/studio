@@ -520,31 +520,29 @@ export function ChartsPageContent() {
     }, [schedule, activityDurations, selectedActivityDate]);
 
     const allCategoriesData = useMemo(() => {
-        const categoriesWithData = Object.values(activityNameMap)
-            .map(category => {
-                const historicalData = Object.entries(schedule)
-                    .map(([date, dailySchedule]) => {
-                        const dailyTotalForCategory = Object.values(dailySchedule)
-                            .flat()
-                            .filter(activity => activity && activity.completed && activityNameMap[activity.type] === category)
-                            .reduce((sum, activity) => sum + (parseInt(activityDurations[activity.id]?.replace(' min', '') || '0')), 0);
-
-                        return {
-                            date: date,
-                            time: dailyTotalForCategory,
-                            activities: Object.values(dailySchedule).flat().filter(a => a && a.completed && activityNameMap[a.type] === category).map(a => ({ name: a.details, duration: parseInt(activityDurations[a.id]?.replace(' min', '') || '0') }))
-                        };
-                    })
-                    .filter(item => item.time > 0)
-                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-                
-                return {
-                    category,
-                    historicalData,
-                };
+        const categories = Object.values(activityNameMap);
+        const categoryData = categories.map(category => {
+            const historicalData = Object.entries(schedule).map(([date, dailySchedule]) => {
+                const dailyTotal = Object.values(dailySchedule).flat().reduce((sum, activity: Activity) => {
+                    if (activity && activity.completed && activityNameMap[activity.type] === category) {
+                        const durationStr = activityDurations[activity.id]?.replace(' min', '');
+                        const duration = durationStr ? parseInt(durationStr, 10) : 0;
+                        return sum + duration;
+                    }
+                    return sum;
+                }, 0);
+                return { date, time: dailyTotal };
             })
-            .filter(item => item.historicalData.length > 0);
-        return categoriesWithData;
+            .filter(item => item.time > 0)
+            .sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            
+            return {
+                category,
+                historicalData,
+            };
+        });
+
+        return categoryData.filter(item => item.historicalData.length > 0);
     }, [schedule, activityDurations]);
 
 
@@ -817,3 +815,5 @@ export default function ChartsPage() {
         </AuthGuard>
     );
 }
+
+    
