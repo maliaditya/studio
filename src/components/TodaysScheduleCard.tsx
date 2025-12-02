@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition } from '@/types/workout';
 import {
@@ -60,6 +61,8 @@ export function TodaysScheduleCard({
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
   
   const dragControls = useDragControls()
+  const listRef = useRef<HTMLUListElement>(null);
+
 
   useEffect(() => {
     setPurposeText(settings.currentPurpose || '');
@@ -93,6 +96,12 @@ export function TodaysScheduleCard({
         return slotOrder.indexOf(a.slot as SlotName) - slotOrder.indexOf(b.slot as SlotName);
     });
   }, [schedule, dayKey, settings.agendaShowCurrentSlotOnly, currentSlot]);
+
+  useEffect(() => {
+    if (listRef.current) {
+        listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, [scheduledActivities]);
 
 
   const pendingTasks = React.useMemo(() => {
@@ -282,7 +291,7 @@ export function TodaysScheduleCard({
         </CardHeader>
         <CardContent className="p-3">
             {scheduledActivities.length > 0 ? (
-                 <ul className="space-y-1 max-h-64 overflow-y-auto pr-2">
+                 <ul ref={listRef} className="space-y-1 max-h-64 overflow-y-auto pr-2">
                     {slotOrder.map(slotName => {
                         const activitiesForSlot = scheduledActivities.filter(a => a.slot === slotName);
                         if (activitiesForSlot.length === 0) return null;
@@ -349,3 +358,5 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
+
+    
