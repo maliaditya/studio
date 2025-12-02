@@ -96,15 +96,25 @@ export function ProductivityInsights() {
         const keyProductive = ['Planning', 'Learning', 'Deep Work'];
         const keyUnproductive = ['Interrupts', 'Distractions'];
 
-        const productiveChain = keyProductive.map(name => ({
-            name,
-            up: dailyTotals[name]?.time > 0,
-        }));
+        const productiveChain = keyProductive
+            .map(name => ({ name, time: dailyTotals[name]?.time || 0 }))
+            .sort((a, b) => b.time - a.time) // Sort by time spent
+            .filter(item => item.time > 0); // Only show activities that happened
 
-        const unproductiveChain = keyUnproductive.map(name => ({
-            name,
-            up: dailyTotals[name]?.time > 0,
-        }));
+        const unproductiveChain: { name: string, up: boolean, impact?: string }[] = [];
+        const topUnproductive = unproductiveActivities[0];
+
+        if (topUnproductive) {
+            unproductiveChain.push({ name: topUnproductive.name, up: true });
+            const leastProductive = keyProductive
+                .map(name => ({ name, time: dailyTotals[name]?.time || 0 }))
+                .sort((a,b) => a.time - b.time)[0];
+            
+            if (leastProductive && leastProductive.time === 0) {
+                 unproductiveChain.push({ name: leastProductive.name, up: false });
+            }
+        }
+
 
         return {
             productive: productiveActivities,
@@ -120,13 +130,13 @@ export function ProductivityInsights() {
         return `${(minutes / 60).toFixed(1)}h`;
     }
 
-    const ChainDisplay = ({ chain }: { chain: { name: string; up: boolean }[] }) => (
-        <div className="flex items-center gap-1.5 text-xs font-semibold">
+    const ChainDisplay = ({ chain, isUnproductive = false }: { chain: { name: string; up?: boolean }[], isUnproductive?: boolean }) => (
+        <div className="flex items-center gap-1.5 text-xs font-semibold flex-wrap">
             {chain.map((item, index) => (
                 <React.Fragment key={item.name}>
                     <div className="flex items-center gap-0.5">
-                        <span className={item.up ? 'text-foreground' : 'text-muted-foreground'}>{item.name}</span>
-                        {item.up ? <ArrowUp className="h-3 w-3 text-green-500" /> : <ArrowDown className="h-3 w-3 text-red-500" />}
+                        <span className={item.up === false ? 'text-muted-foreground' : 'text-foreground'}>{item.name}</span>
+                        {item.up !== false ? <ArrowUp className="h-3 w-3 text-green-500" /> : <ArrowDown className="h-3 w-3 text-red-500" />}
                     </div>
                     {index < chain.length - 1 && <ArrowRight className="h-3 w-3 text-muted-foreground" />}
                 </React.Fragment>
@@ -144,15 +154,11 @@ export function ProductivityInsights() {
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">
-                    <div className="space-y-2">
-                        <ChainDisplay chain={todaysInsights.productiveChain} />
-                        <ChainDisplay chain={todaysInsights.unproductiveChain} />
-                    </div>
-
                     {todaysInsights.productive.length > 0 && (
                         <div>
                             <h4 className="text-sm font-semibold mb-1">Productive Focus</h4>
-                            <p className="text-sm text-muted-foreground">
+                            {todaysInsights.productiveChain.length > 0 && <ChainDisplay chain={todaysInsights.productiveChain} />}
+                            <p className="text-sm text-muted-foreground mt-2">
                                 Your main efforts today were in: {todaysInsights.productive.map(a => `${a.name} (${a.slots.join(', ')})`).join(' and ')}.
                             </p>
                              <ul className="text-xs text-muted-foreground list-disc list-inside pl-2 mt-1">
@@ -165,7 +171,8 @@ export function ProductivityInsights() {
                      {todaysInsights.unproductive.length > 0 && (
                         <div>
                             <h4 className="text-sm font-semibold mb-1">Main Distractions</h4>
-                            <p className="text-sm text-muted-foreground">
+                            {todaysInsights.unproductiveChain.length > 0 && <ChainDisplay chain={todaysInsights.unproductiveChain} isUnproductive={true} />}
+                            <p className="text-sm text-muted-foreground mt-2">
                                 Your biggest time sinks were: {todaysInsights.unproductive.map(a => `${a.name} (${a.slots.join(', ')})`).join(' and ')}.
                             </p>
                             <ul className="text-xs text-muted-foreground list-disc list-inside pl-2 mt-1">
