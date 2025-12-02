@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -18,6 +17,7 @@ import { format, addDays } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
 import { useToast } from '@/hooks/use-toast';
+import { motion, useDragControls } from 'framer-motion';
 
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
@@ -58,6 +58,8 @@ export function TodaysScheduleCard({
 
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
+  
+  const dragControls = useDragControls()
 
   useEffect(() => {
     setPurposeText(settings.currentPurpose || '');
@@ -88,7 +90,7 @@ export function TodaysScheduleCard({
         if (a.completed !== b.completed) {
             return a.completed ? 1 : -1;
         }
-        return slotOrder.indexOf(a.slot) - slotOrder.indexOf(b.slot);
+        return slotOrder.indexOf(a.slot as SlotName) - slotOrder.indexOf(b.slot as SlotName);
     });
   }, [schedule, dayKey, settings.agendaShowCurrentSlotOnly, currentSlot]);
 
@@ -102,9 +104,7 @@ export function TodaysScheduleCard({
       .filter((activity): activity is Activity => !!activity && !activity.completed);
   }, [schedule, date]);
 
-  const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState({ x: 20, y: 80 });
-  const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
 
   const positionKey = currentUser ? `lifeos_agenda_widget_position_${currentUser.username}` : null;
 
@@ -128,45 +128,6 @@ export function TodaysScheduleCard({
         }
     }
   }, [isAgendaDocked, positionKey]);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('button, [role="button"]') || isAgendaDocked) return;
-    setIsDragging(true);
-    setDragStartOffset({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
-    });
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (isDragging) {
-      setPosition({
-        x: e.clientX - dragStartOffset.x,
-        y: e.clientY - dragStartOffset.y,
-      });
-    }
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    if (positionKey) {
-        localStorage.setItem(positionKey, JSON.stringify(position));
-    }
-  };
-
-  useEffect(() => {
-    if (isDragging && !isAgendaDocked) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    } else {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    }
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, dragStartOffset, isAgendaDocked, position, positionKey]);
 
   const onRemoveActivity = (slotName: string, activityId: string) => {
     setGlobalSchedule(prev => {
@@ -231,10 +192,12 @@ export function TodaysScheduleCard({
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
         <CardHeader
-            className={cn("p-3", !isAgendaDocked && "cursor-grab active:cursor-grabbing")}
-            onMouseDown={handleMouseDown}
+            className={cn("p-3")}
         >
-            <div className="flex items-center justify-between gap-2">
+            <div 
+              className={cn("flex items-center justify-between gap-2", !isAgendaDocked && "cursor-grab active:cursor-grabbing")}
+              onPointerDown={(e) => dragControls.start(e)}
+            >
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                 <div className="flex items-center">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleAddPomodoro}>
@@ -319,23 +282,38 @@ export function TodaysScheduleCard({
         </CardHeader>
         <CardContent className="p-3">
             {scheduledActivities.length > 0 ? (
-                <ul className="space-y-1 max-h-64 overflow-y-auto pr-2">
-                    {scheduledActivities.map((activity) => (
-                    <AgendaWidgetItem
-                        key={activity.id}
-                        activity={{...activity, slot: activity.slot as SlotName}}
-                        date={date}
-                        onToggleComplete={handleToggleComplete}
-                        onActivityClick={onActivityClick}
-                        onStartFocus={onStartFocus}
-                        onRemoveActivity={onRemoveActivity}
-                        onUpdateActivity={handleUpdateActivity}
-                        setRoutine={toggleRoutine}
-                        onOpenHabitPopup={onOpenHabitPopup}
-                        context="agenda"
-                        loggedDuration={activityDurations[activity.id]}
-                    />
-                    ))}
+                 <ul className="space-y-1 max-h-64 overflow-y-auto pr-2">
+                    {slotOrder.map(slotName => {
+                        const activitiesForSlot = scheduledActivities.filter(a => a.slot === slotName);
+                        if (activitiesForSlot.length === 0) return null;
+                        const isCurrent = slotName === currentSlot;
+                        return (
+                            <li key={slotName}>
+                                <div className={cn("text-xs font-semibold uppercase text-muted-foreground flex items-center gap-2 mb-1", isCurrent && "text-primary")}>
+                                     {isCurrent && <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse"></span>}
+                                    {slotName}
+                                </div>
+                                <ul className="space-y-1 pl-2 border-l">
+                                {activitiesForSlot.map(activity => (
+                                    <AgendaWidgetItem
+                                        key={activity.id}
+                                        activity={{...activity, slot: activity.slot as SlotName}}
+                                        date={date}
+                                        onToggleComplete={handleToggleComplete}
+                                        onActivityClick={onActivityClick}
+                                        onStartFocus={onStartFocus}
+                                        onRemoveActivity={onRemoveActivity}
+                                        onUpdateActivity={handleUpdateActivity}
+                                        setRoutine={toggleRoutine}
+                                        onOpenHabitPopup={onOpenHabitPopup}
+                                        context="agenda"
+                                        loggedDuration={activityDurations[activity.id]}
+                                    />
+                                ))}
+                                </ul>
+                            </li>
+                        );
+                    })}
                 </ul>
             ) : (
                 <div className="text-center text-muted-foreground py-4">
@@ -348,16 +326,24 @@ export function TodaysScheduleCard({
 
   if (!isAgendaDocked) {
     return (
-      <div
+      <motion.div
+        drag
+        dragControls={dragControls}
+        dragListener={false}
         className="fixed z-50 w-full max-w-sm"
         style={{
           left: `${position.x}px`,
           top: `${position.y}px`,
-          userSelect: isDragging ? 'none' : 'auto',
         }}
+        onDragEnd={() => {
+            if (positionKey) {
+                localStorage.setItem(positionKey, JSON.stringify(position));
+            }
+        }}
+        dragMomentum={false}
       >
         {cardContent}
-      </div>
+      </motion.div>
     );
   }
 
