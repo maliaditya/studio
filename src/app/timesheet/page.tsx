@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -20,6 +21,7 @@ import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent,
 import { Separator } from '@/components/ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Tooltip, Pie } from 'recharts';
+import { ActivityDistributionCard } from '@/components/ActivityDistributionCard';
 
 interface TimesheetPageContentProps {
   isModal?: boolean;
@@ -130,7 +132,6 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     const [viewMode, setViewMode] = useState<ViewMode>("day");
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
     const [modalData, setModalData] = useState<{ date: Date; activities: ProcessedActivity[] } | null>(null);
-    const [timeAllocationView, setTimeAllocationView] = useState<TimeAllocationView>('bar');
 
     const parseDurationToMinutes = (durationStr: string | undefined): number => {
         if (!durationStr) return 0;
@@ -333,76 +334,36 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                     <CardTitle>Day View: {format(selectedDate, 'PPP')}</CardTitle>
                     <CardDescription>A summary of your logged time and attention for the selected day.</CardDescription>
                 </CardHeader>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle className="flex items-center gap-2 text-base"><BarChartIcon/> Time Allocation</CardTitle>
-                         <Button variant="ghost" size="icon" onClick={() => setTimeAllocationView(v => v === 'bar' ? 'pie' : 'bar')}>
-                            {timeAllocationView === 'bar' ? <PieChartIcon className="h-4 w-4" /> : <BarChartIcon className="h-4 w-4" />}
-                        </Button>
-                    </CardHeader>
-                    <CardContent>
-                        {timeAllocationData.length > 0 ? (
-                            timeAllocationView === 'bar' ? (
-                                <ChartContainer config={{}} className="h-[200px] w-full">
-                                    <ResponsiveContainer>
-                                        <BarChart data={timeAllocationData} layout="vertical" margin={{ left: 10, right: 10, top: 5, bottom: 5 }} onClick={(data) => {
-                                            if (data && data.activePayload) {
-                                                const categoryName = data.activePayload[0].payload.name;
-                                                const categoryActivities = timeAllocationData.find(d => d.name === categoryName)?.activities || [];
-                                                setModalData({ date: selectedDate, activities: categoryActivities.map(a => ({...a, type: 'deepwork', slot: '', completed: true, calculatedDuration: a.duration})) });
-                                            }
-                                        }}>
-                                            <XAxis type="number" dataKey="value" domain={[0, 'dataMax + 1']} fontSize={12} tickFormatter={(value) => formatMinutes(value)} />
-                                            <YAxis type="category" dataKey="name" width={80} tickLine={false} axisLine={false} fontSize={12} />
-                                            <Tooltip
-                                                cursor={{ fill: "hsl(var(--muted))" }}
-                                                content={({ active, payload }) => {
-                                                  if (active && payload && payload.length) {
-                                                    const data = payload[0].payload;
-                                                    return (
-                                                      <div className="grid min-w-[12rem] items-start gap-1.5 rounded-lg border bg-background px-2.5 py-1.5 text-xs shadow-xl">
-                                                        <p className="font-bold text-foreground">{data.name}: {formatMinutes(data.value)}</p>
-                                                        <Separator />
-                                                        <ul className="space-y-1">
-                                                            {data.activities.map((act: {name: string, duration: number}, index: number) => (
-                                                                <li key={index} className="text-muted-foreground">{act.name} ({formatMinutes(act.duration)})</li>
-                                                            ))}
-                                                        </ul>
-                                                      </div>
-                                                    );
-                                                  }
-                                                  return null;
-                                                }}
-                                            />
-                                            <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                                                {timeAllocationData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
-                                                ))}
-                                            </Bar>
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                </ChartContainer>
-                            ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base"><PieChartIcon/> Time Allocation</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {timeAllocationData.length > 0 ? (
                                 <ChartContainer config={{}} className="h-[250px] w-full">
                                     <ResponsiveContainer>
                                         <PieChart>
                                             <ChartTooltip
                                                 content={<ChartTooltipContent formatter={(value) => formatMinutes(value as number)} nameKey="name" />}
                                             />
-                                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} stroke="hsl(var(--background))" strokeWidth={2} label={({ name }) => name}>
+                                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} stroke="hsl(var(--background))" strokeWidth={2} label={({ name, value }) => value > 60 ? `${name}` : ''}>
                                                 {pieData.map((entry) => (
-                                                  <Cell key={`cell-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
+                                                <Cell key={`cell-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
                                                 ))}
                                             </Pie>
                                         </PieChart>
                                     </ResponsiveContainer>
                                 </ChartContainer>
-                            )
-                        ) : (
-                            <p className="text-sm text-center text-muted-foreground py-8">No time logged for this day.</p>
-                        )}
-                    </CardContent>
-                </Card>
+                            ) : (
+                                <p className="text-sm text-center text-muted-foreground py-8">No time logged for this day.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                    <div className="mt-[-1rem]">
+                      <ActivityDistributionCard />
+                    </div>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {slotOrder.map(slot => {
                         const activitiesInSlot = activitiesForDay.filter(act => act.slot === slot.name);
@@ -708,4 +669,5 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
+
 

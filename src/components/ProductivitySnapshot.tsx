@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -644,4 +645,3 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
   );
 }
 
-    
