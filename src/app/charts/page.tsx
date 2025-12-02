@@ -54,6 +54,7 @@ const activityNameMap: Record<ActivityType, string> = {
     interrupt: 'Interrupts',
     distraction: 'Distractions',
     nutrition: 'Nutrition',
+    pomodoro: 'Pomodoro',
 };
 
 const activityColorMapping: Record<string, string> = {
@@ -520,50 +521,53 @@ export function ChartsPageContent() {
     }, [schedule, activityDurations, selectedActivityDate]);
     
     const parseDurationToMinutes = (durationStr: string | undefined): number => {
-      if (!durationStr) return 0;
-      let totalMinutes = 0;
-      const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
-      const minMatch = durationStr.match(/(\d+)\s*m/);
+        if (!durationStr) return 0;
+        let totalMinutes = 0;
+        const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
+        const minMatch = durationStr.match(/(\d+)\s*m/);
 
-      if (hourMatch) {
-          totalMinutes += parseFloat(hourMatch[1]) * 60;
-      }
-      if (minMatch) {
-          totalMinutes += parseInt(minMatch[1], 10);
-      }
-      if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
-          return parseInt(durationStr.trim(), 10);
-      }
-      return totalMinutes;
-  };
+        if (hourMatch) {
+            totalMinutes += parseFloat(hourMatch[1]) * 60;
+        }
+        if (minMatch) {
+            totalMinutes += parseInt(minMatch[1], 10);
+        }
+        if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
+            return parseInt(durationStr.trim(), 10);
+        }
+        return totalMinutes;
+    };
 
-  const allCategoriesData = useMemo(() => {
-    const categories = Object.values(activityNameMap);
-    return categories.map(category => {
-      const dailyTotals: Record<string, number> = {};
-      
-      Object.entries(schedule).forEach(([date, dailySchedule]) => {
-        if (!dailyTotals[date]) dailyTotals[date] = 0;
-        
-        Object.values(dailySchedule).flat().forEach((activity: Activity) => {
-          if (activity && activity.completed && activityNameMap[activity.type] === category) {
-            const duration = parseDurationToMinutes(activityDurations[activity.id]);
-            dailyTotals[date] += duration;
-          }
-        });
-      });
-      
-      const historicalData = Object.entries(dailyTotals)
-        .filter(([, time]) => time > 0)
-        .map(([date, time]) => ({ date, time }))
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        
-      return {
-        category,
-        historicalData,
-      };
-    }).filter(item => item.historicalData.length > 0);
-  }, [schedule, activityDurations]);
+    const allCategoriesData = useMemo(() => {
+        const categories = Object.values(activityNameMap);
+        return categories.map(category => {
+          const dailyTotals: Record<string, number> = {};
+          
+          Object.entries(schedule).forEach(([date, dailySchedule]) => {
+            if (!dailyTotals[date]) dailyTotals[date] = 0;
+            
+            Object.values(dailySchedule).flat().forEach((activity: Activity) => {
+              if (activity && activity.completed) {
+                const effectiveActivityType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+                if (activityNameMap[effectiveActivityType] === category) {
+                    const duration = parseDurationToMinutes(activityDurations[activity.id]);
+                    dailyTotals[date] += duration;
+                }
+              }
+            });
+          });
+          
+          const historicalData = Object.entries(dailyTotals)
+            .filter(([, time]) => time > 0)
+            .map(([date, time]) => ({ date, time }))
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            
+          return {
+            category,
+            historicalData,
+          };
+        }).filter(item => item.historicalData.length > 0);
+    }, [schedule, activityDurations]);
 
 
     const chartComponents = [
@@ -835,3 +839,4 @@ export default function ChartsPage() {
         </AuthGuard>
     );
 }
+
