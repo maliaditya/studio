@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -72,7 +71,7 @@ const activityColorMapping: Record<string, string> = {
     'Distractions': 'hsl(0, 70%, 50%)',
     'Nutrition': 'hsl(340, 82%, 56%)',
     'Free Time': 'hsl(var(--muted))',
-    'Pomodoro': 'hsl(var(--chart-2))',
+    'Mindset': 'hsl(var(--chart-5))',
 };
 
 const useThemeColors = () => {
@@ -104,7 +103,6 @@ const activityTypeMapping: Record<string, Activity['type']> = {
     'Lead Gen': 'lead-generation',
     'Interrupts': 'interrupt',
     'Nutrition': 'nutrition',
-    'Pomodoro': 'pomodoro',
 };
 
 const formatMinutes = (minutes: number) => {
@@ -645,3 +643,5 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
     </>
   );
 }
+
+    
