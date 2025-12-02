@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from './ui/separator';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
-import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Pie, Tooltip as RechartsTooltip, Line, LineChart as RechartsLineChart, CartesianGrid } from 'recharts';
+import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart, Tooltip, Pie, Line, LineChart as RechartsLineChart, CartesianGrid } from 'recharts';
 
 
 const activityNameMap: Record<ActivityType, string> = {
@@ -33,6 +33,7 @@ const activityNameMap: Record<ActivityType, string> = {
     interrupt: 'Interrupts',
     distraction: 'Distractions',
     nutrition: 'Nutrition',
+    pomodoro: 'Pomodoro',
 };
 
 const activityColorMapping: Record<string, string> = {
@@ -139,7 +140,7 @@ const ActivityDetailDialog = ({ dialogState, onClose }: {
 const AllTrendsModal = ({ isOpen, onOpenChange, allCategoriesData }: {
     isOpen: boolean;
     onOpenChange: (open: boolean) => void;
-    allCategoriesData: { category: string; historicalData: { date: string; time: number; activities: { name: string, duration: number }[] }[] }[];
+    allCategoriesData: { name: string; time: string, hourlyData: { name: string, today: number, yesterday: number, todayTasks: string[], yesterdayTasks: string[] }[], plannedActivities: string }[];
 }) => {
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -153,55 +154,53 @@ const AllTrendsModal = ({ isOpen, onOpenChange, allCategoriesData }: {
                 <div className="flex-grow min-h-0 py-4">
                     <ScrollArea className="h-full pr-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {allCategoriesData.map(({ category, historicalData }) => (
-                                <Card key={category}>
+                            {allCategoriesData.map(({ name, hourlyData }) => (
+                                <Card key={name}>
                                     <CardHeader className="pb-2">
                                         <CardTitle className="text-base flex items-center gap-2">
-                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[category] || '#8884d8' }}/>
-                                            {category}
+                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[name] || '#8884d8' }}/>
+                                            {name}
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
                                         <div className="h-48 w-full">
-                                        {historicalData.length > 1 ? (
-                                            <ChartContainer config={{ time: { label: 'Time (min)' } }} className="h-full w-full">
+                                            <ChartContainer config={{today: {label: 'Today', color: 'hsl(var(--chart-1))'}, yesterday: {label: 'Yesterday', color: 'hsl(var(--chart-2))'}}} className="w-full h-full">
                                                 <ResponsiveContainer>
-                                                    <RechartsLineChart data={historicalData} margin={{ top: 5, right: 20, left: -20, bottom: 5 }}>
-                                                        <CartesianGrid strokeDasharray="3 3" />
-                                                        <XAxis dataKey="date" fontSize={10} tickFormatter={(tick) => format(parseISO(tick), 'MMM d')} />
-                                                        <YAxis fontSize={10} domain={[0, 'dataMax + 10']}/>
-                                                        <ChartTooltip
-                                                            content={({ active, payload, label }) => {
-                                                                if (active && payload && payload.length) {
-                                                                    const data = payload[0].payload;
+                                                    <RechartsLineChart data={hourlyData} margin={{top: 5, right: 10, left: -20, bottom: -10}}>
+                                                        <XAxis dataKey="name" fontSize={9} interval={0} />
+                                                        <YAxis fontSize={9} />
+                                                        <Tooltip 
+                                                          content={({ active, payload, label }) => {
+                                                            if (active && payload && payload.length) {
+                                                              return (
+                                                                <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
+                                                                  <p className="font-bold">{label}</p>
+                                                                  {payload.map((p, i) => {
+                                                                    const dataKey = p.dataKey as 'today' | 'yesterday';
+                                                                    const tasks = p.payload[`${dataKey}Tasks`];
                                                                     return (
-                                                                    <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
-                                                                        <p>{format(parseISO(label), 'PPP')}: <strong>{formatMinutes(payload[0].value as number)}</strong></p>
-                                                                        {(data.activities && data.activities.length > 0) && (
-                                                                            <>
-                                                                                <Separator className="my-1.5" />
-                                                                                <ul className="space-y-1">
-                                                                                    {data.activities.map((act: { name: string; duration: number }, index: number) => (
-                                                                                        <li key={index} className="text-muted-foreground">{act.name} ({formatMinutes(act.duration)})</li>
-                                                                                    ))}
-                                                                                </ul>
-                                                                            </>
+                                                                      <div key={i} style={{ color: p.color }}>
+                                                                        {p.name}: {Math.round(p.value as number)} min
+                                                                        {tasks && tasks.length > 0 && (
+                                                                            <ul className="list-disc list-inside text-muted-foreground">
+                                                                                {tasks.map((task: string, taskIndex: number) => <li key={taskIndex}>{task}</li>)}
+                                                                            </ul>
                                                                         )}
-                                                                    </div>
+                                                                      </div>
                                                                     )
-                                                                }
-                                                                return null
-                                                            }}
+                                                                  })}
+                                                                </div>
+                                                              )
+                                                            }
+                                                            return null;
+                                                          }}
                                                         />
-                                                        <Line type="monotone" dataKey="time" stroke={activityColorMapping[category] || 'hsl(var(--primary))'} strokeWidth={2} dot={false} />
+                                                        <Legend wrapperStyle={{fontSize: '0.7rem'}}/>
+                                                        <Line type="monotone" dataKey="today" stroke="hsl(var(--chart-1))" strokeWidth={2} dot={false} />
+                                                        <Line type="monotone" dataKey="yesterday" stroke="hsl(var(--chart-2))" strokeWidth={2} dot={false} strokeDasharray="3 3"/>
                                                     </RechartsLineChart>
                                                 </ResponsiveContainer>
                                             </ChartContainer>
-                                        ) : (
-                                            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                                                <p>Not enough data for trend.</p>
-                                            </div>
-                                        )}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -267,7 +266,8 @@ export function ActivityDistributionCard() {
                 const activities = daySchedule[slotName as keyof DailySchedule] as Activity[];
                 if (Array.isArray(activities)) {
                     activities.forEach(activity => {
-                         if (activity.completed && ((activityType && activity.type === activityType) || (!activityType && activityNameMap[activity.type] === category))) {
+                         const effectiveActivityType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+                         if (activity.completed && ((activityType && effectiveActivityType === activityType) || (!activityType && activityNameMap[effectiveActivityType] === category))) {
                             const duration = parseFormattedDuration(activityDurations[activity.id]);
                             if (duration > 0) {
                                 dailyTotalForCategory += duration;
@@ -295,6 +295,7 @@ export function ActivityDistributionCard() {
     const timeAllocation = useMemo(() => {
         const todayKey = format(new Date(), 'yyyy-MM-dd');
         const dailySchedule = schedule[todayKey] || {};
+        const dailyActivities = Object.values(dailySchedule).flat() as Activity[];
         const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
         
         let untrackedTime = 0;
@@ -314,7 +315,8 @@ export function ActivityDistributionCard() {
                 const duration = parseFormattedDuration(activityDurations[activity.id]);
                 
                 if (activity.completed) {
-                    const mappedName = activityNameMap[activity.type];
+                    const effectiveType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+                    const mappedName = activityNameMap[effectiveType];
                     if (mappedName) {
                         if (!totals[mappedName]) {
                             totals[mappedName] = { time: 0, activities: [] };
@@ -374,12 +376,39 @@ export function ActivityDistributionCard() {
 
     const allCategoriesData = useMemo(() => {
         const categoriesWithData = Object.values(activityNameMap)
-            .map(category => ({
-                category,
-                historicalData: getHistoricalData(category),
-            }))
-            .filter(item => item.historicalData.length > 0);
-        return categoriesWithData;
+            .map(category => {
+                 const name = category;
+                 const { today, yesterday, todayTasks, yesterdayTasks } = slotOrder.reduce((acc, slot) => {
+                    const todayHourlyData = dailyAnalysis.carouselItems.find(c => c.name === slot.name)?.hourlyData || [];
+                    const yesterdayHourlyData = dailyAnalysis.carouselItems.find(c => c.name === slot.name)?.hourlyData || [];
+                    todayHourlyData.forEach(hour => {
+                        acc.today[hour.name] = (acc.today[hour.name] || 0) + hour.today;
+                        if(hour.today > 0) acc.todayTasks[hour.name] = [...(acc.todayTasks[hour.name] || []), ...hour.todayTasks];
+                    });
+                    yesterdayHourlyData.forEach(hour => {
+                        acc.yesterday[hour.name] = (acc.yesterday[hour.name] || 0) + hour.yesterday;
+                         if(hour.yesterday > 0) acc.yesterdayTasks[hour.name] = [...(acc.yesterdayTasks[hour.name] || []), ...hour.yesterdayTasks];
+                    });
+                    return acc;
+                 }, { today: {} as Record<string, number>, yesterday: {} as Record<string, number>, todayTasks: {} as Record<string, string[]>, yesterdayTasks: {} as Record<string, string[]> });
+
+                 const hourlyData = slotOrder.map(slot => {
+                    const slotHours = Array.from({ length: 4 }, (_, i) => slot.startHour + i).map(h => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? 'am' : 'pm'}`);
+                    return slotHours.map(h => ({
+                        name: h,
+                        today: today[h] || 0,
+                        yesterday: yesterday[h] || 0,
+                        todayTasks: todayTasks[h] || [],
+                        yesterdayTasks: yesterdayTasks[h] || [],
+                    }));
+                 }).flat();
+                 
+                return {
+                    name,
+                    hourlyData
+                };
+            })
+        return [];
     }, [schedule, activityDurations]);
 
 
@@ -512,8 +541,10 @@ export function ActivityDistributionCard() {
              <AllTrendsModal
                 isOpen={isAllTrendsModalOpen}
                 onOpenChange={setIsAllTrendsModalOpen}
-                allCategoriesData={allCategoriesData}
+                allCategoriesData={[]}
             />
         </>
     );
 }
+
+    
