@@ -518,26 +518,50 @@ export function ChartsPageContent() {
     
         return { hourlyActivityData: hourlyData, hourlyActivityConfig: config };
     }, [schedule, activityDurations, selectedActivityDate]);
+    
+    const parseDurationToMinutes = (durationStr: string | undefined): number => {
+        if (!durationStr) return 0;
+        let totalMinutes = 0;
+        const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
+        const minMatch = durationStr.match(/(\d+)\s*m/);
+
+        if (hourMatch) {
+            totalMinutes += parseFloat(hourMatch[1]) * 60;
+        }
+        if (minMatch) {
+            totalMinutes += parseInt(minMatch[1], 10);
+        }
+        if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
+            return parseInt(durationStr.trim(), 10);
+        }
+        return totalMinutes;
+    };
 
     const allCategoriesData = useMemo(() => {
         const categories = Object.values(activityNameMap);
         const categoryData = categories.map(category => {
             const historicalData: { date: string, time: number }[] = [];
-            Object.entries(schedule).forEach(([date, dailySchedule]) => {
-                const dailyTotal = Object.values(dailySchedule).flat().reduce((sum, activity: Activity) => {
-                    if (activity && activity.completed && activityNameMap[activity.type] === category) {
-                        const durationStr = activityDurations[activity.id]?.replace(' min', '');
-                        const duration = durationStr ? parseInt(durationStr, 10) : 0;
-                        return sum + duration;
-                    }
-                    return sum;
-                }, 0);
+            const dailyTotals: Record<string, number> = {};
 
-                if (dailyTotal > 0) {
-                    historicalData.push({ date, time: dailyTotal });
+            Object.entries(schedule).forEach(([date, dailySchedule]) => {
+                if (!dailyTotals[date]) {
+                    dailyTotals[date] = 0;
                 }
+                const activitiesForDay = Object.values(dailySchedule).flat() as Activity[];
+                activitiesForDay.forEach((activity: Activity) => {
+                    if (activity && activity.completed && activityNameMap[activity.type] === category) {
+                        const durationStr = activityDurations[activity.id];
+                        dailyTotals[date] += parseDurationToMinutes(durationStr);
+                    }
+                });
             });
 
+            for (const date in dailyTotals) {
+                if (dailyTotals[date] > 0) {
+                    historicalData.push({ date, time: dailyTotals[date] });
+                }
+            }
+            
             return {
                 category,
                 historicalData: historicalData.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()),
