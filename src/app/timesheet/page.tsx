@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -131,7 +132,7 @@ const DayDetailModal = ({ isOpen, onOpenChange, data, allActivitiesData }: {
                       <CardTitle className="flex items-center gap-2 text-base"><Briefcase /> Productivity Insights</CardTitle>
                   </CardHeader>
                   <CardContent>
-                      <ProductivityInsights />
+                      <ProductivityInsights activities={activities} date={date} />
                   </CardContent>
               </Card>
             </div>
@@ -373,6 +374,10 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
         }));
     }, [selectedDate, timeData]);
     
+    const dayViewActivities = useMemo(() => {
+        const dateKey = format(selectedDate, 'yyyy-MM-dd');
+        return timeData.dailyData[dateKey]?.activities || [];
+    }, [selectedDate, timeData]);
 
     const renderDayView = () => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -401,7 +406,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                             <CardTitle className="flex items-center gap-2 text-base"><Briefcase /> Productivity Insights</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ProductivityInsights />
+                            <ProductivityInsights activities={dayViewActivities} date={selectedDate}/>
                         </CardContent>
                     </Card>
                 </div>
@@ -717,4 +722,3 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
-
