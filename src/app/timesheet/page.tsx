@@ -72,7 +72,7 @@ const activityNameMap: Record<ActivityTypeType, string> = {
 
 
 const activityColorMapping: Record<string, string> = {
-    'Deep Work': 'hsl(var(--chart-1))',
+    'Deep Work': 'hsl(var(--chart-4))',
     'Learning': 'hsl(var(--chart-2))',
     'Workout': 'hsl(var(--chart-3))',
     'Branding': 'hsl(var(--chart-4))',
@@ -630,5 +630,6 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
+
 
 
