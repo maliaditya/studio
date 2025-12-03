@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -90,54 +89,98 @@ const activityColorMapping: Record<string, string> = {
 };
 
 
-const DayDetailModal = ({ isOpen, onOpenChange, data }: { isOpen: boolean, onOpenChange: (open: boolean) => void, data: { date: Date; activities: ProcessedActivity[] } }) => {
+const DayDetailModal = ({ isOpen, onOpenChange, data, allActivitiesData }: { 
+    isOpen: boolean; 
+    onOpenChange: (open: boolean) => void; 
+    data: { date: Date; activities: ProcessedActivity[], pieData: any[] };
+    allActivitiesData: { category: string, historicalData: { date: string, time: number }[] }[];
+}) => {
   const { date, activities } = data;
   const totalMinutes = activities.reduce((sum, act) => sum + act.calculatedDuration, 0);
 
+  const timeAllocationData = useMemo(() => {
+    return data.pieData.map(d => ({
+        name: d.name,
+        time: d.value,
+        activities: d.activities,
+    }));
+  }, [data.pieData]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-4xl h-[90vh]">
         <DialogHeader>
           <DialogTitle>Details for {format(date, 'PPP')}</DialogTitle>
           <DialogDescriptionComponent>
             Total time for selected filters: {formatMinutes(totalMinutes)}
           </DialogDescriptionComponent>
         </DialogHeader>
-        <div className="max-h-[60vh]">
+        <div className="flex-grow min-h-0">
           <ScrollArea className="h-full pr-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[120px]">Slot</TableHead>
-                  <TableHead>Details</TableHead>
-                  <TableHead className="text-right w-[100px]">Duration</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {activities.length > 0 ? (
-                  activities.map((activity) => (
-                    <TableRow key={activity.id}>
-                      <TableCell>{activity.slot}</TableCell>
-                      <TableCell>
-                        <div className="font-medium">{activity.details}</div>
-                        <div className="text-xs text-muted-foreground capitalize">
-                          {activity.type.replace('_', ' + ')}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right font-medium">
-                        {formatMinutes(activity.calculatedDuration)}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={3} className="h-24 text-center">
-                      No activities for this day.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card>
+                  <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base"><PieChartIcon/> Time Allocation</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                      <TimeAllocationChart timeAllocationData={timeAllocationData} />
+                  </CardContent>
+              </Card>
+              <Card>
+                  <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base"><Briefcase /> Productivity Insights</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                      <ProductivityInsights />
+                  </CardContent>
+              </Card>
+            </div>
+            <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-4">All Activity Trends</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {allActivitiesData.map(({ category, historicalData }) => (
+                         <Card key={category}>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: activityColorMapping[category] || '#8884d8' }}/>
+                                    {category}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="h-32 w-full">
+                                {historicalData.length > 1 ? (
+                                    <ChartContainer config={{ time: { label: 'Time (min)' } }} className="h-full w-full">
+                                        <ResponsiveContainer>
+                                            <RechartsLineChart data={historicalData} margin={{ top: 5, right: 10, left: -20, bottom: -10 }}>
+                                                <XAxis dataKey="date" fontSize={9} tickFormatter={(tick) => format(parseISO(tick), 'MMM d')} />
+                                                <YAxis fontSize={9} domain={[0, 'dataMax + 10']}/>
+                                                <Tooltip 
+                                                    content={({ active, payload, label }) => {
+                                                    if (active && payload && payload.length) {
+                                                        return (
+                                                        <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
+                                                            <p>{format(parseISO(label), 'PPP')}: <strong>{formatMinutes(payload[0].value as number)}</strong></p>
+                                                        </div>
+                                                        )
+                                                    }
+                                                    return null;
+                                                    }}
+                                                />
+                                                <Line type="monotone" dataKey="time" stroke={activityColorMapping[category] || 'hsl(var(--primary))'} strokeWidth={2} dot={false} />
+                                            </RechartsLineChart>
+                                        </ResponsiveContainer>
+                                    </ChartContainer>
+                                ) : (
+                                    <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                                        <p>Not enough data for trend.</p>
+                                    </div>
+                                )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            </div>
           </ScrollArea>
         </div>
       </DialogContent>
@@ -151,7 +194,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>("day");
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
-    const [modalData, setModalData] = useState<{ date: Date; activities: ProcessedActivity[] } | null>(null);
+    const [modalData, setModalData] = useState<{ date: Date; activities: ProcessedActivity[], pieData: any[] } | null>(null);
 
     const handlePrev = () => {
         if (viewMode === 'day') {
@@ -283,6 +326,42 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
         return { dailyData };
     }, [selectedDate, viewMode, activityFilter, schedule, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, activityDurations]);
     
+    const allActivitiesData = useMemo(() => {
+        const categories = Object.values(activityNameMap);
+        const thirtyDaysAgo = subDays(new Date(), 30);
+
+        return categories.map(category => {
+          const dailyTotals: Record<string, number> = {};
+          
+          Object.entries(schedule).forEach(([date, dailySchedule]) => {
+            const logDate = parseISO(date);
+            if (logDate < thirtyDaysAgo) return;
+
+            if (!dailyTotals[date]) dailyTotals[date] = 0;
+            
+            Object.values(dailySchedule).flat().forEach((activity: Activity) => {
+              if (activity && activity.completed) {
+                const effectiveActivityType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+                if (activityNameMap[effectiveActivityType] === category) {
+                    const duration = activity.duration || 0;
+                    dailyTotals[date] += duration;
+                }
+              }
+            });
+          });
+          
+          const historicalData = Object.entries(dailyTotals)
+            .filter(([, time]) => time > 0)
+            .map(([date, time]) => ({ date, time }))
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            
+          return {
+            category,
+            historicalData,
+          };
+        }).filter(item => item.historicalData.length > 0);
+    }, [schedule, activityDurations]);
+
     const timeAllocationData = useMemo(() => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
         const dayData = timeData.dailyData[dateKey];
@@ -297,7 +376,8 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
 
     const renderDayView = () => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
-        const activitiesForDay = timeData.dailyData[dateKey]?.activities || [];
+        const dayData = timeData.dailyData[dateKey];
+        const activitiesForDay = dayData?.activities || [];
     
         return (
             <div className="space-y-6">
@@ -416,7 +496,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                             return (
                                 <Card 
                                     key={dateKey} 
-                                    onClick={() => setModalData({ date: day, activities })}
+                                    onClick={() => setModalData({ date: day, activities, pieData })}
                                     className={cn("cursor-pointer transition-all hover:shadow-md hover:-translate-y-1 hover:bg-accent flex flex-col", isSameDay(day, new Date()) && "bg-muted")}
                                 >
                                     <CardHeader className="p-3 pb-0">
@@ -506,7 +586,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                 return (
                                     <Card 
                                         key={dateKey} 
-                                        onClick={() => setModalData({ date: day, activities })}
+                                        onClick={() => setModalData({ date: day, activities, pieData })}
                                         className={cn("cursor-pointer transition-all hover:shadow-md hover:-translate-y-1 hover:bg-accent flex flex-col", isSameDay(day, new Date()) && "bg-muted")}
                                     >
                                         <CardHeader className="p-3 pb-0">
@@ -622,6 +702,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                     isOpen={!!modalData}
                     onOpenChange={() => setModalData(null)}
                     data={modalData}
+                    allActivitiesData={allActivitiesData}
                 />
             )}
         </div>
@@ -636,7 +717,4 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
-
-
-
 
