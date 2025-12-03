@@ -10,8 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO } from 'date-fns';
-import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide, Check, CheckCircle, XCircle } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from 'date-fns';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide, Check, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
@@ -153,22 +153,24 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
     const [modalData, setModalData] = useState<{ date: Date; activities: ProcessedActivity[] } | null>(null);
 
-    const parseDurationToMinutes = (durationStr: string | undefined): number => {
-        if (!durationStr) return 0;
-        // Case 1: "4h", "2h", "1h 30m"
-        const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
-        const minMatch = durationStr.match(/(\d+)\s*m/);
-
-        let totalMinutes = 0;
-        if (hourMatch) totalMinutes += parseFloat(hourMatch[1]) * 60;
-        if (minMatch) totalMinutes += parseInt(minMatch[1], 10);
-
-        // Case 2: No units found, treat as minutes. E.g., "240", "30"
-        if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
-            totalMinutes += parseInt(durationStr.trim(), 10);
+    const handlePrev = () => {
+        if (viewMode === 'day') {
+            setSelectedDate(prev => subDays(prev, 1));
+        } else if (viewMode === 'week') {
+            setSelectedDate(prev => subWeeks(prev, 1));
+        } else if (viewMode === 'month') {
+            setSelectedDate(prev => subMonths(prev, 1));
         }
+    };
 
-        return totalMinutes;
+    const handleNext = () => {
+        if (viewMode === 'day') {
+            setSelectedDate(prev => addDays(prev, 1));
+        } else if (viewMode === 'week') {
+            setSelectedDate(prev => addWeeks(prev, 1));
+        } else if (viewMode === 'month') {
+            setSelectedDate(prev => addMonths(prev, 1));
+        }
     };
 
     const timeData = useMemo(() => {
@@ -331,7 +333,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                             .filter(a => ['deepwork', 'upskill', 'branding', 'lead-generation', 'planning', 'tracking', 'workout', 'mindset', 'essentials', 'nutrition', 'pomodoro'].includes(a.type))
                             .reduce((sum, act) => sum + act.calculatedDuration, 0);
 
-                        const unproductiveTime = Math.max(0, 240 - productiveTime);
+                        const unproductiveTime = 240 - productiveTime;
 
                         const allTasksInSlot = schedule[dateKey]?.[slot.name as keyof typeof schedule[string]] || [];
                         const totalTasks = Array.isArray(allTasksInSlot) ? allTasksInSlot.length : 0;
@@ -568,17 +570,21 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                 )}
                 <CardContent className={cn("space-y-6", isModal ? "p-4 flex-grow min-h-0 flex flex-col" : "")}>
                     <div className="flex flex-wrap items-center gap-4 flex-shrink-0">
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant={"outline"} className="w-auto sm:w-[280px] justify-start text-left font-normal">
-                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                    {format(selectedDate, 'PPP')}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                                <Calendar mode="single" selected={selectedDate} onSelect={(d) => d && setSelectedDate(d)} initialFocus />
-                            </PopoverContent>
-                        </Popover>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" size="icon" onClick={handlePrev}><ChevronLeft className="h-4 w-4" /></Button>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant={"outline"} className="w-auto sm:w-[240px] justify-start text-left font-normal">
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {format(selectedDate, 'PPP')}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                    <Calendar mode="single" selected={selectedDate} onSelect={(d) => d && setSelectedDate(d)} initialFocus />
+                                </PopoverContent>
+                            </Popover>
+                            <Button variant="outline" size="icon" onClick={handleNext}><ChevronRight className="h-4 w-4" /></Button>
+                        </div>
                         <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)} className="w-auto">
                             <TabsList>
                                 <TabsTrigger value="day">Day</TabsTrigger>
@@ -630,6 +636,7 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
+
 
 
 
