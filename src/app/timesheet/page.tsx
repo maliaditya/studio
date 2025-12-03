@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -109,7 +108,7 @@ const DayDetailModal = ({ isOpen, onOpenChange, data, allActivitiesData }: {
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl h-[90vh]">
+      <DialogContent className="sm:max-w-4xl h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Details for {format(date, 'PPP')}</DialogTitle>
           <DialogDescriptionComponent>
@@ -189,9 +188,48 @@ const DayDetailModal = ({ isOpen, onOpenChange, data, allActivitiesData }: {
   );
 };
 
+const getLoggedMinutes = (activity: Activity, allDeepWorkLogs: any[], allUpskillLogs: any[], brandingLogs: any[], allLeadGenLogs: any[], allWorkoutLogs: any[], allMindProgrammingLogs: any[], dateKey: string): number => {
+    if (!activity.completed) return 0;
+
+    // Handle focus sessions first
+    if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+        const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
+        const pauseDurationsMs = (activity.focusSessionPauses || [])
+            .filter(p => p.resumeTime)
+            .reduce((sum, p) => sum + (p.resumeTime! - p.pauseTime), 0);
+        const totalWorkTimeMs = totalSessionMs - pauseDurationsMs;
+        return Math.round(totalWorkTimeMs / 60000);
+    }
+    
+    // Fallback for simple duration-based activities if no focus session
+    if (activity.duration) {
+        return activity.duration;
+    }
+
+    const activityTaskInstanceIds = new Set(activity.taskIds || []);
+    if (activityTaskInstanceIds.size === 0) return 0;
+    
+    const findDurationInLogs = (logs: any[], durationField: 'reps' | 'weight') => {
+        const logForDay = logs.find(l => l.date === dateKey);
+        if (!logForDay) return 0;
+        return logForDay.exercises
+            .filter((ex: any) => activityTaskInstanceIds.has(ex.id))
+            .reduce((sum: number, ex: any) => sum + (ex.loggedSets || []).reduce((setSum: number, set: any) => setSum + (set[durationField] || 0), 0), 0);
+    };
+
+    switch(activity.type) {
+        case 'deepwork': return findDurationInLogs(allDeepWorkLogs, 'weight');
+        case 'upskill': return findDurationInLogs(allUpskillLogs, 'reps');
+        case 'branding': return findDurationInLogs(brandingLogs, 'weight');
+        case 'lead-generation': return findDurationInLogs(allLeadGenLogs, 'weight');
+        case 'workout': return findDurationInLogs(allWorkoutLogs, 'reps');
+        case 'mindset': return findDurationInLogs(allMindProgrammingLogs, 'reps');
+        default: return 0;
+    }
+};
 
 export function TimesheetPageContent({ isModal = false }: TimesheetPageContentProps) {
-    const { schedule, allDeepWorkLogs, allUpskillLogs, activityDurations, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs } = useAuth();
+    const { schedule, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs } = useAuth();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>("day");
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
@@ -218,47 +256,6 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     };
 
     const timeData = useMemo(() => {
-        const getLoggedMinutes = (activity: Activity, dateKey: string): number => {
-            if (!activity.completed) return 0;
-    
-            // Handle focus sessions first
-            if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
-                const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
-                const pauseDurationsMs = (activity.focusSessionPauses || [])
-                    .filter(p => p.resumeTime)
-                    .reduce((sum, p) => sum + (p.resumeTime! - p.pauseTime), 0);
-                const totalWorkTimeMs = totalSessionMs - pauseDurationsMs;
-                return Math.round(totalWorkTimeMs / 60000);
-            }
-            
-            // Fallback for simple duration-based activities if no focus session
-            if (activity.duration) {
-                return activity.duration;
-            }
-
-            // Fallback for older log types if necessary
-            const activityTaskInstanceIds = new Set(activity.taskIds || []);
-            if (activityTaskInstanceIds.size === 0) return 0;
-            
-            const findDurationInLogs = (logs: any[], durationField: 'reps' | 'weight') => {
-                const logForDay = logs.find(l => l.date === dateKey);
-                if (!logForDay) return 0;
-                return logForDay.exercises
-                    .filter((ex: any) => activityTaskInstanceIds.has(ex.id))
-                    .reduce((sum: number, ex: any) => sum + (ex.loggedSets || []).reduce((setSum: number, set: any) => setSum + (set[durationField] || 0), 0), 0);
-            };
-
-            switch(activity.type) {
-                case 'deepwork': return findDurationInLogs(allDeepWorkLogs, 'weight');
-                case 'upskill': return findDurationInLogs(allUpskillLogs, 'reps');
-                case 'branding': return findDurationInLogs(brandingLogs, 'weight');
-                case 'lead-generation': return findDurationInLogs(allLeadGenLogs, 'weight');
-                case 'workout': return findDurationInLogs(allWorkoutLogs, 'reps');
-                case 'mindset': return findDurationInLogs(allMindProgrammingLogs, 'reps');
-                default: return 0;
-            }
-        };
-
         const filterActivity = (activity: Activity): boolean => {
             if (activityFilter === 'all') return true;
             if (activityFilter === 'deepwork') return activity.type === 'deepwork';
@@ -292,7 +289,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                 if (activities) {
                     activities.forEach(activity => {
                         if (filterActivity(activity)) {
-                            let duration = getLoggedMinutes(activity, dateKey);
+                            let duration = getLoggedMinutes(activity, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
                             
                             if (duration > 0) {
                                 processedActivities.push({ ...activity, slot: slot.name, calculatedDuration: duration });
@@ -325,43 +322,40 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
         }
 
         return { dailyData };
-    }, [selectedDate, viewMode, activityFilter, schedule, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs, activityDurations]);
+    }, [selectedDate, viewMode, activityFilter, schedule, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs]);
     
     const allActivitiesData = useMemo(() => {
         const categories = Object.values(activityNameMap);
-        const thirtyDaysAgo = subDays(new Date(), 30);
+        
+        const historicalData: Record<string, { date: string, time: number }[]> = {};
 
-        return categories.map(category => {
-          const dailyTotals: Record<string, number> = {};
-          
-          Object.entries(schedule).forEach(([date, dailySchedule]) => {
-            const logDate = parseISO(date);
-            if (logDate < thirtyDaysAgo) return;
-
-            if (!dailyTotals[date]) dailyTotals[date] = 0;
-            
+        Object.entries(schedule).forEach(([date, dailySchedule]) => {
             Object.values(dailySchedule).flat().forEach((activity: Activity) => {
-              if (activity && activity.completed) {
-                const effectiveActivityType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
-                if (activityNameMap[effectiveActivityType] === category) {
-                    const duration = activity.duration || 0;
-                    dailyTotals[date] += duration;
+                if (activity && activity.completed) {
+                    const effectiveActivityType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+                    const category = activityNameMap[effectiveActivityType];
+                    const duration = getLoggedMinutes(activity, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, date);
+                    if (category && duration > 0) {
+                        if (!historicalData[category]) historicalData[category] = [];
+                        
+                        const dayEntry = historicalData[category].find(d => d.date === date);
+                        if (dayEntry) {
+                            dayEntry.time += duration;
+                        } else {
+                            historicalData[category].push({ date, time: duration });
+                        }
+                    }
                 }
-              }
             });
-          });
-          
-          const historicalData = Object.entries(dailyTotals)
-            .filter(([, time]) => time > 0)
-            .map(([date, time]) => ({ date, time }))
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-            
-          return {
+        });
+
+        Object.values(historicalData).forEach(data => data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
+        
+        return categories.map(category => ({
             category,
-            historicalData,
-          };
-        }).filter(item => item.historicalData.length > 0);
-    }, [schedule, activityDurations]);
+            historicalData: historicalData[category] || [],
+        })).filter(item => item.historicalData.length > 0);
+    }, [schedule, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs]);
 
     const timeAllocationData = useMemo(() => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -415,7 +409,6 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                         const activitiesInSlot = activitiesForDay.filter(act => act.slot === slot.name);
                         
                         const productiveTime = activitiesInSlot
-                            .filter(a => ['deepwork', 'upskill', 'branding', 'lead-generation', 'planning', 'tracking', 'workout', 'mindset', 'essentials', 'nutrition', 'pomodoro'].includes(a.type))
                             .reduce((sum, act) => sum + act.calculatedDuration, 0);
 
                         const unproductiveTime = 240 - productiveTime;
@@ -722,3 +715,5 @@ export default function TimesheetPage() {
         </AuthGuard>
     );
 }
+
+    
