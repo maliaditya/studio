@@ -214,6 +214,7 @@ function NavigationMenu() {
           <DropdownMenuItem asChild><Link href="/timesheet">Timesheet</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/cube">3D Cube</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/code-viz">3D Code Viz</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/canvas">Canvas</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/code-of-conduct">Code of Conduct</Link></DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
