@@ -277,7 +277,7 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
                                         onOpenMarkdownModal={() => onOpenMarkdownModal(resource.id, point.id)}
                                         onEditLinkText={onEditLinkText}
                                         onConvertToCard={() => onConvertToCard(point)}
-                                        onOpenPdfViewer={onOpenPdfViewer}
+                                        onOpenPdfViewer={() => {}}
                                     />
                                 ))}
                             </ul>
@@ -829,6 +829,27 @@ function ResourcesPageContent() {
     };
   }, [contextMenuRef]);
 
+  const filteredFolders = useMemo(() => {
+    if (!searchTerm) {
+        return resourceFolders;
+    }
+    const lowercasedTerm = searchTerm.toLowerCase();
+    const matchingFolderIds = new Set(
+        resourceFolders.filter(f => f.name.toLowerCase().includes(lowercasedTerm)).map(f => f.id)
+    );
+
+    // Add all parents of matching folders
+    matchingFolderIds.forEach(id => {
+        let currentFolder = resourceFolders.find(f => f.id === id);
+        while (currentFolder && currentFolder.parentId) {
+            matchingFolderIds.add(currentFolder.parentId);
+            currentFolder = resourceFolders.find(f => f.id === currentFolder.parentId);
+        }
+    });
+
+    return resourceFolders.filter(f => matchingFolderIds.has(f.id));
+  }, [searchTerm, resourceFolders]);
+
   const filteredResources = useMemo(() => {
     let resourcesToFilter = resources;
     if (searchTerm && !selectedResourceFolderId) {
@@ -1122,28 +1143,6 @@ function ResourcesPageContent() {
     return options;
   }, [resourceFolders]);
 
-  const filteredFolders = useMemo(() => {
-    if (!resourceFolders) return [];
-    if (!searchTerm) {
-        return resourceFolders;
-    }
-    const lowercasedTerm = searchTerm.toLowerCase();
-    const matchingFolderIds = new Set(
-        resourceFolders.filter(f => f.name.toLowerCase().includes(lowercasedTerm)).map(f => f.id)
-    );
-
-    // Add all parents of matching folders
-    matchingFolderIds.forEach(id => {
-        let currentFolder = resourceFolders.find(f => f.id === id);
-        while (currentFolder && currentFolder.parentId) {
-            matchingFolderIds.add(currentFolder.parentId);
-            currentFolder = resourceFolders.find(f => f.id === currentFolder.parentId);
-        }
-    });
-
-    return resourceFolders.filter(f => matchingFolderIds.has(f.id));
-  }, [searchTerm, resourceFolders]);
-
   const renderSidebarFolders = useCallback((parentId: string | null, level: number) => {
     if (!filteredFolders) return null;
     const foldersToRender = filteredFolders
@@ -1235,8 +1234,7 @@ function ResourcesPageContent() {
         ))}
       </ul>
     );
-  }, [filteredFolders, editingFolderId, editingFolderName, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse, activeId, searchTerm, toggleFolderCollapse]);
-
+  }, [filteredFolders, editingFolderId, editingFolderName, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse, activeId, searchTerm]);
   
   const isDescendant = (childId: string, parentId: string): boolean => {
     if (childId === parentId) return true;
@@ -1409,7 +1407,6 @@ function ResourcesPageContent() {
       setIsAdding(false);
   };
 
-
   return (
     <div className="grid h-full grid-cols-1 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-4 gap-4 p-4">
       <input type="file" ref={pdfUploadInputRef} onChange={handlePdfUpload} accept=".pdf" className="hidden" />
@@ -1550,7 +1547,7 @@ function ResourcesPageContent() {
                                 } else if (res.type === 'mechanism') {
                                     cardContent = <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} />;
                                 } else if(res.type === 'card') {
-                                    cardContent = <ResourceCardComponent onOpenPdfViewer={openPdfViewer} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={() => createResourceWithHierarchy(res, undefined, 'card')}/>;
+                                    cardContent = <ResourceCardComponent onOpenPdfViewer={() => {}} playingAudio={playingAudio} setPlayingAudio={setPlayingAudio} resource={res} onUpdate={handleUpdateResource} onDelete={() => handleDeleteResource(res)} onOpenNestedPopup={(id, e) => handleOpenNestedPopup(id, e)} onOpenMarkdownModal={handleOpenMarkdownModal} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onEditLinkText={handleEditLinkText} onConvertToCard={() => createResourceWithHierarchy(res, undefined, 'card')}/>;
                                 } else {
                                     const youtubeEmbedUrl = getYouTubeEmbedUrl(res.link);
                                     const isGif = isGifUrl(res.link);
@@ -1657,7 +1654,7 @@ function ResourcesPageContent() {
           ) : activeId?.startsWith('card-') ? (
             <Card className="w-48 shadow-lg">
               <CardHeader className="p-3">
-                <CardTitle className="text-sm truncate">{resources.find(r => r.id === activeId.replace('card-', ''))?.name}</CardHeader>
+                <CardTitle className="text-sm truncate">{resources.find(r => r.id === activeId.replace('card-', ''))?.name}</CardTitle>
               </CardHeader>
             </Card>
           ) : null}
@@ -1701,6 +1698,7 @@ function ResourcesPageContent() {
                         <div className="flex items-center space-x-2"><RadioGroupItem value="positive" id="r-pos" /><Label htmlFor="r-pos">Positive</Label></div>
                     </RadioGroup>
                 )}
+
                  {addResourceType === 'model3d' && (
                     <div className="space-y-2">
                         <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Model Name"/>
@@ -1737,3 +1735,6 @@ export default function ResourcesPage() {
 
 
     
+
+    
+
