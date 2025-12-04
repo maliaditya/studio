@@ -178,44 +178,57 @@ function DrawingCanvasPageContent() {
     }, []);
 
     useEffect(() => {
-        if (!isMounted || !resourceFolders || !resources) {
+        if (!isMounted) return;
+        if (!resourceFolders || !resources) return;
+    
+        // If state is already initialized, don't re-run this.
+        if (drawingCanvasState && drawingCanvasState.activeCanvasId) {
             return;
         }
-        
-        if (drawingCanvasState && drawingCanvasState.activeCanvasId) {
-            return; 
-        }
 
-        let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
+        let foldersToUpdate = [...(resourceFolders || [])];
+        let resourcesToUpdate = [...(resources || [])];
+        let didUpdate = false;
+    
+        let scratchpadFolder = foldersToUpdate.find(f => f.name === 'Scratchpad');
         if (!scratchpadFolder) {
             scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
-            setResourceFolders(prev => [...(prev || []), scratchpadFolder!]);
+            foldersToUpdate.push(scratchpadFolder);
+            didUpdate = true;
         }
         
-        let scratchpadResource = resources.find(r => r.folderId === scratchpadFolder?.id && r.name === 'Default Scratchpad');
-        let scratchpadPoint: ResourcePoint | undefined;
-        
+        let scratchpadResource = resourcesToUpdate.find(r => r.folderId === scratchpadFolder?.id && r.name === 'Default Scratchpad');
         if (!scratchpadResource) {
             scratchpadResource = { id: 'res_scratchpad', name: 'Default Scratchpad', folderId: scratchpadFolder!.id, type: 'card', createdAt: new Date().toISOString(), points: [] };
-             setResources(prev => [...(prev || []), scratchpadResource!]);
+            resourcesToUpdate.push(scratchpadResource);
+            didUpdate = true;
         }
         
-        scratchpadPoint = scratchpadResource.points?.find(p => p.type === 'paint');
+        let scratchpadPoint = scratchpadResource.points?.find(p => p.type === 'paint');
         if (!scratchpadPoint) {
             scratchpadPoint = { id: `point_scratchpad_${Date.now()}`, text: 'Default Canvas', type: 'paint' };
-            setResources(prev => (prev || []).map(r => r.id === scratchpadResource!.id ? { ...r, points: [...(r.points || []), scratchpadPoint!] } : r));
+            const resIndex = resourcesToUpdate.findIndex(r => r.id === scratchpadResource!.id);
+            if (resIndex > -1) {
+              resourcesToUpdate[resIndex].points = [...(resourcesToUpdate[resIndex].points || []), scratchpadPoint!];
+              didUpdate = true;
+            }
         }
         
-        const scratchpadCanvasId = `${scratchpadResource.id}-${scratchpadPoint.id}`;
+        if (didUpdate) {
+            setResourceFolders(foldersToUpdate);
+            setResources(resourcesToUpdate);
+        }
+        
+        const scratchpadCanvasId = `${scratchpadResource.id}-${scratchpadPoint!.id}`;
         
         const openCanvasesMap = new Map();
         
         const scratchpadCanvasData = {
             id: scratchpadCanvasId,
             resourceId: scratchpadResource.id,
-            pointId: scratchpadPoint.id,
-            name: scratchpadPoint.text || 'Scratchpad',
-            data: scratchpadPoint.drawing,
+            pointId: scratchpadPoint!.id,
+            name: scratchpadPoint!.text || 'Scratchpad',
+            data: scratchpadPoint!.drawing,
             isPinned: (settings.pinnedCanvasIds || []).includes(scratchpadCanvasId)
         };
         openCanvasesMap.set(scratchpadCanvasId, scratchpadCanvasData);
@@ -290,10 +303,10 @@ function DrawingCanvasPageContent() {
         }
     }, [handleSaveClick]);
 
-    const handleTabClick = (canvasId: string) => {
+    const handleTabClick = useCallback((canvasId: string) => {
         if (isDirty) handleSaveClick();
         setDrawingCanvasState(prev => prev ? { ...prev, activeCanvasId: canvasId } : null);
-    };
+    }, [isDirty, handleSaveClick, setDrawingCanvasState]);
 
     const handleCloseTab = (e: React.MouseEvent, canvasId: string) => {
         e.stopPropagation();
