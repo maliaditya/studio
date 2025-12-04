@@ -184,7 +184,7 @@ function DrawingCanvasPageContent() {
             return;
         }
     
-        if (drawingCanvasState && drawingCanvasState.openCanvases.length > 0) {
+        if (drawingCanvasState && drawingCanvasState.openCanvases.length > 0 && drawingCanvasState.activeCanvasId) {
             return;
         }
     
@@ -240,7 +240,7 @@ function DrawingCanvasPageContent() {
             pointId: scratchpadPoint.id,
             name: scratchpadPoint.text || 'Scratchpad',
             data: scratchpadPoint.drawing,
-            isPinned: (settings.pinnedCanvasIds || []).includes(scratchpadCanvasId) || true, // Default canvas is always "pinned" in a sense
+            isPinned: (settings.pinnedCanvasIds || []).includes(scratchpadCanvasId) || true,
         });
     
         (settings.pinnedCanvasIds || []).forEach(pinnedId => {
@@ -284,11 +284,15 @@ function DrawingCanvasPageContent() {
     const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
     
     const handleCreateNewCanvas = useCallback(() => {
-        let localResources = [...(resources || [])];
-        let localResourceFolders = [...(resourceFolders || [])];
-        let shouldUpdateFolders = false;
-        let shouldUpdateResources = false;
+        if (!resources || !resourceFolders) {
+          toast({ title: "Error", description: "Resources not loaded yet. Please try again in a moment.", variant: "destructive" });
+          return;
+        }
     
+        let localResources = [...resources];
+        let localResourceFolders = [...resourceFolders];
+        let shouldUpdateFolders = false;
+        
         let scratchpadFolder = localResourceFolders.find(f => f.name === 'Scratchpad' && !f.parentId);
         if (!scratchpadFolder) {
             scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
@@ -308,14 +312,11 @@ function DrawingCanvasPageContent() {
         };
         
         localResources.push(newResource);
-        shouldUpdateResources = true;
-
+        
         if (shouldUpdateFolders) {
             setResourceFolders(localResourceFolders);
         }
-        if (shouldUpdateResources) {
-            setResources(localResources);
-        }
+        setResources(localResources);
         
         const newPoint = newResource.points![0];
         openDrawingCanvas({
@@ -324,7 +325,7 @@ function DrawingCanvasPageContent() {
             name: newPoint.text || 'New Canvas',
             initialDrawing: newPoint.drawing,
         });
-    }, [resources, resourceFolders, setResources, setResourceFolders, openDrawingCanvas]);
+    }, [resources, resourceFolders, setResources, setResourceFolders, openDrawingCanvas, toast]);
 
     useEffect(() => {
         isUserChange.current = false;
@@ -537,5 +538,3 @@ export default function DrawingCanvasPage() {
         </AuthGuard>
     )
 }
-
-    
