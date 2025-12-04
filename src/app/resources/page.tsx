@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -422,6 +423,11 @@ const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, 
                 onConvertToCard={onConvertToCard}
                 onEditLinkText={onEditLinkText}
                 dragHandle={{ attributes, listeners }}
+                onSeekTo={()=>{}}
+                currentTime={0}
+                onSetEndTime={()=>{}}
+                onClearEndTime={()=>{}}
+                onOpenDrawingCanvas={()=>{}}
             />
         </div>
     );
@@ -1117,6 +1123,7 @@ function ResourcesPageContent() {
     if (!searchTerm) {
         return resourceFolders;
     }
+    if (!resourceFolders) return [];
     const lowercasedTerm = searchTerm.toLowerCase();
     const matchingFolderIds = new Set(
         resourceFolders.filter(f => f.name.toLowerCase().includes(lowercasedTerm)).map(f => f.id)
@@ -1135,6 +1142,7 @@ function ResourcesPageContent() {
   }, [searchTerm, resourceFolders]);
 
   const renderSidebarFolders = useCallback((parentId: string | null, level: number) => {
+    if (!filteredFolders) return null;
     const foldersToRender = filteredFolders
         .filter(f => f.parentId === parentId)
         .sort((a, b) => {
