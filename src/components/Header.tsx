@@ -602,6 +602,7 @@ export function Header() {
     syncWithGitHub,
     downloadFromGitHub,
     openMindsetWidget,
+    openDrawingCanvas,
     openDrawingCanvasFromHeader,
   } = useAuth();
 
