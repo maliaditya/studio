@@ -337,26 +337,19 @@ function DrawingCanvasPageContent() {
             const point = resource?.points?.find(p => p.id === pointId);
             
             if (resource && point) {
-                const canvasId = `${resource.id}-${point.id}`;
-                const isAlreadyOpen = drawingCanvasState?.openCanvases?.some(c => c.id === canvasId);
-                
-                if (isAlreadyOpen) {
-                    handleTabClick(canvasId);
-                } else {
-                     openDrawingCanvas({
-                        resourceId: resource.id,
-                        pointId: point.id,
-                        name: point.text || 'Linked Canvas',
-                        initialDrawing: point.drawing,
-                    });
-                }
+                openDrawingCanvas({
+                    resourceId: resource.id,
+                    pointId: point.id,
+                    name: point.text || 'Linked Canvas',
+                    initialDrawing: point.drawing,
+                });
             } else {
                 toast({ title: 'Error', description: 'Could not find the linked canvas.', variant: 'destructive'});
             }
         } else if (link) {
             setFloatingVideoUrl(link);
         }
-    }, [openDrawingCanvas, resources, toast, drawingCanvasState, setFloatingVideoUrl, handleTabClick]);
+    }, [openDrawingCanvas, resources, toast, setFloatingVideoUrl]);
   
     const handleLinkingSearchSelect = useCallback((resource: Resource, point: ResourcePoint) => {
         const api = excalidrawAPIRef.current;
@@ -389,7 +382,7 @@ function DrawingCanvasPageContent() {
                 <header className="p-2 flex items-center justify-between border-b gap-4 flex-shrink-0">
                     <div className="flex-grow min-w-0 overflow-x-auto">
                         <div className="flex items-center gap-2">
-                            {(drawingCanvasState?.openCanvases || []).map(canvas => (
+                            {drawingCanvasState?.openCanvases && drawingCanvasState.openCanvases.map(canvas => (
                                 <Button
                                     key={canvas.id}
                                     variant={drawingCanvasState?.activeCanvasId === canvas.id ? "secondary" : "ghost"}
