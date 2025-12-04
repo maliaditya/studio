@@ -1300,6 +1300,7 @@ function ResourcesPageContent() {
   const currentMarkdownResource = markdownModalState.resource;
 
   const sortedTabs = useMemo(() => {
+    if (!activeResourceTabIds) return [];
     return [...activeResourceTabIds].sort((a, b) => {
         const aIsPinned = pinnedFolderIds.has(a);
         const bIsPinned = pinnedFolderIds.has(b);
@@ -1310,6 +1311,7 @@ function ResourcesPageContent() {
   }, [activeResourceTabIds, pinnedFolderIds]);
   
   const showCloseAll = useMemo(() => {
+    if (!activeResourceTabIds) return false;
     return activeResourceTabIds.some(id => !pinnedFolderIds.has(id));
   }, [activeResourceTabIds, pinnedFolderIds]);
 
@@ -1448,7 +1450,7 @@ function ResourcesPageContent() {
                         onWheel={handleWheelScroll}
                         className="flex items-center overflow-x-auto flex-grow"
                     >
-                        {sortedTabs.map(tabId => {
+                        {sortedTabs && sortedTabs.map(tabId => {
                             const folder = resourceFolders.find(f => f.id === tabId);
                             if (!folder) return null;
                             const isPinned = pinnedFolderIds.has(tabId);
@@ -1688,6 +1690,7 @@ function ResourcesPageContent() {
                 
                 {addResourceType === 'link' && <Input value={newResourceLink} onChange={e => setNewResourceLink(e.target.value)} placeholder="https://example.com" />}
                 {addResourceType !== 'link' && addResourceType !== 'pdf' && addResourceType !== 'model3d' && <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Resource Name"/>}
+                
                 {addResourceType === 'mechanism' && (
                     <RadioGroup value={mechanismFramework} onValueChange={(v) => setMechanismFramework(v as any)} className="flex items-center space-x-4">
                         <Label>Framework:</Label>
@@ -1727,3 +1730,4 @@ export default function ResourcesPage() {
     
 
     
+
