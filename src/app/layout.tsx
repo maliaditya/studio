@@ -536,7 +536,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                     }}
                 />
             )}
-            <PdfViewerPopup />
+            {authContext.pdfViewerState?.isOpen && <PdfViewerPopup />}
             <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-[65]">
               {Array.from(openPopups.values()).map(popup => {
                   if (!popup.parentId) return null;
