@@ -2,8 +2,9 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Save, X, Pin, PinOff, Search, Link as LinkIcon, PlusCircle, Copy } from 'lucide-react';
+import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -402,45 +403,6 @@ function DrawingCanvasPageContent() {
         setIsLinkingSearchOpen(false);
     }, [handleSaveClick]);
 
-    const handleCreateNewCanvas = useCallback(() => {
-        const folders = resourceFolders || [];
-        let scratchpadFolder = folders.find(f => f.name === 'Scratchpad');
-        let shouldUpdateFolders = false;
-
-        if (!scratchpadFolder) {
-            scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
-            shouldUpdateFolders = true;
-        }
-
-        const newResource: Resource = {
-            id: `res_canvas_${Date.now()}`,
-            name: `New Canvas ${new Date().toLocaleTimeString()}`,
-            folderId: scratchpadFolder.id,
-            type: 'card',
-            createdAt: new Date().toISOString(),
-            points: [],
-        };
-        
-        const newPoint: ResourcePoint = {
-            id: `point_canvas_${Date.now()}`,
-            text: `New Canvas`,
-            type: 'paint',
-        };
-
-        newResource.points!.push(newPoint);
-        
-        if (shouldUpdateFolders) {
-            setResourceFolders(prev => [...(prev || []), scratchpadFolder!]);
-        }
-        setResources(prev => [...(prev || []), newResource]);
-        
-        openDrawingCanvas({
-            resourceId: newResource.id,
-            pointId: newPoint.id,
-            name: newPoint.text || 'New Canvas',
-        });
-    }, [resourceFolders, setResourceFolders, setResources, openDrawingCanvas]);
-
     const handleCopyLink = () => {
         if (!activeCanvas) return;
         const link = `canvas://${activeCanvas.resourceId}/${activeCanvas.pointId}`;
@@ -479,7 +441,11 @@ function DrawingCanvasPageContent() {
                         </div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button variant="ghost" size="icon" onClick={handleCreateNewCanvas}><PlusCircle className="h-4 w-4"/></Button>
+                        <Button variant="ghost" size="icon" asChild>
+                            <Link href="/my-plate">
+                                <LayoutDashboard className="h-4 w-4" />
+                            </Link>
+                        </Button>
                         <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" onClick={handleCopyLink}><Copy className="h-4 w-4"/></Button>
@@ -517,3 +483,5 @@ export default function DrawingCanvasPage() {
         </AuthGuard>
     )
 }
+
+    
