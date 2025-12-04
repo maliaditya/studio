@@ -329,7 +329,7 @@ function DrawingCanvasPageContent() {
             });
         }
         setIsSearchOpen(false);
-    }, [openDrawingCanvas, drawingCanvasState]);
+    }, [openDrawingCanvas, drawingCanvasState, handleTabClick]);
 
     const onLinkOpen: OnLinkOpen = useCallback((element, event) => {
         event.preventDefault();
@@ -387,7 +387,8 @@ function DrawingCanvasPageContent() {
     }, [handleSaveClick]);
 
     const handleCreateNewCanvas = useCallback(() => {
-        let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
+        const folders = resourceFolders || [];
+        let scratchpadFolder = folders.find(f => f.name === 'Scratchpad');
         if (!scratchpadFolder) {
             scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
             setResourceFolders(prev => [...(prev || []), scratchpadFolder!]);
