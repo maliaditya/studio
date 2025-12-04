@@ -356,7 +356,7 @@ function DrawingCanvasPageContent() {
         } else if (link) {
             setFloatingVideoUrl(link);
         }
-    }, [openDrawingCanvas, resources, toast, drawingCanvasState, setFloatingVideoUrl]);
+    }, [openDrawingCanvas, resources, toast, drawingCanvasState, setFloatingVideoUrl, handleTabClick]);
   
     const handleLinkingSearchSelect = useCallback((resource: Resource, point: ResourcePoint) => {
         const api = excalidrawAPIRef.current;
