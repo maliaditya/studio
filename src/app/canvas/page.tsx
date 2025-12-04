@@ -147,7 +147,7 @@ function DrawingCanvasPageContent() {
         mediaQuery.addEventListener('change', handleThemeChange);
 
         // If no canvas is open, open the scratchpad
-        if (!drawingCanvasState || !drawingCanvasState.activeCanvasId) {
+        if ((!drawingCanvasState || !drawingCanvasState.activeCanvasId) && resourceFolders) {
             let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
             if (!scratchpadFolder) {
                 scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
@@ -180,7 +180,7 @@ function DrawingCanvasPageContent() {
         }
         
         return () => mediaQuery.removeEventListener('change', handleThemeChange);
-    }, []);
+    }, [drawingCanvasState, resourceFolders, resources, settings.pinnedCanvasIds]);
 
     const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
 
