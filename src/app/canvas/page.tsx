@@ -284,18 +284,18 @@ function DrawingCanvasPageContent() {
     const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
     
     const handleCreateNewCanvas = useCallback(() => {
-        let localResources = resources || [];
-        let localResourceFolders = resourceFolders || [];
+        let localResources = [...(resources || [])];
+        let localResourceFolders = [...(resourceFolders || [])];
         let shouldUpdateFolders = false;
         let shouldUpdateResources = false;
-
-        let scratchpadFolder = localResourceFolders.find(f => f.name === 'Scratchpad');
+    
+        let scratchpadFolder = localResourceFolders.find(f => f.name === 'Scratchpad' && !f.parentId);
         if (!scratchpadFolder) {
             scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
-            localResourceFolders = [...localResourceFolders, scratchpadFolder];
+            localResourceFolders.push(scratchpadFolder);
             shouldUpdateFolders = true;
         }
-
+    
         const newResource: Resource = {
             id: `res_canvas_${Date.now()}`,
             name: 'New Canvas',
@@ -307,7 +307,7 @@ function DrawingCanvasPageContent() {
             ]
         };
         
-        localResources = [...localResources, newResource];
+        localResources.push(newResource);
         shouldUpdateResources = true;
 
         if (shouldUpdateFolders) {
