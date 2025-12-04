@@ -3,7 +3,7 @@
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush } from 'lucide-react';
+import { Save, X, Pin, PinOff, Search, Link as LinkIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -151,103 +151,77 @@ function DrawingCanvasPageContent() {
     }, []);
 
     useEffect(() => {
-      // Ensure data is ready and component is mounted
-      if (!isMounted || !resourceFolders || !resources) {
-        return;
-      }
-    
-      // Only run this initialization logic if the canvas state isn't already set up
-      if (drawingCanvasState && drawingCanvasState.isOpen) {
-        return;
-      }
-    
-      let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
-      let scratchpadResource: Resource | undefined;
-      let scratchpadPoint: ResourcePoint | undefined;
-    
-      let foldersToUpdate: ResourceFolder[] = [];
-      let resourcesToUpdate: Resource[] = [];
-      let resourceNeedsUpdate = false;
-    
-      if (!scratchpadFolder) {
-        scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
-        foldersToUpdate.push(scratchpadFolder);
-      }
-    
-      scratchpadResource = resources.find(r => r.folderId === scratchpadFolder?.id && r.name === 'Default Scratchpad');
-    
-      if (!scratchpadResource) {
-        scratchpadResource = {
-          id: 'res_scratchpad',
-          name: 'Default Scratchpad',
-          folderId: scratchpadFolder.id,
-          type: 'card',
-          createdAt: new Date().toISOString(),
-          points: [],
-        };
-        resourcesToUpdate.push(scratchpadResource);
-      }
-    
-      scratchpadPoint = scratchpadResource.points?.find(p => p.type === 'paint');
-    
-      if (!scratchpadPoint) {
-        scratchpadPoint = { id: `point_scratchpad_${Date.now()}`, text: 'Default Canvas', type: 'paint' };
-        scratchpadResource = {
-          ...scratchpadResource,
-          points: [...(scratchpadResource.points || []), scratchpadPoint],
-        };
-        resourceNeedsUpdate = true;
-      }
-    
-      // Apply updates if any were needed
-      if (foldersToUpdate.length > 0) setResourceFolders(prev => [...prev, ...foldersToUpdate]);
-      if (resourcesToUpdate.length > 0) setResources(prev => [...prev, ...resourcesToUpdate]);
-      if (resourceNeedsUpdate) {
-        if (resources.find(r => r.id === scratchpadResource!.id)) {
-          setResources(prev => prev.map(r => r.id === scratchpadResource!.id ? scratchpadResource! : r));
-        } else if (!resourcesToUpdate.find(r => r.id === scratchpadResource!.id)) {
-          setResources(prev => [...prev, scratchpadResource!]);
+        if (!isMounted || !resourceFolders || !resources) {
+            return;
         }
-      }
-    
-      const scratchpadCanvasData = {
-        id: `${scratchpadResource.id}-${scratchpadPoint.id}`,
-        resourceId: scratchpadResource.id,
-        pointId: scratchpadPoint.id,
-        name: scratchpadPoint.text || 'Scratchpad',
-        data: scratchpadPoint.drawing,
-        isPinned: (settings.pinnedCanvasIds || []).includes(`${scratchpadResource.id}-${scratchpadPoint.id}`)
-      };
-    
-      const openCanvasesMap = new Map<string, typeof scratchpadCanvasData>();
-      openCanvasesMap.set(scratchpadCanvasData.id, scratchpadCanvasData);
-      
-      // Load all pinned canvases
-      (settings.pinnedCanvasIds || []).forEach(pinnedId => {
-        if (!openCanvasesMap.has(pinnedId)) {
-          const resource = resources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
-          const point = resource?.points?.find(p => `${resource.id}-${p.id}` === pinnedId);
-          if (resource && point) {
-            openCanvasesMap.set(pinnedId, {
-              id: pinnedId,
-              resourceId: resource.id,
-              pointId: point.id,
-              name: point.text || 'Untitled Canvas',
-              data: point.drawing,
-              isPinned: true,
-            });
-          }
+
+        if (drawingCanvasState?.isOpen) {
+            return;
         }
-      });
-    
-      // Finally, set the canvas state
-      setDrawingCanvasState({
-        isOpen: true,
-        position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
-        openCanvases: Array.from(openCanvasesMap.values()),
-        activeCanvasId: scratchpadCanvasData.id,
-      });
-    
+
+        let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
+        if (!scratchpadFolder) {
+            scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
+            setResourceFolders(prev => [...prev, scratchpadFolder!]);
+        }
+        
+        let scratchpadResource = resources.find(r => r.folderId === scratchpadFolder?.id && r.name === 'Default Scratchpad');
+        let scratchpadPoint: ResourcePoint | undefined;
+        let resourceNeedsUpdate = false;
+        
+        if (!scratchpadResource) {
+            scratchpadResource = { id: 'res_scratchpad', name: 'Default Scratchpad', folderId: scratchpadFolder!.id, type: 'card', createdAt: new Date().toISOString(), points: [] };
+            setResources(prev => [...prev, scratchpadResource!]);
+            resourceNeedsUpdate = true; // Mark that resources were updated
+        }
+        
+        scratchpadPoint = scratchpadResource.points?.find(p => p.type === 'paint');
+        if (!scratchpadPoint) {
+            scratchpadPoint = { id: `point_scratchpad_${Date.now()}`, text: 'Default Canvas', type: 'paint' };
+            scratchpadResource = { ...scratchpadResource, points: [...(scratchpadResource.points || []), scratchpadPoint]};
+            
+            setResources(prev => prev.map(r => r.id === scratchpadResource!.id ? scratchpadResource! : r));
+            resourceNeedsUpdate = true;
+        }
+
+        const scratchpadCanvasId = `${scratchpadResource.id}-${scratchpadPoint.id}`;
+        
+        const openCanvasesMap = new Map();
+        
+        const scratchpadCanvasData = {
+            id: scratchpadCanvasId,
+            resourceId: scratchpadResource.id,
+            pointId: scratchpadPoint.id,
+            name: scratchpadPoint.text || 'Scratchpad',
+            data: scratchpadPoint.drawing,
+            isPinned: (settings.pinnedCanvasIds || []).includes(scratchpadCanvasId)
+        };
+        openCanvasesMap.set(scratchpadCanvasId, scratchpadCanvasData);
+        
+        (settings.pinnedCanvasIds || []).forEach(pinnedId => {
+            if (!openCanvasesMap.has(pinnedId)) {
+                const resource = resources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
+                const point = resource?.points?.find(p => `${resource.id}-${p.id}` === pinnedId);
+                if (resource && point) {
+                    openCanvasesMap.set(pinnedId, {
+                        id: pinnedId,
+                        resourceId: resource.id,
+                        pointId: point.id,
+                        name: point.text || 'Untitled Canvas',
+                        data: point.drawing,
+                        isPinned: true,
+                    });
+                }
+            }
+        });
+        
+        setDrawingCanvasState({
+            isOpen: true,
+            position: { x: 0, y: 0 },
+            openCanvases: Array.from(openCanvasesMap.values()),
+            activeCanvasId: scratchpadCanvasId,
+        });
+
     }, [isMounted, resourceFolders, resources, drawingCanvasState, setDrawingCanvasState, setResources, setResourceFolders, settings.pinnedCanvasIds]);
 
     const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
@@ -445,5 +419,3 @@ export default function DrawingCanvasPage() {
         </AuthGuard>
     )
 }
-
-    
