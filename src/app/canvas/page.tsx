@@ -4,7 +4,7 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy } from 'lucide-react';
+import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -179,69 +179,77 @@ function DrawingCanvasPageContent() {
     }, []);
 
     useEffect(() => {
-        // Guard against running before essential data is loaded
         if (!isMounted || !resources || !resourceFolders) {
             return;
         }
 
-        // Only initialize if state is not already set up
         if (drawingCanvasState && drawingCanvasState.openCanvases.length > 0) {
             return;
         }
 
-        const openCanvasesMap = new Map();
-        
-        let localResources = [...resources];
-        let localResourceFolders = [...resourceFolders];
+        let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad' && !f.parentId);
+        let scratchpadResource: Resource | undefined = scratchpadFolder ? resources.find(r => r.folderId === scratchpadFolder!.id && r.name === 'Default Scratchpad') : undefined;
+        let scratchpadPoint: ResourcePoint | undefined = scratchpadResource?.points?.find(p => p.type === 'paint');
 
-        let scratchpadFolder = localResourceFolders.find(f => f.name === 'Scratchpad' && !f.parentId);
-        
+        let shouldUpdateFolders = false;
+        let shouldUpdateResources = false;
+
+        let finalFolders = [...resourceFolders];
+        let finalResources = [...resources];
+
         if (!scratchpadFolder) {
             scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
-            localResourceFolders.push(scratchpadFolder);
+            finalFolders.push(scratchpadFolder);
+            shouldUpdateFolders = true;
         }
 
-        let scratchpadResource = localResources.find(r => r.folderId === scratchpadFolder!.id && r.name === 'Default Scratchpad');
-        
         if (!scratchpadResource) {
             scratchpadResource = {
-                id: 'res_scratchpad', name: 'Default Scratchpad', folderId: scratchpadFolder.id, type: 'card', createdAt: new Date().toISOString(), points: []
+                id: 'res_scratchpad',
+                name: 'Default Scratchpad',
+                folderId: scratchpadFolder.id,
+                type: 'card',
+                createdAt: new Date().toISOString(),
+                points: []
             };
-            localResources.push(scratchpadResource);
+            finalResources.push(scratchpadResource);
+            shouldUpdateResources = true;
         }
 
-        let scratchpadPoint = scratchpadResource.points?.find(p => p.type === 'paint');
         if (!scratchpadPoint) {
             scratchpadPoint = { id: `point_scratchpad_${Date.now()}`, text: 'Default Canvas', type: 'paint' };
-            
-            const resIndex = localResources.findIndex(r => r.id === scratchpadResource!.id);
+            const resIndex = finalResources.findIndex(r => r.id === scratchpadResource!.id);
             if (resIndex > -1) {
-              localResources[resIndex] = {
-                ...localResources[resIndex],
-                points: [...(localResources[resIndex].points || []), scratchpadPoint]
-              };
+                const updatedPoints = [...(finalResources[resIndex].points || []), scratchpadPoint];
+                finalResources[resIndex] = { ...finalResources[resIndex], points: updatedPoints };
+            } else {
+                 finalResources.push({...scratchpadResource, points: [scratchpadPoint]});
             }
+            shouldUpdateResources = true;
         }
-        
-        // Batch update state if changes were made
-        if (localResources.length !== resources.length || localResourceFolders.length !== resourceFolders.length) {
-          setResources(localResources);
-          setResourceFolders(localResourceFolders);
+
+        if (shouldUpdateFolders) {
+            setResourceFolders(finalFolders);
         }
-        
+        if (shouldUpdateResources) {
+            setResources(finalResources);
+        }
+
+        const openCanvasesMap = new Map();
         const scratchpadCanvasId = `${scratchpadResource.id}-${scratchpadPoint.id}`;
+        
         openCanvasesMap.set(scratchpadCanvasId, {
             id: scratchpadCanvasId,
             resourceId: scratchpadResource.id,
             pointId: scratchpadPoint.id,
             name: scratchpadPoint.text || 'Scratchpad',
             data: scratchpadPoint.drawing,
-            isPinned: (settings.pinnedCanvasIds || []).includes(scratchpadCanvasId)
+            isPinned: true
         });
-        
+
         (settings.pinnedCanvasIds || []).forEach(pinnedId => {
             if (!openCanvasesMap.has(pinnedId)) {
-                const resource = localResources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
+                const resource = resources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
                 const point = resource?.points?.find(p => `${resource.id}-${p.id}` === pinnedId);
                 if (resource && point) {
                     openCanvasesMap.set(pinnedId, {
@@ -255,7 +263,7 @@ function DrawingCanvasPageContent() {
                 }
             }
         });
-        
+
         setDrawingCanvasState({
             isOpen: true,
             position: { x: 0, y: 0 },
@@ -266,6 +274,49 @@ function DrawingCanvasPageContent() {
     }, [isMounted, resources, resourceFolders, settings.pinnedCanvasIds, drawingCanvasState, setDrawingCanvasState, setResources, setResourceFolders]);
 
     const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
+    
+    const handleCreateNewCanvas = useCallback(() => {
+        let localResources = resources || [];
+        let localResourceFolders = resourceFolders || [];
+        let shouldUpdateFolders = false;
+        let shouldUpdateResources = false;
+
+        let scratchpadFolder = localResourceFolders.find(f => f.name === 'Scratchpad');
+        if (!scratchpadFolder) {
+            scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
+            localResourceFolders = [...localResourceFolders, scratchpadFolder];
+            shouldUpdateFolders = true;
+        }
+
+        const newResource: Resource = {
+            id: `res_canvas_${Date.now()}`,
+            name: 'New Canvas',
+            folderId: scratchpadFolder.id,
+            type: 'card',
+            createdAt: new Date().toISOString(),
+            points: [
+                { id: `point_${Date.now()}`, text: 'New Canvas', type: 'paint' }
+            ]
+        };
+        
+        localResources = [...localResources, newResource];
+        shouldUpdateResources = true;
+
+        if (shouldUpdateFolders) {
+            setResourceFolders(localResourceFolders);
+        }
+        if (shouldUpdateResources) {
+            setResources(localResources);
+        }
+        
+        const newPoint = newResource.points![0];
+        openDrawingCanvas({
+            resourceId: newResource.id,
+            pointId: newPoint.id,
+            name: newPoint.text || 'New Canvas',
+            initialDrawing: newPoint.drawing,
+        });
+    }, [resources, resourceFolders, setResources, setResourceFolders, openDrawingCanvas]);
 
     useEffect(() => {
         isUserChange.current = false;
@@ -441,6 +492,7 @@ function DrawingCanvasPageContent() {
                                 <LayoutDashboard className="h-4 w-4" />
                             </Link>
                         </Button>
+                        <Button variant="ghost" size="icon" onClick={handleCreateNewCanvas}><Plus className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" onClick={handleCopyLink}><Copy className="h-4 w-4"/></Button>
