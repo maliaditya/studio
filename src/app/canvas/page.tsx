@@ -138,49 +138,76 @@ function DrawingCanvasPageContent() {
     const isUserChange = useRef(false);
 
     useEffect(() => {
-        setIsMounted(true);
-        const handleThemeChange = (e: MediaQueryListEvent) => {
-            setTheme(e.matches ? 'dark' : 'light');
-        };
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        setTheme(mediaQuery.matches ? 'dark' : 'light');
-        mediaQuery.addEventListener('change', handleThemeChange);
+      setIsMounted(true);
+      const handleThemeChange = (e: MediaQueryListEvent) => {
+          setTheme(e.matches ? 'dark' : 'light');
+      };
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      setTheme(mediaQuery.matches ? 'dark' : 'light');
+      mediaQuery.addEventListener('change', handleThemeChange);
 
-        if (resourceFolders && (!drawingCanvasState || !drawingCanvasState.activeCanvasId)) {
-            // Find or create the scratchpad resource
-            let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
-            if (!scratchpadFolder) {
-                scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
-                setResourceFolders(prev => [...prev, scratchpadFolder!]);
-            }
-            let scratchpadResource = resources.find(r => r.folderId === scratchpadFolder!.id && r.name === 'Default Scratchpad');
-            if (!scratchpadResource) {
-                scratchpadResource = {
-                    id: 'res_scratchpad',
-                    name: 'Default Scratchpad',
-                    folderId: scratchpadFolder.id,
-                    type: 'card',
-                    createdAt: new Date().toISOString(),
-                    points: [],
-                };
-                setResources(prev => [...prev, scratchpadResource!]);
-            }
-            let scratchpadPoint = scratchpadResource.points?.find(p => p.type === 'paint');
-            if (!scratchpadPoint) {
-                scratchpadPoint = { id: `point_scratchpad_${Date.now()}`, text: 'Default Canvas', type: 'paint' };
-                setResources(prev => prev.map(r => r.id === scratchpadResource!.id ? { ...r, points: [...(r.points || []), scratchpadPoint!] } : r));
-            }
-            
-            openDrawingCanvas({
-                resourceId: scratchpadResource.id,
-                pointId: scratchpadPoint.id,
-                name: scratchpadPoint.text || 'Scratchpad',
-                initialDrawing: scratchpadPoint.drawing,
-            });
+      if (resourceFolders && (!drawingCanvasState || !drawingCanvasState.activeCanvasId)) {
+        let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
+        if (!scratchpadFolder) {
+            scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
+            setResourceFolders(prev => [...prev, scratchpadFolder!]);
         }
-        
-        return () => mediaQuery.removeEventListener('change', handleThemeChange);
-    }, [drawingCanvasState, resourceFolders, resources, settings.pinnedCanvasIds]);
+        let scratchpadResource = resources.find(r => r.folderId === scratchpadFolder!.id && r.name === 'Default Scratchpad');
+        if (!scratchpadResource) {
+            scratchpadResource = {
+                id: 'res_scratchpad',
+                name: 'Default Scratchpad',
+                folderId: scratchpadFolder.id,
+                type: 'card',
+                createdAt: new Date().toISOString(),
+                points: [],
+            };
+            setResources(prev => [...prev, scratchpadResource!]);
+        }
+        let scratchpadPoint = scratchpadResource.points?.find(p => p.type === 'paint');
+        if (!scratchpadPoint) {
+            scratchpadPoint = { id: `point_scratchpad_${Date.now()}`, text: 'Default Canvas', type: 'paint' };
+            setResources(prev => prev.map(r => r.id === scratchpadResource!.id ? { ...r, points: [...(r.points || []), scratchpadPoint!] } : r));
+        }
+
+        const openCanvases = [{
+          id: `${scratchpadResource.id}-${scratchpadPoint.id}`,
+          resourceId: scratchpadResource.id,
+          pointId: scratchpadPoint.id,
+          name: scratchpadPoint.text || 'Scratchpad',
+          data: scratchpadPoint.drawing,
+          isPinned: (settings.pinnedCanvasIds || []).includes(`${scratchpadResource.id}-${scratchpadPoint.id}`)
+        }];
+
+        // Also open any other pinned canvases
+        (settings.pinnedCanvasIds || []).forEach(pinnedId => {
+            if (pinnedId !== `${scratchpadResource.id}-${scratchpadPoint.id}`) {
+                const resource = resources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
+                const point = resource?.points?.find(p => `${resource.id}-${p.id}` === pinnedId);
+                if (resource && point) {
+                    openCanvases.push({
+                        id: pinnedId,
+                        resourceId: resource.id,
+                        pointId: point.id,
+                        name: point.text || 'Untitled Canvas',
+                        data: point.drawing,
+                        isPinned: true,
+                    });
+                }
+            }
+        });
+
+        setDrawingCanvasState({
+            isOpen: true,
+            position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+            openCanvases,
+            activeCanvasId: `${scratchpadResource.id}-${scratchpadPoint.id}`,
+        });
+      }
+      
+      return () => mediaQuery.removeEventListener('change', handleThemeChange);
+    }, [resourceFolders, resources, settings.pinnedCanvasIds]);
+
 
     const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
 
@@ -350,7 +377,7 @@ function DrawingCanvasPageContent() {
                     </Button>
                 </div>
             </header>
-            <main className="flex-grow relative">
+            <main className="flex-grow min-h-0 relative">
                 {isMounted && activeCanvas ? (
                     <ExcalidrawWrapper 
                         activeCanvas={activeCanvas}
