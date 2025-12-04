@@ -146,7 +146,7 @@ function DrawingCanvasPageContent() {
       setTheme(mediaQuery.matches ? 'dark' : 'light');
       mediaQuery.addEventListener('change', handleThemeChange);
 
-      if (resourceFolders && (!drawingCanvasState || !drawingCanvasState.activeCanvasId)) {
+      if (resourceFolders && resources && (!drawingCanvasState || !drawingCanvasState.activeCanvasId)) {
         let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
         if (!scratchpadFolder) {
             scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
@@ -181,9 +181,9 @@ function DrawingCanvasPageContent() {
 
         // Also open any other pinned canvases
         (settings.pinnedCanvasIds || []).forEach(pinnedId => {
-            if (pinnedId !== `${scratchpadResource.id}-${scratchpadPoint.id}`) {
+            if (pinnedId !== `${scratchpadResource!.id}-${scratchpadPoint!.id}`) {
                 const resource = resources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
-                const point = resource?.points?.find(p => `${resource.id}-${p.id}` === pinnedId);
+                const point = resource?.points?.find(p => `${resource!.id}-${p.id}` === pinnedId);
                 if (resource && point) {
                     openCanvases.push({
                         id: pinnedId,
@@ -206,7 +206,7 @@ function DrawingCanvasPageContent() {
       }
       
       return () => mediaQuery.removeEventListener('change', handleThemeChange);
-    }, [resourceFolders, resources, settings.pinnedCanvasIds]);
+    }, [resourceFolders, resources, settings.pinnedCanvasIds, drawingCanvasState, setDrawingCanvasState, setResourceFolders, setResources]);
 
 
     const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);

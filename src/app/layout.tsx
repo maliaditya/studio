@@ -52,6 +52,7 @@ import { PillarPopup } from '@/components/PillarPopup';
 import { DrawingCanvas } from '@/components/DrawingCanvas';
 import dynamic from 'next/dynamic';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
+import { usePathname } from 'next/navigation';
 
 const PdfViewerPopup = dynamic(() => import('@/components/PdfViewerPopup'), {
   ssr: false,
@@ -144,6 +145,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
   const [remainingTime, setRemainingTime] = React.useState<string | null>(null);
+  const pathname = usePathname();
   
   const [interruptModalState, setInterruptModalState] = useState<{isOpen: boolean, slotName: string | null, activityType: 'interrupt' | 'distraction' | null}>({ isOpen: false, slotName: null, activityType: null });
   const [interruptDetails, setInterruptDetails] = useState('');
@@ -405,7 +407,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <DefaultBackground />
       <MatrixBackground />
       <ClothBackground />
-      <Header />
+      {pathname !== '/canvas' && <Header />}
       {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.pistons && <PistonsHead />}
       <main>{children}</main>
       <Toaster />

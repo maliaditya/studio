@@ -288,6 +288,7 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                 ...skill,
                 mainIntentionId: mainIntention?.id,
                 nextReviewDate: sortedDates.length > 0 ? nextReviewDate : new Date(),
+                isOverdue: sortedDates.length > 0 && isBefore(nextReviewDate, startOfToday()),
             };
         });
     }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes]);
