@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -278,6 +277,7 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
                                         onOpenMarkdownModal={() => onOpenMarkdownModal(resource.id, point.id)}
                                         onEditLinkText={onEditLinkText}
                                         onConvertToCard={() => onConvertToCard(point)}
+                                        onOpenPdfViewer={onOpenPdfViewer}
                                     />
                                 ))}
                             </ul>
@@ -300,6 +300,7 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
                                 <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
                                 <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
                                 <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
+                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('paint')}><Paintbrush className="mr-2 h-4 w-4" />Paint Canvas</Button>
                            </div>
                         </PopoverContent>
                     </Popover>
@@ -368,7 +369,7 @@ const SortableResourceCard = React.memo(({ item, children, className, linkingFro
 SortableResourceCard.displayName = 'SortableResourceCard';
 
 
-const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText }: {
+const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText, onOpenPdfViewer }: {
     point: ResourcePoint;
     onConvertToCard: () => void;
     onUpdate: (updatedText: string) => void;
@@ -376,6 +377,7 @@ const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, 
     onOpenNestedPopup: (event: React.MouseEvent) => void;
     onOpenMarkdownModal: () => void;
     onEditLinkText: (point: ResourcePoint) => void;
+    onOpenPdfViewer: () => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'point', item: point } });
 
@@ -428,6 +430,7 @@ const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, 
                 onSetEndTime={()=>{}}
                 onClearEndTime={()=>{}}
                 onOpenDrawingCanvas={()=>{}}
+                onOpenPdfViewer={onOpenPdfViewer}
             />
         </div>
     );
@@ -447,7 +450,7 @@ const DraggableFolder = React.memo(({ folder, children, isDragging, ...props }: 
     } : undefined;
   
     return (
-        <div ref={setNodeRef} style={style} className={cn(isDragging && "opacity-50")}>
+        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={cn(isDragging && "opacity-50")}>
             <div {...attributes} {...listeners} {...props}>
                 {children}
             </div>
@@ -1120,10 +1123,10 @@ function ResourcesPageContent() {
   }, [resourceFolders]);
 
   const filteredFolders = useMemo(() => {
+    if (!resourceFolders) return [];
     if (!searchTerm) {
         return resourceFolders;
     }
-    if (!resourceFolders) return [];
     const lowercasedTerm = searchTerm.toLowerCase();
     const matchingFolderIds = new Set(
         resourceFolders.filter(f => f.name.toLowerCase().includes(lowercasedTerm)).map(f => f.id)
@@ -1232,7 +1235,7 @@ function ResourcesPageContent() {
         ))}
       </ul>
     );
-  }, [filteredFolders, editingFolderId, editingFolderName, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse, activeId, searchTerm, togglePinFolder]);
+  }, [filteredFolders, editingFolderId, editingFolderName, selectedResourceFolderId, collapsedFolders, handleSelectFolder, commitFolderEdit, cancelFolderEdit, handleContextMenu, pinnedFolderIds, handleShareFolder, toggleFolderCollapse, activeId, searchTerm, toggleFolderCollapse]);
 
   
   const isDescendant = (childId: string, parentId: string): boolean => {
@@ -1450,7 +1453,7 @@ function ResourcesPageContent() {
                         onWheel={handleWheelScroll}
                         className="flex items-center overflow-x-auto flex-grow"
                     >
-                        {sortedTabs && sortedTabs.map(tabId => {
+                        {sortedTabs && resourceFolders && sortedTabs.map(tabId => {
                             const folder = resourceFolders.find(f => f.id === tabId);
                             if (!folder) return null;
                             const isPinned = pinnedFolderIds.has(tabId);
@@ -1654,7 +1657,7 @@ function ResourcesPageContent() {
           ) : activeId?.startsWith('card-') ? (
             <Card className="w-48 shadow-lg">
               <CardHeader className="p-3">
-                <CardTitle className="text-sm truncate">{resources.find(r => r.id === activeId.replace('card-', ''))?.name}</CardTitle>
+                <CardTitle className="text-sm truncate">{resources.find(r => r.id === activeId.replace('card-', ''))?.name}</CardHeader>
               </CardHeader>
             </Card>
           ) : null}
@@ -1731,3 +1734,6 @@ export default function ResourcesPage() {
 
     
 
+
+
+    
