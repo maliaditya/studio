@@ -148,6 +148,7 @@ function DrawingCanvasPageContent() {
         togglePinDrawing,
         openDrawingCanvas,
         settings,
+        setSettings,
         resources,
         setResources,
         resourceFolders,
@@ -182,27 +183,23 @@ function DrawingCanvasPageContent() {
         if (!isMounted || !resources || !resourceFolders) {
             return;
         }
-
+    
         if (drawingCanvasState && drawingCanvasState.openCanvases.length > 0) {
             return;
         }
-
-        let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad' && !f.parentId);
-        let scratchpadResource: Resource | undefined = scratchpadFolder ? resources.find(r => r.folderId === scratchpadFolder!.id && r.name === 'Default Scratchpad') : undefined;
-        let scratchpadPoint: ResourcePoint | undefined = scratchpadResource?.points?.find(p => p.type === 'paint');
-
-        let shouldUpdateFolders = false;
-        let shouldUpdateResources = false;
-
-        let finalFolders = [...resourceFolders];
-        let finalResources = [...resources];
-
+    
+        let localFolders = [...resourceFolders];
+        let localResources = [...resources];
+        let shouldUpdateState = false;
+    
+        let scratchpadFolder = localFolders.find(f => f.name === 'Scratchpad' && !f.parentId);
         if (!scratchpadFolder) {
             scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
-            finalFolders.push(scratchpadFolder);
-            shouldUpdateFolders = true;
+            localFolders.push(scratchpadFolder);
+            shouldUpdateState = true;
         }
-
+    
+        let scratchpadResource = localResources.find(r => r.folderId === scratchpadFolder!.id && r.name === 'Default Scratchpad');
         if (!scratchpadResource) {
             scratchpadResource = {
                 id: 'res_scratchpad',
@@ -212,29 +209,28 @@ function DrawingCanvasPageContent() {
                 createdAt: new Date().toISOString(),
                 points: []
             };
-            finalResources.push(scratchpadResource);
-            shouldUpdateResources = true;
+            localResources.push(scratchpadResource);
+            shouldUpdateState = true;
         }
-
+    
+        let scratchpadPoint = scratchpadResource.points?.find(p => p.type === 'paint');
         if (!scratchpadPoint) {
             scratchpadPoint = { id: `point_scratchpad_${Date.now()}`, text: 'Default Canvas', type: 'paint' };
-            const resIndex = finalResources.findIndex(r => r.id === scratchpadResource!.id);
+            const resIndex = localResources.findIndex(r => r.id === scratchpadResource!.id);
             if (resIndex > -1) {
-                const updatedPoints = [...(finalResources[resIndex].points || []), scratchpadPoint];
-                finalResources[resIndex] = { ...finalResources[resIndex], points: updatedPoints };
+                const updatedPoints = [...(localResources[resIndex].points || []), scratchpadPoint];
+                localResources[resIndex] = { ...localResources[resIndex], points: updatedPoints };
             } else {
-                 finalResources.push({...scratchpadResource, points: [scratchpadPoint]});
+                 localResources.push({...scratchpadResource, points: [scratchpadPoint]});
             }
-            shouldUpdateResources = true;
+            shouldUpdateState = true;
         }
-
-        if (shouldUpdateFolders) {
-            setResourceFolders(finalFolders);
+    
+        if (shouldUpdateState) {
+            setResourceFolders(localFolders);
+            setResources(localResources);
         }
-        if (shouldUpdateResources) {
-            setResources(finalResources);
-        }
-
+    
         const openCanvasesMap = new Map();
         const scratchpadCanvasId = `${scratchpadResource.id}-${scratchpadPoint.id}`;
         
@@ -244,12 +240,12 @@ function DrawingCanvasPageContent() {
             pointId: scratchpadPoint.id,
             name: scratchpadPoint.text || 'Scratchpad',
             data: scratchpadPoint.drawing,
-            isPinned: true
+            isPinned: (settings.pinnedCanvasIds || []).includes(scratchpadCanvasId) || true, // Default canvas is always "pinned" in a sense
         });
-
+    
         (settings.pinnedCanvasIds || []).forEach(pinnedId => {
             if (!openCanvasesMap.has(pinnedId)) {
-                const resource = resources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
+                const resource = localResources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
                 const point = resource?.points?.find(p => `${resource.id}-${p.id}` === pinnedId);
                 if (resource && point) {
                     openCanvasesMap.set(pinnedId, {
@@ -263,15 +259,27 @@ function DrawingCanvasPageContent() {
                 }
             }
         });
+    
+        const lastActiveCanvasId = settings.lastActiveCanvasId;
+        const finalActiveCanvasId = lastActiveCanvasId && openCanvasesMap.has(lastActiveCanvasId) 
+            ? lastActiveCanvasId 
+            : scratchpadCanvasId;
 
         setDrawingCanvasState({
             isOpen: true,
             position: { x: 0, y: 0 },
             openCanvases: Array.from(openCanvasesMap.values()),
-            activeCanvasId: scratchpadCanvasId,
+            activeCanvasId: finalActiveCanvasId,
         });
+    
+    }, [isMounted, resources, resourceFolders, settings.pinnedCanvasIds, settings.lastActiveCanvasId, drawingCanvasState, setDrawingCanvasState, setResources, setResourceFolders]);
 
-    }, [isMounted, resources, resourceFolders, settings.pinnedCanvasIds, drawingCanvasState, setDrawingCanvasState, setResources, setResourceFolders]);
+    useEffect(() => {
+        if (drawingCanvasState?.activeCanvasId) {
+            setSettings(prev => ({...prev, lastActiveCanvasId: drawingCanvasState.activeCanvasId}));
+        }
+    }, [drawingCanvasState?.activeCanvasId, setSettings]);
+
 
     const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
     
