@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import type { Resource, ResourcePoint } from '@/types/workout';
+import type { Resource, ResourcePoint, ResourceFolder } from '@/types/workout';
 import { AuthGuard } from '@/components/AuthGuard';
 import dynamic from 'next/dynamic';
 import { OnLinkOpen, PointerDownState, AppState, ExcalidrawElement, NonDeleted } from '@excalidraw/excalidraw/types/types';
@@ -191,61 +191,57 @@ function DrawingCanvasPageContent() {
 
         const openCanvasesMap = new Map();
         
-        // --- 1. Find or Create Scratchpad ---
-        let finalScratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad' && !f.parentId);
-        let finalScratchpadResource: Resource | undefined;
-        let finalScratchpadPoint: ResourcePoint | undefined;
-        
-        let shouldUpdateFolders = false;
-        let shouldUpdateResources = false;
+        let localResources = [...resources];
+        let localResourceFolders = [...resourceFolders];
 
-        if (!finalScratchpadFolder) {
-            finalScratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
-            shouldUpdateFolders = true;
+        let scratchpadFolder = localResourceFolders.find(f => f.name === 'Scratchpad' && !f.parentId);
+        
+        if (!scratchpadFolder) {
+            scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
+            localResourceFolders.push(scratchpadFolder);
         }
 
-        finalScratchpadResource = resources.find(r => r.folderId === finalScratchpadFolder!.id && r.name === 'Default Scratchpad');
+        let scratchpadResource = localResources.find(r => r.folderId === scratchpadFolder!.id && r.name === 'Default Scratchpad');
         
-        if (!finalScratchpadResource) {
-            finalScratchpadResource = {
-                id: 'res_scratchpad', name: 'Default Scratchpad', folderId: finalScratchpadFolder.id, type: 'card', createdAt: new Date().toISOString(), points: []
+        if (!scratchpadResource) {
+            scratchpadResource = {
+                id: 'res_scratchpad', name: 'Default Scratchpad', folderId: scratchpadFolder.id, type: 'card', createdAt: new Date().toISOString(), points: []
             };
-            shouldUpdateResources = true;
+            localResources.push(scratchpadResource);
         }
 
-        finalScratchpadPoint = finalScratchpadResource.points?.find(p => p.type === 'paint');
-        if (!finalScratchpadPoint) {
-            finalScratchpadPoint = { id: `point_scratchpad_${Date.now()}`, text: 'Default Canvas', type: 'paint' };
-            finalScratchpadResource.points = [...(finalScratchpadResource.points || []), finalScratchpadPoint];
-            shouldUpdateResources = true;
+        let scratchpadPoint = scratchpadResource.points?.find(p => p.type === 'paint');
+        if (!scratchpadPoint) {
+            scratchpadPoint = { id: `point_scratchpad_${Date.now()}`, text: 'Default Canvas', type: 'paint' };
+            
+            const resIndex = localResources.findIndex(r => r.id === scratchpadResource!.id);
+            if (resIndex > -1) {
+              localResources[resIndex] = {
+                ...localResources[resIndex],
+                points: [...(localResources[resIndex].points || []), scratchpadPoint]
+              };
+            }
         }
         
-        if (shouldUpdateFolders) {
-          setResourceFolders(prev => [...(prev || []), finalScratchpadFolder!]);
-        }
-        if (shouldUpdateResources) {
-          const resourceExists = resources.some(r => r.id === finalScratchpadResource!.id);
-          if (resourceExists) {
-            setResources(prev => prev.map(r => r.id === finalScratchpadResource!.id ? finalScratchpadResource! : r));
-          } else {
-            setResources(prev => [...(prev || []), finalScratchpadResource!]);
-          }
+        // Batch update state if changes were made
+        if (localResources.length !== resources.length || localResourceFolders.length !== resourceFolders.length) {
+          setResources(localResources);
+          setResourceFolders(localResourceFolders);
         }
         
-        // --- 2. Add Scratchpad and Pinned Canvases ---
-        const scratchpadCanvasId = `${finalScratchpadResource.id}-${finalScratchpadPoint.id}`;
+        const scratchpadCanvasId = `${scratchpadResource.id}-${scratchpadPoint.id}`;
         openCanvasesMap.set(scratchpadCanvasId, {
             id: scratchpadCanvasId,
-            resourceId: finalScratchpadResource.id,
-            pointId: finalScratchpadPoint.id,
-            name: finalScratchpadPoint.text || 'Scratchpad',
-            data: finalScratchpadPoint.drawing,
+            resourceId: scratchpadResource.id,
+            pointId: scratchpadPoint.id,
+            name: scratchpadPoint.text || 'Scratchpad',
+            data: scratchpadPoint.drawing,
             isPinned: (settings.pinnedCanvasIds || []).includes(scratchpadCanvasId)
         });
         
         (settings.pinnedCanvasIds || []).forEach(pinnedId => {
             if (!openCanvasesMap.has(pinnedId)) {
-                const resource = resources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
+                const resource = localResources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
                 const point = resource?.points?.find(p => `${resource.id}-${p.id}` === pinnedId);
                 if (resource && point) {
                     openCanvasesMap.set(pinnedId, {
@@ -260,7 +256,6 @@ function DrawingCanvasPageContent() {
             }
         });
         
-        // --- 3. Set Final State ---
         setDrawingCanvasState({
             isOpen: true,
             position: { x: 0, y: 0 },
@@ -483,5 +478,3 @@ export default function DrawingCanvasPage() {
         </AuthGuard>
     )
 }
-
-    
