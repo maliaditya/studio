@@ -12,6 +12,7 @@ import type { Resource, ResourcePoint } from '@/types/workout';
 import { AuthGuard } from '@/components/AuthGuard';
 import dynamic from 'next/dynamic';
 import { OnLinkOpen, PointerDownState, AppState, ExcalidrawElement, NonDeleted } from '@excalidraw/excalidraw/types/types';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -60,6 +61,32 @@ const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource,
   );
 });
 SearchContent.displayName = 'SearchContent';
+
+export const SearchPopup = React.memo(({ open, setOpen, onSelect, title }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource, point: ResourcePoint) => void, title: string }) => {
+    
+    const style: React.CSSProperties = {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 130,
+    };
+
+    if (!open) return null;
+
+    return (
+        <div style={style}>
+             <Card className="w-[512px] shadow-2xl border-2 bg-popover">
+                <CardHeader className="p-3 border-b flex flex-row justify-between items-center">
+                    <CardTitle className="text-base">{title}</CardTitle>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setOpen(false)}><X className="h-4 w-4" /></Button>
+                </CardHeader>
+                <SearchContent onSelect={onSelect} />
+            </Card>
+        </div>
+    );
+});
+SearchPopup.displayName = 'SearchPopup';
 
 const ExcalidrawWrapper = ({
   activeCanvas,
@@ -167,12 +194,10 @@ function DrawingCanvasPageContent() {
         
         let scratchpadResource = resources.find(r => r.folderId === scratchpadFolder?.id && r.name === 'Default Scratchpad');
         let scratchpadPoint: ResourcePoint | undefined;
-        let resourceNeedsUpdate = false;
         
         if (!scratchpadResource) {
             scratchpadResource = { id: 'res_scratchpad', name: 'Default Scratchpad', folderId: scratchpadFolder!.id, type: 'card', createdAt: new Date().toISOString(), points: [] };
             setResources(prev => [...prev, scratchpadResource!]);
-            resourceNeedsUpdate = true; // Mark that resources were updated
         }
         
         scratchpadPoint = scratchpadResource.points?.find(p => p.type === 'paint');
@@ -181,7 +206,6 @@ function DrawingCanvasPageContent() {
             scratchpadResource = { ...scratchpadResource, points: [...(scratchpadResource.points || []), scratchpadPoint]};
             
             setResources(prev => prev.map(r => r.id === scratchpadResource!.id ? scratchpadResource! : r));
-            resourceNeedsUpdate = true;
         }
 
         const scratchpadCanvasId = `${scratchpadResource.id}-${scratchpadPoint.id}`;
@@ -292,7 +316,7 @@ function DrawingCanvasPageContent() {
         togglePinDrawing(canvasId);
     };
     
-    const handleSearchSelect = (resource: Resource, point: ResourcePoint) => {
+    const handleSearchSelect = useCallback((resource: Resource, point: ResourcePoint) => {
         openDrawingCanvas({
             resourceId: resource.id,
             pointId: point.id,
@@ -300,7 +324,7 @@ function DrawingCanvasPageContent() {
             initialDrawing: point.drawing,
         });
         setIsSearchOpen(false);
-    };
+    }, [openDrawingCanvas]);
 
     const onLinkOpen: OnLinkOpen = useCallback((element, event) => {
         event.preventDefault();
@@ -332,9 +356,9 @@ function DrawingCanvasPageContent() {
         } else if (link) {
             setFloatingVideoUrl(link);
         }
-    }, [openDrawingCanvas, resources, toast, drawingCanvasState, handleTabClick, setFloatingVideoUrl]);
+    }, [openDrawingCanvas, resources, toast, drawingCanvasState, setFloatingVideoUrl]);
   
-    const handleLinkingSearchSelect = (resource: Resource, point: ResourcePoint) => {
+    const handleLinkingSearchSelect = useCallback((resource: Resource, point: ResourcePoint) => {
         const api = excalidrawAPIRef.current;
         if (!api) return;
         const { scrollX, scrollY, width, height } = api.getAppState();
@@ -357,58 +381,62 @@ function DrawingCanvasPageContent() {
         api.history.clear();
         handleSaveClick();
         setIsLinkingSearchOpen(false);
-    };
+    }, [handleSaveClick]);
 
     return (
-        <div className="h-screen w-screen flex flex-col bg-background">
-            <header className="p-2 flex items-center justify-between border-b gap-4 flex-shrink-0">
-                <div className="flex-grow min-w-0 overflow-x-auto">
-                    <div className="flex items-center gap-2">
-                        {(drawingCanvasState?.openCanvases || []).map(canvas => (
-                            <Button
-                                key={canvas.id}
-                                variant={drawingCanvasState?.activeCanvasId === canvas.id ? "secondary" : "ghost"}
-                                size="sm"
-                                className="h-8 pl-2 pr-1 flex items-center gap-1 flex-shrink-0"
-                                onClick={() => handleTabClick(canvas.id)}
-                            >
-                                <span className="truncate max-w-[120px]">{canvas.name}</span>
-                                <button onClick={(e) => handleTogglePin(e, canvas.id)} className="p-1 rounded hover:bg-muted">
-                                    <Pin className={cn("h-3 w-3", (settings.pinnedCanvasIds || []).includes(canvas.id) ? "text-primary fill-current" : "text-muted-foreground")}/>
-                                </button>
-                                {!(settings.pinnedCanvasIds || []).includes(canvas.id) && (
-                                    <button onClick={(e) => handleCloseTab(e, canvas.id)} className="p-1 rounded hover:bg-destructive/20">
-                                        <X className="h-3 w-3 text-destructive"/>
+        <>
+            <div className="h-screen w-screen flex flex-col bg-background">
+                <header className="p-2 flex items-center justify-between border-b gap-4 flex-shrink-0">
+                    <div className="flex-grow min-w-0 overflow-x-auto">
+                        <div className="flex items-center gap-2">
+                            {(drawingCanvasState?.openCanvases || []).map(canvas => (
+                                <Button
+                                    key={canvas.id}
+                                    variant={drawingCanvasState?.activeCanvasId === canvas.id ? "secondary" : "ghost"}
+                                    size="sm"
+                                    className="h-8 pl-2 pr-1 flex items-center gap-1 flex-shrink-0"
+                                    onClick={() => handleTabClick(canvas.id)}
+                                >
+                                    <span className="truncate max-w-[120px]">{canvas.name}</span>
+                                    <button onClick={(e) => handleTogglePin(e, canvas.id)} className="p-1 rounded hover:bg-muted">
+                                        <Pin className={cn("h-3 w-3", (settings.pinnedCanvasIds || []).includes(canvas.id) ? "text-primary fill-current" : "text-muted-foreground")}/>
                                     </button>
-                                )}
-                            </Button>
-                        ))}
+                                    {!(settings.pinnedCanvasIds || []).includes(canvas.id) && (
+                                        <button onClick={(e) => handleCloseTab(e, canvas.id)} className="p-1 rounded hover:bg-destructive/20">
+                                            <X className="h-3 w-3 text-destructive"/>
+                                        </button>
+                                    )}
+                                </Button>
+                            ))}
+                        </div>
                     </div>
-                </div>
-                <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-4 w-4"/></Button>
-                    <Button variant="ghost" size="icon" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-4 w-4"/></Button>
-                    <Button variant="ghost" size="icon" onClick={handleSaveClick}>
-                        <Save className={cn("h-4 w-4", isDirty ? "text-red-500" : "text-green-500")} />
-                    </Button>
-                </div>
-            </header>
-            <main className="flex-grow min-h-0 relative">
-                {isMounted && activeCanvas ? (
-                    <ExcalidrawWrapper 
-                        activeCanvas={activeCanvas}
-                        theme={theme}
-                        apiRef={excalidrawAPIRef}
-                        onChange={handleCanvasChange}
-                        onPointerDown={handlePointerDown}
-                        onKeyDown={handleKeyDown}
-                        onLinkOpen={onLinkOpen}
-                    />
-                ) : (
-                    <div className="flex h-full w-full items-center justify-center text-muted-foreground">Select or open a canvas to start drawing.</div>
-                )}
-            </main>
-        </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-4 w-4"/></Button>
+                        <Button variant="ghost" size="icon" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-4 w-4"/></Button>
+                        <Button variant="ghost" size="icon" onClick={handleSaveClick}>
+                            <Save className={cn("h-4 w-4", isDirty ? "text-red-500" : "text-green-500")} />
+                        </Button>
+                    </div>
+                </header>
+                <main className="flex-grow min-h-0 relative">
+                    {isMounted && activeCanvas ? (
+                        <ExcalidrawWrapper 
+                            activeCanvas={activeCanvas}
+                            theme={theme}
+                            apiRef={excalidrawAPIRef}
+                            onChange={handleCanvasChange}
+                            onPointerDown={handlePointerDown}
+                            onKeyDown={handleKeyDown}
+                            onLinkOpen={onLinkOpen}
+                        />
+                    ) : (
+                        <div className="flex h-full w-full items-center justify-center text-muted-foreground">Select or open a canvas to start drawing.</div>
+                    )}
+                </main>
+            </div>
+            <SearchPopup open={isSearchOpen} setOpen={setIsSearchOpen} onSelect={handleSearchSelect} title="Search & Open Canvas" />
+            <SearchPopup open={isLinkingSearchOpen} setOpen={setIsLinkingSearchOpen} onSelect={handleLinkingSearchSelect} title="Link to a Canvas" />
+        </>
     );
 }
 
