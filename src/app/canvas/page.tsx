@@ -3,7 +3,7 @@
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Save, X, Pin, PinOff, Search, Link as LinkIcon } from 'lucide-react';
+import { Save, X, Pin, PinOff, Search, Link as LinkIcon, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -183,8 +183,8 @@ function DrawingCanvasPageContent() {
         }
         
         // This effect runs once to initialize the canvas state
-        if (drawingCanvasState && drawingCanvasState.isOpen) {
-            return; // Already initialized, possibly by a direct link click
+        if (drawingCanvasState && drawingCanvasState.activeCanvasId) {
+            return; // Already initialized
         }
 
         let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
@@ -204,8 +204,7 @@ function DrawingCanvasPageContent() {
         scratchpadPoint = scratchpadResource.points?.find(p => p.type === 'paint');
         if (!scratchpadPoint) {
             scratchpadPoint = { id: `point_scratchpad_${Date.now()}`, text: 'Default Canvas', type: 'paint' };
-            scratchpadResource.points = [...(scratchpadResource.points || []), scratchpadPoint];
-            setResources(prev => (prev || []).map(r => r.id === scratchpadResource!.id ? scratchpadResource! : r));
+            setResources(prev => (prev || []).map(r => r.id === scratchpadResource!.id ? { ...r, points: [...(r.points || []), scratchpadPoint!] } : r));
         }
         
         const scratchpadCanvasId = `${scratchpadResource.id}-${scratchpadPoint.id}`;
@@ -318,9 +317,8 @@ function DrawingCanvasPageContent() {
     
     const handleSearchSelect = useCallback((resource: Resource, point: ResourcePoint) => {
         const canvasId = `${resource.id}-${point.id}`;
-        const isAlreadyOpen = drawingCanvasState?.openCanvases?.some(c => c.id === canvasId);
-
-        if (isAlreadyOpen) {
+        
+        if (drawingCanvasState?.openCanvases?.some(c => c.id === canvasId)) {
             handleTabClick(canvasId);
         } else {
             openDrawingCanvas({
@@ -345,9 +343,7 @@ function DrawingCanvasPageContent() {
             
             if (resource && point) {
                 const canvasId = `${resource.id}-${point.id}`;
-                const isAlreadyOpen = drawingCanvasState?.openCanvases?.some(c => c.id === canvasId);
-                
-                if (isAlreadyOpen) {
+                if (drawingCanvasState?.openCanvases?.some(c => c.id === canvasId)) {
                     handleTabClick(canvasId);
                 } else {
                     openDrawingCanvas({
@@ -390,13 +386,45 @@ function DrawingCanvasPageContent() {
         setIsLinkingSearchOpen(false);
     }, [handleSaveClick]);
 
+    const handleCreateNewCanvas = useCallback(() => {
+        let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
+        if (!scratchpadFolder) {
+            scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
+            setResourceFolders(prev => [...(prev || []), scratchpadFolder!]);
+        }
+
+        const newResource: Resource = {
+            id: `res_canvas_${Date.now()}`,
+            name: `New Canvas ${new Date().toLocaleTimeString()}`,
+            folderId: scratchpadFolder.id,
+            type: 'card',
+            createdAt: new Date().toISOString(),
+            points: [],
+        };
+        
+        const newPoint: ResourcePoint = {
+            id: `point_canvas_${Date.now()}`,
+            text: `New Canvas`,
+            type: 'paint',
+        };
+
+        newResource.points!.push(newPoint);
+        setResources(prev => [...(prev || []), newResource]);
+        
+        openDrawingCanvas({
+            resourceId: newResource.id,
+            pointId: newPoint.id,
+            name: newPoint.text || 'New Canvas',
+        });
+    }, [resourceFolders, setResourceFolders, setResources, openDrawingCanvas]);
+
     return (
         <>
             <div className="h-screen w-screen flex flex-col bg-background">
                 <header className="p-2 flex items-center justify-between border-b gap-4 flex-shrink-0">
                     <div className="flex-grow min-w-0 overflow-x-auto">
                         <div className="flex items-center gap-2">
-                            {drawingCanvasState?.openCanvases && drawingCanvasState.openCanvases.map(canvas => (
+                            {(drawingCanvasState?.openCanvases || []).map(canvas => (
                                 <Button
                                     key={canvas.id}
                                     variant={drawingCanvasState?.activeCanvasId === canvas.id ? "secondary" : "ghost"}
@@ -418,6 +446,7 @@ function DrawingCanvasPageContent() {
                         </div>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button variant="ghost" size="icon" onClick={handleCreateNewCanvas}><PlusCircle className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" onClick={handleSaveClick}>
