@@ -379,11 +379,11 @@ function DrawingCanvasPageContent() {
     const handleCreateNewCanvas = useCallback(() => {
         const folders = resourceFolders || [];
         let scratchpadFolder = folders.find(f => f.name === 'Scratchpad');
-        
         let shouldUpdateFolders = false;
+
         if (!scratchpadFolder) {
             scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
-            setResourceFolders(prev => [...(prev || []), scratchpadFolder!]);
+            shouldUpdateFolders = true;
         }
 
         const newResource: Resource = {
@@ -403,6 +403,9 @@ function DrawingCanvasPageContent() {
 
         newResource.points!.push(newPoint);
         
+        if (shouldUpdateFolders) {
+            setResourceFolders(prev => [...(prev || []), scratchpadFolder!]);
+        }
         setResources(prev => [...(prev || []), newResource]);
         
         openDrawingCanvas({
@@ -410,7 +413,7 @@ function DrawingCanvasPageContent() {
             pointId: newPoint.id,
             name: newPoint.text || 'New Canvas',
         });
-    }, [resourceFolders, setResourceFolders, setResources, openDrawingCanvas]);
+    }, [resourceFolders, setResourceFolders, resources, setResources, openDrawingCanvas]);
 
     const handleCopyLink = () => {
         if (!activeCanvas) return;
