@@ -181,15 +181,16 @@ function DrawingCanvasPageContent() {
         if (!isMounted || !resourceFolders || !resources) {
             return;
         }
-
-        if (drawingCanvasState?.isOpen) {
-            return;
+        
+        // This effect runs once to initialize the canvas state
+        if (drawingCanvasState && drawingCanvasState.isOpen) {
+            return; // Already initialized, possibly by a direct link click
         }
 
         let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
         if (!scratchpadFolder) {
             scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
-            setResourceFolders(prev => [...prev, scratchpadFolder!]);
+            setResourceFolders(prev => [...(prev || []), scratchpadFolder!]);
         }
         
         let scratchpadResource = resources.find(r => r.folderId === scratchpadFolder?.id && r.name === 'Default Scratchpad');
@@ -197,17 +198,16 @@ function DrawingCanvasPageContent() {
         
         if (!scratchpadResource) {
             scratchpadResource = { id: 'res_scratchpad', name: 'Default Scratchpad', folderId: scratchpadFolder!.id, type: 'card', createdAt: new Date().toISOString(), points: [] };
-            setResources(prev => [...prev, scratchpadResource!]);
+             setResources(prev => [...(prev || []), scratchpadResource!]);
         }
         
         scratchpadPoint = scratchpadResource.points?.find(p => p.type === 'paint');
         if (!scratchpadPoint) {
             scratchpadPoint = { id: `point_scratchpad_${Date.now()}`, text: 'Default Canvas', type: 'paint' };
-            scratchpadResource = { ...scratchpadResource, points: [...(scratchpadResource.points || []), scratchpadPoint]};
-            
-            setResources(prev => prev.map(r => r.id === scratchpadResource!.id ? scratchpadResource! : r));
+            scratchpadResource.points = [...(scratchpadResource.points || []), scratchpadPoint];
+            setResources(prev => (prev || []).map(r => r.id === scratchpadResource!.id ? scratchpadResource! : r));
         }
-
+        
         const scratchpadCanvasId = `${scratchpadResource.id}-${scratchpadPoint.id}`;
         
         const openCanvasesMap = new Map();
@@ -317,14 +317,21 @@ function DrawingCanvasPageContent() {
     };
     
     const handleSearchSelect = useCallback((resource: Resource, point: ResourcePoint) => {
-        openDrawingCanvas({
-            resourceId: resource.id,
-            pointId: point.id,
-            name: point.text || 'Untitled Canvas',
-            initialDrawing: point.drawing,
-        });
+        const canvasId = `${resource.id}-${point.id}`;
+        const isAlreadyOpen = drawingCanvasState?.openCanvases?.some(c => c.id === canvasId);
+
+        if (isAlreadyOpen) {
+            handleTabClick(canvasId);
+        } else {
+            openDrawingCanvas({
+                resourceId: resource.id,
+                pointId: point.id,
+                name: point.text || 'Untitled Canvas',
+                initialDrawing: point.drawing,
+            });
+        }
         setIsSearchOpen(false);
-    }, [openDrawingCanvas]);
+    }, [openDrawingCanvas, drawingCanvasState]);
 
     const onLinkOpen: OnLinkOpen = useCallback((element, event) => {
         event.preventDefault();
@@ -337,19 +344,26 @@ function DrawingCanvasPageContent() {
             const point = resource?.points?.find(p => p.id === pointId);
             
             if (resource && point) {
-                openDrawingCanvas({
-                    resourceId: resource.id,
-                    pointId: point.id,
-                    name: point.text || 'Linked Canvas',
-                    initialDrawing: point.drawing,
-                });
+                const canvasId = `${resource.id}-${point.id}`;
+                const isAlreadyOpen = drawingCanvasState?.openCanvases?.some(c => c.id === canvasId);
+                
+                if (isAlreadyOpen) {
+                    handleTabClick(canvasId);
+                } else {
+                    openDrawingCanvas({
+                        resourceId: resource.id,
+                        pointId: point.id,
+                        name: point.text || 'Linked Canvas',
+                        initialDrawing: point.drawing,
+                    });
+                }
             } else {
                 toast({ title: 'Error', description: 'Could not find the linked canvas.', variant: 'destructive'});
             }
         } else if (link) {
             setFloatingVideoUrl(link);
         }
-    }, [openDrawingCanvas, resources, toast, setFloatingVideoUrl]);
+    }, [openDrawingCanvas, resources, toast, drawingCanvasState, handleTabClick, setFloatingVideoUrl]);
   
     const handleLinkingSearchSelect = useCallback((resource: Resource, point: ResourcePoint) => {
         const api = excalidrawAPIRef.current;

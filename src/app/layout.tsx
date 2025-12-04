@@ -484,7 +484,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       {isBrowser && document.getElementById('global-popup-root') &&
         createPortal(
           <>
-            {drawingCanvasState?.isOpen && (
+            {drawingCanvasState?.isOpen && pathname !== '/canvas' && (
               <DrawingCanvas
                 isOpen={drawingCanvasState.isOpen}
                 onClose={() => setDrawingCanvasState(null)}
