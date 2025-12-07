@@ -90,7 +90,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     setLocalSettings(prev => ({...prev, [key]: value}));
   };
   
-  const handleGithubSettingsSave = () => {
+  const handleGithubSettingsSave = async () => {
     setSettings(prev => ({
         ...prev,
         githubToken: localSettings.githubToken,
@@ -98,7 +98,33 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
         githubRepo: localSettings.githubRepo,
         githubPath: localSettings.githubPath,
     }));
-    toast({ title: "GitHub Settings Saved", description: "Your sync configuration has been updated." });
+
+    if (!currentUser?.username) {
+        toast({ title: "Error", description: "You must be logged in to save GitHub settings.", variant: "destructive" });
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/github-settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                username: currentUser.username,
+                githubToken: localSettings.githubToken,
+                githubOwner: localSettings.githubOwner,
+                githubRepo: localSettings.githubRepo,
+                githubPath: localSettings.githubPath,
+            }),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to save settings.');
+        }
+        toast({ title: "GitHub Settings Saved", description: "Your sync configuration has been updated and saved to the cloud." });
+    } catch (error) {
+        console.error("Failed to save GitHub settings to cloud:", error);
+        toast({ title: "Save Failed", description: error instanceof Error ? error.message : "Could not save settings to the cloud.", variant: "destructive" });
+    }
   };
 
   const handleSettingChange = (key: keyof typeof settings, value: any) => {
@@ -129,7 +155,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
         let dayWasModified = false;
 
         Object.keys(daySchedule).forEach(slotName => {
-          const activities = daySchedule[slotName] as Activity[] | undefined;
+          const activities = (daySchedule[slotName] as Activity[]) || [];
 
           if (Array.isArray(activities)) {
             let slotWasModified = false;
@@ -145,7 +171,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
             });
 
             if (slotWasModified) {
-              daySchedule[slotName] = updatedActivities;
+              daySchedule[slotName as SlotName] = updatedActivities;
               dayWasModified = true;
             }
           }
