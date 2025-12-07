@@ -53,6 +53,7 @@ import { DrawingCanvas } from '@/components/DrawingCanvas';
 import dynamic from 'next/dynamic';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { usePathname } from 'next/navigation';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const PdfViewerPopup = dynamic(() => import('@/components/PdfViewerPopup'), {
   ssr: false,
@@ -146,6 +147,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const [isDietPlanModalOpen, setIsDietPlanModalOpen] = React.useState(false);
   const [remainingTime, setRemainingTime] = React.useState<string | null>(null);
   const pathname = usePathname();
+  const isMobile = useIsMobile();
   
   const [interruptModalState, setInterruptModalState] = useState<{isOpen: boolean, slotName: string | null, activityType: 'interrupt' | 'distraction' | null}>({ isOpen: false, slotName: null, activityType: null });
   const [interruptDetails, setInterruptDetails] = useState('');
@@ -445,7 +447,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
         onLogDuration={onLogDuration}
         initialDuration={focusDuration}
       />
-      {(!isAgendaDocked && authContext.settings.widgetVisibility.agenda) && (
+      {(!isAgendaDocked && authContext.settings.widgetVisibility.agenda && !isMobile) && (
         <TodaysScheduleCard
             date={new Date()}
             isAgendaDocked={isAgendaDocked}
