@@ -429,7 +429,7 @@ function DrawingCanvasPageContent() {
 
     return (
         <>
-            <div className={cn("h-screen w-screen flex flex-col bg-background", isMobile && 'force-landscape-canvas')}>
+            <div className={cn("h-screen w-screen flex flex-col bg-background")}>
                 <header className="p-2 flex items-center justify-between border-b gap-4 flex-shrink-0">
                     {!isHeaderCollapsed && (
                         <div className="flex-grow min-w-0 overflow-x-auto">
