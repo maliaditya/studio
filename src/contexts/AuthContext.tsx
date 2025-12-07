@@ -1372,15 +1372,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     const { success, message, user } = await localLoginUser(username, password);
     if (success && user) {
-      setCurrentUser(user);
+        setCurrentUser(user);
 
-      if (user.username === 'demo') {
-        await pullDataFromCloud(user.username);
-      }
-      router.push('/my-plate');
-      toast({ title: "Success", description: message });
+        if (user.username === 'demo') {
+            await pullDataFromCloud(user.username);
+        } else {
+            // Fetch main data from cloud
+            const mainDataResponse = await fetch(`/api/blob-sync?username=${user.username.toLowerCase()}`);
+            if (mainDataResponse.ok) {
+                const mainDataResult = await mainDataResponse.json();
+                if (mainDataResult.data) {
+                    // Fetch GitHub settings from cloud
+                    const githubSettingsResponse = await fetch(`/api/github-settings?username=${user.username.toLowerCase()}`);
+                    if (githubSettingsResponse.ok) {
+                        const githubSettingsResult = await githubSettingsResponse.json();
+                        if (githubSettingsResult.settings) {
+                            // Combine settings and load
+                            const combinedSettings = { ...mainDataResult.data.main.settings, ...githubSettingsResult.settings };
+                            mainDataResult.data.main.settings = combinedSettings;
+                        }
+                    }
+                    loadImportedData(mainDataResult.data.main, mainDataResult.data.ui || {});
+                }
+            }
+        }
+        
+        router.push('/my-plate');
+        toast({ title: "Success", description: message });
     } else {
-      toast({ title: "Error", description: message, variant: "destructive" });
+        toast({ title: "Error", description: message, variant: "destructive" });
     }
     setLoading(false);
   };
@@ -3569,4 +3589,5 @@ export const useAuth = (): AuthContextType => {
 };
     
     
+
 
