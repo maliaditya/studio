@@ -454,10 +454,10 @@ function DrawingCanvasPageContent() {
                             </div>
                         </div>
                     )}
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsHeaderCollapsed(p => !p)}>
-                        {isHeaderCollapsed ? <ChevronsDown className="h-4 w-4" /> : <ChevronsUp className="h-4 w-4" />}
-                    </Button>
                     <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsHeaderCollapsed(p => !p)}>
+                            {isHeaderCollapsed ? <ChevronsDown className="h-4 w-4" /> : <ChevronsUp className="h-4 w-4" />}
+                        </Button>
                         <Button variant="ghost" size="icon" asChild>
                             <Link href="/my-plate">
                                 <LayoutDashboard className="h-4 w-4" />
