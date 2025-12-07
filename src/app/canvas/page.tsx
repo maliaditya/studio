@@ -4,7 +4,7 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy } from 'lucide-react';
+import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy, ChevronsDown, ChevronsUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -160,6 +160,7 @@ function DrawingCanvasPageContent() {
     const [isMounted, setIsMounted] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isLinkingSearchOpen, setIsLinkingSearchOpen] = useState(false);
+    const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
 
     const excalidrawAPIRef = useRef<any>(null);
     const { toast } = useToast();
@@ -282,50 +283,6 @@ function DrawingCanvasPageContent() {
 
 
     const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
-    
-    const handleCreateNewCanvas = useCallback(() => {
-        if (!resources || !resourceFolders) {
-          toast({ title: "Error", description: "Resources not loaded yet. Please try again in a moment.", variant: "destructive" });
-          return;
-        }
-    
-        let localResources = [...resources];
-        let localResourceFolders = [...resourceFolders];
-        let shouldUpdateFolders = false;
-        
-        let scratchpadFolder = localResourceFolders.find(f => f.name === 'Scratchpad' && !f.parentId);
-        if (!scratchpadFolder) {
-            scratchpadFolder = { id: 'folder_scratchpad', name: 'Scratchpad', parentId: null, icon: 'Paintbrush' };
-            localResourceFolders.push(scratchpadFolder);
-            shouldUpdateFolders = true;
-        }
-    
-        const newResource: Resource = {
-            id: `res_canvas_${Date.now()}`,
-            name: 'New Canvas',
-            folderId: scratchpadFolder.id,
-            type: 'card',
-            createdAt: new Date().toISOString(),
-            points: [
-                { id: `point_${Date.now()}`, text: 'New Canvas', type: 'paint' }
-            ]
-        };
-        
-        localResources.push(newResource);
-        
-        if (shouldUpdateFolders) {
-            setResourceFolders(localResourceFolders);
-        }
-        setResources(localResources);
-        
-        const newPoint = newResource.points![0];
-        openDrawingCanvas({
-            resourceId: newResource.id,
-            pointId: newPoint.id,
-            name: newPoint.text || 'New Canvas',
-            initialDrawing: newPoint.drawing,
-        });
-    }, [resources, resourceFolders, setResources, setResourceFolders, openDrawingCanvas, toast]);
 
     useEffect(() => {
         isUserChange.current = false;
@@ -472,29 +429,34 @@ function DrawingCanvasPageContent() {
         <>
             <div className="h-screen w-screen flex flex-col bg-background">
                 <header className="p-2 flex items-center justify-between border-b gap-4 flex-shrink-0">
-                    <div className="flex-grow min-w-0 overflow-x-auto">
-                        <div className="flex items-center gap-2">
-                            {(drawingCanvasState?.openCanvases || []).map(canvas => (
-                                <Button
-                                    key={canvas.id}
-                                    variant={drawingCanvasState?.activeCanvasId === canvas.id ? "secondary" : "ghost"}
-                                    size="sm"
-                                    className="h-8 pl-2 pr-1 flex items-center gap-1 flex-shrink-0"
-                                    onClick={() => handleTabClick(canvas.id)}
-                                >
-                                    <span className="truncate max-w-[120px]">{canvas.name}</span>
-                                    <button onClick={(e) => handleTogglePin(e, canvas.id)} className="p-1 rounded hover:bg-muted">
-                                        <Pin className={cn("h-3 w-3", (settings.pinnedCanvasIds || []).includes(canvas.id) ? "text-primary fill-current" : "text-muted-foreground")}/>
-                                    </button>
-                                    {!(settings.pinnedCanvasIds || []).includes(canvas.id) && (
-                                        <button onClick={(e) => handleCloseTab(e, canvas.id)} className="p-1 rounded hover:bg-destructive/20">
-                                            <X className="h-3 w-3 text-destructive"/>
+                    {!isHeaderCollapsed && (
+                        <div className="flex-grow min-w-0 overflow-x-auto">
+                            <div className="flex items-center gap-2">
+                                {(drawingCanvasState?.openCanvases || []).map(canvas => (
+                                    <Button
+                                        key={canvas.id}
+                                        variant={drawingCanvasState?.activeCanvasId === canvas.id ? "secondary" : "ghost"}
+                                        size="sm"
+                                        className="h-8 pl-2 pr-1 flex items-center gap-1 flex-shrink-0"
+                                        onClick={() => handleTabClick(canvas.id)}
+                                    >
+                                        <span className="truncate max-w-[120px]">{canvas.name}</span>
+                                        <button onClick={(e) => handleTogglePin(e, canvas.id)} className="p-1 rounded hover:bg-muted">
+                                            <Pin className={cn("h-3 w-3", (settings.pinnedCanvasIds || []).includes(canvas.id) ? "text-primary fill-current" : "text-muted-foreground")}/>
                                         </button>
-                                    )}
-                                </Button>
-                            ))}
+                                        {!(settings.pinnedCanvasIds || []).includes(canvas.id) && (
+                                            <button onClick={(e) => handleCloseTab(e, canvas.id)} className="p-1 rounded hover:bg-destructive/20">
+                                                <X className="h-3 w-3 text-destructive"/>
+                                            </button>
+                                        )}
+                                    </Button>
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsHeaderCollapsed(p => !p)}>
+                        {isHeaderCollapsed ? <ChevronsDown className="h-4 w-4" /> : <ChevronsUp className="h-4 w-4" />}
+                    </Button>
                     <div className="flex items-center gap-1 flex-shrink-0">
                         <Button variant="ghost" size="icon" asChild>
                             <Link href="/my-plate">
