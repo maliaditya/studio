@@ -1,10 +1,12 @@
 
+
 "use client";
 
 const DB_NAME = 'LifeOSFileDB';
 const AUDIO_STORE_NAME = 'audioStore';
 const PDF_STORE_NAME = 'pdfStore';
-const DB_VERSION = 2;
+const BACKUP_STORE_NAME = 'backupStore';
+const DB_VERSION = 3; // Incremented version
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -28,6 +30,9 @@ function getDB(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(PDF_STORE_NAME)) {
         db.createObjectStore(PDF_STORE_NAME);
+      }
+      if (!db.objectStoreNames.contains(BACKUP_STORE_NAME)) {
+        db.createObjectStore(BACKUP_STORE_NAME);
       }
     };
 
@@ -101,7 +106,7 @@ async function deleteItem(storeName: string, key: string): Promise<void> {
 export async function clearAllData(): Promise<void> {
     const db = await getDB();
     return new Promise((resolve, reject) => {
-      const storesToClear = [AUDIO_STORE_NAME, PDF_STORE_NAME];
+      const storesToClear = [AUDIO_STORE_NAME, PDF_STORE_NAME, BACKUP_STORE_NAME];
       if (storesToClear.every(store => !db.objectStoreNames.contains(store))) {
         console.log('No object stores found to clear.');
         resolve();
@@ -139,3 +144,8 @@ export const deleteAudio = (key: string) => deleteItem(AUDIO_STORE_NAME, key);
 export const storePdf = (key: string, pdfBlob: Blob) => storeItem(PDF_STORE_NAME, key, pdfBlob);
 export const getPdf = (key: string) => getItem(PDF_STORE_NAME, key);
 export const deletePdf = (key: string) => deleteItem(PDF_STORE_NAME, key);
+
+// Backup functions
+export const storeBackup = (key: string, backupBlob: Blob) => storeItem(BACKUP_STORE_NAME, key, backupBlob);
+export const getBackup = (key: string) => getItem(BACKUP_STORE_NAME, key);
+export const deleteBackup = (key: string) => deleteItem(BACKUP_STORE_NAME, key);

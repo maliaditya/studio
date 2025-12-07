@@ -36,9 +36,10 @@ import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { HabitDetailPopup } from '@/components/HabitDetailPopup';
-import { deleteAudio, clearAllData } from '@/lib/audioDB';
+import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup } from '@/lib/audioDB';
 import { PillarPopup } from '@/components/PillarPopup';
 import { BrainHacksCard } from '@/components/BrainHacksCard';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 
 interface ResourcePopupProps {
@@ -624,7 +625,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
-  
+  const [importBackupConfirmationOpen, setImportBackupConfirmationOpen] = useState(false);
+
   const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
     const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
     const linkKey = type === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds';
@@ -1377,22 +1379,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (user.username === 'demo') {
             await pullDataFromCloud(user.username);
         } else {
-            // Fetch main data from cloud
-            const mainDataResponse = await fetch(`/api/blob-sync?username=${user.username.toLowerCase()}`);
-            if (mainDataResponse.ok) {
-                const mainDataResult = await mainDataResponse.json();
-                if (mainDataResult.data) {
-                    // Fetch GitHub settings from cloud
-                    const githubSettingsResponse = await fetch(`/api/github-settings?username=${user.username.toLowerCase()}`);
-                    if (githubSettingsResponse.ok) {
-                        const githubSettingsResult = await githubSettingsResponse.json();
-                        if (githubSettingsResult.settings) {
-                            // Combine settings and load
-                            const combinedSettings = { ...mainDataResult.data.main.settings, ...githubSettingsResult.settings };
-                            mainDataResult.data.main.settings = combinedSettings;
+            const mainDataString = localStorage.getItem(`lifeos_data_${user.username}`);
+            const ghSettingsString = localStorage.getItem(`github_settings_${user.username}`);
+
+            let settingsToLoad = settings;
+            if (ghSettingsString) {
+              try {
+                const ghSettings = JSON.parse(ghSettingsString);
+                settingsToLoad = {...settings, ...ghSettings};
+              } catch (e) { console.error("Error parsing GitHub settings from localStorage", e); }
+            }
+            
+            if (mainDataString) {
+                const mainData = JSON.parse(mainDataString);
+                mainData.settings = {...mainData.settings, ...settingsToLoad};
+                loadState(user.username);
+            } else {
+                const mainDataResponse = await fetch(`/api/blob-sync?username=${user.username.toLowerCase()}`);
+                if (mainDataResponse.ok) {
+                    const mainDataResult = await mainDataResponse.json();
+                    if (mainDataResult.data) {
+                        const githubSettingsResponse = await fetch(`/api/github-settings?username=${user.username.toLowerCase()}`);
+                        if (githubSettingsResponse.ok) {
+                            const githubSettingsResult = await githubSettingsResponse.json();
+                            if (githubSettingsResult.settings) {
+                                const combinedSettings = { ...mainDataResult.data.main.settings, ...githubSettingsResult.settings };
+                                mainDataResult.data.main.settings = combinedSettings;
+                            }
                         }
+                        loadImportedData(mainDataResult.data.main, mainDataResult.data.ui || {});
                     }
-                    loadImportedData(mainDataResult.data.main, mainDataResult.data.ui || {});
                 }
             }
         }
@@ -1514,6 +1530,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const data = result.data;
 
             if (data && data.main) {
+                const githubSettingsResponse = await fetch(`/api/github-settings?username=${effectiveUsername.toLowerCase()}`);
+                if (githubSettingsResponse.ok) {
+                    const githubSettingsResult = await githubSettingsResponse.json();
+                    if (githubSettingsResult.settings) {
+                        data.main.settings = { ...data.main.settings, ...githubSettingsResult.settings };
+                    }
+                }
                 loadImportedData(data.main, data.ui || {});
                 toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
             } else if (!localDataIsEmpty) {
@@ -3337,7 +3360,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         toast({ title: 'GitHub settings not configured', variant: 'destructive' });
         return;
     }
-    toast({ title: "Downloading..." });
+    toast({ title: "Downloading...", description: "Backup will be stored locally." });
     try {
         const response = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${githubPath}`, {
             headers: { 'Authorization': `token ${githubToken}` }
@@ -3351,17 +3374,33 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         if (!fileResponse.ok) throw new Error('Failed to download file content.');
 
         const blob = await fileResponse.blob();
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = githubPath.split('/').pop() || 'backup.json';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
+        await storeBackup('github_backup', blob);
 
-        toast({ title: "Download Successful" });
+        setImportBackupConfirmationOpen(true);
+        
     } catch (error) {
         toast({ title: 'Download Failed', description: error instanceof Error ? error.message : "Unknown error", variant: 'destructive' });
+    }
+  };
+
+  const handleImportFromLocalBackup = async () => {
+    try {
+        const blob = await getBackup('github_backup');
+        if (blob) {
+            const text = await blob.text();
+            const importedData = JSON.parse(text);
+            const mainData = importedData.main || importedData;
+            const uiData = importedData.ui || {};
+            loadImportedData(mainData, uiData);
+            await deleteBackup('github_backup');
+            toast({ title: 'Import Successful', description: 'Data from GitHub backup has been loaded.' });
+        } else {
+            toast({ title: 'Import Failed', description: 'No local backup found.', variant: 'destructive' });
+        }
+    } catch (error) {
+        toast({ title: 'Import Failed', description: 'Could not read or parse the local backup.', variant: 'destructive' });
+    } finally {
+        setImportBackupConfirmationOpen(false);
     }
   };
 
@@ -3575,7 +3614,21 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
   return (
     <AuthContext.Provider value={value}>
-      {children}
+        {children}
+        <AlertDialog open={importBackupConfirmationOpen} onOpenChange={setImportBackupConfirmationOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Import Downloaded Backup?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        A backup from GitHub has been downloaded to your browser. Would you like to import it now? This will overwrite your current local data.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => deleteBackup('github_backup')}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleImportFromLocalBackup}>Import Data</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </AuthContext.Provider>
   );
 };
@@ -3589,5 +3642,6 @@ export const useAuth = (): AuthContextType => {
 };
     
     
+
 
 
