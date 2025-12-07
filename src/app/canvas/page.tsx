@@ -14,6 +14,7 @@ import { AuthGuard } from '@/components/AuthGuard';
 import dynamic from 'next/dynamic';
 import { OnLinkOpen, PointerDownState, AppState, ExcalidrawElement, NonDeleted } from '@excalidraw/excalidraw/types/types';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -156,6 +157,7 @@ function DrawingCanvasPageContent() {
         setFloatingVideoUrl,
     } = useAuth();
     
+    const isMobile = useIsMobile();
     const [theme, setTheme] = useState('dark');
     const [isMounted, setIsMounted] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -427,7 +429,7 @@ function DrawingCanvasPageContent() {
 
     return (
         <>
-            <div className="h-screen w-screen flex flex-col bg-background">
+            <div className={cn("h-screen w-screen flex flex-col bg-background", isMobile && 'force-landscape-canvas')}>
                 <header className="p-2 flex items-center justify-between border-b gap-4 flex-shrink-0">
                     {!isHeaderCollapsed && (
                         <div className="flex-grow min-w-0 overflow-x-auto">
