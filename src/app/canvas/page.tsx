@@ -4,7 +4,7 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy, ChevronsDown, ChevronsUp } from 'lucide-react';
+import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy, ChevronsDown, ChevronsUp, Smartphone } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -181,17 +181,6 @@ function DrawingCanvasPageContent() {
       
       return () => mediaQuery.removeEventListener('change', handleThemeChange);
     }, []);
-
-    useEffect(() => {
-        if (isMobile) {
-            document.body.classList.add('canvas-page-mobile');
-        }
-        return () => {
-            if (isMobile) {
-                document.body.classList.remove('canvas-page-mobile');
-            }
-        };
-    }, [isMobile]);
 
     useEffect(() => {
         if (!isMounted || !resources || !resourceFolders) {
@@ -437,10 +426,22 @@ function DrawingCanvasPageContent() {
             toast({ title: "Failed to copy", description: "Could not copy link to clipboard.", variant: "destructive" });
         });
     };
+    
+    if (isMobile) {
+      return (
+          <div className="flex h-screen w-screen items-center justify-center bg-background text-center text-foreground p-4">
+              <div className="space-y-4">
+                  <Smartphone className="mx-auto h-16 w-16" />
+                  <h1 className="text-2xl font-bold">Please Rotate Your Device</h1>
+                  <p className="text-muted-foreground">For the best drawing experience, please use landscape mode.</p>
+              </div>
+          </div>
+      );
+    }
 
     return (
         <>
-            <div className={cn("h-screen w-screen flex flex-col bg-background", isMobile && "mobile-canvas-container")}>
+            <div className="h-screen w-screen flex flex-col bg-background">
                 <header className="p-2 flex items-center justify-between border-b gap-4 flex-shrink-0">
                     <div className="flex-grow min-w-0 flex items-center gap-2">
                         <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => setIsHeaderCollapsed(p => !p)}>
