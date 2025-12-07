@@ -225,3 +225,23 @@
 .editable-sentence span {
   display: inline;
 }
+
+/* Mobile Canvas Landscape Mode */
+@media (max-width: 767px) and (orientation: portrait) {
+  body.canvas-page-mobile {
+    overflow: hidden;
+  }
+  
+  .mobile-canvas-container {
+    transform: rotate(90deg);
+    transform-origin: center center;
+    width: 100vh;
+    height: 100vw;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    margin-left: -50vh;
+    margin-top: -50vw;
+    overflow: hidden;
+  }
+}

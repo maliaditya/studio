@@ -183,6 +183,17 @@ function DrawingCanvasPageContent() {
     }, []);
 
     useEffect(() => {
+        if (isMobile) {
+            document.body.classList.add('canvas-page-mobile');
+        }
+        return () => {
+            if (isMobile) {
+                document.body.classList.remove('canvas-page-mobile');
+            }
+        };
+    }, [isMobile]);
+
+    useEffect(() => {
         if (!isMounted || !resources || !resourceFolders) {
             return;
         }
@@ -429,37 +440,39 @@ function DrawingCanvasPageContent() {
 
     return (
         <>
-            <div className={cn("h-screen w-screen flex flex-col bg-background")}>
+            <div className={cn("h-screen w-screen flex flex-col bg-background", isMobile && "mobile-canvas-container")}>
                 <header className="p-2 flex items-center justify-between border-b gap-4 flex-shrink-0">
-                    {!isHeaderCollapsed && (
-                        <div className="flex-grow min-w-0 overflow-x-auto">
-                            <div className="flex items-center gap-2">
-                                {(drawingCanvasState?.openCanvases || []).map(canvas => (
-                                    <Button
-                                        key={canvas.id}
-                                        variant={drawingCanvasState?.activeCanvasId === canvas.id ? "secondary" : "ghost"}
-                                        size="sm"
-                                        className="h-8 pl-2 pr-1 flex items-center gap-1 flex-shrink-0"
-                                        onClick={() => handleTabClick(canvas.id)}
-                                    >
-                                        <span className="truncate max-w-[120px]">{canvas.name}</span>
-                                        <button onClick={(e) => handleTogglePin(e, canvas.id)} className="p-1 rounded hover:bg-muted">
-                                            <Pin className={cn("h-3 w-3", (settings.pinnedCanvasIds || []).includes(canvas.id) ? "text-primary fill-current" : "text-muted-foreground")}/>
-                                        </button>
-                                        {!(settings.pinnedCanvasIds || []).includes(canvas.id) && (
-                                            <button onClick={(e) => handleCloseTab(e, canvas.id)} className="p-1 rounded hover:bg-destructive/20">
-                                                <X className="h-3 w-3 text-destructive"/>
-                                            </button>
-                                        )}
-                                    </Button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsHeaderCollapsed(p => !p)}>
+                    <div className="flex-grow min-w-0 flex items-center gap-2">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => setIsHeaderCollapsed(p => !p)}>
                             {isHeaderCollapsed ? <ChevronsDown className="h-4 w-4" /> : <ChevronsUp className="h-4 w-4" />}
                         </Button>
+                        {!isHeaderCollapsed && (
+                            <div className="overflow-x-auto">
+                                <div className="flex items-center gap-2">
+                                    {(drawingCanvasState?.openCanvases || []).map(canvas => (
+                                        <Button
+                                            key={canvas.id}
+                                            variant={drawingCanvasState?.activeCanvasId === canvas.id ? "secondary" : "ghost"}
+                                            size="sm"
+                                            className="h-8 pl-2 pr-1 flex items-center gap-1 flex-shrink-0"
+                                            onClick={() => handleTabClick(canvas.id)}
+                                        >
+                                            <span className="truncate max-w-[120px]">{canvas.name}</span>
+                                            <button onClick={(e) => handleTogglePin(e, canvas.id)} className="p-1 rounded hover:bg-muted">
+                                                <Pin className={cn("h-3 w-3", (settings.pinnedCanvasIds || []).includes(canvas.id) ? "text-primary fill-current" : "text-muted-foreground")}/>
+                                            </button>
+                                            {!(settings.pinnedCanvasIds || []).includes(canvas.id) && (
+                                                <button onClick={(e) => handleCloseTab(e, canvas.id)} className="p-1 rounded hover:bg-destructive/20">
+                                                    <X className="h-3 w-3 text-destructive"/>
+                                                </button>
+                                            )}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
                         <Button variant="ghost" size="icon" asChild>
                             <Link href="/my-plate">
                                 <LayoutDashboard className="h-4 w-4" />
