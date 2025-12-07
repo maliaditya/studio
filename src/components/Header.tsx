@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github, Download, Paintbrush } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github, Download, Paintbrush, UploadCloud, DownloadCloud } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
@@ -27,6 +27,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
 import { getExercisesForDay } from '@/lib/workoutUtils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolean) => void }) => {
@@ -612,7 +613,39 @@ export function Header() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUpcomingTasksModalOpen, setIsUpcomingTasksModalOpen] = useState(false);
+  const isMobile = useIsMobile();
   
+  if (isMobile) {
+    return (
+        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="container mx-auto flex h-14 items-center justify-between">
+                <Link href="/my-plate" className="flex items-center gap-2">
+                    <BrainCircuit className="h-6 w-6 text-primary" />
+                    <span className="font-bold">Dock</span>
+                </Link>
+                <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}>
+                        <UploadCloud className="h-4 w-4" />
+                        <span className="sr-only">Push to GitHub</span>
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}>
+                        <DownloadCloud className="h-4 w-4" />
+                        <span className="sr-only">Pull from GitHub</span>
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                        <Link href="/canvas">
+                            <Paintbrush className="h-4 w-4" />
+                            <span className="sr-only">Canvas</span>
+                        </Link>
+                    </Button>
+                     <UserProfile onSettingsClick={() => setIsSettingsModalOpen(true)} />
+                </div>
+            </div>
+            <SettingsModal isOpen={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen} />
+        </header>
+    );
+  }
+
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">

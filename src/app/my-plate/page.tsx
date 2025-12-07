@@ -36,6 +36,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { WeightLog } from '@/types/workout';
 import { WeightChartModal } from '@/components/WeightChartModal';
 import { DeepWorkPageContent } from '@/app/deep-work/page';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 const slotEndHours: Record<string, number> = {
@@ -105,6 +106,7 @@ function MyPlatePageContent() {
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
+    const isMobile = useIsMobile();
     
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
     const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
@@ -493,6 +495,25 @@ function MyPlatePageContent() {
       toast({ title: "Weight Logged", description: `Weight for the week of ${format(date, 'PPP')} has been saved as ${weight} kg/lb.` });
     };
 
+    if (isMobile) {
+      return (
+          <div className="container mx-auto p-4">
+              <TodaysScheduleCard
+                  date={selectedDate}
+                  schedule={schedule}
+                  activityDurations={activityDurations}
+                  isAgendaDocked={true} // Docked by default on mobile
+                  onToggleDock={() => {}} // No-op, can't undock
+                  onOpenHabitPopup={onOpenHabitPopup}
+                  currentSlot={currentSlot}
+                  onOpenFocusModal={onOpenFocusModal}
+                  onActivityClick={handleOpenFocusModalForPlanning}
+                  onStartFocus={onStartFocus}
+              />
+          </div>
+      );
+    }
+
     return (
         <>
             <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -685,5 +706,3 @@ function MyPlatePageContent() {
 export default function MyPlatePage() {
     return <AuthGuard><MyPlatePageContent /></AuthGuard>;
 }
-
-    
