@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
@@ -625,11 +624,11 @@ export function Header() {
                 </Link>
                 <div className="flex items-center gap-2">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}>
-                        <UploadCloud className="h-4 w-4" />
+                        <Github className="h-4 w-4" />
                         <span className="sr-only">Push to GitHub</span>
                     </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}>
-                        <DownloadCloud className="h-4 w-4" />
+                        <Download className="h-4 w-4" />
                         <span className="sr-only">Pull from GitHub</span>
                     </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
