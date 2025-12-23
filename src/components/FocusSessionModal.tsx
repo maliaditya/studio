@@ -143,30 +143,46 @@ export function FocusSessionModal({
   
   const handleCreateTask = () => {
     if (!activity || !selectedMicroSkillId || !linkedActivityType) return;
-    
+
     const microSkill = microSkills.find(ms => ms.id === selectedMicroSkillId);
     if (!microSkill) return;
 
-    const newDef: ExerciseDefinition = {
-      id: `def_${Date.now()}`,
-      name: activity.details,
+    const now = Date.now();
+    const taskName = activity.details;
+    
+    const childId = `def_${now}_child`;
+    const parentId = `def_${now}_parent`;
+
+    const childTask: ExerciseDefinition = {
+      id: childId,
+      name: taskName,
       category: microSkill.name as any,
+      nodeType: linkedActivityType === 'deepwork' ? 'Action' : 'Visualization',
+    };
+    
+    const parentTask: ExerciseDefinition = {
+        id: parentId,
+        name: taskName,
+        category: microSkill.name as any,
+        nodeType: linkedActivityType === 'deepwork' ? 'Intention' : 'Curiosity',
+        [linkedActivityType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds']: [childId],
     };
 
     if (linkedActivityType === 'deepwork') {
-      setDeepWorkDefinitions(prev => [...prev, newDef]);
+      setDeepWorkDefinitions(prev => [...prev, parentTask, childTask]);
     } else if (linkedActivityType === 'upskill') {
-      setUpskillDefinitions(prev => [...prev, newDef]);
+      setUpskillDefinitions(prev => [...prev, parentTask, childTask]);
     }
 
     const updatedActivity: Activity = {
       ...activity,
-      taskIds: [newDef.id],
+      taskIds: [childId], // Link Pomodoro to the most granular task (Action/Visualization)
       linkedActivityType: linkedActivityType,
       linkedEntityType: linkedActivityType === 'deepwork' ? 'intention' : 'curiosity',
     };
     updateActivity(updatedActivity);
   };
+
 
   const handleStartClick = () => {
     if (activity) {
@@ -207,7 +223,7 @@ export function FocusSessionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl">
+      <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Start Focus Session</DialogTitle>
           <DialogDescription>
@@ -291,28 +307,19 @@ export function FocusSessionModal({
                 <Label htmlFor="skip-breaks-modal">Skip breaks</Label>
             </div>
         </div>
-        {activity.type === 'pomodoro' ? (
-             <DialogFooter className="grid grid-cols-3 gap-2">
-                 <Button variant="outline" className="w-full" onClick={handleLogDurationClick}>
-                     <Save className="mr-2 h-4 w-4" /> Log &amp; Complete
-                 </Button>
-                 <Button variant="secondary" onClick={handleCreateTask} disabled={!canCreateTask}>
-                     Create Task
-                 </Button>
-                 <Button className="w-full" onClick={handleStartClick}>
-                     <Play className="mr-2 h-4 w-4" /> Start Session
-                 </Button>
-             </DialogFooter>
-        ) : (
-            <DialogFooter className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="w-full" onClick={handleLogDurationClick}>
-                    <Save className="mr-2 h-4 w-4" /> Log Duration &amp; Complete
+        <DialogFooter className="grid grid-cols-3 gap-2">
+            <Button variant="outline" className="w-full" onClick={handleLogDurationClick}>
+                <Save className="mr-2 h-4 w-4" /> Log & Complete
+            </Button>
+            {activity.type === 'pomodoro' ? (
+                <Button variant="secondary" onClick={handleCreateTask} disabled={!canCreateTask}>
+                    Create Task
                 </Button>
-                <Button className="w-full" onClick={handleStartClick}>
-                    <Play className="mr-2 h-4 w-4" /> Start Focus Session
-                </Button>
-            </DialogFooter>
-        )}
+            ) : <div/>}
+            <Button className="w-full" onClick={handleStartClick}>
+                <Play className="mr-2 h-4 w-4" /> Start Session
+            </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

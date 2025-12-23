@@ -681,107 +681,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logSubTaskTime = useCallback((taskId: string, durationMinutes: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
-    let taskUpdated = false;
-    let parentObjective: ExerciseDefinition | null = null;
-  
-    const allDefsMap = new Map([...deepWorkDefinitions, ...upskillDefinitions].map(d => [d.id, d]));
-  
-    const findParentObjective = (startTaskId: string): ExerciseDefinition | null => {
-      let currentId: string | undefined = startTaskId;
-      let parent: ExerciseDefinition | undefined;
-      let topLevelParent: ExerciseDefinition | undefined = allDefsMap.get(startTaskId);
-  
-      while (currentId) {
-        const foundParent = Array.from(allDefsMap.values()).find(p =>
-          (p.linkedDeepWorkIds?.includes(currentId!)) || (p.linkedUpskillIds?.includes(currentId!))
-        );
-  
-        if (foundParent) {
-          currentId = foundParent.id;
-          parent = foundParent;
-          if ((parent.linkedDeepWorkIds && parent.linkedDeepWorkIds.length > 0) || (parent.linkedUpskillIds && parent.linkedUpskillIds.length > 0)) {
-            topLevelParent = parent;
-          }
-        } else {
-          currentId = undefined;
-        }
-      }
-      return topLevelParent || null;
-    };
-  
-    const updateDefinitions = (definitions: ExerciseDefinition[], setDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>) => {
-      let defs = [...definitions];
-      let taskFoundAndUpdated = false;
-      let parentUpdated = false;
-  
-      defs = defs.map(def => {
+
+    const updateDefinitions = (
+      definitions: ExerciseDefinition[],
+      setDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>
+    ) => {
+      let taskToUpdate = definitions.find(d => d.id === taskId);
+      if (!taskToUpdate) return definitions;
+
+      const newLoggedDuration = (taskToUpdate.loggedDuration || 0) + durationMinutes;
+      
+      return definitions.map(def => {
         if (def.id === taskId) {
-          taskFoundAndUpdated = true;
           return {
             ...def,
-            loggedDuration: (def.loggedDuration || 0) + durationMinutes,
+            loggedDuration: newLoggedDuration,
             last_logged_date: todayKey,
           };
         }
         return def;
       });
-  
-      if (taskFoundAndUpdated) {
-        parentObjective = findParentObjective(taskId);
-  
-        if (parentObjective) {
-          const leafNodes = getDescendantLeafNodes(parentObjective.id, upskillDefinitions.some(d => d.id === parentObjective!.id) ? 'upskill' : 'deepwork');
-          const totalLoggedMinutes = leafNodes.reduce((total, node) => {
-            const nodeFromUpdatedDefs = defs.find(d => d.id === node.id);
-            return total + (nodeFromUpdatedDefs?.loggedDuration || node.loggedDuration || 0);
-          }, 0);
-  
-          defs = defs.map(def => {
-            if (def.id === parentObjective!.id) {
-              parentUpdated = true;
-              return { ...def, loggedDuration: totalLoggedMinutes };
-            }
-            return def;
-          });
-  
-          // After calculating everything, find the parent Activity and update it
-          const parentActivity = Object.values(schedule)
-            .flatMap(day => Object.values(day).flat())
-            .find(act => act && act.taskIds?.includes(parentObjective!.id));
-  
-          if (parentActivity) {
-            const allLeavesCompleted = leafNodes.every(node => {
-              const updatedNode = defs.find(d => d.id === node.id);
-              // A leaf is 'complete' if it has logged time. For this check, that's enough.
-              return (updatedNode?.loggedDuration || 0) > 0;
-            });
-            
-            const updatedActivityData: Partial<Activity> = {
-              duration: totalLoggedMinutes,
-            };
-            if(allLeavesCompleted) {
-              updatedActivityData.completed = true;
-              updatedActivityData.completedAt = Date.now();
-            }
-
-            updateActivity({
-              ...parentActivity,
-              ...updatedActivityData,
-            });
-          }
-        }
-      }
-      setDefinitions(defs);
     };
-  
-    if (upskillDefinitions.some(d => d.id === taskId)) {
-      updateDefinitions(upskillDefinitions, setUpskillDefinitions);
-    } else if (deepWorkDefinitions.some(d => d.id === taskId)) {
-      updateDefinitions(deepWorkDefinitions, setDeepWorkDefinitions);
-    }
-  
-    toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes.` });
-  }, [upskillDefinitions, deepWorkDefinitions, getDescendantLeafNodes, schedule, updateActivity, toast]);
+
+    setUpskillDefinitions(prev => updateDefinitions(prev, setUpskillDefinitions));
+    setDeepWorkDefinitions(prev => updateDefinitions(prev, setDeepWorkDefinitions));
+    
+    toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes for the linked task.` });
+  }, [setUpskillDefinitions, setDeepWorkDefinitions, toast]);
   
   const onLogDuration = useCallback((activity: Activity, duration: number) => {
     if (activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
@@ -3645,6 +3571,7 @@ export const useAuth = (): AuthContextType => {
 };
     
     
+
 
 
 
