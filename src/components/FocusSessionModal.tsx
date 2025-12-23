@@ -65,6 +65,7 @@ export function FocusSessionModal({
   // New state for hierarchical selection
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   const [selectedSpecId, setSelectedSpecId] = useState<string | null>(null);
+  const [selectedSkillAreaId, setSelectedSkillAreaId] = useState<string | null>(null);
   const [selectedMicroSkillId, setSelectedMicroSkillId] = useState<string | null>(null);
   
   const specializations = useMemo(() => {
@@ -72,11 +73,19 @@ export function FocusSessionModal({
     return coreSkills.filter(cs => cs.domainId === selectedDomainId && cs.type === 'Specialization');
   }, [selectedDomainId, coreSkills]);
 
-  const microSkills = useMemo(() => {
-      if (!selectedSpecId) return [];
-      const spec = coreSkills.find(cs => cs.id === selectedSpecId);
-      return spec?.skillAreas.flatMap(sa => sa.microSkills) || [];
+  const skillAreas = useMemo(() => {
+    if (!selectedSpecId) return [];
+    const spec = coreSkills.find(cs => cs.id === selectedSpecId);
+    return spec?.skillAreas || [];
   }, [selectedSpecId, coreSkills]);
+
+  const microSkills = useMemo(() => {
+      if (!selectedSkillAreaId) return [];
+      const spec = coreSkills.find(cs => cs.id === selectedSpecId);
+      if (!spec) return [];
+      const skillArea = spec.skillAreas.find(sa => sa.id === selectedSkillAreaId);
+      return skillArea?.microSkills || [];
+  }, [selectedSkillAreaId, selectedSpecId, coreSkills]);
 
   useEffect(() => {
     setDuration(initialDuration > 0 ? initialDuration : 30);
@@ -84,17 +93,25 @@ export function FocusSessionModal({
     // Reset selections when modal opens
     setSelectedDomainId(null);
     setSelectedSpecId(null);
+    setSelectedSkillAreaId(null);
     setSelectedMicroSkillId(null);
   }, [initialDuration, isOpen, activity]);
 
   const handleDomainChange = (domainId: string) => {
     setSelectedDomainId(domainId);
     setSelectedSpecId(null);
+    setSelectedSkillAreaId(null);
     setSelectedMicroSkillId(null);
   };
   
   const handleSpecChange = (specId: string) => {
     setSelectedSpecId(specId);
+    setSelectedSkillAreaId(null);
+    setSelectedMicroSkillId(null);
+  };
+
+  const handleSkillAreaChange = (areaId: string) => {
+    setSelectedSkillAreaId(areaId);
     setSelectedMicroSkillId(null);
   };
 
@@ -239,7 +256,18 @@ export function FocusSessionModal({
                             )}
                             {selectedSpecId && (
                                <div>
-                                <Label>4. Select Micro-Skill</Label>
+                                <Label>4. Select Skill Area</Label>
+                                <Select onValueChange={handleSkillAreaChange} value={selectedSkillAreaId || ''}>
+                                    <SelectTrigger><SelectValue placeholder="Select Skill Area..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {skillAreas.map(sa => <SelectItem key={sa.id} value={sa.id}>{sa.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                               </div>
+                            )}
+                            {selectedSkillAreaId && (
+                               <div>
+                                <Label>5. Select Micro-Skill</Label>
                                 <Select onValueChange={setSelectedMicroSkillId} value={selectedMicroSkillId || ''}>
                                     <SelectTrigger><SelectValue placeholder="Select Micro-Skill..." /></SelectTrigger>
                                     <SelectContent>
