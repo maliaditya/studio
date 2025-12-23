@@ -141,30 +141,35 @@ export function FocusSessionModal({
     };
   }, [allDeepWorkLogs, allUpskillLogs, isOpen]);
   
+  const handleCreateTask = () => {
+    if (!activity || !selectedMicroSkillId || !linkedActivityType) return;
+    
+    const microSkill = microSkills.find(ms => ms.id === selectedMicroSkillId);
+    if (!microSkill) return;
+
+    const newDef: ExerciseDefinition = {
+      id: `def_${Date.now()}`,
+      name: activity.details,
+      category: microSkill.name as any,
+    };
+
+    if (linkedActivityType === 'deepwork') {
+      setDeepWorkDefinitions(prev => [...prev, newDef]);
+    } else if (linkedActivityType === 'upskill') {
+      setUpskillDefinitions(prev => [...prev, newDef]);
+    }
+
+    const updatedActivity: Activity = {
+      ...activity,
+      taskIds: [newDef.id],
+      linkedActivityType: linkedActivityType,
+      linkedEntityType: linkedActivityType === 'deepwork' ? 'intention' : 'curiosity',
+    };
+    updateActivity(updatedActivity);
+  };
+
   const handleStartClick = () => {
     if (activity) {
-      let taskToLink: Partial<ExerciseDefinition> | null = null;
-
-      if (selectedMicroSkillId && linkedActivityType) {
-        const microSkill = microSkills.find(ms => ms.id === selectedMicroSkillId);
-        if (microSkill) {
-          const newDef: ExerciseDefinition = {
-            id: `def_${Date.now()}`,
-            name: activity.details,
-            category: microSkill.name as any,
-            linkedDeepWorkIds: [],
-            linkedUpskillIds: [],
-          };
-
-          if (linkedActivityType === 'deepwork') {
-            setDeepWorkDefinitions(prev => [...prev, newDef]);
-          } else if (linkedActivityType === 'upskill') {
-            setUpskillDefinitions(prev => [...prev, newDef]);
-          }
-          taskToLink = newDef;
-        }
-      }
-
       const now = Date.now();
       const updatedActivity: Activity = {
         ...activity,
@@ -174,7 +179,6 @@ export function FocusSessionModal({
         focusSessionPauses: [],
         focusSessionInitialDuration: duration,
         linkedActivityType: activity.type === 'pomodoro' ? (linkedActivityType as ActivityType) : undefined,
-        taskIds: taskToLink ? [taskToLink.id!] : activity.taskIds,
       };
       updateActivity(updatedActivity); 
       onStartSession(updatedActivity, duration);
@@ -196,6 +200,8 @@ export function FocusSessionModal({
       onOpenChange(false);
     }
   };
+  
+  const canCreateTask = selectedMicroSkillId && linkedActivityType;
 
   if (!activity) return null;
 
@@ -286,12 +292,25 @@ export function FocusSessionModal({
             </div>
         </div>
         <DialogFooter className="grid grid-cols-2 gap-2">
-          <Button variant="outline" className="w-full" onClick={handleLogDurationClick}>
-            <Save className="mr-2 h-4 w-4" /> Log Duration & Complete
-          </Button>
-          <Button className="w-full" onClick={handleStartClick}>
-            <Play className="mr-2 h-4 w-4" /> Start Focus Session
-          </Button>
+            {activity.type === 'pomodoro' ? (
+                <>
+                    <Button variant="secondary" onClick={handleCreateTask} disabled={!canCreateTask}>
+                        Create Task
+                    </Button>
+                    <Button className="w-full" onClick={handleStartClick}>
+                        <Play className="mr-2 h-4 w-4" /> Start Focus Session
+                    </Button>
+                </>
+            ) : (
+                <>
+                    <Button variant="outline" className="w-full" onClick={handleLogDurationClick}>
+                        <Save className="mr-2 h-4 w-4" /> Log Duration & Complete
+                    </Button>
+                    <Button className="w-full" onClick={handleStartClick}>
+                        <Play className="mr-2 h-4 w-4" /> Start Focus Session
+                    </Button>
+                </>
+            )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
