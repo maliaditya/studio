@@ -783,6 +783,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes.` });
   }, [upskillDefinitions, deepWorkDefinitions, getDescendantLeafNodes, schedule, updateActivity, toast]);
   
+  const onLogDuration = useCallback((activity: Activity, duration: number) => {
+    if (activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
+        logSubTaskTime(activity.taskIds[0], duration);
+    }
+    updateActivity({
+        ...activity,
+        duration: (activity.duration || 0) + duration,
+        completed: true,
+        completedAt: Date.now(),
+    });
+    toast({ title: 'Duration Logged & Task Completed!' });
+  }, [updateActivity, toast, logSubTaskTime]);
+  
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
     setDrawingCanvasState(prev => {
@@ -1013,16 +1026,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return map;
   }, [coreSkills]);
 
-  const onLogDuration = useCallback((activity: Activity, duration: number) => {
-    updateActivity({
-      ...activity,
-      duration: (activity.duration || 0) + duration,
-      completed: true,
-      completedAt: Date.now(),
-    });
-    toast({ title: 'Duration Logged & Task Completed!' });
-  }, [updateActivity, toast]);
-  
   const allDefinitionMap = useMemo(() => new Map([...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])), [deepWorkDefinitions, upskillDefinitions]);
 
   const childToParentMap = useMemo(() => {
@@ -3642,6 +3645,7 @@ export const useAuth = (): AuthContextType => {
 };
     
     
+
 
 
 
