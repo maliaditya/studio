@@ -10,12 +10,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
-import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle, ArrowRight, Minus, Save } from 'lucide-react';
+import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle, ArrowRight, Minus, Save, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import type { Activity, HabitEquation, Resource, ActivityType, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -67,6 +67,7 @@ export function FocusSessionModal({
   const [selectedSpecId, setSelectedSpecId] = useState<string | null>(null);
   const [selectedSkillAreaId, setSelectedSkillAreaId] = useState<string | null>(null);
   const [selectedMicroSkillId, setSelectedMicroSkillId] = useState<string | null>(null);
+  const [createdTaskInfo, setCreatedTaskInfo] = useState<{ path: string[]; taskName: string } | null>(null);
   
   const specializations = useMemo(() => {
     if (!selectedDomainId) return [];
@@ -95,6 +96,7 @@ export function FocusSessionModal({
     setSelectedSpecId(null);
     setSelectedSkillAreaId(null);
     setSelectedMicroSkillId(null);
+    setCreatedTaskInfo(null);
   }, [initialDuration, isOpen, activity]);
 
   const handleDomainChange = (domainId: string) => {
@@ -102,45 +104,22 @@ export function FocusSessionModal({
     setSelectedSpecId(null);
     setSelectedSkillAreaId(null);
     setSelectedMicroSkillId(null);
+    setCreatedTaskInfo(null);
   };
   
   const handleSpecChange = (specId: string) => {
     setSelectedSpecId(specId);
     setSelectedSkillAreaId(null);
     setSelectedMicroSkillId(null);
+    setCreatedTaskInfo(null);
   };
 
   const handleSkillAreaChange = (areaId: string) => {
     setSelectedSkillAreaId(areaId);
     setSelectedMicroSkillId(null);
+    setCreatedTaskInfo(null);
   };
 
-  const dailyProgress = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
-    const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
-    
-    const getMinutesForDay = (dateKey: string) => {
-        let total = 0;
-        const deepLog = allDeepWorkLogs.find(log => log.date === dateKey);
-        if(deepLog) total += deepLog.exercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.weight, 0), 0);
-        
-        const upskillLog = allUpskillLogs.find(log => log.date === dateKey);
-        if(upskillLog) total += upskillLog.exercises.reduce((sum, ex) => sum + ex.loggedSets.reduce((s, set) => s + set.reps, 0), 0);
-        
-        return total;
-    }
-    
-    const completed = getMinutesForDay(today);
-    const yesterdayCompleted = getMinutesForDay(yesterday);
-    
-    return {
-      yesterday: yesterdayCompleted,
-      goal: 8 * 60,
-      completed: completed,
-      streak: 0,
-    };
-  }, [allDeepWorkLogs, allUpskillLogs, isOpen]);
-  
   const handleCreateTask = () => {
     if (!activity || !selectedMicroSkillId || !linkedActivityType) return;
 
@@ -176,11 +155,26 @@ export function FocusSessionModal({
 
     const updatedActivity: Activity = {
       ...activity,
-      taskIds: [childId], // Link Pomodoro to the most granular task (Action/Visualization)
+      taskIds: [childId],
       linkedActivityType: linkedActivityType,
       linkedEntityType: linkedActivityType === 'deepwork' ? 'intention' : 'curiosity',
     };
     updateActivity(updatedActivity);
+
+    const domain = skillDomains.find(d => d.id === selectedDomainId);
+    const spec = coreSkills.find(s => s.id === selectedSpecId);
+    const area = spec?.skillAreas.find(sa => sa.id === selectedSkillAreaId);
+
+    setCreatedTaskInfo({
+      path: [
+        domain?.name || 'Unknown Domain',
+        spec?.name || 'Unknown Specialization',
+        area?.name || 'Unknown Skill Area',
+        microSkill.name,
+        parentTask.name,
+      ],
+      taskName: childTask.name
+    });
   };
 
 
@@ -223,7 +217,7 @@ export function FocusSessionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-2xl">
+      <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Start Focus Session</DialogTitle>
           <DialogDescription>
@@ -297,6 +291,20 @@ export function FocusSessionModal({
                                     </SelectContent>
                                 </Select>
                                </div>
+                            )}
+                             {createdTaskInfo && (
+                                <div className="p-3 bg-muted rounded-md text-sm">
+                                    <p className="font-semibold text-foreground">Task Created:</p>
+                                    <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-1">
+                                        {createdTaskInfo.path.map((part, index) => (
+                                            <React.Fragment key={index}>
+                                                <span>{part}</span>
+                                                {index < createdTaskInfo.path.length - 1 && <ChevronRightIcon className="h-3 w-3" />}
+                                            </React.Fragment>
+                                        ))}
+                                    </div>
+                                    <p className="font-medium text-primary mt-1 pl-4">└ {createdTaskInfo.taskName}</p>
+                                </div>
                             )}
                         </div>
                     )}
