@@ -687,6 +687,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       durationField: 'reps' | 'weight'
     ) => {
       const logIndex = logs.findIndex(log => log.date === todayKey);
+      let definitionId: string | undefined;
+
       if (logIndex > -1) {
         const newLogs = [...logs];
         const logToUpdate = { ...newLogs[logIndex] };
@@ -694,6 +696,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (exerciseIndex > -1) {
           const exerciseToUpdate = { ...logToUpdate.exercises[exerciseIndex] };
+          definitionId = exerciseToUpdate.definitionId;
           const newSet: LoggedSet = {
             id: `set_${Date.now()}`,
             reps: durationField === 'reps' ? durationMinutes : 1,
@@ -704,23 +707,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           logToUpdate.exercises[exerciseIndex] = exerciseToUpdate;
           newLogs[logIndex] = logToUpdate;
           setLogs(newLogs);
-          return true;
+          return definitionId;
         }
       }
-      return false;
+      return undefined;
     };
     
-    if (!updateLogs(allUpskillLogs, setAllUpskillLogs, 'reps')) {
-      updateLogs(allDeepWorkLogs, setAllDeepWorkLogs, 'weight');
+    let definitionId = updateLogs(allUpskillLogs, setAllUpskillLogs, 'reps');
+    if (!definitionId) {
+      definitionId = updateLogs(allDeepWorkLogs, setAllDeepWorkLogs, 'weight');
     }
     
     toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes for the linked task.` });
+    return definitionId;
   }, [allDeepWorkLogs, allUpskillLogs, setAllDeepWorkLogs, setAllUpskillLogs, toast]);
   
   const onLogDuration = useCallback((activity: Activity, duration: number) => {
+    let definitionId: string | undefined;
     if (activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
-        logSubTaskTime(activity.taskIds[0], duration);
+        definitionId = logSubTaskTime(activity.taskIds[0], duration);
     }
+    
+    if (definitionId) {
+      setPermanentlyLoggedTaskIds(prev => new Set(prev).add(definitionId!));
+    }
+    
     updateActivity({
         ...activity,
         duration: (activity.duration || 0) + duration,
@@ -1031,18 +1042,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
   
-  const permanentlyLoggedTaskIds = useMemo(() => {
-    const loggedIds = new Set<string>();
-    const allLogs = [...allDeepWorkLogs, ...allUpskillLogs, ...allMindProgrammingLogs];
-    allLogs.forEach(log => {
-      log.exercises.forEach(ex => {
-        if (ex.loggedSets.length > 0) {
-          loggedIds.add(ex.definitionId);
-        }
-      });
-    });
-    return loggedIds;
-  }, [allDeepWorkLogs, allUpskillLogs, allMindProgrammingLogs]);
+  const [permanentlyLoggedTaskIds, setPermanentlyLoggedTaskIds] = useState<Set<string>>(new Set());
 
   const onOpenFocusModal = useCallback((activity: Activity) => {
     const isPlanningTask = (activity.type === 'upskill' || activity.type === 'deepwork') && activity.linkedEntityType === 'specialization';
@@ -3585,3 +3585,6 @@ export const useAuth = (): AuthContextType => {
 
 
 
+
+
+    
