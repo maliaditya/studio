@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { PistonEntry, PistonType, PistonsData, Resource, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry as AutoSuggestionEntry, RuleDetailPopupState, HabitEquation, ResourceFolder } from '@/types/workout';
 import { DndContext, useDraggable } from '@dnd-kit/core';
-import type { DragEndEvent } from '@dnd-kit/core';
+import type { DragEndEvent } from 'dnd-kit';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Popover, PopoverTrigger, PopoverContent } from './ui/popover';
@@ -152,12 +152,12 @@ const MainPistonView = ({ onSelect }: { onSelect: (view: 'quick-access' | 'rule-
 );
 
 const QuickAccessView = () => {
-    const { resources, resourceFolders, setResources, openGeneralPopup, setPinnedFolderIds } = useAuth();
+    const { resources, resourceFolders, setResources, openGeneralPopup } = useAuth();
     const { toast } = useToast();
     const [editingCardId, setEditingCardId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
 
-    const quickAccessFolder = useMemo(() => resourceFolders.find(f => f.name === 'Quick Access' && !f.parentId), [resourceFolders]);
+    const quickAccessFolder = useMemo(() => (resourceFolders || []).find(f => f.name === 'Quick Access' && !f.parentId), [resourceFolders]);
 
     const quickAccessCards = useMemo(() => {
         if (!quickAccessFolder) return [];
@@ -267,7 +267,7 @@ const RuleEquationsView = () => {
                                     <AccordionTrigger className="px-4 py-3 text-sm font-semibold hover:no-underline text-left">
                                         <div className="flex items-center gap-2">
                                             <ArrowRight className="h-4 w-4 text-primary flex-shrink-0" />
-                                            <span>{eq.outcome}</span>
+                                            <span className="flex-grow">{eq.outcome}</span>
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent className="px-4 pb-3">
