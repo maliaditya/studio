@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { useToast } from '@/hooks/use-toast';
+import { getExercisesForDay } from '@/lib/workoutUtils';
 
 
 const activityIcons: Record<ActivityType, React.ReactNode> = {
@@ -96,7 +97,18 @@ export function TimeSlots({
   onStartFocus,
 }: TimeSlotsProps) {
     const { toast } = useToast();
-    const { setSchedule: setGlobalSchedule, settings, handleToggleComplete, toggleRoutine, activityDurations } = useAuth();
+    const { 
+        setSchedule: setGlobalSchedule, 
+        settings, 
+        handleToggleComplete, 
+        toggleRoutine, 
+        activityDurations,
+        workoutMode,
+        workoutPlans,
+        exerciseDefinitions,
+        allWorkoutLogs,
+        workoutPlanRotation,
+    } = useAuth();
     const dateKey = useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
     const todaysSchedule = useMemo(() => schedule[dateKey] || {}, [schedule, dateKey]);
 
@@ -141,10 +153,15 @@ export function TimeSlots({
 
   const handleAddActivity = (slotName: string, type: ActivityType, details: string) => {
     let activityDetails = details;
-    if (!details) {
+    
+    if (type === 'workout') {
+        const { description } = getExercisesForDay(date, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
+        activityDetails = description || "New Workout";
+    } else if (!details) {
         if (type === 'pomodoro') activityDetails = "New Pomodoro";
         else activityDetails = `New ${type.replace('-', ' ')}`;
     }
+    
     const newActivity: Activity = {
         id: `${type}-${Date.now()}-${Math.random()}`,
         type,

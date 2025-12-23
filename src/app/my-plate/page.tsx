@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -149,6 +150,12 @@ function MyPlatePageContent() {
     
     const handleOpenFocusModalForPlanning = useCallback((activity: Activity) => {
         const { type, details } = activity;
+        if (type === 'workout') {
+          setWorkoutActivityToLog(activity);
+          setIsTodaysWorkoutModalOpen(true);
+          return true;
+        }
+        
         if (type !== 'upskill' && type !== 'deepwork') {
             return false;
         }
