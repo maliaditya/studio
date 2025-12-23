@@ -207,7 +207,7 @@ export function FocusSessionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md md:max-w-lg lg:max-w-xl">
         <DialogHeader>
           <DialogTitle>Start Focus Session</DialogTitle>
           <DialogDescription>
@@ -291,27 +291,28 @@ export function FocusSessionModal({
                 <Label htmlFor="skip-breaks-modal">Skip breaks</Label>
             </div>
         </div>
-        <DialogFooter className="grid grid-cols-2 gap-2">
-            {activity.type === 'pomodoro' ? (
-                <>
-                    <Button variant="secondary" onClick={handleCreateTask} disabled={!canCreateTask}>
-                        Create Task
-                    </Button>
-                    <Button className="w-full" onClick={handleStartClick}>
-                        <Play className="mr-2 h-4 w-4" /> Start Focus Session
-                    </Button>
-                </>
-            ) : (
-                <>
-                    <Button variant="outline" className="w-full" onClick={handleLogDurationClick}>
-                        <Save className="mr-2 h-4 w-4" /> Log Duration & Complete
-                    </Button>
-                    <Button className="w-full" onClick={handleStartClick}>
-                        <Play className="mr-2 h-4 w-4" /> Start Focus Session
-                    </Button>
-                </>
-            )}
-        </DialogFooter>
+        {activity.type === 'pomodoro' ? (
+             <DialogFooter className="grid grid-cols-3 gap-2">
+                 <Button variant="outline" className="w-full" onClick={handleLogDurationClick}>
+                     <Save className="mr-2 h-4 w-4" /> Log &amp; Complete
+                 </Button>
+                 <Button variant="secondary" onClick={handleCreateTask} disabled={!canCreateTask}>
+                     Create Task
+                 </Button>
+                 <Button className="w-full" onClick={handleStartClick}>
+                     <Play className="mr-2 h-4 w-4" /> Start Session
+                 </Button>
+             </DialogFooter>
+        ) : (
+            <DialogFooter className="grid grid-cols-2 gap-2">
+                <Button variant="outline" className="w-full" onClick={handleLogDurationClick}>
+                    <Save className="mr-2 h-4 w-4" /> Log Duration &amp; Complete
+                </Button>
+                <Button className="w-full" onClick={handleStartClick}>
+                    <Play className="mr-2 h-4 w-4" /> Start Focus Session
+                </Button>
+            </DialogFooter>
+        )}
       </DialogContent>
     </Dialog>
   );
