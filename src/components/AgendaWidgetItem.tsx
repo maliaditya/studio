@@ -101,7 +101,7 @@ export const AgendaWidgetItem = React.memo(({
                     <div className="flex items-center gap-1 text-xs text-muted-foreground capitalize">
                         {activityIcons[activity.type]} {activity.type.replace('-', ' ')}
                     </div>
-                    {linkedActivityName && <Badge variant="secondary">{linkedActivityName}</Badge>}
+                    {linkedActivityName && <Badge variant={activity.completed ? 'outline' : 'secondary'}>{linkedActivityName}</Badge>}
                     {isPlanningTask && <Badge variant="outline">Planning</Badge>}
                     {activity.completed && loggedDuration && (
                         <Badge variant="secondary">{loggedDuration}</Badge>
@@ -112,4 +112,3 @@ export const AgendaWidgetItem = React.memo(({
     );
 });
 AgendaWidgetItem.displayName = 'AgendaWidgetItem';
-
