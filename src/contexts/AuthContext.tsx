@@ -27,7 +27,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { PlusCircle, Link as LinkIcon } from 'lucide-react';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Textarea } from './ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
@@ -417,7 +417,7 @@ interface AuthContextType {
   setSelectedDeepWorkTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
   selectedMicroSkill: MicroSkill | null;
   setSelectedMicroSkill: React.Dispatch<React.SetStateAction<MicroSkill | null>>;
-  logSubTaskTime: (taskId: string, durationMinutes: number) => void;
+  logSubTaskTime: (taskId: string, durationMinutes: number) => string | undefined;
 }
 
 const AuthContext = createContext<AuthContextType>({} as AuthContextType);
@@ -678,25 +678,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setSchedule]);
 
-  const logSubTaskTime = useCallback((taskId: string, durationMinutes: number) => {
+  const logSubTaskTime = useCallback((taskId: string, durationMinutes: number): string | undefined => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
+    let definitionId: string | undefined;
 
     const updateLogs = (
       logs: DatedWorkout[], 
       setLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>,
       durationField: 'reps' | 'weight'
     ) => {
+      let exerciseDefinitionId: string | undefined;
       const logIndex = logs.findIndex(log => log.date === todayKey);
-      let definitionId: string | undefined;
 
       if (logIndex > -1) {
         const newLogs = [...logs];
         const logToUpdate = { ...newLogs[logIndex] };
         const exerciseIndex = logToUpdate.exercises.findIndex(ex => ex.id === taskId);
-
+        
         if (exerciseIndex > -1) {
           const exerciseToUpdate = { ...logToUpdate.exercises[exerciseIndex] };
-          definitionId = exerciseToUpdate.definitionId;
+          exerciseDefinitionId = exerciseToUpdate.definitionId;
           const newSet: LoggedSet = {
             id: `set_${Date.now()}`,
             reps: durationField === 'reps' ? durationMinutes : 1,
@@ -707,29 +708,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           logToUpdate.exercises[exerciseIndex] = exerciseToUpdate;
           newLogs[logIndex] = logToUpdate;
           setLogs(newLogs);
-          return definitionId;
         }
+        return exerciseDefinitionId;
       }
       return undefined;
     };
     
-    let definitionId = updateLogs(allUpskillLogs, setAllUpskillLogs, 'reps');
+    definitionId = updateLogs(allUpskillLogs, setAllUpskillLogs, 'reps');
     if (!definitionId) {
       definitionId = updateLogs(allDeepWorkLogs, setAllDeepWorkLogs, 'weight');
     }
+
+    if (definitionId) {
+      const defIdToUpdate = definitionId;
+      // Also update the total logged time on the global definition
+      setDeepWorkDefinitions(prev => prev.map(def => def.id === defIdToUpdate ? {...def, loggedDuration: (def.loggedDuration || 0) + durationMinutes, last_logged_date: todayKey} : def));
+      setUpskillDefinitions(prev => prev.map(def => def.id === defIdToUpdate ? {...def, loggedDuration: (def.loggedDuration || 0) + durationMinutes, last_logged_date: todayKey} : def));
+    }
     
-    toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes for the linked task.` });
+    toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes.` });
     return definitionId;
-  }, [allDeepWorkLogs, allUpskillLogs, setAllDeepWorkLogs, setAllUpskillLogs, toast]);
+  }, [allDeepWorkLogs, allUpskillLogs, setAllDeepWorkLogs, setAllUpskillLogs, toast, setDeepWorkDefinitions, setUpskillDefinitions]);
   
   const onLogDuration = useCallback((activity: Activity, duration: number) => {
     let definitionId: string | undefined;
     if (activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
         definitionId = logSubTaskTime(activity.taskIds[0], duration);
-    }
-    
-    if (definitionId) {
-      setPermanentlyLoggedTaskIds(prev => new Set(prev).add(definitionId!));
+        if (definitionId) {
+            setPermanentlyLoggedTaskIds(prev => new Set(prev).add(definitionId!));
+        }
     }
     
     updateActivity({
@@ -949,7 +956,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ...prev,
         position: {
           x: prev.position.x + delta.x,
-          y: prev.y + delta.y,
+          y: prev.position.y + delta.y,
         },
       } : null);
     }
@@ -2311,7 +2318,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     let x, y;
     const targetRect = (event.target as HTMLElement).getBoundingClientRect();
     const screenWidth = window.innerWidth;
-    const screenHeight = window.innerHeight;
     
     if (targetRect.right + popupWidth < screenWidth) {
       x = targetRect.right + 10;
@@ -3586,5 +3592,7 @@ export const useAuth = (): AuthContextType => {
 
 
 
+
+    
 
     
