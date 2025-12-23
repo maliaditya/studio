@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -682,32 +681,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logSubTaskTime = useCallback((taskId: string, durationMinutes: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
 
-    const updateDefinitions = (
-      definitions: ExerciseDefinition[],
-      setDefinitions: React.Dispatch<React.SetStateAction<ExerciseDefinition[]>>
+    const updateLogs = (
+      logs: DatedWorkout[], 
+      setLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>,
+      durationField: 'reps' | 'weight'
     ) => {
-      let taskToUpdate = definitions.find(d => d.id === taskId);
-      if (!taskToUpdate) return definitions;
+      const logIndex = logs.findIndex(log => log.date === todayKey);
+      if (logIndex > -1) {
+        const newLogs = [...logs];
+        const logToUpdate = { ...newLogs[logIndex] };
+        const exerciseIndex = logToUpdate.exercises.findIndex(ex => ex.id === taskId);
 
-      const newLoggedDuration = (taskToUpdate.loggedDuration || 0) + durationMinutes;
-      
-      return definitions.map(def => {
-        if (def.id === taskId) {
-          return {
-            ...def,
-            loggedDuration: newLoggedDuration,
-            last_logged_date: todayKey,
+        if (exerciseIndex > -1) {
+          const exerciseToUpdate = { ...logToUpdate.exercises[exerciseIndex] };
+          const newSet: LoggedSet = {
+            id: `set_${Date.now()}`,
+            reps: durationField === 'reps' ? durationMinutes : 1,
+            weight: durationField === 'weight' ? durationMinutes : 1,
+            timestamp: Date.now(),
           };
+          exerciseToUpdate.loggedSets = [...(exerciseToUpdate.loggedSets || []), newSet];
+          logToUpdate.exercises[exerciseIndex] = exerciseToUpdate;
+          newLogs[logIndex] = logToUpdate;
+          setLogs(newLogs);
+          return true;
         }
-        return def;
-      });
+      }
+      return false;
     };
-
-    setUpskillDefinitions(prev => updateDefinitions(prev, setUpskillDefinitions));
-    setDeepWorkDefinitions(prev => updateDefinitions(prev, setDeepWorkDefinitions));
+    
+    if (!updateLogs(allUpskillLogs, setAllUpskillLogs, 'reps')) {
+      updateLogs(allDeepWorkLogs, setAllDeepWorkLogs, 'weight');
+    }
     
     toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes for the linked task.` });
-  }, [setUpskillDefinitions, setDeepWorkDefinitions, toast]);
+  }, [allDeepWorkLogs, allUpskillLogs, setAllDeepWorkLogs, setAllUpskillLogs, toast]);
   
   const onLogDuration = useCallback((activity: Activity, duration: number) => {
     if (activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
@@ -2940,13 +2948,13 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   const openLinkedResistancePopup = (techniqueId: string, event: React.MouseEvent) => {
     const popupWidth = 384;
     const popupHeight = 400;
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const targetRect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     
-    let x = rect.right + 10;
-    let y = rect.top;
+    let x = targetRect.right + 10;
+    let y = targetRect.top;
 
     if (x + popupWidth > window.innerWidth) {
-      x = rect.left - popupWidth - 10;
+      x = targetRect.left - popupWidth - 10;
     }
     if (y + popupHeight > window.innerHeight) {
       y = window.innerHeight - popupHeight - 10;
@@ -3571,6 +3579,7 @@ export const useAuth = (): AuthContextType => {
 };
     
     
+
 
 
 
