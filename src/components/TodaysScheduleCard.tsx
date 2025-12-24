@@ -5,7 +5,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition, Stopper, Resource } from '@/types/workout';
 import {
-  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer, PieChart, AlertCircle, Brain
+  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer, PieChart, AlertCircle, Brain, Flame, Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -60,7 +60,7 @@ export function TodaysScheduleCard({
 
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
-  const [view, setView] = useState<'list' | 'chart' | 'resistances'>('list');
+  const [view, setView] = useState<'list' | 'chart' | 'urges' | 'resistances'>('list');
   
   const dragControls = useDragControls()
   const listRef = useRef<HTMLUListElement>(null);
@@ -108,7 +108,7 @@ export function TodaysScheduleCard({
         const slotCounts: Record<string, number> = {};
         (link.stopper.timestamps || []).forEach((ts: number) => {
             const eventDate = new Date(ts);
-            if (isWithinInterval(eventDate, { start: sevenDaysAgo, end: new Date() })) {
+            if (isWithinInterval(eventDate, { start: sevenDaysAgo, end: addDays(new Date(), 1) })) { // Include today
                 const hour = getHours(eventDate);
                 const slot = slotTimes.find(s => hour >= s.start && hour < s.end);
                 if (slot) {
@@ -279,14 +279,29 @@ export function TodaysScheduleCard({
     });
   };
 
-  const allResistances = useMemo(() => {
-    const links: { habitId: string; stopper: Stopper; isUrge: boolean }[] = [];
+  const allResistancesAndUrges = useMemo(() => {
+    const urges: { habitId: string; stopper: Stopper; isUrge: boolean }[] = [];
+    const resistances: { habitId: string; stopper: Stopper; isUrge: boolean }[] = [];
     habitCards.forEach(habit => {
-      (habit.urges || []).forEach(stopper => links.push({ habitId: habit.id, stopper, isUrge: true }));
-      (habit.resistances || []).forEach(stopper => links.push({ habitId: habit.id, stopper, isUrge: false }));
+      (habit.urges || []).forEach(stopper => urges.push({ habitId: habit.id, stopper, isUrge: true }));
+      (habit.resistances || []).forEach(stopper => resistances.push({ habitId: habit.id, stopper, isUrge: false }));
     });
-    return links;
-  }, [habitCards]);
+    mechanismCards.forEach(mechanism => {
+        (mechanism.urges || []).forEach(stopper => urges.push({ habitId: mechanism.id, stopper, isUrge: true }));
+        (mechanism.resistances || []).forEach(stopper => resistances.push({ habitId: mechanism.id, stopper, isUrge: false }));
+    });
+    
+    const sortFn = (a: { stopper: Stopper }, b: { stopper: Stopper }) => {
+        const lastTsA = Math.max(0, ...(a.stopper.timestamps || []));
+        const lastTsB = Math.max(0, ...(b.stopper.timestamps || []));
+        return lastTsB - lastTsA;
+    };
+
+    return {
+      urges: urges.sort(sortFn),
+      resistances: resistances.sort(sortFn),
+    };
+  }, [habitCards, mechanismCards]);
 
 
   const cardContent = (
@@ -300,9 +315,13 @@ export function TodaysScheduleCard({
             >
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                 <div className="flex items-center">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView(v => v === 'resistances' ? 'list' : 'resistances')}>
-                        <Brain className="h-4 w-4" />
-                        <span className="sr-only">Toggle Resistances/Urges View</span>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView(v => v === 'urges' ? 'list' : 'urges')}>
+                        <Flame className="h-4 w-4 text-red-500" />
+                        <span className="sr-only">Toggle Urges View</span>
+                    </Button>
+                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView(v => v === 'resistances' ? 'list' : 'resistances')}>
+                        <Shield className="h-4 w-4 text-blue-500" />
+                        <span className="sr-only">Toggle Resistances View</span>
                     </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView(v => v === 'chart' ? 'list' : 'chart')}>
                         <PieChart className="h-4 w-4" />
@@ -397,12 +416,11 @@ export function TodaysScheduleCard({
             ) : (
                  <ScrollArea className="h-72 pr-2">
                     <ul className="space-y-2">
-                        {allResistances.map(link => (
+                        {(view === 'urges' ? allResistancesAndUrges.urges : allResistancesAndUrges.resistances).map(link => (
                             <li key={`${link.habitId}-${link.stopper.id}`}>
                                 <div className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
                                     <div className="flex-grow pr-2">
                                         <p className="font-medium">{link.stopper.text}</p>
-                                        <p className="text-xs text-muted-foreground">{link.isUrge ? 'Urge' : 'Resistance'}</p>
                                     </div>
                                     <div className="flex items-center flex-shrink-0">
                                         <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
