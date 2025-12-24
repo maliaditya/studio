@@ -58,15 +58,15 @@ export const AgendaWidgetItem = React.memo(({
     context,
     loggedDuration,
 }: AgendaWidgetItemProps) => {
-    const isTimeslot = context === 'timeslot';
-    const router = useRouter();
     const { 
         setSelectedDeepWorkTask, 
         setSelectedUpskillTask,
         findRootTask
     } = useAuth();
+    const router = useRouter();
 
     const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition'].includes(activity.type);
+    const isAgendaContext = context === 'agenda';
 
     const handleItemClick = (e: React.MouseEvent) => {
         if (onActivityClick) {
@@ -90,7 +90,7 @@ export const AgendaWidgetItem = React.memo(({
                     router.push('/deep-work');
                 } else if (activity.linkedActivityType === 'upskill') {
                     setSelectedUpskillTask(rootTask);
-                    router.push('/upskill');
+                    router.push('/deep-work');
                 }
             }
         }
@@ -100,7 +100,7 @@ export const AgendaWidgetItem = React.memo(({
         <li 
             className={cn(
                 "flex items-start gap-2 p-2 rounded-lg group transition-all",
-                isTimeslot && 'bg-background',
+                context === 'timeslot' && 'bg-background',
                 onActivityClick && 'cursor-pointer'
             )}
             onClick={handleItemClick}
@@ -109,7 +109,7 @@ export const AgendaWidgetItem = React.memo(({
                 {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
             </button>
             <div className="flex-grow min-w-0">
-                {isTimeslot && isInlineEditable ? (
+                {(isAgendaContext || context === 'timeslot') && isInlineEditable ? (
                     <EditableActivityText
                         initialValue={activity.details}
                         onUpdate={(newDetails) => onUpdateActivity(activity.id, newDetails)}
