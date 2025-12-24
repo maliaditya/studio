@@ -90,11 +90,10 @@ export const AgendaWidgetItem = React.memo(({
             if (rootTask) {
                 if (activity.linkedActivityType === 'deepwork') {
                     setSelectedDeepWorkTask(rootTask);
-                    router.push('/deep-work');
                 } else if (activity.linkedActivityType === 'upskill') {
                     setSelectedUpskillTask(rootTask);
-                    router.push('/deep-work'); // Both deepwork and upskill are on the same page now
                 }
+                router.push('/deep-work');
             }
         }
     };

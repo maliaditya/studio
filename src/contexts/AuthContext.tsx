@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -680,99 +681,53 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setSchedule]);
 
-  const logSubTaskTime = useCallback((taskInstanceId: string, durationMinutes: number): { definitionId?: string } | undefined => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    let definitionId: string | undefined;
-
-    const findTaskAndUpdate = (
-        logs: DatedWorkout[],
-        setLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>>,
-        durationField: 'reps' | 'weight'
-    ): boolean => {
-        const logIndex = logs.findIndex(l => l.date === todayKey);
-        if (logIndex > -1) {
-            const logToUpdate = { ...logs[logIndex] };
-            const exerciseIndex = logToUpdate.exercises.findIndex(ex => ex.id === taskInstanceId);
-            if (exerciseIndex > -1) {
-                const exerciseToUpdate = { ...logToUpdate.exercises[exerciseIndex] };
-                definitionId = exerciseToUpdate.definitionId;
-                const newSet: LoggedSet = {
-                    id: `set_${Date.now()}`,
-                    reps: durationField === 'reps' ? durationMinutes : 1,
-                    weight: durationField === 'weight' ? durationMinutes : 1,
-                    timestamp: Date.now(),
-                };
-                exerciseToUpdate.loggedSets = [...(exerciseToUpdate.loggedSets || []), newSet];
-                logToUpdate.exercises[exerciseIndex] = exerciseToUpdate;
-                
-                const newLogs = [...logs];
-                newLogs[logIndex] = logToUpdate;
-                setLogs(newLogs);
-                return true;
-            }
-        }
-        return false;
-    };
-    
-    let wasFound = findTaskAndUpdate([...allUpskillLogs], setAllUpskillLogs, 'reps');
-    if (!wasFound) {
-      wasFound = findTaskAndUpdate([...allDeepWorkLogs], setAllDeepWorkLogs, 'weight');
-    }
-
-    if (definitionId) {
-        const defIdToUpdate = definitionId;
-        
-        const updateDefinitions = (definitions: ExerciseDefinition[]) => 
-            definitions.map(def => def.id === defIdToUpdate ? { ...def, loggedDuration: (def.loggedDuration || 0) + durationMinutes, last_logged_date: todayKey } : def);
-
-        if (upskillDefinitions.some(def => def.id === defIdToUpdate)) {
-            setUpskillDefinitions(updateDefinitions);
-        } else {
-            setDeepWorkDefinitions(updateDefinitions);
-        }
-    }
-    
-    return { definitionId };
-  }, [allUpskillLogs, allDeepWorkLogs, setAllUpskillLogs, setAllDeepWorkLogs, upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions]);
-  
-  const [permanentlyLoggedTaskIds, setPermanentlyLoggedTaskIds] = useState<Set<string>>(new Set());
-
   const onLogDuration = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
+
     if (activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
-      const taskInstanceId = activity.taskIds[0];
-      let definitionId: string | undefined;
+        const linkedTaskInstanceId = activity.taskIds[0];
+        let definitionId: string | undefined;
 
-      // Find which log array the task instance belongs to
-      let logFound = false;
-      const upskillLog = allUpskillLogs.find(l => l.date === todayKey);
-      if (upskillLog && upskillLog.exercises.some(e => e.id === taskInstanceId)) {
-        logFound = true;
-        definitionId = upskillLog.exercises.find(e => e.id === taskInstanceId)?.definitionId;
-      }
-      
-      if (!logFound) {
-        const deepWorkLog = allDeepWorkLogs.find(l => l.date === todayKey);
-        if (deepWorkLog && deepWorkLog.exercises.some(e => e.id === taskInstanceId)) {
-          definitionId = deepWorkLog.exercises.find(e => e.id === taskInstanceId)?.definitionId;
+        // Determine if it's a deepwork or upskill task by checking the logs
+        const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
+        const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === linkedTaskInstanceId);
+        
+        if (taskLog) {
+            definitionId = taskLog.definitionId;
         }
-      }
 
-      if (definitionId) {
-          logSubTaskTime(taskInstanceId, duration);
-          setPermanentlyLoggedTaskIds(prev => new Set(prev).add(definitionId!));
-          toast({ title: 'Task Completed!', description: `The underlying task has been marked as complete.` });
-      }
+        if (definitionId) {
+            const isUpskill = upskillDefinitions.some(d => d.id === definitionId);
+            const definitions = isUpskill ? upskillDefinitions : deepWorkDefinitions;
+            const setDefinitions = isUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
+            
+            setDefinitions(prevDefs => prevDefs.map(def => {
+                if (def.id === definitionId) {
+                    return {
+                        ...def,
+                        loggedDuration: (def.loggedDuration || 0) + duration,
+                        last_logged_date: todayKey
+                    };
+                }
+                return def;
+            }));
+
+            // Mark task as permanently completed
+            setPermanentlyLoggedTaskIds(prev => new Set(prev).add(definitionId!));
+            toast({ title: 'Task Completed!', description: 'The linked task has been marked as complete.' });
+        }
     }
     
+    // Update the Pomodoro activity itself
     updateActivity({
         ...activity,
         duration: (activity.duration || 0) + duration,
         completed: true,
         completedAt: Date.now(),
     });
+
     toast({ title: 'Duration Logged & Task Completed!' });
-  }, [updateActivity, toast, logSubTaskTime, allUpskillLogs, allDeepWorkLogs]);
+}, [updateActivity, toast, allUpskillLogs, allDeepWorkLogs, upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions]);
   
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
@@ -3070,13 +3025,13 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     const taskInstanceId = activity.taskIds?.[0];
     
     if (taskInstanceId) {
-        const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
-        const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === taskInstanceId);
-        if (taskLog) {
-            currentDefId = taskLog.definitionId;
-        } else if (allDefs.has(taskInstanceId)) {
-            currentDefId = taskInstanceId;
-        }
+      const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
+      const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === taskInstanceId);
+      if(taskLog){
+        currentDefId = taskLog.definitionId;
+      } else if (allDefs.has(taskInstanceId)) {
+        currentDefId = taskInstanceId;
+      }
     }
   
     if (!currentDefId) return null;
@@ -3440,113 +3395,30 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     }
   }, [playbackRequest, openGeneralPopup]);
   
-  const handleCreateTask = async (
-    activity: Activity,
-    linkedActivityType: ActivityType,
-    microSkillName: string,
-    parentTaskId: string // 'new' or an existing ID
-  ): Promise<{ parentName: string, childName: string, childId: string } | null> => {
-    const taskName = activity.details;
-    const now = Date.now();
-    let parentName = '';
-    let parentDefId = parentTaskId;
-    let childTask: ExerciseDefinition | undefined;
+  const permanentlyLoggedTaskIds = useMemo(() => {
+    const idSet = new Set<string>();
+    
+    [...allDeepWorkLogs, ...allUpskillLogs].forEach(log => {
+      log.exercises.forEach(ex => {
+        const defId = ex.definitionId;
+        const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+        const definition = allDefs.find(d => d.id === defId);
 
-    const createChildTask = (category: string, type: 'Action' | 'Visualization'): ExerciseDefinition => {
-        return {
-            id: `def_${now}_child_${Math.random()}`,
-            name: taskName,
-            category: category as any,
-            nodeType: type,
-        };
-    };
-
-    if (parentTaskId === 'new') {
-        const newParentTask: ExerciseDefinition = {
-            id: `def_${now}_parent`,
-            name: taskName,
-            category: microSkillName as any,
-            nodeType: linkedActivityType === 'deepwork' ? 'Intention' : 'Curiosity',
-            linkedUpskillIds: [],
-            linkedDeepWorkIds: [],
-        };
-        parentDefId = newParentTask.id;
-        parentName = newParentTask.name;
-
-        childTask = createChildTask(microSkillName, linkedActivityType === 'deepwork' ? 'Action' : 'Visualization');
-        
-        if (linkedActivityType === 'deepwork') {
-            newParentTask.linkedDeepWorkIds!.push(childTask.id);
-            setDeepWorkDefinitions(prev => [...prev, newParentTask, childTask!]);
-        } else {
-            newParentTask.linkedUpskillIds!.push(childTask.id);
-            setUpskillDefinitions(prev => [...prev, newParentTask, childTask!]);
-        }
-    } else {
-        const parentTask = [...deepWorkDefinitions, ...upskillDefinitions].find(d => d.id === parentTaskId);
-        if (parentTask) {
-            parentName = parentTask.name;
-            childTask = createChildTask(microSkillName, linkedActivityType === 'deepwork' ? 'Action' : 'Visualization');
-
-            if (linkedActivityType === 'deepwork') {
-                setDeepWorkDefinitions(prev => {
-                    return prev.map(def => def.id === parentDefId ? { ...def, linkedDeepWorkIds: [...(def.linkedDeepWorkIds || []), childTask!.id] } : def).concat([childTask]);
-                });
-            } else {
-                 setUpskillDefinitions(prev => {
-                    return prev.map(def => def.id === parentDefId ? { ...def, linkedUpskillIds: [...(def.linkedUpskillIds || []), childTask!.id] } : def).concat([childTask]);
-                });
+        if (definition) {
+            const isUpskill = upskillDefinitions.some(d => d.id === defId);
+            const getNodeType = isUpskill ? getUpskillNodeType : getDeepWorkNodeType;
+            const nodeType = getNodeType(definition);
+            
+            if (nodeType === 'Action' || nodeType === 'Visualization' || nodeType === 'Standalone') {
+                 if (ex.loggedSets.length > 0) {
+                     idSet.add(defId);
+                 }
             }
         }
-    }
-    
-    if (!childTask) return null;
-
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const newExerciseInstance: WorkoutExercise = {
-        id: id('ex'),
-        definitionId: childTask.id,
-        name: childTask.name,
-        category: childTask.category,
-        loggedSets: [],
-        targetSets: 1,
-        targetReps: "1",
-    };
-
-    if (linkedActivityType === 'deepwork') {
-        setAllDeepWorkLogs(prev => {
-            const logIndex = prev.findIndex(l => l.date === todayKey);
-            if (logIndex > -1) {
-                const newLogs = [...prev];
-                newLogs[logIndex].exercises.push(newExerciseInstance);
-                return newLogs;
-            } else {
-                return [...prev, { id: todayKey, date: todayKey, exercises: [newExerciseInstance] }];
-            }
-        });
-    } else {
-        setAllUpskillLogs(prev => {
-            const logIndex = prev.findIndex(l => l.date === todayKey);
-            if (logIndex > -1) {
-                const newLogs = [...prev];
-                newLogs[logIndex].exercises.push(newExerciseInstance);
-                return newLogs;
-            } else {
-                return [...prev, { id: todayKey, date: todayKey, exercises: [newExerciseInstance] }];
-            }
-        });
-    }
-    
-    const updatedActivity: Activity = {
-        ...activity,
-        taskIds: [newExerciseInstance.id],
-        linkedActivityType: linkedActivityType,
-        linkedEntityType: linkedActivityType === 'deepwork' ? 'intention' : 'curiosity',
-    };
-    updateActivity(updatedActivity);
-    
-    return { parentName, childName: childTask.name, childId: childTask.id };
-  };
+      });
+    });
+    return idSet;
+  }, [allDeepWorkLogs, allUpskillLogs, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType]);
 
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
@@ -3578,7 +3450,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     allLeadGenLogs, setAllLeadGenLogs,
     allMindProgrammingLogs, setAllMindProgrammingLogs,
     dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked,
-    onLogDuration, logSubTaskTime,
+    onLogDuration,
     findRootTask,
     focusSessionModalOpen, setFocusSessionModalOpen, focusActivity, setFocusActivity, focusDuration, onOpenFocusModal, handleStartFocusSession,
     activeFocusSession, setActiveFocusSession,
@@ -3683,6 +3555,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     openMindsetWidget,
     isMindsetModalOpen, setIsMindsetModalOpen,
     toggleProjectBrandingStatus,
+    logSubTaskTime
   };
 
   return (
