@@ -19,6 +19,7 @@ import { AgendaWidgetItem } from './AgendaWidgetItem';
 import { useToast } from '@/hooks/use-toast';
 import { motion, useDragControls } from 'framer-motion';
 import { TimeAllocationChart } from './ProductivitySnapshot';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/select';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -55,12 +56,17 @@ export function TodaysScheduleCard({
     habitCards,
     mechanismCards,
     logStopperEncounter,
+    setResources,
   } = useAuth();
   const { toast } = useToast();
 
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
   const [view, setView] = useState<'list' | 'chart' | 'urges' | 'resistances'>('list');
+  
+  const [newEntryText, setNewEntryText] = useState('');
+  const [selectedHabitId, setSelectedHabitId] = useState<string>('');
+  const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
   
   const dragControls = useDragControls()
   const listRef = useRef<HTMLUListElement>(null);
@@ -80,7 +86,7 @@ export function TodaysScheduleCard({
   
   const predictedResistances = useMemo(() => {
     const today = startOfToday();
-    const sevenDaysAgo = subDays(today, 7);
+    const sevenDaysAgo = subDays(today, 6); // Include today
     const predictions: Record<string, { text: string; type: 'Urge' | 'Resistance' }[]> = {
         'Late Night': [], 'Dawn': [], 'Morning': [], 'Afternoon': [], 'Evening': [], 'Night': [],
     };
@@ -108,7 +114,7 @@ export function TodaysScheduleCard({
         const slotCounts: Record<string, number> = {};
         (link.stopper.timestamps || []).forEach((ts: number) => {
             const eventDate = new Date(ts);
-            if (isWithinInterval(eventDate, { start: sevenDaysAgo, end: addDays(new Date(), 1) })) { // Include today
+            if (isWithinInterval(eventDate, { start: sevenDaysAgo, end: addDays(new Date(), 1) })) {
                 const hour = getHours(eventDate);
                 const slot = slotTimes.find(s => hour >= s.start && hour < s.end);
                 if (slot) {
@@ -302,6 +308,37 @@ export function TodaysScheduleCard({
       resistances: resistances.sort(sortFn),
     };
   }, [habitCards, mechanismCards]);
+  
+  const handleAddEntry = () => {
+    if (!newEntryText.trim() || !selectedHabitId) {
+      toast({ title: 'Error', description: 'Please describe the entry and select a habit to link it to.', variant: 'destructive'});
+      return;
+    }
+
+    const newStopper: Stopper = {
+        id: `stopper_${Date.now()}`,
+        text: newEntryText.trim(),
+        status: 'none',
+    };
+
+    setResources(prev => prev.map(r => {
+        if (r.id === selectedHabitId) {
+            const updatedResource = { ...r };
+            if (view === 'urges') {
+                updatedResource.urges = [...(updatedResource.urges || []), newStopper];
+            } else {
+                updatedResource.resistances = [...(updatedResource.resistances || []), newStopper];
+            }
+            return updatedResource;
+        }
+        return r;
+    }));
+
+    setNewEntryText('');
+    setSelectedHabitId('');
+    setIsAddPopoverOpen(false);
+    toast({ title: 'Success', description: `New ${view === 'urges' ? 'urge' : 'resistance'} has been logged.`});
+  };
 
 
   const cardContent = (
@@ -319,7 +356,7 @@ export function TodaysScheduleCard({
                         <Flame className="h-4 w-4 text-red-500" />
                         <span className="sr-only">Toggle Urges View</span>
                     </Button>
-                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView(v => v === 'resistances' ? 'list' : 'resistances')}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView(v => v === 'resistances' ? 'list' : 'resistances')}>
                         <Shield className="h-4 w-4 text-blue-500" />
                         <span className="sr-only">Toggle Resistances View</span>
                     </Button>
@@ -414,25 +451,54 @@ export function TodaysScheduleCard({
                 <TimeAllocationChart timeAllocationData={timeAllocationData} />
               </div>
             ) : (
-                 <ScrollArea className="h-72 pr-2">
-                    <ul className="space-y-2">
-                        {(view === 'urges' ? allResistancesAndUrges.urges : allResistancesAndUrges.resistances).map(link => (
-                            <li key={`${link.habitId}-${link.stopper.id}`}>
-                                <div className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
-                                    <div className="flex-grow pr-2">
-                                        <p className="font-medium">{link.stopper.text}</p>
+                 <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                        <h4 className="text-base font-semibold capitalize">{view}</h4>
+                        <Popover open={isAddPopoverOpen} onOpenChange={setIsAddPopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-7 w-7"><PlusCircle className="h-4 w-4 text-green-500"/></Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-4 space-y-4">
+                                <h5 className="font-medium text-sm">Add New {view === 'urges' ? 'Urge' : 'Resistance'}</h5>
+                                <Input 
+                                    value={newEntryText}
+                                    onChange={e => setNewEntryText(e.target.value)}
+                                    placeholder="Describe the feeling or obstacle..."
+                                />
+                                <Select onValueChange={setSelectedHabitId} value={selectedHabitId}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Link to a Habit..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {habitCards.map(habit => (
+                                            <SelectItem key={habit.id} value={habit.id}>{habit.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Button onClick={handleAddEntry} className="w-full">Add Entry</Button>
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                    <ScrollArea className="h-64 pr-2">
+                        <ul className="space-y-2">
+                            {(view === 'urges' ? allResistancesAndUrges.urges : allResistancesAndUrges.resistances).map(link => (
+                                <li key={`${link.habitId}-${link.stopper.id}`}>
+                                    <div className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
+                                        <div className="flex-grow pr-2">
+                                            <p className="font-medium">{link.stopper.text}</p>
+                                        </div>
+                                        <div className="flex items-center flex-shrink-0">
+                                            <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
+                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(link.habitId, link.stopper.id); }}>
+                                                <PlusCircle className="h-4 w-4 text-green-500" />
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center flex-shrink-0">
-                                        <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
-                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => logStopperEncounter(link.habitId, link.stopper.id)}>
-                                            <PlusCircle className="h-4 w-4 text-green-500" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            </li>
-                        ))}
-                    </ul>
-                 </ScrollArea>
+                                </li>
+                            ))}
+                        </ul>
+                    </ScrollArea>
+                 </div>
             )}
         </CardContent>
     </Card>
@@ -463,3 +529,4 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
+
