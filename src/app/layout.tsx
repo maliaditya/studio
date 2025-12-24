@@ -53,7 +53,7 @@ import { DrawingCanvas } from '@/components/DrawingCanvas';
 import dynamic from 'next/dynamic';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { usePathname } from 'next/navigation';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 
 const PdfViewerPopup = dynamic(() => import('@/components/PdfViewerPopup'), {
   ssr: false,
@@ -410,68 +410,75 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <MatrixBackground />
       <ClothBackground />
       {pathname !== '/canvas' && <Header />}
-      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.pistons && <PistonsHead />}
-      <main>{children}</main>
-      <Toaster />
-      <BackgroundAudioPlayer />
-      <FloatingVideoPlayer />
-      <MindsetCategoriesCard />
-      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.activityDistribution && <ActivityDistributionCard />}
-      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.favorites && <FavoriteCards />}
-      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.topPriorities && <TopPrioritiesCard />}
-      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.goals && <GoalsWidget />}
-      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.brainHacks && <BrainHacksCard />}
-      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.ruleEquations && <RuleEquationsCard />}
-      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.visualizationTechniques && <VisualizationTechniquesCard />}
-      {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.spacedRepetition && <SpacedRepetitionPopup />}
-      <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
-      <StopperProgressModal 
-        popupState={stopperProgressPopup}
-        onOpenChange={(isOpen) => setStopperProgressPopup(prev => ({ ...prev, isOpen }))}
-      />
-       {activeFocusSession && (
-          <FocusTimerPopup
-            activity={activeFocusSession.activity}
-            duration={activeFocusSession.duration}
-            initialSecondsLeft={activeFocusSession.secondsLeft}
-            onClose={() => setActiveFocusSession(null)}
+
+      {pathname !== '/canvas' && (
+        <>
+          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.pistons && <PistonsHead />}
+          <main>{children}</main>
+          <Toaster />
+          <BackgroundAudioPlayer />
+          <FloatingVideoPlayer />
+          <MindsetCategoriesCard />
+          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.activityDistribution && <ActivityDistributionCard />}
+          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.favorites && <FavoriteCards />}
+          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.topPriorities && <TopPrioritiesCard />}
+          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.goals && <GoalsWidget />}
+          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.brainHacks && <BrainHacksCard />}
+          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.ruleEquations && <RuleEquationsCard />}
+          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.visualizationTechniques && <VisualizationTechniquesCard />}
+          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.spacedRepetition && <SpacedRepetitionPopup />}
+          <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
+          <StopperProgressModal 
+            popupState={stopperProgressPopup}
+            onOpenChange={(isOpen) => setStopperProgressPopup(prev => ({ ...prev, isOpen }))}
+          />
+          {activeFocusSession && (
+              <FocusTimerPopup
+                activity={activeFocusSession.activity}
+                duration={activeFocusSession.duration}
+                initialSecondsLeft={activeFocusSession.secondsLeft}
+                onClose={() => setActiveFocusSession(null)}
+                onLogDuration={onLogDuration}
+                onToggleMicroSkillRepetition={authContext.handleToggleMicroSkillRepetition}
+              />
+            )}
+          <FocusSessionModal
+            isOpen={focusSessionModalOpen}
+            onOpenChange={setFocusSessionModalOpen}
+            activity={focusActivity}
+            onStartSession={handleStartFocusSession}
             onLogDuration={onLogDuration}
-            onToggleMicroSkillRepetition={authContext.handleToggleMicroSkillRepetition}
+            initialDuration={focusDuration}
           />
-        )}
-      <FocusSessionModal
-        isOpen={focusSessionModalOpen}
-        onOpenChange={setFocusSessionModalOpen}
-        activity={focusActivity}
-        onStartSession={handleStartFocusSession}
-        onLogDuration={onLogDuration}
-        initialDuration={focusDuration}
-      />
-      {(!isAgendaDocked && authContext.settings.widgetVisibility.agenda && !isMobile) && (
-        <TodaysScheduleCard
-            date={new Date()}
-            isAgendaDocked={isAgendaDocked}
-            onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-            onOpenFocusModal={onOpenFocusModal}
-            onOpenTaskContext={openTaskContextPopup}
-            onOpenHabitPopup={openHabitPopup}
-            currentSlot={currentSlot}
-            schedule={schedule}
-            activityDurations={activityDurations}
-        />
+          {(!isAgendaDocked && authContext.settings.widgetVisibility.agenda && !isMobile) && (
+            <TodaysScheduleCard
+                date={new Date()}
+                schedule={schedule}
+                activityDurations={activityDurations}
+                isAgendaDocked={isAgendaDocked}
+                onToggleDock={() => setIsAgendaDocked(prev => !prev)}
+                onOpenFocusModal={onOpenFocusModal}
+                onOpenHabitPopup={openHabitPopup}
+                currentSlot={currentSlot}
+            />
+          )}
+          {authContext.settings.widgetVisibility.smartLogging && (
+              <SmartLoggingPrompt 
+                  promptType={promptType} 
+                  onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot, activityType: null })} 
+                  activeProjects={activeProjectsForPrompt}
+                  currentSlot={currentSlot}
+                  activeFocusSession={activeFocusSession}
+                  lastSessionReview={lastSessionReview}
+                  openMindsetTechniquePopup={openMindsetTechniquePopup}
+                  openHabitDetailPopup={openHabitPopup}
+              />
+          )}
+        </>
       )}
-      {authContext.settings.widgetVisibility.smartLogging && (
-          <SmartLoggingPrompt 
-              promptType={promptType} 
-              onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot, activityType: null })} 
-              activeProjects={activeProjectsForPrompt}
-              currentSlot={currentSlot}
-              activeFocusSession={activeFocusSession}
-              lastSessionReview={lastSessionReview}
-              openMindsetTechniquePopup={openMindsetTechniquePopup}
-              openHabitDetailPopup={openHabitPopup}
-          />
-      )}
+
+      {pathname === '/canvas' && children}
+      
       <MissedSlotModal 
           state={missedSlotModalState}
           onOpenChange={(isOpen) => setMissedSlotModalState(prev => ({ ...prev, isOpen }))}

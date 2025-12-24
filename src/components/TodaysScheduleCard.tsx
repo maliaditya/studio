@@ -2,25 +2,157 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition, Stopper, Resource } from '@/types/workout';
-import {
-  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer, PieChart, AlertCircle, Brain, Flame, Shield, Trash2, Compass
-} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush } from 'lucide-react';
+import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern } from '@/types/workout';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useAuth } from '@/contexts/AuthContext';
+import { Textarea } from './ui/textarea';
+import { Badge } from './ui/badge';
+import { EditableActivityText } from './EditableActivityText';
+import { useRouter } from 'next/navigation';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
+import { ScrollArea } from './ui/scroll-area';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import { motion, useDragControls } from 'framer-motion';
+import { format, isToday } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { getExercisesForDay } from '@/lib/workoutUtils';
+import { TimeAllocationChart } from './ProductivitySnapshot';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays, startOfToday, subDays, getHours, isWithinInterval } from 'date-fns';
-import { ScrollArea } from './ui/scroll-area';
-import { AgendaWidgetItem } from './AgendaWidgetItem';
-import { useToast } from '@/hooks/use-toast';
-import { motion, useDragControls } from 'framer-motion';
-import { TimeAllocationChart } from './ProductivitySnapshot';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/select';
-import { Checkbox } from './ui/checkbox';
+
+
+const activityIcons: Record<ActivityType, React.ReactNode> = {
+    workout: <Dumbbell className="h-4 w-4" />,
+    upskill: <BookOpenCheck className="h-4 w-4" />,
+    deepwork: <Briefcase className="h-4 w-4" />,
+    planning: <ClipboardList className="h-4 w-4" />,
+    tracking: <ClipboardCheck className="h-4 w-4" />,
+    branding: <Share2 className="h-4 w-4" />,
+    'lead-generation': <Magnet className="h-4 w-4" />,
+    essentials: <CheckSquare className="h-4 w-4" />,
+    nutrition: <Utensils className="h-4 w-4" />,
+    interrupt: <AlertCircle className="h-4 w-4 text-red-500" />,
+    distraction: <Wind className="h-4 w-4 text-yellow-500" />,
+    mindset: <Brain className="h-4 w-4" />,
+    pomodoro: <Timer className="h-4 w-4" />,
+};
+
+interface AgendaWidgetItemProps {
+    activity: Activity & { slot: string };
+    date: Date;
+    onToggleComplete: (slotName: string, activityId: string) => void;
+    onRemoveActivity: (slotName: string, activityId: string) => void;
+    onUpdateActivity: (activityId: string, newDetails: string) => void;
+    setRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
+    onActivityClick?: (activity: Activity, event: React.MouseEvent) => void;
+    onStartFocus?: (activity: Activity, event: React.MouseEvent) => void;
+    onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
+    context: 'agenda' | 'timeslot';
+    loggedDuration?: string;
+}
+
+export const AgendaWidgetItem = React.memo(({ 
+    activity,
+    date, 
+    onToggleComplete, 
+    onRemoveActivity, 
+    onUpdateActivity, 
+    setRoutine, 
+    onActivityClick, 
+    onStartFocus,
+    onOpenHabitPopup, 
+    context,
+    loggedDuration,
+}: AgendaWidgetItemProps) => {
+    const { 
+        setSelectedDeepWorkTask, 
+        setSelectedUpskillTask,
+        findRootTask
+    } = useAuth();
+    const router = useRouter();
+
+    const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition'].includes(activity.type);
+    const isAgendaContext = context === 'agenda';
+
+    const handleItemClick = (e: React.MouseEvent) => {
+        if (onActivityClick) {
+            onActivityClick(activity, e);
+        }
+    };
+    
+    const isPlanningTask = (activity.type === 'upskill' || activity.type === 'deepwork') && activity.linkedEntityType === 'specialization';
+    const linkedActivityName = activity.type === 'pomodoro' && activity.linkedActivityType
+        ? activity.linkedActivityType.charAt(0).toUpperCase() + activity.linkedActivityType.slice(1).replace('-', ' ')
+        : null;
+
+    const handleBadgeClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+    
+        if (activity.completed && activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
+            const rootTask = findRootTask(activity);
+            if (rootTask) {
+                if (activity.linkedActivityType === 'deepwork') {
+                    setSelectedDeepWorkTask(rootTask);
+                    router.push('/deep-work');
+                } else if (activity.linkedActivityType === 'upskill') {
+                    setSelectedUpskillTask(rootTask);
+                    router.push('/deep-work');
+                }
+            }
+        }
+    };
+
+    return (
+        <li 
+            className={cn(
+                "flex items-start gap-2 p-2 rounded-lg group transition-all",
+                context === 'timeslot' && 'bg-background',
+                onActivityClick && 'cursor-pointer'
+            )}
+            onClick={handleItemClick}
+        >
+            <button onClick={(e) => { e.stopPropagation(); onToggleComplete(activity.slot, activity.id); }} className="mt-0.5">
+                {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
+            </button>
+            <div className="flex-grow min-w-0">
+                {(isAgendaContext || context === 'timeslot') && isInlineEditable ? (
+                    <EditableActivityText
+                        initialValue={activity.details}
+                        onUpdate={(newDetails) => onUpdateActivity(activity.id, newDetails)}
+                        className={cn("text-sm font-medium w-full block", activity.completed && "line-through text-muted-foreground")}
+                    />
+                ) : (
+                    <p className={cn("text-sm font-medium", activity.completed && "line-through text-muted-foreground")}>
+                        {activity.details}
+                    </p>
+                )}
+                 <div className="flex flex-wrap items-center gap-2 mt-1">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground capitalize">
+                        {activityIcons[activity.type]} {activity.type.replace('-', ' ')}
+                    </div>
+                    {linkedActivityName && (
+                        <Badge 
+                            variant={activity.completed ? 'outline' : 'secondary'}
+                            onClick={handleBadgeClick}
+                            className={cn(activity.completed && "cursor-pointer hover:bg-accent")}
+                        >
+                            {linkedActivityName}
+                        </Badge>
+                    )}
+                    {isPlanningTask && <Badge variant="outline">Planning</Badge>}
+                    {activity.completed && loggedDuration && (
+                        <Badge variant="secondary">{loggedDuration}</Badge>
+                    )}
+                </div>
+            </div>
+        </li>
+    );
+});
+AgendaWidgetItem.displayName = 'AgendaWidgetItem';
 
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
@@ -33,8 +165,6 @@ interface TodaysScheduleCardProps {
   onStartFocus?: (activity: Activity, event: React.MouseEvent) => void;
   onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
   currentSlot: string;
-  schedule: FullSchedule;
-  activityDurations: Record<string, string>;
 }
 
 export function TodaysScheduleCard({
@@ -45,8 +175,6 @@ export function TodaysScheduleCard({
   onStartFocus,
   onOpenHabitPopup,
   currentSlot,
-  schedule,
-  activityDurations,
 }: TodaysScheduleCardProps) {
   const { 
     currentUser,
@@ -54,24 +182,20 @@ export function TodaysScheduleCard({
     setSettings,
     handleToggleComplete, 
     toggleRoutine, 
+    schedule,
     setSchedule: setGlobalSchedule,
-    habitCards,
-    mechanismCards,
+    activityDurations,
     resources,
-    setResources,
     metaRules,
     patterns,
-    logStopperEncounter,
   } = useAuth();
-  const { toast } = useToast();
+  const router = useRouter();
 
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
   const [view, setView] = useState<'list' | 'chart' | 'urges' | 'resistances' | 'rules'>('list');
-  
-  const [newEntryText, setNewEntryText] = useState('');
   const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
-  const [selectedResistanceIds, setSelectedResistanceIds] = useState<string[]>([]);
+  const [newEntryText, setNewEntryText] = useState('');
   
   const dragControls = useDragControls()
   const listRef = useRef<HTMLUListElement>(null);
@@ -88,59 +212,6 @@ export function TodaysScheduleCard({
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
 
   const todaysSchedule = useMemo(() => schedule[dayKey] || {}, [schedule, dayKey]);
-  
-  const predictedResistances = useMemo(() => {
-    const today = startOfToday();
-    const sevenDaysAgo = subDays(today, 7);
-    const predictions: Record<string, { text: string; type: 'Urge' | 'Resistance' }[]> = {
-        'Late Night': [], 'Dawn': [], 'Morning': [], 'Afternoon': [], 'Evening': [], 'Night': [],
-    };
-
-    const allLinks: { stopper: Stopper; isUrge: boolean }[] = [];
-    
-    const mindsetCard = resources.find(r => r.name === "Mindset");
-    if (mindsetCard) {
-        (mindsetCard.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
-        (mindsetCard.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
-    }
-
-    const slotTimes: { name: SlotName, start: number, end: number }[] = [
-        { name: 'Late Night', start: 0, end: 4 },
-        { name: 'Dawn', start: 4, end: 8 },
-        { name: 'Morning', start: 8, end: 12 },
-        { name: 'Afternoon', start: 12, end: 16 },
-        { name: 'Evening', start: 16, end: 20 },
-        { name: 'Night', start: 20, end: 24 },
-    ];
-
-    allLinks.forEach(link => {
-        const slotCounts: Record<string, number> = {};
-        (link.stopper.timestamps || []).forEach((ts: number) => {
-            const eventDate = new Date(ts);
-            if (isWithinInterval(eventDate, { start: sevenDaysAgo, end: addDays(new Date(), 1) })) {
-                const hour = getHours(eventDate);
-                const slot = slotTimes.find(s => hour >= s.start && hour < s.end);
-                if (slot) {
-                    slotCounts[slot.name] = (slotCounts[slot.name] || 0) + 1;
-                }
-            }
-        });
-
-        for (const slotName in slotCounts) {
-            if (slotCounts[slotName] > 0) {
-                const existing = predictions[slotName].find(p => p.text === link.stopper.text);
-                if (!existing) {
-                    predictions[slotName].push({
-                        text: link.stopper.text,
-                        type: link.isUrge ? 'Urge' : 'Resistance',
-                    });
-                }
-            }
-        }
-    });
-
-    return predictions;
-  }, [habitCards, mechanismCards, resources, schedule]);
 
   const scheduledActivities = useMemo(() => {
     const todaysSchedule = schedule[dayKey] || {};
@@ -290,20 +361,14 @@ export function TodaysScheduleCard({
 
   const allResistancesAndUrges = useMemo(() => {
     const mindsetCard = resources.find(r => r.name === "Mindset");
-    const urges: { habitId: string; stopper: Stopper; isUrge: boolean }[] = (mindsetCard?.urges || []).map(stopper => ({
-        habitId: mindsetCard.id,
-        stopper,
-        isUrge: true,
-    }));
-    const resistances: { habitId: string; stopper: Stopper; isUrge: boolean }[] = (mindsetCard?.resistances || []).map(stopper => ({
-        habitId: mindsetCard.id,
-        stopper,
-        isUrge: false,
-    }));
+    if (!mindsetCard) return { urges: [], resistances: [] };
+
+    const urges = mindsetCard.urges || [];
+    const resistances = mindsetCard.resistances || [];
     
-    const sortFn = (a: { stopper: Stopper }, b: { stopper: Stopper }) => {
-        const lastTsA = Math.max(0, ...(a.stopper.timestamps || []));
-        const lastTsB = Math.max(0, ...(b.stopper.timestamps || []));
+    const sortFn = (a: { timestamps?: number[] }, b: { timestamps?: number[] }) => {
+        const lastTsA = Math.max(0, ...(a.timestamps || []));
+        const lastTsB = Math.max(0, ...(b.timestamps || []));
         return lastTsB - lastTsA;
     };
 
@@ -314,10 +379,7 @@ export function TodaysScheduleCard({
   }, [resources]);
   
   const handleAddEntry = () => {
-    if (!newEntryText.trim()) {
-        toast({ title: 'Error', description: 'Please describe the entry.', variant: 'destructive'});
-        return;
-    }
+    if (!newEntryText.trim()) return;
   
     const mindsetCard = resources.find(r => r.name === "Mindset");
     if (!mindsetCard) {
@@ -329,7 +391,6 @@ export function TodaysScheduleCard({
       id: `stopper_${Date.now()}`,
       text: newEntryText.trim(),
       status: 'none',
-      linkedResistanceIds: view === 'urges' ? selectedResistanceIds : undefined,
     };
   
     const updatedMindsetCard = { ...mindsetCard };
@@ -342,7 +403,6 @@ export function TodaysScheduleCard({
     setResources(prev => prev.map(r => r.id === mindsetCard.id ? updatedMindsetCard : r));
   
     setNewEntryText('');
-    setSelectedResistanceIds([]);
     setIsAddPopoverOpen(false);
     toast({ title: 'Success', description: `New ${view === 'urges' ? 'urge' : 'resistance'} has been logged.`});
   };
@@ -380,6 +440,10 @@ export function TodaysScheduleCard({
             >
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                 <div className="flex items-center">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push('/canvas')}>
+                        <Paintbrush className="h-4 w-4" />
+                        <span className="sr-only">Canvas</span>
+                    </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('rules')}>
                         <Compass className="h-4 w-4 text-orange-500" />
                         <span className="sr-only">Toggle Rules View</span>
@@ -429,12 +493,11 @@ export function TodaysScheduleCard({
         </CardHeader>
         <CardContent className="p-3">
             {view === 'list' ? (
-              scheduledActivities.length > 0 || Object.values(predictedResistances).some(v => v.length > 0) ? (
+              scheduledActivities.length > 0 ? (
                  <ul ref={listRef} className="space-y-1 max-h-64 overflow-y-auto pr-2">
                     {slotOrder.map(slotName => {
                         const activitiesForSlot = scheduledActivities.filter(a => a.slot === slotName);
-                        const predictionsForSlot = predictedResistances[slotName] || [];
-                        if (activitiesForSlot.length === 0 && predictionsForSlot.length === 0) return null;
+                        if (activitiesForSlot.length === 0) return null;
                         
                         const isCurrent = slotName === currentSlot;
                         return (
@@ -459,14 +522,6 @@ export function TodaysScheduleCard({
                                         context="agenda"
                                         loggedDuration={activityDurations[activity.id]}
                                     />
-                                ))}
-                                {predictionsForSlot.map((prediction, index) => (
-                                    <li key={`pred-${index}`} className="flex items-center gap-2 p-1">
-                                        <AlertCircle className={cn("h-4 w-4 flex-shrink-0", prediction.type === 'Urge' ? 'text-red-500' : 'text-yellow-500')} />
-                                        <p className="text-xs text-muted-foreground italic truncate" title={prediction.text}>
-                                            {prediction.text}
-                                        </p>
-                                    </li>
                                 ))}
                                 </ul>
                             </li>
@@ -507,18 +562,18 @@ export function TodaysScheduleCard({
                                         <PopoverContent className="w-64 p-0">
                                             <ScrollArea className="h-48">
                                                 <div className="p-2 space-y-1">
-                                                    {allResistancesAndUrges.resistances.map(link => (
-                                                        <div key={link.stopper.id} className="flex items-center space-x-2">
+                                                    {allResistancesAndUrges.resistances.map(stopper => (
+                                                        <div key={stopper.id} className="flex items-center space-x-2">
                                                             <Checkbox
-                                                                id={`res-check-${link.stopper.id}`}
-                                                                checked={selectedResistanceIds.includes(link.stopper.id)}
+                                                                id={`res-check-${stopper.id}`}
+                                                                checked={selectedResistanceIds.includes(stopper.id)}
                                                                 onCheckedChange={(checked) => {
                                                                     setSelectedResistanceIds(prev =>
-                                                                        checked ? [...prev, link.stopper.id] : prev.filter(id => id !== link.stopper.id)
+                                                                        checked ? [...prev, stopper.id] : prev.filter(id => id !== stopper.id)
                                                                     );
                                                                 }}
                                                             />
-                                                            <Label htmlFor={`res-check-${link.stopper.id}`} className="text-xs font-normal">{link.stopper.text}</Label>
+                                                            <Label htmlFor={`res-check-${stopper.id}`} className="text-xs font-normal">{stopper.text}</Label>
                                                         </div>
                                                     ))}
                                                 </div>
