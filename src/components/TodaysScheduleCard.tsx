@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition, Stopper } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition, Stopper, Resource } from '@/types/workout';
 import {
-  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer, PieChart, AlertCircle
+  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer, PieChart, AlertCircle, Brain
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -54,12 +54,13 @@ export function TodaysScheduleCard({
     setSchedule: setGlobalSchedule,
     habitCards,
     mechanismCards,
+    logStopperEncounter,
   } = useAuth();
   const { toast } = useToast();
 
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
-  const [view, setView] = useState<'list' | 'chart'>('list');
+  const [view, setView] = useState<'list' | 'chart' | 'resistances'>('list');
   
   const dragControls = useDragControls()
   const listRef = useRef<HTMLUListElement>(null);
@@ -78,8 +79,8 @@ export function TodaysScheduleCard({
   const todaysSchedule = useMemo(() => schedule[dayKey] || {}, [schedule, dayKey]);
   
   const predictedResistances = useMemo(() => {
-    const today = new Date();
-    const sevenDaysAgo = subDays(startOfToday(today), 6); // Look at today + the past 6 days.
+    const today = startOfToday();
+    const sevenDaysAgo = subDays(today, 7);
     const predictions: Record<string, { text: string; type: 'Urge' | 'Resistance' }[]> = {
         'Late Night': [], 'Dawn': [], 'Morning': [], 'Afternoon': [], 'Evening': [], 'Night': [],
     };
@@ -107,7 +108,7 @@ export function TodaysScheduleCard({
         const slotCounts: Record<string, number> = {};
         (link.stopper.timestamps || []).forEach((ts: number) => {
             const eventDate = new Date(ts);
-            if (eventDate >= sevenDaysAgo && eventDate <= today) { // Check within the last 7 days including today
+            if (isWithinInterval(eventDate, { start: sevenDaysAgo, end: new Date() })) {
                 const hour = getHours(eventDate);
                 const slot = slotTimes.find(s => hour >= s.start && hour < s.end);
                 if (slot) {
@@ -117,7 +118,7 @@ export function TodaysScheduleCard({
         });
 
         for (const slotName in slotCounts) {
-            if (slotCounts[slotName] > 0) { // Can be adjusted for higher frequency if needed
+            if (slotCounts[slotName] > 0) {
                 const existing = predictions[slotName].find(p => p.text === link.stopper.text);
                 if (!existing) {
                     predictions[slotName].push({
@@ -278,6 +279,16 @@ export function TodaysScheduleCard({
     });
   };
 
+  const allResistances = useMemo(() => {
+    const links: { habitId: string; stopper: Stopper; isUrge: boolean }[] = [];
+    habitCards.forEach(habit => {
+      (habit.urges || []).forEach(stopper => links.push({ habitId: habit.id, stopper, isUrge: true }));
+      (habit.resistances || []).forEach(stopper => links.push({ habitId: habit.id, stopper, isUrge: false }));
+    });
+    return links;
+  }, [habitCards]);
+
+
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
         <CardHeader
@@ -289,7 +300,11 @@ export function TodaysScheduleCard({
             >
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                 <div className="flex items-center">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView(v => v === 'list' ? 'chart' : 'list')}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView(v => v === 'resistances' ? 'list' : 'resistances')}>
+                        <Brain className="h-4 w-4" />
+                        <span className="sr-only">Toggle Resistances/Urges View</span>
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView(v => v === 'chart' ? 'list' : 'chart')}>
                         <PieChart className="h-4 w-4" />
                         <span className="sr-only">Toggle Chart View</span>
                     </Button>
@@ -375,10 +390,31 @@ export function TodaysScheduleCard({
                       <p className="text-sm">No activities scheduled.</p>
                   </div>
               )
-            ) : (
+            ) : view === 'chart' ? (
               <div className="h-[250px] w-full">
                 <TimeAllocationChart timeAllocationData={timeAllocationData} />
               </div>
+            ) : (
+                 <ScrollArea className="h-72 pr-2">
+                    <ul className="space-y-2">
+                        {allResistances.map(link => (
+                            <li key={`${link.habitId}-${link.stopper.id}`}>
+                                <div className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
+                                    <div className="flex-grow pr-2">
+                                        <p className="font-medium">{link.stopper.text}</p>
+                                        <p className="text-xs text-muted-foreground">{link.isUrge ? 'Urge' : 'Resistance'}</p>
+                                    </div>
+                                    <div className="flex items-center flex-shrink-0">
+                                        <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => logStopperEncounter(link.habitId, link.stopper.id)}>
+                                            <PlusCircle className="h-4 w-4 text-green-500" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
+                 </ScrollArea>
             )}
         </CardContent>
     </Card>
