@@ -561,16 +561,6 @@ function ResourcesPageContent() {
     })
   );
 
-  const handleOpenNestedPopup = useCallback((resourceId: string, event: React.MouseEvent) => {
-    openGeneralPopup(resourceId, event);
-  }, [openGeneralPopup]);
-
-  const handleUpdateResource = (updatedResource: Resource) => {
-    setResources(prev =>
-      prev.map(res => res.id === updatedResource.id ? updatedResource : res)
-    );
-  };
-  
   const handleLinkClick = useCallback((resourceId: string) => {
     if (linkingFromId === null) {
       const sourceCard = resources.find(r => r.id === resourceId);
@@ -591,4 +581,615 @@ function ResourcesPageContent() {
       const targetCard = resources.find(r => r.id === resourceId);
 
       if (!sourceCard || !targetCard || (targetCard.type !== 'card' && targetCard.type !== 'habit' && targetCard.type !== 'mechanism')) {
-        toast({ title: "Invalid Link", description: "The target must also be a 'Card', 'Habit'
+        toast({ title: "Invalid Link", description: "The target must also be a 'Card', 'Habit', or 'Mechanism'.", variant: "destructive" });
+        setLinkingFromId(null);
+        return;
+      }
+
+      const newPoint: ResourcePoint = {
+        id: `point_${Date.now()}`,
+        type: 'card',
+        text: targetCard.name,
+        resourceId: targetCard.id
+      };
+      
+      const updatedSourceCard = { ...sourceCard, points: [...(sourceCard.points || []), newPoint] };
+      setResources(prev => prev.map(r => r.id === linkingFromId ? updatedSourceCard : r));
+      setLinkingFromId(null);
+      toast({ title: "Link Created!", description: `Linked "${targetCard.name}" in "${sourceCard.name}".`});
+    }
+  }, [linkingFromId, resources, setResources, toast]);
+  
+  const handleOpenMarkdownModal = (resourceId: string, pointId: string) => {
+    const resource = resources.find(r => r.id === resourceId);
+    const point = resource?.points?.find(p => p.id === pointId);
+    setMarkdownModalState({
+      isOpen: true,
+      resource: resource || null,
+      point: point || null,
+    });
+  };
+
+  const handleContextMenu = useCallback((event: React.MouseEvent, item: ResourceFolder) => {
+    event.preventDefault();
+    setContextMenu({
+      mouseX: event.clientX - 2,
+      mouseY: event.clientY - 4,
+      item: item
+    });
+  }, []);
+  
+  const pdfUploadInputRef = useRef<HTMLInputElement>(null);
+
+  const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!selectedResourceFolderId) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+  
+    const newResource: Resource = {
+      id: `res_pdf_${Date.now()}`,
+      name: file.name,
+      folderId: selectedResourceFolderId,
+      type: 'pdf',
+      createdAt: new Date().toISOString(),
+      pdfFileName: file.name,
+      hasLocalPdf: true,
+    };
+  
+    try {
+      await storePdf(newResource.id, file);
+      setResources(prev => [...prev, newResource]);
+      toast({ title: `PDF Uploaded`, description: `"${file.name}" has been added.` });
+    } catch (error) {
+      console.error("Failed to store PDF:", error);
+      toast({ title: `Error storing PDF`, description: "Could not save the PDF file to the local database.", variant: "destructive" });
+    }
+  
+    if(e.target) e.target.value = ''; // Reset file input
+    setIsAdding(false);
+  };
+  
+  const onConvertToCard = (point: ResourcePoint) => {
+    const parentResource = resources.find(r => r.points?.some(p => p.id === point.id));
+    if (!parentResource) return;
+    createResourceWithHierarchy(parentResource, point, 'card');
+  };
+
+  const modelUploadInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpdateResource = (updatedResource: Resource) => {
+    setResources(prev => prev.map(r => r.id === updatedResource.id ? updatedResource : r));
+  };
+  
+  const handleEditLinkText = useCallback((point: ResourcePoint) => {
+    const resource = resources.find(r => r.points?.some(p => p.id === point.id));
+    if (resource) {
+        setCurrentDisplayText(point.displayText || point.text || '');
+        setLinkTextDialog({ point, resourceId: resource.id });
+    }
+  }, [resources]);
+
+  const handleSaveLinkText = () => {
+    if (!linkTextDialog) return;
+    const { point, resourceId } = linkTextDialog;
+    
+    setResources(prev => prev.map(r => {
+        if (r.id === resourceId) {
+            return {
+                ...r,
+                points: r.points?.map(p => p.id === point.id ? { ...p, displayText: currentDisplayText } : p)
+            };
+        }
+        return r;
+    }));
+
+    setLinkTextDialog(null);
+    setCurrentDisplayText('');
+  };
+  
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+        if (contextMenuRef.current && !contextMenuRef.current.contains(event.target as Node)) {
+            setContextMenu(null);
+        }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    // When a new folder is created, expand its parents
+    if (newlyCreatedFolderId) {
+      const folder = resourceFolders.find(f => f.id === newlyCreatedFolderId);
+      if (folder && folder.parentId) {
+        let currentId: string | null = folder.parentId;
+        const toExpand = new Set<string>();
+        while (currentId) {
+          toExpand.add(currentId);
+          currentId = resourceFolders.find(f => f.id === currentId)?.parentId || null;
+        }
+        setCollapsedFolders(prev => new Set([...prev].filter(id => !toExpand.has(id))));
+      }
+      setNewlyCreatedFolderId(null); // Reset after expanding
+    }
+  }, [newlyCreatedFolderId, resourceFolders]);
+
+  const rootFolders = useMemo(() => {
+    return (resourceFolders || []).filter(folder => folder.parentId === null);
+  }, [resourceFolders]);
+  
+  useEffect(() => {
+    // Load collapsed state from localStorage
+    const savedCollapsed = localStorage.getItem('collapsedResourceFolders');
+    if (savedCollapsed) {
+        try {
+            setCollapsedFolders(new Set(JSON.parse(savedCollapsed)));
+        } catch (e) {
+            console.error("Failed to parse collapsed folders state from localStorage", e);
+            if (resourceFolders) {
+               setCollapsedFolders(new Set(resourceFolders.map(f => f.id)));
+            }
+        }
+    } else {
+        // If nothing is saved, collapse all by default
+        if (resourceFolders) {
+            setCollapsedFolders(new Set(resourceFolders.map(f => f.id)));
+        }
+    }
+  }, [resourceFolders]);
+
+  useEffect(() => {
+    // Save collapsed state to localStorage
+    if (resourceFolders) {
+        localStorage.setItem('collapsedResourceFolders', JSON.stringify(Array.from(collapsedFolders)));
+    }
+  }, [collapsedFolders, resourceFolders]);
+  
+  const handleAddFolder = (parentId: string | null = null) => {
+    if (!newFolderName.trim()) {
+      toast({ title: 'Folder name cannot be empty', variant: 'destructive' });
+      return;
+    }
+    const newFolder: ResourceFolder = {
+      id: `folder_${Date.now()}`,
+      name: newFolderName.trim(),
+      parentId: parentId,
+      icon: 'Folder'
+    };
+    setResourceFolders(prev => [...(prev || []), newFolder]);
+    setNewFolderName('');
+    setIsAdding(false);
+    
+    // If it's a subfolder, make sure the parent is expanded
+    if(parentId) {
+        setCollapsedFolders(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(parentId);
+            return newSet;
+        });
+    }
+  };
+
+  const handleEditFolder = (folderId: string) => {
+    setEditingFolderId(folderId);
+    setEditingFolderName(resourceFolders.find(f => f.id === folderId)?.name || '');
+    setContextMenu(null);
+  };
+  
+  const handleSaveEditFolder = () => {
+    if (!editingFolderId || !editingFolderName.trim()) return;
+    setResourceFolders(prev => prev.map(f => f.id === editingFolderId ? { ...f, name: editingFolderName.trim() } : f));
+    setEditingFolderId(null);
+  };
+
+  const handleDeleteItem = () => {
+    if (!deleteConfirmation) return;
+    const { item } = deleteConfirmation;
+
+    if ('parentId' in item) { // It's a ResourceFolder
+      const folderToDelete = item as ResourceFolder;
+      const childIds = new Set<string>();
+      const queue = [folderToDelete.id];
+      childIds.add(folderToDelete.id);
+
+      while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        resourceFolders.forEach(folder => {
+          if (folder.parentId === currentId) {
+            childIds.add(folder.id);
+            queue.push(folder.id);
+          }
+        });
+      }
+      
+      setResourceFolders(prev => prev.filter(f => !childIds.has(f.id)));
+      setResources(prev => prev.filter(r => !childIds.has(r.folderId)));
+      
+      if (selectedResourceFolderId && childIds.has(selectedResourceFolderId)) {
+        setSelectedResourceFolderId(folderToDelete.parentId);
+      }
+      
+      toast({ title: "Folder Deleted", description: `"${folderToDelete.name}" and all its contents were deleted.`});
+    } else { // It's a Resource
+      const resourceToDelete = item as Resource;
+      setResources(prev => prev.filter(r => r.id !== resourceToDelete.id));
+      toast({ title: "Resource Deleted", description: `"${resourceToDelete.name}" was deleted.`});
+    }
+
+    setDeleteConfirmation(null);
+    setContextMenu(null);
+  };
+
+  const toggleFolderCollapse = (folderId: string) => {
+    setCollapsedFolders(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(folderId)) {
+        newSet.delete(folderId);
+      } else {
+        newSet.add(folderId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleAddResource = async () => {
+    if (!selectedResourceFolderId) return;
+
+    if (addResourceType === 'pdf') {
+        pdfUploadInputRef.current?.click();
+        return;
+    }
+
+    let resourceName = newResourceName.trim();
+    if (addResourceType === 'link' && !newResourceLink.trim()) {
+      toast({ title: "URL is required for link type.", variant: "destructive" });
+      return;
+    }
+    if ((addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d') && !resourceName) {
+      toast({ title: "Name is required for this resource type.", variant: "destructive" });
+      return;
+    }
+
+    let finalResource: Resource;
+
+    if (addResourceType === 'link') {
+      setIsFetchingMeta(true);
+      try {
+        const response = await fetch('/api/get-link-metadata', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: newResourceLink.trim() }),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to fetch metadata.');
+        }
+
+        finalResource = {
+          id: `res_${Date.now()}`,
+          name: result.title || 'Untitled Resource',
+          link: newResourceLink.trim(),
+          description: result.description || '',
+          folderId: selectedResourceFolderId,
+          iconUrl: getFaviconUrl(newResourceLink.trim()),
+          type: 'link',
+          createdAt: new Date().toISOString(),
+        };
+      } catch (error) {
+        toast({
+          title: "Error adding resource",
+          description: error instanceof Error ? error.message : "Could not fetch metadata from URL.",
+          variant: "destructive",
+        });
+        setIsFetchingMeta(false);
+        return;
+      } finally {
+        setIsFetchingMeta(false);
+      }
+    } else if (addResourceType === 'model3d') {
+        const file3d = modelUploadInputRef.current?.files?.[0];
+        if (!file3d) {
+            toast({ title: 'GLB/GLTF file is required', variant: 'destructive' });
+            return;
+        }
+        const modelUrl = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => resolve(event.target?.result as string);
+            reader.onerror = (error) => reject(error);
+            reader.readAsDataURL(file3d);
+        });
+        finalResource = {
+            id: `res_model_${Date.now()}`,
+            name: resourceName || file3d.name,
+            folderId: selectedResourceFolderId,
+            type: 'model3d',
+            modelUrl,
+            createdAt: new Date().toISOString(),
+        };
+    } else {
+      finalResource = {
+        id: `res_${Date.now()}`,
+        name: resourceName,
+        folderId: selectedResourceFolderId,
+        type: addResourceType,
+        points: [],
+        icon: 'Library',
+        createdAt: new Date().toISOString(),
+        mechanismFramework: addResourceType === 'mechanism' ? mechanismFramework : undefined,
+      };
+    }
+
+    setResources(prev => [...prev, finalResource]);
+    setIsAdding(false);
+    setNewResourceName('');
+    setNewResourceLink('');
+  };
+  
+  const handleOpenMindMapForFolder = (folderId: string) => {
+      setMindMapRootFolderId(folderId);
+      setIsMindMapModalOpen(true);
+      setContextMenu(null);
+  };
+  
+  const handleShareFolder = async (folder: ResourceFolder) => {
+      setContextMenu(null);
+      const childFolders = getDescendantFolders(folder.id, resourceFolders);
+      const payload = { folder, allResources: resources, childFolders, username: currentUser?.username || 'anonymous' };
+      try {
+          const response = await fetch('/api/share/folder', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Failed to share folder');
+          
+          setShareUrl(`${window.location.origin}${result.publicUrl}`);
+          setShareDialogOpen(true);
+      } catch (error) {
+          toast({ title: "Sharing Failed", description: error instanceof Error ? error.message : "An unknown error occurred.", variant: "destructive" });
+      }
+  };
+
+  const getDescendantFolders = (folderId: string, allFolders: ResourceFolder[]): ResourceFolder[] => {
+    const descendants: ResourceFolder[] = [];
+    const queue = [folderId];
+    while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        const children = allFolders.filter(f => f.parentId === currentId);
+        descendants.push(...children);
+        children.forEach(child => queue.push(child.id));
+    }
+    return descendants;
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    if (over && active.id !== over.id) {
+        const activeItem = active.data.current;
+        const overItem = over.data.current;
+
+        if (activeItem?.type === 'folder' && overItem?.type === 'folder') {
+             // Re-parent folder
+            setResourceFolders(folders => folders.map(f => 
+                f.id === active.id ? { ...f, parentId: over.id as string } : f
+            ));
+        } else if (activeItem?.type === 'card' && overItem?.type === 'folder') {
+            // Move card to folder
+            setResources(resources => resources.map(r => 
+                r.id === active.id ? { ...r, folderId: over.id as string } : r
+            ));
+        }
+    }
+  };
+
+  const toggleFolderPin = (folderId: string) => {
+      setPinnedFolderIds(prev => {
+          const newSet = new Set(prev);
+          if (newSet.has(folderId)) {
+              newSet.delete(folderId);
+          } else {
+              newSet.add(folderId);
+          }
+          return newSet;
+      });
+  };
+
+  const closeTab = (folderId: string) => {
+      setActiveResourceTabIds(prev => prev.filter(id => id !== folderId));
+      if (selectedResourceFolderId === folderId) {
+          setSelectedResourceFolderId(null);
+      }
+  };
+  
+  const handleTabSelect = (folderId: string) => {
+    setSelectedResourceFolderId(folderId);
+    if (!activeResourceTabIds.includes(folderId)) {
+        setActiveResourceTabIds(prev => [...prev, folderId]);
+    }
+  };
+  
+  const filteredResources = useMemo(() => {
+    if (!resources) {
+        return [];
+    }
+
+    if (searchTerm) {
+        const lowercasedTerm = searchTerm.toLowerCase();
+        return resources.filter(res =>
+            res.name.toLowerCase().includes(lowercasedTerm) ||
+            res.description?.toLowerCase().includes(lowercasedTerm) ||
+            res.link?.toLowerCase().includes(lowercasedTerm) ||
+            (res.points || []).some(p => p.text?.toLowerCase().includes(lowercasedTerm))
+        );
+    }
+    
+    if (selectedResourceFolderId) {
+        return resources.filter(res => res.folderId === selectedResourceFolderId);
+    }
+
+    return [];
+}, [resources, selectedResourceFolderId, searchTerm]);
+
+  return (
+    <div className="grid h-full grid-cols-1 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-4 gap-4 p-4">
+      <input type="file" ref={pdfUploadInputRef} onChange={handlePdfUpload} accept=".pdf" className="hidden" />
+      <DndContext
+        sensors={sensors}
+        onDragStart={(e) => setActiveId(e.active.id.toString())}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="md:col-span-1 h-full">
+            <Card className="h-full flex flex-col">
+                <CardHeader>
+                    <div className="flex justify-between items-center">
+                        <CardTitle>Folders</CardTitle>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <PlusCircle className="h-4 w-4" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-60">
+                                <form onSubmit={(e) => { e.preventDefault(); handleAddFolder(); }} className="flex gap-2">
+                                <Input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="New folder name..." />
+                                <Button type="submit">Add</Button>
+                                </form>
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                </CardHeader>
+                <CardContent className="flex-grow p-2">
+                    <ScrollArea className="h-full">
+                        <FolderTreeView
+                            folders={rootFolders}
+                            allFolders={resourceFolders}
+                            selectedFolderId={selectedResourceFolderId}
+                            onSelect={setSelectedResourceFolderId}
+                            onEdit={handleEditFolder}
+                            onDelete={(id) => setDeleteConfirmation({ item: resourceFolders.find(f => f.id === id)! })}
+                            onContextMenu={handleContextMenu}
+                            editingFolderId={editingFolderId}
+                            editingFolderName={editingFolderName}
+                            setEditingFolderName={setEditingFolderName}
+                            handleSaveEditFolder={handleSaveEditFolder}
+                            setEditingFolderId={setEditingFolderId}
+                            collapsedFolders={collapsedFolders}
+                            toggleFolderCollapse={toggleFolderCollapse}
+                            onPin={toggleFolderPin}
+                            pinnedFolderIds={pinnedFolderIds}
+                            activeDragId={activeId}
+                        />
+                    </ScrollArea>
+                </CardContent>
+            </Card>
+        </div>
+        <div className="h-full md:col-span-3 lg:col-span-4 xl:col-span-3">
+            <Card className="h-full flex flex-col">
+                <CardHeader>
+                    <div className="flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center">
+                         <div className="relative flex-grow">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="Search resources..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10"/>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button onClick={() => setIsAdding(true)} disabled={!selectedResourceFolderId}>
+                                <PlusCircle className="mr-2 h-4 w-4" /> Add Resource
+                            </Button>
+                            <Button variant="outline" onClick={() => handleOpenMindMapForFolder(selectedResourceFolderId || 'root')} disabled={!selectedResourceFolderId}>
+                                <GitMerge className="mr-2 h-4 w-4 text-purple-500" />
+                                Mind Map
+                            </Button>
+                        </div>
+                    </div>
+                    {/* Tabs for active/pinned folders */}
+                    {activeResourceTabIds.length > 0 && (
+                        <div className="mt-4 border-t pt-2" ref={tabsContainerRef}>
+                            <ScrollArea className="w-full whitespace-nowrap">
+                                <div className="flex space-x-2 pb-2">
+                                {activeResourceTabIds.map(id => {
+                                    const folder = resourceFolders.find(f => f.id === id);
+                                    return folder ? (
+                                    <Button
+                                        key={id}
+                                        variant={selectedResourceFolderId === id ? "default" : "secondary"}
+                                        size="sm"
+                                        onClick={() => handleTabSelect(id)}
+                                        className="h-8 group/tab relative"
+                                    >
+                                        <span className="truncate max-w-[150px]">{folder.name}</span>
+                                        <button onClick={(e) => { e.stopPropagation(); closeTab(id); }} className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover/tab:opacity-100 transition-opacity flex items-center justify-center">
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    </Button>
+                                    ) : null;
+                                })}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    )}
+                </CardHeader>
+                <CardContent className="p-4 flex-grow">
+                    <h2 className="text-2xl font-bold mb-4">
+                        {selectedResourceFolderId && !searchTerm && resourceFolders
+                        ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
+                        : searchTerm ? `Search results for "${searchTerm}"` : 'Select a folder'}
+                    </h2>
+                    
+                    <ScrollArea className="h-[calc(100vh-20rem)] pr-4">
+                        {filteredResources.length > 0 ? (
+                            <SortableContext items={filteredResources.map(r => r.id)}>
+                            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                                {filteredResources.map(res => (
+                                    <SortableResourceCard key={res.id} item={res} className="h-full" linkingFromId={linkingFromId}>
+                                    {res.type === 'habit' ? (
+                                        <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => setDeleteConfirmation({item: res})} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)} />
+                                    ) : res.type === 'mechanism' ? (
+                                        <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => setDeleteConfirmation({item: res})} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)} />
+                                    ) : (
+                                        <ResourceCard
+                                            resource={res}
+                                            onUpdate={handleUpdateResource}
+                                            onDelete={() => setDeleteConfirmation({ item: res })}
+                                            onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)}
+                                            onLinkClick={handleLinkClick}
+                                            linkingFromId={linkingFromId}
+                                            onEditLinkText={handleEditLinkText}
+                                            onConvertToCard={onConvertToCard}
+                                            onOpenPdfViewer={openPdfViewer}
+                                        />
+                                    )}
+                                    </SortableResourceCard>
+                                ))}
+                            </div>
+                            </SortableContext>
+                        ) : (
+                            <div className="text-center text-muted-foreground pt-16">
+                            <p>{searchTerm ? "No resources found matching your search." : "This folder is empty. Add a resource to get started."}</p>
+                            </div>
+                        )}
+                    </ScrollArea>
+                </CardContent>
+            </Card>
+        </div>
+        <DragOverlay>
+            {activeId && activeId.startsWith('folder_') ? <div className="p-2 bg-primary text-primary-foreground rounded-md shadow-lg flex items-center gap-2"><Folder className="h-4 w-4"/> {resourceFolders.find(f => f.id === activeId)?.name}</div> : null}
+            {activeId && activeId.startsWith('res_') ? <div className="p-2 bg-primary text-primary-foreground rounded-md shadow-lg flex items-center gap-2"><Library className="h-4 w-4"/> {resources.find(r => r.id === activeId)?.name}</div> : null}
+        </DragOverlay>
+      </DndContext>
+      {/* ... (dialogs and modals) ... */}
+    </div>
+  );
+}
+
+// ... other components ...
+
+export default function ResourcesPage() {
+    return (
+        <AuthGuard>
+            <ResourcesPageContent />
+        </AuthGuard>
+    )
+}
