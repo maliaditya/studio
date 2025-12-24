@@ -115,6 +115,109 @@ const isObsidianUrl = (url: string | undefined): boolean => {
     } catch (e) { return false; }
 };
 
+interface FolderTreeViewProps {
+  folders: ResourceFolder[];
+  allFolders: ResourceFolder[];
+  selectedFolderId: string | null;
+  onSelect: (id: string | null) => void;
+  onEdit: (id: string) => void;
+  onDelete: (id: string) => void;
+  onContextMenu: (event: React.MouseEvent, folder: ResourceFolder) => void;
+  editingFolderId: string | null;
+  editingFolderName: string;
+  setEditingFolderName: (name: string) => void;
+  handleSaveEditFolder: () => void;
+  setEditingFolderId: (id: string | null) => void;
+  level?: number;
+  collapsedFolders: Set<string>;
+  toggleFolderCollapse: (id: string) => void;
+  onPin: (folderId: string) => void;
+  pinnedFolderIds: Set<string>;
+  activeDragId: string | null;
+}
+
+const FolderTreeView: React.FC<FolderTreeViewProps> = ({
+  folders, allFolders, selectedFolderId, onSelect, onEdit, onDelete, onContextMenu,
+  editingFolderId, editingFolderName, setEditingFolderName, handleSaveEditFolder, setEditingFolderId,
+  level = 0, collapsedFolders, toggleFolderCollapse, onPin, pinnedFolderIds, activeDragId
+}) => {
+  return (
+    <ul className={cn(level > 0 && "pl-4 border-l ml-2 space-y-1")}>
+      {folders.map(folder => {
+        const children = allFolders.filter(f => f.parentId === folder.id).sort((a,b) => a.name.localeCompare(b.name));
+        const isCollapsed = collapsedFolders.has(folder.id);
+        const isSelected = selectedFolderId === folder.id;
+        const isPinned = pinnedFolderIds.has(folder.id);
+
+        return (
+          <li key={folder.id}>
+            <DroppableFolder folder={folder} >
+                <DraggableFolder folder={folder} isDragging={activeDragId === folder.id}>
+                    <div 
+                        onContextMenu={(e) => onContextMenu(e, folder)} 
+                        onClick={() => onSelect(folder.id)}
+                        className={cn("flex items-center gap-1 p-1 rounded-md hover:bg-muted cursor-pointer group", isSelected && "bg-accent")}
+                    >
+                        {children.length > 0 && (
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {e.stopPropagation(); toggleFolderCollapse(folder.id); }}>
+                                <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
+                            </Button>
+                        )}
+                        <Folder className={cn("h-4 w-4 flex-shrink-0", children.length === 0 && "ml-7", isPinned && 'text-yellow-500 fill-yellow-500/20')} />
+                        
+                        {editingFolderId === folder.id ? (
+                            <Input
+                                value={editingFolderName}
+                                onChange={e => setEditingFolderName(e.target.value)}
+                                onBlur={handleSaveEditFolder}
+                                onKeyDown={e => e.key === 'Enter' && handleSaveEditFolder()}
+                                autoFocus
+                                className="h-7 text-sm"
+                            />
+                        ) : (
+                            <span className="truncate flex-grow" title={folder.name}>{folder.name}</span>
+                        )}
+                        
+                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onPin(folder.id); }}>
+                                {isPinned ? <PinOff className="h-4 w-4 text-yellow-500"/> : <Pin className="h-4 w-4"/>}
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onEdit(folder.id); }}><Edit className="h-4 w-4"/></Button>
+                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onDelete(folder.id); }}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+                        </div>
+                    </div>
+                </DraggableFolder>
+            </DroppableFolder>
+            {!isCollapsed && children.length > 0 && (
+                <FolderTreeView
+                    folders={children}
+                    allFolders={allFolders}
+                    selectedFolderId={selectedFolderId}
+                    onSelect={onSelect}
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onContextMenu={onContextMenu}
+                    editingFolderId={editingFolderId}
+                    editingFolderName={editingFolderName}
+                    setEditingFolderName={setEditingFolderName}
+                    handleSaveEditFolder={handleSaveEditFolder}
+                    setEditingFolderId={setEditingFolderId}
+                    level={level + 1}
+                    collapsedFolders={collapsedFolders}
+                    toggleFolderCollapse={toggleFolderCollapse}
+                    onPin={onPin}
+                    pinnedFolderIds={pinnedFolderIds}
+                    activeDragId={activeDragId}
+                />
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+};
+
+
 interface ResourceCardComponentProps {
     resource: Resource; 
     onUpdate: (resource: Resource) => void; 
@@ -737,7 +840,7 @@ function ResourcesPageContent() {
             setCollapsedFolders(new Set(resourceFolders.map(f => f.id)));
         }
     }
-  }, [resourceFolders]);
+  }, []);
 
   useEffect(() => {
     // Save collapsed state to localStorage
@@ -1133,7 +1236,7 @@ function ResourcesPageContent() {
                 </CardHeader>
                 <CardContent className="p-4 flex-grow">
                     <h2 className="text-2xl font-bold mb-4">
-                        {selectedResourceFolderId && !searchTerm && resourceFolders
+                        {selectedResourceFolderId && !searchTerm && resourceFolders && resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
                         ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
                         : searchTerm ? `Search results for "${searchTerm}"` : 'Select a folder'}
                     </h2>
@@ -1179,12 +1282,256 @@ function ResourcesPageContent() {
             {activeId && activeId.startsWith('res_') ? <div className="p-2 bg-primary text-primary-foreground rounded-md shadow-lg flex items-center gap-2"><Library className="h-4 w-4"/> {resources.find(r => r.id === activeId)?.name}</div> : null}
         </DragOverlay>
       </DndContext>
-      {/* ... (dialogs and modals) ... */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="absolute z-50 w-48 bg-popover border rounded-md shadow-lg p-1"
+          style={{ top: contextMenu.mouseY, left: contextMenu.mouseX }}
+        >
+          <Button variant="ghost" className="w-full justify-start" onClick={() => handleOpenMindMapForFolder(contextMenu.item.id)}>
+            <GitMerge className="h-4 w-4 mr-2" /> Mind Map
+          </Button>
+           <Button variant="ghost" className="w-full justify-start" onClick={() => handleShareFolder(contextMenu.item)}>
+            <Share className="h-4 w-4 mr-2" /> Share
+          </Button>
+          <Button variant="ghost" className="w-full justify-start text-destructive" onClick={() => setDeleteConfirmation({ item: contextMenu.item })}>
+            <Trash2 className="h-4 w-4 mr-2" /> Delete
+          </Button>
+        </div>
+      )}
+
+      {deleteConfirmation && (
+          <AlertDialog open={!!deleteConfirmation} onOpenChange={() => setDeleteConfirmation(null)}>
+              <AlertDialogContent>
+                  <AlertDialogHeader>
+                      <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                          This will permanently delete "{deleteConfirmation.item.name}" and all of its contents. This action cannot be undone.
+                      </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeleteItem}>Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+              </AlertDialogContent>
+          </AlertDialog>
+      )}
+
+        <Dialog open={isAdding} onOpenChange={setIsAdding}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Add New Resource</DialogTitle>
+                    <DialogDescription>Select the type of resource you want to add.</DialogDescription>
+                </DialogHeader>
+                <div className="py-4 space-y-4">
+                    <RadioGroup value={addResourceType} onValueChange={(value) => setAddResourceType(value as any)} className="grid grid-cols-3 gap-4">
+                        <div><RadioGroupItem value="link" id="r-link" className="peer sr-only" /><Label htmlFor="r-link" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><LinkIcon className="mb-3 h-6 w-6"/>Link</Label></div>
+                        <div><RadioGroupItem value="card" id="r-card" className="peer sr-only" /><Label htmlFor="r-card" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><Library className="mb-3 h-6 w-6"/>Card</Label></div>
+                        <div><RadioGroupItem value="habit" id="r-habit" className="peer sr-only" /><Label htmlFor="r-habit" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><Zap className="mb-3 h-6 w-6"/>Habit</Label></div>
+                        <div><RadioGroupItem value="mechanism" id="r-mechanism" className="peer sr-only" /><Label htmlFor="r-mechanism" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><Workflow className="mb-3 h-6 w-6"/>Mechanism</Label></div>
+                        <div><RadioGroupItem value="model3d" id="r-model3d" className="peer sr-only" /><Label htmlFor="r-model3d" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><View className="mb-3 h-6 w-6"/>3D Model</Label></div>
+                         <div><RadioGroupItem value="pdf" id="r-pdf" className="peer sr-only" /><Label htmlFor="r-pdf" className="flex flex-col items-center justify-center rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary"><FileIcon className="mb-3 h-6 w-6"/>PDF</Label></div>
+                    </RadioGroup>
+                    
+                    {addResourceType === 'link' && <Input value={newResourceLink} onChange={e => setNewResourceLink(e.target.value)} placeholder="https://example.com" />}
+                    {(addResourceType === 'card' || addResourceType === 'habit' || addResourceType === 'mechanism' || addResourceType === 'model3d') && <Input value={newResourceName} onChange={e => setNewResourceName(e.target.value)} placeholder="Resource Name"/>}
+                    
+                    {addResourceType === 'mechanism' && (
+                        <RadioGroup value={mechanismFramework} onValueChange={(v) => setMechanismFramework(v as any)} className="flex items-center space-x-4">
+                            <Label>Framework:</Label>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="negative" id="r-neg" /><Label htmlFor="r-neg">Negative</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="positive" id="r-pos" /><Label htmlFor="r-pos">Positive</Label></div>
+                        </RadioGroup>
+                    )}
+
+                     {addResourceType === 'model3d' && (
+                        <div className="space-y-2">
+                            <Input type="file" ref={modelUploadInputRef} accept=".glb,.gltf" />
+                        </div>
+                    )}
+
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsAdding(false)}>Cancel</Button>
+                    <Button onClick={handleAddResource} disabled={isFetchingMeta}>
+                        {isFetchingMeta ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                        Add Resource
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
+            <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+                <DialogHeader className="p-4 border-b">
+                    <DialogTitle>Mind Map for: {resourceFolders.find(f => f.id === mindMapRootFolderId)?.name || 'Root'}</DialogTitle>
+                </DialogHeader>
+                <div className="flex-grow min-h-0">
+                  <MindMapViewer rootFolderId={mindMapRootFolderId} />
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Share Folder</DialogTitle>
+              <DialogDescription>
+                Anyone with this link can view the contents of this folder and its subfolders.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex items-center space-x-2">
+              <Input value={shareUrl} readOnly />
+              <Button onClick={() => { navigator.clipboard.writeText(shareUrl); toast({ title: 'Copied to clipboard!' }); }} size="icon">
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+        
+        <Dialog open={markdownModalState.isOpen} onOpenChange={(isOpen) => setMarkdownModalState(prev => ({...prev, isOpen}))}>
+          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+            <DialogHeader className="p-4 border-b">
+              <DialogTitle>{markdownModalState.resource?.name || "Content"}</DialogTitle>
+            </DialogHeader>
+            <div className="flex-grow min-h-0">
+                <ScrollArea className="h-full">
+                    <div className="p-6">
+                      {markdownModalState.point?.type === 'markdown' ? (
+                        <div className="prose dark:prose-invert max-w-none">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdownModalState.point.text}</ReactMarkdown>
+                        </div>
+                      ) : (
+                        <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{margin: 0}} showLineNumbers>
+                          {markdownModalState.point?.text || ""}
+                        </SyntaxHighlighter>
+                      )}
+                    </div>
+                </ScrollArea>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+         <Dialog open={modelModalState.isOpen} onOpenChange={(isOpen) => setModelModalState({isOpen, modelUrl: null})}>
+            <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+                <DialogHeader className="p-4 border-b">
+                    <DialogTitle>3D Model Viewer</DialogTitle>
+                </DialogHeader>
+                 <div className="flex-grow min-h-0">
+                    {modelModalState.modelUrl && <ModelViewer modelUrl={modelModalState.modelUrl} />}
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!linkTextDialog} onOpenChange={() => setLinkTextDialog(null)}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit Link Display Text</DialogTitle>
+                    <DialogDescription>
+                        Change how the link is displayed without changing the URL.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                    <Label htmlFor="display-text">Display Text</Label>
+                    <Input 
+                        id="display-text" 
+                        value={currentDisplayText}
+                        onChange={(e) => setCurrentDisplayText(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSaveLinkText()}
+                        autoFocus
+                    />
+                    <p className="text-xs text-muted-foreground mt-2 truncate">
+                        URL: {linkTextDialog?.point.text}
+                    </p>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setLinkTextDialog(null)}>Cancel</Button>
+                    <Button onClick={handleSaveLinkText}>Save</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
     </div>
   );
 }
 
-// ... other components ...
+
+const ResourceCard = React.memo(({ resource, onUpdate, onDelete, onOpenNestedPopup, onLinkClick, linkingFromId, onEditLinkText, onConvertToCard, onOpenPdfViewer }: Omit<ResourceCardComponentProps, 'onOpenMarkdownModal' | 'playingAudio' | 'setPlayingAudio'> & { onOpenPdfViewer: (resource: Resource) => void }) => {
+    const { setFloatingVideoUrl } = useAuth();
+    const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+
+    const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
+    const imageEmbedUrl = isImageUrl(resource.link) ? resource.link : null;
+
+    if (imageEmbedUrl) {
+        return (
+            <Card className="overflow-hidden h-full flex flex-col">
+                <div className="aspect-video w-full bg-black relative">
+                    <Image src={imageEmbedUrl} alt={resource.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
+                </div>
+                <CardContent className="p-3 flex-grow flex flex-col">
+                    <p className="font-semibold text-sm truncate" title={resource.name}>{resource.name}</p>
+                    <div className="mt-auto pt-2">
+                        <Button asChild variant="secondary" size="sm" className="w-full"><a href={resource.link} target="_blank" rel="noopener noreferrer">View Full Size <ExternalLink className="ml-2 h-3 w-3"/></a></Button>
+                    </div>
+                </CardContent>
+            </Card>
+        )
+    }
+
+    if (youtubeEmbedUrl) {
+         return (
+            <>
+                <Card className="overflow-hidden h-full flex flex-col">
+                    <div className="aspect-video w-full bg-black relative group">
+                        <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                         <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(resource.link!)}><PictureInPicture className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(youtubeEmbedUrl)}><Expand className="h-4 w-4" /></Button>
+                        </div>
+                    </div>
+                    <CardContent className="p-3 flex-grow flex flex-col">
+                        <div className="flex items-center gap-2"><Youtube className="h-4 w-4 text-red-500"/><p className="font-semibold text-sm truncate" title={resource.name}>{resource.name}</p></div>
+                    </CardContent>
+                </Card>
+                <Dialog open={!!embedUrl} onOpenChange={(isOpen) => !isOpen && setEmbedUrl(null)}>
+                    <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2"><div className="flex-grow min-h-0">{embedUrl && (<iframe src={embedUrl} className="w-full h-full border-0 rounded-md" title="Embedded Resource"></iframe>)}</div></DialogContent>
+                </Dialog>
+            </>
+        )
+    }
+    
+     if (resource.type === 'pdf') {
+        return (
+            <Card className="h-full flex flex-col cursor-pointer" onClick={() => onOpenPdfViewer(resource)}>
+                <CardHeader className="flex-row items-center gap-3 space-y-0">
+                    <FileIcon className="h-5 w-5 text-red-500 flex-shrink-0" />
+                    <CardTitle className="text-base truncate flex-grow" title={resource.name}>{resource.name}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex-grow flex items-center justify-center">
+                    <p className="text-sm text-muted-foreground">Click to view PDF</p>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    return (
+        <Card className="h-full flex flex-col">
+            <CardHeader className="flex-row items-center gap-3 space-y-0">
+                {resource.iconUrl ? <Image src={resource.iconUrl} alt="" width={16} height={16} className="flex-shrink-0" unoptimized/> : <Globe className="h-4 w-4 flex-shrink-0"/>}
+                <CardTitle className="text-base truncate flex-grow" title={resource.name}>{resource.name}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-grow flex flex-col pt-0">
+                <p className="text-xs text-muted-foreground line-clamp-2 flex-grow">{resource.description || 'No description provided.'}</p>
+                <div className="mt-auto pt-2">
+                    <Button asChild variant="secondary" size="sm" className="w-full"><a href={resource.link} target="_blank" rel="noopener noreferrer">Visit Link <ExternalLink className="ml-2 h-3 w-3"/></a></Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+});
+ResourceCard.displayName = 'ResourceCard';
+
 
 export default function ResourcesPage() {
     return (
