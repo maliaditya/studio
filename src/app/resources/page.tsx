@@ -827,15 +827,12 @@ function ResourcesPageContent() {
             setCollapsedFolders(new Set(JSON.parse(savedCollapsed)));
         } catch (e) {
             console.error("Failed to parse collapsed folders state from localStorage", e);
-            if (resourceFolders) {
-               setCollapsedFolders(new Set(resourceFolders.map(f => f.id)));
-            }
+             // Default to not collapsing any if parsing fails
+             setCollapsedFolders(new Set());
         }
     } else {
-        // If nothing is saved, collapse all by default
-        if (resourceFolders) {
-            setCollapsedFolders(new Set(resourceFolders.map(f => f.id)));
-        }
+        // If nothing is saved, default to not collapsing any folders
+        setCollapsedFolders(new Set());
     }
   }, []);
 
@@ -1112,9 +1109,7 @@ function ResourcesPageContent() {
   };
   
   const filteredResources = useMemo(() => {
-    if (!resources) {
-        return [];
-    }
+    if (!resources) return [];
 
     if (searchTerm) {
         const lowercasedTerm = searchTerm.toLowerCase();
