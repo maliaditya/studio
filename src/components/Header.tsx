@@ -26,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
 import { getExercisesForDay } from '@/lib/workoutUtils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 
 const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolean) => void }) => {
@@ -603,7 +604,6 @@ export function Header() {
     syncWithGitHub,
     downloadFromGitHub,
     openMindsetWidget,
-    openDrawingCanvas,
     openDrawingCanvasFromHeader,
   } = useAuth();
 
@@ -611,24 +611,23 @@ export function Header() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUpcomingTasksModalOpen, setIsUpcomingTasksModalOpen] = useState(false);
+  const isMobile = useIsMobile();
   
+  if (isMobile) {
+    return null;
+  }
+
   return (
     <>
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-14 items-center">
-          <div className="mr-4 hidden md:flex">
+          <div className="mr-4 flex">
             <Link href="/" className="flex items-center gap-2">
               <BrainCircuit className="h-6 w-6 text-primary" />
               <span className="font-bold">Dock</span>
             </Link>
           </div>
           
-          <div className="md:hidden">
-            <Link href="/my-plate" className="flex items-center gap-2">
-              <BrainCircuit className="h-6 w-6 text-primary" />
-            </Link>
-          </div>
-
           <div className="flex flex-1 items-center justify-between space-x-2 md:justify-end">
             <div className="w-full flex-1 md:w-auto md:flex-none">
               <NavigationMenu />
