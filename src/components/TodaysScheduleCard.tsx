@@ -58,6 +58,7 @@ export function TodaysScheduleCard({
     mechanismCards,
     logStopperEncounter,
     setResources,
+    handleDeleteStopper,
   } = useAuth();
   const { toast } = useToast();
 
@@ -523,7 +524,7 @@ export function TodaysScheduleCard({
                         <ul className="space-y-2">
                             {(view === 'urges' ? allResistancesAndUrges.urges : allResistancesAndUrges.resistances).map(link => (
                                 <li key={`${link.habitId}-${link.stopper.id}`}>
-                                    <div className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50">
+                                    <div className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50 group">
                                         <div className="flex-grow pr-2">
                                             <p className="font-medium">{link.stopper.text}</p>
                                         </div>
@@ -531,6 +532,9 @@ export function TodaysScheduleCard({
                                             <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
                                             <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(link.habitId, link.stopper.id); }}>
                                                 <PlusCircle className="h-4 w-4 text-green-500" />
+                                            </Button>
+                                             <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100" onClick={(e) => {e.stopPropagation(); handleDeleteStopper(link.habitId, link.stopper.id)}}>
+                                                <Trash2 className="h-3 w-3"/>
                                             </Button>
                                         </div>
                                     </div>
