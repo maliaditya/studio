@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -21,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { motion, useDragControls } from 'framer-motion';
 import { TimeAllocationChart } from './ProductivitySnapshot';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/select';
+import { Checkbox } from './ui/checkbox';
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -88,7 +88,7 @@ export function TodaysScheduleCard({
   
   const predictedResistances = useMemo(() => {
     const today = startOfToday();
-    const sevenDaysAgo = subDays(today, 6);
+    const sevenDaysAgo = subDays(today, 7);
     const predictions: Record<string, { text: string; type: 'Urge' | 'Resistance' }[]> = {
         'Late Night': [], 'Dawn': [], 'Morning': [], 'Afternoon': [], 'Evening': [], 'Night': [],
     };
@@ -474,7 +474,7 @@ export function TodaysScheduleCard({
                                 <Input 
                                     value={newEntryText}
                                     onChange={e => setNewEntryText(e.target.value)}
-                                    placeholder="Describe the feeling or obstacle..."
+                                    placeholder={`Describe the ${view}...`}
                                 />
                                 <Select onValueChange={setSelectedHabitId} value={selectedHabitId}>
                                     <SelectTrigger>
