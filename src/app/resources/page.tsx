@@ -1485,7 +1485,7 @@ function ResourcesPageContent() {
                   <ScrollArea className="h-full pr-4 -mr-4">
                     <h2 className="text-2xl font-bold mb-4">
                         {selectedResourceFolderId && !searchTerm
-                        ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
+                        ? (resourceFolders || []).find(f => f.id === selectedResourceFolderId)?.name
                         : searchTerm ? `Search results for "${searchTerm}"` : 'Select a folder'}
                     </h2>
                     
@@ -1738,3 +1738,6 @@ export default function ResourcesPage() {
 
     
 
+
+
+    
