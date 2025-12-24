@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
@@ -379,7 +380,7 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
                                         onOpenNestedPopup={(e: React.MouseEvent) => onOpenNestedPopup(point.resourceId!, e)}
                                         onOpenMarkdownModal={() => onOpenMarkdownModal(resource.id, point.id)}
                                         onEditLinkText={onEditLinkText}
-                                        onConvertToCard={() => onConvertToCard(point)}
+                                        onConvertToCard={onConvertToCard}
                                         onOpenPdfViewer={() => {}}
                                     />
                                 ))}
@@ -684,7 +685,7 @@ function ResourcesPageContent() {
       const targetCard = resources.find(r => r.id === resourceId);
 
       if (!sourceCard || !targetCard || (targetCard.type !== 'card' && targetCard.type !== 'habit' && targetCard.type !== 'mechanism')) {
-        toast({ title: "Invalid Link", description: "The target must also be a 'Card', 'Habit', or 'Mechanism'.", variant: "destructive" });
+        toast({ title: "Invalid Link", description: "The target must also be a 'Card', 'Habit', or 'Mechanism' type resource.", variant: "destructive" });
         setLinkingFromId(null);
         return;
       }
@@ -1213,7 +1214,7 @@ function ResourcesPageContent() {
                             <ScrollArea className="w-full whitespace-nowrap">
                                 <div className="flex space-x-2 pb-2">
                                 {activeResourceTabIds.map(id => {
-                                    const folder = resourceFolders.find(f => f.id === id);
+                                    const folder = resourceFolders && resourceFolders.find(f => f.id === id);
                                     return folder ? (
                                     <Button
                                         key={id}
