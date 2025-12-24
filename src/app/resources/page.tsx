@@ -720,8 +720,6 @@ function ResourcesPageContent() {
             console.error("Failed to parse collapsed folders state from localStorage", e);
             setCollapsedFolders(new Set(resourceFolders.map(f => f.id)));
         }
-    } else if (Array.isArray(resourceFolders)) {
-        setCollapsedFolders(new Set(resourceFolders.map(f => f.id)));
     }
   }, [expandedFoldersKey, resourceFolders]);
   
@@ -1144,8 +1142,7 @@ function ResourcesPageContent() {
   }, [resourceFolders]);
 
   const renderSidebarFolders = useCallback((parentId: string | null, level: number) => {
-    if (!filteredFolders) return null;
-    const foldersToRender = filteredFolders
+    const foldersToRender = (filteredFolders || [])
         .filter(f => f.parentId === parentId)
         .sort((a, b) => {
             const aIsPinned = pinnedFolderIds.has(a.id);
@@ -1654,7 +1651,7 @@ function ResourcesPageContent() {
           ) : activeId?.startsWith('card-') ? (
             <Card className="w-48 shadow-lg">
               <CardHeader className="p-3">
-                <CardTitle className="text-sm truncate">{resources.find(r => r.id === activeId.replace('card-', ''))?.name}</CardHeader>
+                <CardTitle className="text-sm truncate">{resources.find(r => r.id === activeId.replace('card-', ''))?.name}</CardTitle>
               </CardHeader>
             </Card>
           ) : null}
@@ -1739,6 +1736,10 @@ export default function ResourcesPage() {
     
 
 
+
+    
+
+    
 
     
 
