@@ -1,7 +1,8 @@
 
+
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition, Stopper, Resource } from '@/types/workout';
 import {
@@ -67,6 +68,7 @@ export function TodaysScheduleCard({
   const [newEntryText, setNewEntryText] = useState('');
   const [selectedHabitId, setSelectedHabitId] = useState<string>('');
   const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
+  const [selectedResistanceIds, setSelectedResistanceIds] = useState<string[]>([]);
   
   const dragControls = useDragControls()
   const listRef = useRef<HTMLUListElement>(null);
@@ -86,7 +88,7 @@ export function TodaysScheduleCard({
   
   const predictedResistances = useMemo(() => {
     const today = startOfToday();
-    const sevenDaysAgo = subDays(today, 6); // Include today
+    const sevenDaysAgo = subDays(today, 6);
     const predictions: Record<string, { text: string; type: 'Urge' | 'Resistance' }[]> = {
         'Late Night': [], 'Dawn': [], 'Morning': [], 'Afternoon': [], 'Evening': [], 'Night': [],
     };
@@ -310,19 +312,27 @@ export function TodaysScheduleCard({
   }, [habitCards, mechanismCards]);
   
   const handleAddEntry = () => {
-    if (!newEntryText.trim() || !selectedHabitId) {
-      toast({ title: 'Error', description: 'Please describe the entry and select a habit to link it to.', variant: 'destructive'});
-      return;
+    if (!newEntryText.trim()) {
+        toast({ title: 'Error', description: 'Please describe the entry.', variant: 'destructive'});
+        return;
     }
 
     const newStopper: Stopper = {
         id: `stopper_${Date.now()}`,
         text: newEntryText.trim(),
         status: 'none',
+        linkedResistanceIds: view === 'urges' ? selectedResistanceIds : undefined,
     };
+    
+    const targetHabitId = selectedHabitId;
+    
+    if (!targetHabitId) {
+        toast({ title: 'Error', description: 'Please link this entry to a habit.', variant: 'destructive'});
+        return;
+    }
 
     setResources(prev => prev.map(r => {
-        if (r.id === selectedHabitId) {
+        if (r.id === targetHabitId) {
             const updatedResource = { ...r };
             if (view === 'urges') {
                 updatedResource.urges = [...(updatedResource.urges || []), newStopper];
@@ -336,6 +346,7 @@ export function TodaysScheduleCard({
 
     setNewEntryText('');
     setSelectedHabitId('');
+    setSelectedResistanceIds([]);
     setIsAddPopoverOpen(false);
     toast({ title: 'Success', description: `New ${view === 'urges' ? 'urge' : 'resistance'} has been logged.`});
   };
@@ -352,11 +363,11 @@ export function TodaysScheduleCard({
             >
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                 <div className="flex items-center">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView(v => v === 'urges' ? 'list' : 'urges')}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('urges')}>
                         <Flame className="h-4 w-4 text-red-500" />
                         <span className="sr-only">Toggle Urges View</span>
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView(v => v === 'resistances' ? 'list' : 'resistances')}>
+                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('resistances')}>
                         <Shield className="h-4 w-4 text-blue-500" />
                         <span className="sr-only">Toggle Resistances View</span>
                     </Button>
@@ -475,6 +486,35 @@ export function TodaysScheduleCard({
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                {view === 'urges' && (
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                                {selectedResistanceIds.length > 0 ? `${selectedResistanceIds.length} resistance(s) selected` : "Link Resistances..."}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-64 p-0">
+                                            <ScrollArea className="h-48">
+                                                <div className="p-2 space-y-1">
+                                                    {allResistancesAndUrges.resistances.map(link => (
+                                                        <div key={link.stopper.id} className="flex items-center space-x-2">
+                                                            <Checkbox
+                                                                id={`res-check-${link.stopper.id}`}
+                                                                checked={selectedResistanceIds.includes(link.stopper.id)}
+                                                                onCheckedChange={(checked) => {
+                                                                    setSelectedResistanceIds(prev =>
+                                                                        checked ? [...prev, link.stopper.id] : prev.filter(id => id !== link.stopper.id)
+                                                                    );
+                                                                }}
+                                                            />
+                                                            <Label htmlFor={`res-check-${link.stopper.id}`} className="text-xs font-normal">{link.stopper.text}</Label>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </ScrollArea>
+                                        </PopoverContent>
+                                    </Popover>
+                                )}
                                 <Button onClick={handleAddEntry} className="w-full">Add Entry</Button>
                             </PopoverContent>
                         </Popover>
@@ -529,4 +569,3 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
-

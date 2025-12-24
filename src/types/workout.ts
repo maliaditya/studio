@@ -336,6 +336,7 @@ export interface Stopper {
     linkedTechniqueId_stage2?: string; // For 2nd encounter of the day
     linkedTechniqueId_stage3?: string; // For 3rd+ encounter of the day
     timestamps?: number[];
+    linkedResistanceIds?: string[]; // New: Link resistances to urges
 }
 
 export interface Strength {
