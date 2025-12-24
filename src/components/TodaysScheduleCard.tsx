@@ -273,55 +273,6 @@ export function TodaysScheduleCard({
                         <PieChart className="h-4 w-4" />
                         <span className="sr-only">Toggle Chart View</span>
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleAddPomodoro}>
-                        <Timer className="h-4 w-4" />
-                        <span className="sr-only">Add Pomodoro</span>
-                    </Button>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <History className="h-4 w-4" />
-                            <span className="sr-only">Pending Tasks</span>
-                        </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-80">
-                            <h4 className="font-medium leading-none mb-2">Yesterday's Pending Tasks</h4>
-                            {pendingTasks.length > 0 ? (
-                            <ScrollArea className="h-64">
-                                <ul className="space-y-2">
-                                {pendingTasks.map(task => (
-                                    <li key={task.id} className="flex items-center justify-between text-sm">
-                                    <span className="truncate pr-2" title={task.details}>{task.details}</span>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                        <Button variant="outline" size="sm" className="h-7"><PlusCircle className="mr-2 h-3.5 w-3.5" /> Add</Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-48 p-1">
-                                        <div className="flex flex-col">
-                                            {slotOrder.map(slot => (
-                                            <Button
-                                                key={slot}
-                                                variant="ghost"
-                                                className="justify-start h-8 text-sm"
-                                                onClick={() => {
-                                                carryForwardTask(task, slot as string);
-                                                }}
-                                            >
-                                                {slot}
-                                            </Button>
-                                            ))}
-                                        </div>
-                                        </PopoverContent>
-                                    </Popover>
-                                    </li>
-                                ))}
-                                </ul>
-                            </ScrollArea>
-                            ) : (
-                            <p className="text-sm text-muted-foreground text-center py-4">No pending tasks from yesterday.</p>
-                            )}
-                        </PopoverContent>
-                    </Popover>
                     <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
                         {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
                     </Button>
