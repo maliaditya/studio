@@ -654,7 +654,7 @@ export function Header() {
             <span className="font-bold hidden sm:inline-block">Dock</span>
           </Link>
 
-          {currentUser && <NavigationMenu />}
+          {currentUser && !isMobile && <NavigationMenu />}
 
           <div className="flex flex-1 items-center justify-end gap-2">
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsSearchOpen(true)}>

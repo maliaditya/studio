@@ -7,6 +7,7 @@ import { Play, Pause, Volume1, Volume2, VolumeX, Eye, EyeOff } from 'lucide-reac
 import { Slider } from './ui/slider';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export function BackgroundAudioPlayer() {
   const { 
@@ -18,6 +19,7 @@ export function BackgroundAudioPlayer() {
     setSettings,
   } = useAuth();
   const audioRef = useRef<HTMLAudioElement>(null);
+  const isMobile = useIsMobile();
 
   // Effect to sync audio element's playing state with component state
   useEffect(() => {
@@ -83,6 +85,10 @@ export function BackgroundAudioPlayer() {
     if (globalVolume < 0.5) return <Volume1 className="h-5 w-5" />;
     return <Volume2 className="h-5 w-5" />;
   };
+
+  if (isMobile) {
+    return null;
+  }
 
   return (
     <>
