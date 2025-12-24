@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -16,7 +17,7 @@ import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle, ArrowRight, Minus, Save, ChevronRight as ChevronRightIcon } from 'lucide-react';
-import type { Activity, HabitEquation, Resource, ActivityType, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition } from '@/types/workout';
+import type { Activity, HabitEquation, Resource, ActivityType, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, WorkoutExercise } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   ResponsiveContainer,
@@ -55,7 +56,9 @@ export function FocusSessionModal({
     skillDomains, 
     coreSkills,
     setUpskillDefinitions,
-    setDeepWorkDefinitions
+    setDeepWorkDefinitions,
+    setAllUpskillLogs,
+    setAllDeepWorkLogs,
   } = useAuth();
   const [duration, setDuration] = useState(30);
   const [skipBreaks, setSkipBreaks] = useState(false);
@@ -155,7 +158,7 @@ export function FocusSessionModal({
 
     const updatedActivity: Activity = {
       ...activity,
-      taskIds: [childId],
+      taskIds: [childId], // Link to the leaf node (Action/Visualization)
       linkedActivityType: linkedActivityType,
       linkedEntityType: linkedActivityType === 'deepwork' ? 'intention' : 'curiosity',
     };
@@ -217,7 +220,7 @@ export function FocusSessionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-3xl">
+      <DialogContent className="lg:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Start Focus Session</DialogTitle>
           <DialogDescription>

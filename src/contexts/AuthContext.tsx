@@ -418,7 +418,7 @@ interface AuthContextType {
   setSelectedDeepWorkTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
   selectedMicroSkill: MicroSkill | null;
   setSelectedMicroSkill: React.Dispatch<React.SetStateAction<MicroSkill | null>>;
-  logSubTaskTime: (taskId: string, durationMinutes: number) => string | undefined;
+  logSubTaskTime: (taskId: string, durationMinutes: number) => { definitionId?: string; instanceId?: string; } | undefined;
   findRootTask: (activity: Activity) => ExerciseDefinition | null;
 }
 
@@ -680,78 +680,69 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [setSchedule]);
 
-  const logSubTaskTime = useCallback((taskId: string, durationMinutes: number): string | undefined => {
+  const logSubTaskTime = useCallback((taskInstanceId: string, durationMinutes: number): { definitionId?: string; instanceId?: string; } | undefined => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     let definitionId: string | undefined;
+    let setLogs: React.Dispatch<React.SetStateAction<DatedWorkout[]>> | undefined;
+    let durationField: 'reps' | 'weight' | undefined;
 
-    const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
-    const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === taskId);
-    
-    if (taskLog) {
-        definitionId = taskLog.definitionId;
-    }
-
-    const setLogs = upskillDefinitions.some(d => d.id === definitionId) ? setAllUpskillLogs : setAllDeepWorkLogs;
-    const durationField = upskillDefinitions.some(d => d.id === definitionId) ? 'reps' : 'weight';
-
-    setLogs(prevLogs => {
-      const logIndex = prevLogs.findIndex(log => log.date === todayKey);
-      
-      const newSet: LoggedSet = {
-        id: `set_${Date.now()}`,
-        reps: durationField === 'reps' ? durationMinutes : 1,
-        weight: durationField === 'weight' ? durationMinutes : 1,
-        timestamp: Date.now(),
-      };
-      
-      if (logIndex > -1) {
-        const newLogs = [...prevLogs];
-        const logToUpdate = { ...newLogs[logIndex] };
-        const exerciseIndex = logToUpdate.exercises.findIndex(ex => ex.id === taskId);
-
-        if (exerciseIndex > -1) {
-          const exerciseToUpdate = { ...logToUpdate.exercises[exerciseIndex] };
-          exerciseToUpdate.loggedSets = [...(exerciseToUpdate.loggedSets || []), newSet];
-          logToUpdate.exercises[exerciseIndex] = exerciseToUpdate;
-          newLogs[logIndex] = logToUpdate;
-        } else {
-            const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.id === definitionId);
-            if (def) {
-                const newExercise: WorkoutExercise = {
-                    id: taskId,
-                    definitionId: def.id,
-                    name: def.name,
-                    category: def.category,
-                    loggedSets: [newSet],
-                    targetSets: 1,
-                    targetReps: "1",
+    const findTaskAndUpdate = (logs: DatedWorkout[], type: 'upskill' | 'deepwork'): boolean => {
+        const logIndex = logs.findIndex(l => l.date === todayKey);
+        if (logIndex > -1) {
+            const logToUpdate = { ...logs[logIndex] };
+            const exerciseIndex = logToUpdate.exercises.findIndex(ex => ex.id === taskInstanceId);
+            if (exerciseIndex > -1) {
+                const exerciseToUpdate = { ...logToUpdate.exercises[exerciseIndex] };
+                definitionId = exerciseToUpdate.definitionId;
+                const newSet: LoggedSet = {
+                    id: `set_${Date.now()}`,
+                    reps: type === 'upskill' ? durationMinutes : 1,
+                    weight: type === 'deepwork' ? durationMinutes : 1,
+                    timestamp: Date.now(),
                 };
-                logToUpdate.exercises.push(newExercise);
-                newLogs[logIndex] = logToUpdate;
+                exerciseToUpdate.loggedSets = [...(exerciseToUpdate.loggedSets || []), newSet];
+                logToUpdate.exercises[exerciseIndex] = exerciseToUpdate;
+                logs[logIndex] = logToUpdate;
+                setLogs = type === 'upskill' ? setAllUpskillLogs : setAllDeepWorkLogs;
+                durationField = type === 'upskill' ? 'reps' : 'weight';
+                return true;
             }
         }
-        return newLogs;
-      } else {
-          const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.id === definitionId);
-          if (def) {
-              const newExercise: WorkoutExercise = {
-                  id: taskId,
-                  definitionId: def.id,
-                  name: def.name,
-                  category: def.category,
-                  loggedSets: [newSet],
-                  targetSets: 1,
-                  targetReps: "1",
-              };
-              return [...prevLogs, { id: todayKey, date: todayKey, exercises: [newExercise] }];
-          }
-      }
-      return prevLogs;
-    });
+        return false;
+    };
+
+    let updated = findTaskAndUpdate([...allUpskillLogs], 'upskill');
+    if (!updated) {
+        updated = findTaskAndUpdate([...allDeepWorkLogs], 'deepwork');
+    }
+
+    if (updated && setLogs) {
+        setLogs(currentLogs => {
+            const logIndex = currentLogs.findIndex(l => l.date === todayKey);
+            if (logIndex > -1) {
+                 const newLogs = [...currentLogs];
+                 const updatedLog = { ...newLogs[logIndex] };
+                 const exerciseIndex = updatedLog.exercises.findIndex(ex => ex.id === taskInstanceId);
+                 if (exerciseIndex > -1) {
+                     const exerciseToUpdate = { ...updatedLog.exercises[exerciseIndex] };
+                     const newSet: LoggedSet = {
+                         id: `set_${Date.now()}`,
+                         reps: durationField === 'reps' ? durationMinutes : 1,
+                         weight: durationField === 'weight' ? durationMinutes : 1,
+                         timestamp: Date.now(),
+                     };
+                     exerciseToUpdate.loggedSets = [...(exerciseToUpdate.loggedSets || []), newSet];
+                     updatedLog.exercises[exerciseIndex] = exerciseToUpdate;
+                     newLogs[logIndex] = updatedLog;
+                 }
+                 return newLogs;
+            }
+            return currentLogs;
+        });
+    }
 
     if (definitionId) {
         const defIdToUpdate = definitionId;
-        const todayKey = format(new Date(), 'yyyy-MM-dd');
         
         const updateDefinitions = (defs: ExerciseDefinition[]) => 
             defs.map(def => def.id === defIdToUpdate ? { ...def, loggedDuration: (def.loggedDuration || 0) + durationMinutes, last_logged_date: todayKey } : def);
@@ -762,29 +753,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             setDeepWorkDefinitions(updateDefinitions);
         }
     }
-
-    toast({ title: "Progress Logged", description: `Logged ${durationMinutes} minutes.` });
-    return definitionId;
-  }, [allUpskillLogs, allDeepWorkLogs, setAllUpskillLogs, setAllDeepWorkLogs, toast, upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions]);
+    
+    return { definitionId, instanceId: taskInstanceId };
+  }, [allUpskillLogs, allDeepWorkLogs, setAllUpskillLogs, setAllDeepWorkLogs, upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions]);
   
   const [permanentlyLoggedTaskIds, setPermanentlyLoggedTaskIds] = useState<Set<string>>(new Set());
 
   const onLogDuration = useCallback((activity: Activity, duration: number) => {
-      const todayKey = format(new Date(), 'yyyy-MM-dd');
-      if (activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
-          const definitionId = logSubTaskTime(activity.taskIds[0], duration);
-          if (definitionId) {
-              setPermanentlyLoggedTaskIds(prev => new Set(prev).add(definitionId!));
-          }
+    if (activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
+      const taskLogInfo = logSubTaskTime(activity.taskIds[0], duration);
+      if (taskLogInfo?.definitionId) {
+          setPermanentlyLoggedTaskIds(prev => new Set(prev).add(taskLogInfo.definitionId!));
+          toast({ title: 'Task Completed!', description: `The underlying task has been marked as complete.` });
       }
-      
-      updateActivity({
-          ...activity,
-          duration: (activity.duration || 0) + duration,
-          completed: true,
-          completedAt: Date.now(),
-      });
-      toast({ title: 'Duration Logged & Task Completed!' });
+    }
+    
+    updateActivity({
+        ...activity,
+        duration: (activity.duration || 0) + duration,
+        completed: true,
+        completedAt: Date.now(),
+    });
+    toast({ title: 'Duration Logged & Task Completed!' });
   }, [updateActivity, toast, logSubTaskTime]);
   
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
@@ -3084,10 +3074,11 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     
     if (taskInstanceId) {
         const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
-        const taskInstance = allLogs.flatMap(log => log.exercises).find(ex => ex.id === taskInstanceId);
+        const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === taskInstanceId);
         if (taskInstance) {
             currentDefId = taskInstance.definitionId;
         } else if (allDefs.has(taskInstanceId)) {
+            // Fallback for older data structure where definitionId might be stored in taskIds
             currentDefId = taskInstanceId;
         }
     }
@@ -3111,7 +3102,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       }
     }
     return rootTask || null;
-  }, [deepWorkDefinitions, upskillDefinitions, allUpskillLogs, allDeepWorkLogs, brandingLogs]);
+  }, [deepWorkDefinitions, upskillDefinitions, allUpskillLogs, allDeepWorkLogs]);
 
   const handleToggleDailyGoalCompletion = (resourceId: string) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -3632,4 +3623,5 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
 
