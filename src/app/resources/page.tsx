@@ -704,7 +704,7 @@ function ResourcesPageContent() {
   const expandedFoldersKey = useMemo(() => currentUser ? `resource_expanded_folders_${currentUser.username}` : null, [currentUser]);
 
   useEffect(() => {
-    if (expandedFoldersKey) {
+    if (expandedFoldersKey && Array.isArray(resourceFolders)) {
         try {
             const storedExpanded = localStorage.getItem(expandedFoldersKey);
             const expandedIds = storedExpanded ? JSON.parse(storedExpanded) : [];
@@ -720,7 +720,7 @@ function ResourcesPageContent() {
             console.error("Failed to parse collapsed folders state from localStorage", e);
             setCollapsedFolders(new Set(resourceFolders.map(f => f.id)));
         }
-    } else {
+    } else if (Array.isArray(resourceFolders)) {
         setCollapsedFolders(new Set(resourceFolders.map(f => f.id)));
     }
   }, [expandedFoldersKey, resourceFolders]);
@@ -795,7 +795,7 @@ function ResourcesPageContent() {
             newSet.add(folderId);
         }
 
-        if (expandedFoldersKey) {
+        if (expandedFoldersKey && Array.isArray(resourceFolders)) {
             const allFolderIds = resourceFolders.map(f => f.id);
             const expandedIds = allFolderIds.filter(id => !newSet.has(id));
             localStorage.setItem(expandedFoldersKey, JSON.stringify(expandedIds));
@@ -1484,8 +1484,8 @@ function ResourcesPageContent() {
                 <div className="flex-grow min-h-0">
                   <ScrollArea className="h-full pr-4 -mr-4">
                     <h2 className="text-2xl font-bold mb-4">
-                        {selectedResourceFolderId && !searchTerm
-                        ? (resourceFolders || []).find(f => f.id === selectedResourceFolderId)?.name
+                        {selectedResourceFolderId && !searchTerm && resourceFolders
+                        ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
                         : searchTerm ? `Search results for "${searchTerm}"` : 'Select a folder'}
                     </h2>
                     
@@ -1654,7 +1654,7 @@ function ResourcesPageContent() {
           ) : activeId?.startsWith('card-') ? (
             <Card className="w-48 shadow-lg">
               <CardHeader className="p-3">
-                <CardTitle className="text-sm truncate">{resources.find(r => r.id === activeId.replace('card-', ''))?.name}</CardTitle>
+                <CardTitle className="text-sm truncate">{resources.find(r => r.id === activeId.replace('card-', ''))?.name}</CardHeader>
               </CardHeader>
             </Card>
           ) : null}
@@ -1739,5 +1739,7 @@ export default function ResourcesPage() {
     
 
 
+
+    
 
     
