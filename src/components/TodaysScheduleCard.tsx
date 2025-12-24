@@ -5,7 +5,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition, Stopper, Resource } from '@/types/workout';
 import {
-  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer, PieChart, AlertCircle, Brain, Flame, Shield, Trash2
+  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer, PieChart, AlertCircle, Brain, Flame, Shield, Trash2, Compass
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -21,7 +21,6 @@ import { motion, useDragControls } from 'framer-motion';
 import { TimeAllocationChart } from './ProductivitySnapshot';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/select';
 import { Checkbox } from './ui/checkbox';
-import { Compass } from 'lucide-react';
 
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
@@ -58,7 +57,7 @@ export function TodaysScheduleCard({
     setSchedule: setGlobalSchedule,
     habitCards,
     mechanismCards,
-    logStopperEncounter,
+    resources,
     setResources,
     metaRules,
   } = useAuth();
@@ -289,14 +288,17 @@ export function TodaysScheduleCard({
   };
 
   const allResistancesAndUrges = useMemo(() => {
-    const urges: { habitId: string; stopper: Stopper; isUrge: boolean }[] = [];
-    const resistances: { habitId: string; stopper: Stopper; isUrge: boolean }[] = [];
-    
     const mindsetCard = resources.find(r => r.name === "Mindset");
-    if (mindsetCard) {
-        (mindsetCard.urges || []).forEach(stopper => urges.push({ habitId: mindsetCard.id, stopper, isUrge: true }));
-        (mindsetCard.resistances || []).forEach(stopper => resistances.push({ habitId: mindsetCard.id, stopper, isUrge: false }));
-    }
+    const urges: { habitId: string; stopper: Stopper; isUrge: boolean }[] = (mindsetCard?.urges || []).map(stopper => ({
+        habitId: mindsetCard.id,
+        stopper,
+        isUrge: true,
+    }));
+    const resistances: { habitId: string; stopper: Stopper; isUrge: boolean }[] = (mindsetCard?.resistances || []).map(stopper => ({
+        habitId: mindsetCard.id,
+        stopper,
+        isUrge: false,
+    }));
     
     const sortFn = (a: { stopper: Stopper }, b: { stopper: Stopper }) => {
         const lastTsA = Math.max(0, ...(a.stopper.timestamps || []));
@@ -315,29 +317,29 @@ export function TodaysScheduleCard({
         toast({ title: 'Error', description: 'Please describe the entry.', variant: 'destructive'});
         return;
     }
-
+  
     const mindsetCard = resources.find(r => r.name === "Mindset");
     if (!mindsetCard) {
-        toast({ title: 'Error', description: 'Mindset resource card not found.', variant: 'destructive'});
-        return;
+      toast({ title: 'Error', description: 'Mindset resource card not found.', variant: 'destructive'});
+      return;
     }
-
+  
     const newStopper: Stopper = {
-        id: `stopper_${Date.now()}`,
-        text: newEntryText.trim(),
-        status: 'none',
-        linkedResistanceIds: view === 'urges' ? selectedResistanceIds : undefined,
+      id: `stopper_${Date.now()}`,
+      text: newEntryText.trim(),
+      status: 'none',
+      linkedResistanceIds: view === 'urges' ? selectedResistanceIds : undefined,
     };
-    
+  
     const updatedMindsetCard = { ...mindsetCard };
     if (view === 'urges') {
-        updatedMindsetCard.urges = [...(updatedMindsetCard.urges || []), newStopper];
+      updatedMindsetCard.urges = [...(updatedMindsetCard.urges || []), newStopper];
     } else {
-        updatedMindsetCard.resistances = [...(updatedMindsetCard.resistances || []), newStopper];
+      updatedMindsetCard.resistances = [...(updatedMindsetCard.resistances || []), newStopper];
     }
-
+  
     setResources(prev => prev.map(r => r.id === mindsetCard.id ? updatedMindsetCard : r));
-
+  
     setNewEntryText('');
     setSelectedResistanceIds([]);
     setIsAddPopoverOpen(false);
@@ -580,3 +582,5 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
+
+    
