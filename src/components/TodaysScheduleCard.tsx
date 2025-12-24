@@ -21,6 +21,8 @@ import { motion, useDragControls } from 'framer-motion';
 import { TimeAllocationChart } from './ProductivitySnapshot';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/select';
 import { Checkbox } from './ui/checkbox';
+import { Compass } from 'lucide-react';
+
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -58,12 +60,13 @@ export function TodaysScheduleCard({
     mechanismCards,
     logStopperEncounter,
     setResources,
+    metaRules,
   } = useAuth();
   const { toast } = useToast();
 
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
-  const [view, setView] = useState<'list' | 'chart' | 'urges' | 'resistances'>('list');
+  const [view, setView] = useState<'list' | 'chart' | 'urges' | 'resistances' | 'rules'>('list');
   
   const [newEntryText, setNewEntryText] = useState('');
   const [selectedHabitId, setSelectedHabitId] = useState<string>('');
@@ -94,15 +97,13 @@ export function TodaysScheduleCard({
     };
 
     const allLinks: { stopper: Stopper; isUrge: boolean }[] = [];
-    habitCards.forEach(habit => {
-        (habit.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
-        (habit.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
-    });
-    mechanismCards.forEach(mechanism => {
-        (mechanism.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
-        (mechanism.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
-    });
     
+    const mindsetCard = resources.find(r => r.name === "Mindset");
+    if (mindsetCard) {
+        (mindsetCard.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
+        (mindsetCard.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
+    }
+
     const slotTimes: { name: SlotName, start: number, end: number }[] = [
         { name: 'Late Night', start: 0, end: 4 },
         { name: 'Dawn', start: 4, end: 8 },
@@ -139,7 +140,7 @@ export function TodaysScheduleCard({
     });
 
     return predictions;
-  }, [habitCards, mechanismCards, schedule]);
+  }, [habitCards, mechanismCards, resources, schedule]);
 
   const scheduledActivities = useMemo(() => {
     const todaysSchedule = schedule[dayKey] || {};
@@ -290,14 +291,12 @@ export function TodaysScheduleCard({
   const allResistancesAndUrges = useMemo(() => {
     const urges: { habitId: string; stopper: Stopper; isUrge: boolean }[] = [];
     const resistances: { habitId: string; stopper: Stopper; isUrge: boolean }[] = [];
-    habitCards.forEach(habit => {
-      (habit.urges || []).forEach(stopper => urges.push({ habitId: habit.id, stopper, isUrge: true }));
-      (habit.resistances || []).forEach(stopper => resistances.push({ habitId: habit.id, stopper, isUrge: false }));
-    });
-    mechanismCards.forEach(mechanism => {
-        (mechanism.urges || []).forEach(stopper => urges.push({ habitId: mechanism.id, stopper, isUrge: true }));
-        (mechanism.resistances || []).forEach(stopper => resistances.push({ habitId: mechanism.id, stopper, isUrge: false }));
-    });
+    
+    const mindsetCard = resources.find(r => r.name === "Mindset");
+    if (mindsetCard) {
+        (mindsetCard.urges || []).forEach(stopper => urges.push({ habitId: mindsetCard.id, stopper, isUrge: true }));
+        (mindsetCard.resistances || []).forEach(stopper => resistances.push({ habitId: mindsetCard.id, stopper, isUrge: false }));
+    }
     
     const sortFn = (a: { stopper: Stopper }, b: { stopper: Stopper }) => {
         const lastTsA = Math.max(0, ...(a.stopper.timestamps || []));
@@ -309,11 +308,17 @@ export function TodaysScheduleCard({
       urges: urges.sort(sortFn),
       resistances: resistances.sort(sortFn),
     };
-  }, [habitCards, mechanismCards]);
+  }, [resources]);
   
   const handleAddEntry = () => {
     if (!newEntryText.trim()) {
         toast({ title: 'Error', description: 'Please describe the entry.', variant: 'destructive'});
+        return;
+    }
+
+    const mindsetCard = resources.find(r => r.name === "Mindset");
+    if (!mindsetCard) {
+        toast({ title: 'Error', description: 'Mindset resource card not found.', variant: 'destructive'});
         return;
     }
 
@@ -324,36 +329,24 @@ export function TodaysScheduleCard({
         linkedResistanceIds: view === 'urges' ? selectedResistanceIds : undefined,
     };
     
-    const targetHabitId = selectedHabitId;
-    
-    if (!targetHabitId) {
-        toast({ title: 'Error', description: 'Please link this entry to a habit.', variant: 'destructive'});
-        return;
+    const updatedMindsetCard = { ...mindsetCard };
+    if (view === 'urges') {
+        updatedMindsetCard.urges = [...(updatedMindsetCard.urges || []), newStopper];
+    } else {
+        updatedMindsetCard.resistances = [...(updatedMindsetCard.resistances || []), newStopper];
     }
 
-    setResources(prev => prev.map(r => {
-        if (r.id === targetHabitId) {
-            const updatedResource = { ...r };
-            if (view === 'urges') {
-                updatedResource.urges = [...(updatedResource.urges || []), newStopper];
-            } else {
-                updatedResource.resistances = [...(updatedResource.resistances || []), newStopper];
-            }
-            return updatedResource;
-        }
-        return r;
-    }));
+    setResources(prev => prev.map(r => r.id === mindsetCard.id ? updatedMindsetCard : r));
 
     setNewEntryText('');
-    setSelectedHabitId('');
     setSelectedResistanceIds([]);
     setIsAddPopoverOpen(false);
     toast({ title: 'Success', description: `New ${view === 'urges' ? 'urge' : 'resistance'} has been logged.`});
   };
 
-  const handleDeleteStopper = (habitId: string, stopperId: string) => {
+  const handleDeleteStopper = (stopperId: string) => {
     setResources(prev => prev.map(r => {
-      if (r.id === habitId) {
+      if (r.name === "Mindset") {
         const updatedResource = { ...r };
         updatedResource.urges = (updatedResource.urges || []).filter(s => s.id !== stopperId);
         updatedResource.resistances = (updatedResource.resistances || []).filter(s => s.id !== stopperId);
@@ -374,6 +367,10 @@ export function TodaysScheduleCard({
             >
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                 <div className="flex items-center">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('rules')}>
+                        <Compass className="h-4 w-4 text-orange-500" />
+                        <span className="sr-only">Toggle Rules View</span>
+                    </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('urges')}>
                         <Flame className="h-4 w-4 text-red-500" />
                         <span className="sr-only">Toggle Urges View</span>
@@ -487,16 +484,6 @@ export function TodaysScheduleCard({
                                     onChange={e => setNewEntryText(e.target.value)}
                                     placeholder={`Describe the ${view}...`}
                                 />
-                                <Select onValueChange={setSelectedHabitId} value={selectedHabitId}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Link to a Habit..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {habitCards.map(habit => (
-                                            <SelectItem key={habit.id} value={habit.id}>{habit.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
                                 {view === 'urges' && (
                                     <Popover>
                                         <PopoverTrigger asChild>
@@ -532,24 +519,34 @@ export function TodaysScheduleCard({
                     </div>
                     <ScrollArea className="h-64 pr-2">
                         <ul className="space-y-2">
-                            {(view === 'urges' ? allResistancesAndUrges.urges : allResistancesAndUrges.resistances).map(link => (
-                                <li key={`${link.habitId}-${link.stopper.id}`}>
+                            {(view === 'urges' ? allResistancesAndUrges.urges : view === 'resistances' ? allResistancesAndUrges.resistances : view === 'rules' ? metaRules : []).map(item => {
+                                const isStopper = 'stopper' in item;
+                                const id = isStopper ? item.stopper.id : item.id;
+                                const text = isStopper ? item.stopper.text : item.text;
+                                const habitId = isStopper ? item.habitId : undefined;
+                                const timestamps = isStopper ? item.stopper.timestamps || [] : [];
+                                
+                                return (
+                                <li key={id}>
                                     <div className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50 group">
                                         <div className="flex-grow pr-2">
-                                            <p className="font-medium">{link.stopper.text}</p>
+                                            <p className="font-medium">{text}</p>
                                         </div>
-                                        <div className="flex items-center flex-shrink-0">
-                                            <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
-                                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(link.habitId, link.stopper.id); }}>
-                                                <PlusCircle className="h-4 w-4 text-green-500" />
-                                            </Button>
-                                             <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100" onClick={(e) => {e.stopPropagation(); handleDeleteStopper(link.habitId, link.stopper.id)}}>
-                                                <Trash2 className="h-3 w-3"/>
-                                            </Button>
-                                        </div>
+                                        {isStopper && (
+                                            <div className="flex items-center flex-shrink-0">
+                                                <span className="text-xs font-bold mr-1">{timestamps.length}</span>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(habitId!, id); }}>
+                                                    <PlusCircle className="h-4 w-4 text-green-500" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100" onClick={(e) => {e.stopPropagation(); handleDeleteStopper(id)}}>
+                                                    <Trash2 className="h-3 w-3"/>
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                 </li>
-                            ))}
+                                )
+                            })}
                         </ul>
                     </ScrollArea>
                  </div>
@@ -583,5 +580,3 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
-
-    
