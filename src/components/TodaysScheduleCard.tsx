@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays, startOfToday, subDays, getHours } from 'date-fns';
+import { format, addDays, startOfToday, subDays, getHours, isWithinInterval } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
 import { useToast } from '@/hooks/use-toast';
@@ -79,7 +79,7 @@ export function TodaysScheduleCard({
   
   const predictedResistances = useMemo(() => {
     const today = new Date();
-    const sevenDaysAgo = subDays(startOfToday(today), 7);
+    const sevenDaysAgo = subDays(startOfToday(today), 6); // Look at today + the past 6 days.
     const predictions: Record<string, { text: string; type: 'Urge' | 'Resistance' }[]> = {
         'Late Night': [], 'Dawn': [], 'Morning': [], 'Afternoon': [], 'Evening': [], 'Night': [],
     };
@@ -105,9 +105,9 @@ export function TodaysScheduleCard({
 
     allLinks.forEach(link => {
         const slotCounts: Record<string, number> = {};
-        (link.stopper.timestamps || []).forEach(ts => {
+        (link.stopper.timestamps || []).forEach((ts: number) => {
             const eventDate = new Date(ts);
-            if (eventDate >= sevenDaysAgo) {
+            if (eventDate >= sevenDaysAgo && eventDate <= today) { // Check within the last 7 days including today
                 const hour = getHours(eventDate);
                 const slot = slotTimes.find(s => hour >= s.start && hour < s.end);
                 if (slot) {
