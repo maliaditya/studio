@@ -637,11 +637,7 @@ function ResourcesPageContent() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
 
-  const [markdownModalState, setMarkdownModalState] = useState<{
-    isOpen: boolean;
-    resource: Resource | null;
-    point: ResourcePoint | null;
-  }>({ isOpen: false, resource: null, point: null });
+  const [markdownModalState, setMarkdownModalState] = useState<{ isOpen: boolean; resource: Resource | null; point: ResourcePoint | null; }>({ isOpen: false, resource: null, point: null });
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   
@@ -1214,7 +1210,7 @@ function ResourcesPageContent() {
                             <ScrollArea className="w-full whitespace-nowrap">
                                 <div className="flex space-x-2 pb-2">
                                 {activeResourceTabIds.map(id => {
-                                    const folder = resourceFolders && resourceFolders.find(f => f.id === id);
+                                    const folder = resourceFolders?.find(f => f.id === id);
                                     return folder ? (
                                     <Button
                                         key={id}
@@ -1237,7 +1233,7 @@ function ResourcesPageContent() {
                 </CardHeader>
                 <CardContent className="p-4 flex-grow">
                     <h2 className="text-2xl font-bold mb-4">
-                        {selectedResourceFolderId && !searchTerm && resourceFolders && resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
+                        {selectedResourceFolderId && !searchTerm && resourceFolders?.find(f => f.id === selectedResourceFolderId)?.name
                         ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
                         : searchTerm ? `Search results for "${searchTerm}"` : 'Select a folder'}
                     </h2>
@@ -1279,7 +1275,7 @@ function ResourcesPageContent() {
             </Card>
         </div>
         <DragOverlay>
-            {activeId && activeId.startsWith('folder_') ? <div className="p-2 bg-primary text-primary-foreground rounded-md shadow-lg flex items-center gap-2"><Folder className="h-4 w-4"/> {resourceFolders.find(f => f.id === activeId)?.name}</div> : null}
+            {activeId && activeId.startsWith('folder_') ? <div className="p-2 bg-primary text-primary-foreground rounded-md shadow-lg flex items-center gap-2"><Folder className="h-4 w-4"/> {resourceFolders?.find(f => f.id === activeId)?.name}</div> : null}
             {activeId && activeId.startsWith('res_') ? <div className="p-2 bg-primary text-primary-foreground rounded-md shadow-lg flex items-center gap-2"><Library className="h-4 w-4"/> {resources.find(r => r.id === activeId)?.name}</div> : null}
         </DragOverlay>
       </DndContext>
@@ -1365,7 +1361,7 @@ function ResourcesPageContent() {
         <Dialog open={isMindMapModalOpen} onOpenChange={setIsMindMapModalOpen}>
             <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
                 <DialogHeader className="p-4 border-b">
-                    <DialogTitle>Mind Map for: {resourceFolders.find(f => f.id === mindMapRootFolderId)?.name || 'Root'}</DialogTitle>
+                    <DialogTitle>Mind Map for: {resourceFolders?.find(f => f.id === mindMapRootFolderId)?.name || 'Root'}</DialogTitle>
                 </DialogHeader>
                 <div className="flex-grow min-h-0">
                   <MindMapViewer rootFolderId={mindMapRootFolderId} />
@@ -1541,3 +1537,5 @@ export default function ResourcesPage() {
         </AuthGuard>
     )
 }
+
+    
