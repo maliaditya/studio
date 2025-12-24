@@ -5,7 +5,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition, Stopper, Resource } from '@/types/workout';
 import {
-  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer, PieChart, AlertCircle, Brain, Flame, Shield
+  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer, PieChart, AlertCircle, Brain, Flame, Shield, Trash2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -58,7 +58,6 @@ export function TodaysScheduleCard({
     mechanismCards,
     logStopperEncounter,
     setResources,
-    handleDeleteStopper,
   } = useAuth();
   const { toast } = useToast();
 
@@ -140,7 +139,7 @@ export function TodaysScheduleCard({
     });
 
     return predictions;
-  }, [habitCards, mechanismCards]);
+  }, [habitCards, mechanismCards, schedule]);
 
   const scheduledActivities = useMemo(() => {
     const todaysSchedule = schedule[dayKey] || {};
@@ -352,6 +351,17 @@ export function TodaysScheduleCard({
     toast({ title: 'Success', description: `New ${view === 'urges' ? 'urge' : 'resistance'} has been logged.`});
   };
 
+  const handleDeleteStopper = (habitId: string, stopperId: string) => {
+    setResources(prev => prev.map(r => {
+      if (r.id === habitId) {
+        const updatedResource = { ...r };
+        updatedResource.urges = (updatedResource.urges || []).filter(s => s.id !== stopperId);
+        updatedResource.resistances = (updatedResource.resistances || []).filter(s => s.id !== stopperId);
+        return updatedResource;
+      }
+      return r;
+    }));
+  };
 
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
@@ -573,3 +583,5 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
+
+    
