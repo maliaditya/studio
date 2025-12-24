@@ -715,7 +715,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           logToUpdate.exercises[exerciseIndex] = exerciseToUpdate;
           newLogs[logIndex] = logToUpdate;
         } else {
-            // Task instance doesn't exist for this day, create it
             const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.id === definitionId);
             if (def) {
                 const newExercise: WorkoutExercise = {
@@ -733,7 +732,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         return newLogs;
       } else {
-          // No log for today, create one
           const def = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.id === definitionId);
           if (def) {
               const newExercise: WorkoutExercise = {
@@ -772,20 +770,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [permanentlyLoggedTaskIds, setPermanentlyLoggedTaskIds] = useState<Set<string>>(new Set());
 
   const onLogDuration = useCallback((activity: Activity, duration: number) => {
-    if (activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
-        const definitionId = logSubTaskTime(activity.taskIds[0], duration);
-        if (definitionId) {
-            setPermanentlyLoggedTaskIds(prev => new Set(prev).add(definitionId!));
-        }
-    }
-    
-    updateActivity({
-        ...activity,
-        duration: (activity.duration || 0) + duration,
-        completed: true,
-        completedAt: Date.now(),
-    });
-    toast({ title: 'Duration Logged & Task Completed!' });
+      const todayKey = format(new Date(), 'yyyy-MM-dd');
+      if (activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
+          const definitionId = logSubTaskTime(activity.taskIds[0], duration);
+          if (definitionId) {
+              setPermanentlyLoggedTaskIds(prev => new Set(prev).add(definitionId!));
+          }
+      }
+      
+      updateActivity({
+          ...activity,
+          duration: (activity.duration || 0) + duration,
+          completed: true,
+          completedAt: Date.now(),
+      });
+      toast({ title: 'Duration Logged & Task Completed!' });
   }, [updateActivity, toast, logSubTaskTime]);
   
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
@@ -800,7 +799,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 data: state.initialDrawing,
                 isPinned: (settings.pinnedCanvasIds || []).includes(canvasId)
             }];
-            // Also open any other pinned canvases
             (settings.pinnedCanvasIds || []).forEach(pinnedId => {
                 if (pinnedId !== canvasId) {
                     const resource = resources.find(r => r.points?.some(p => `${r.id}-${p.id}` === pinnedId));
@@ -850,7 +848,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [settings.pinnedCanvasIds, resources]);
   
   const openDrawingCanvasFromHeader = useCallback(() => {
-    // Find or create the scratchpad resource
     let scratchpadFolder = resourceFolders.find(f => f.name === 'Scratchpad');
     let updatedFolders = [...resourceFolders];
     let updatedResources = [...resources];
@@ -3084,9 +3081,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     
     let currentDefId: string | undefined;
     const taskInstanceId = activity.taskIds?.[0];
+    
     if (taskInstanceId) {
-        const allLogs = [...allUpskillLogs, ...allDeepWorkLogs, ...brandingLogs];
-        const taskInstance = allLogs.flatMap(l => l.exercises).find(ex => ex.id === taskInstanceId);
+        const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
+        const taskInstance = allLogs.flatMap(log => log.exercises).find(ex => ex.id === taskInstanceId);
         if (taskInstance) {
             currentDefId = taskInstance.definitionId;
         } else if (allDefs.has(taskInstanceId)) {
@@ -3142,7 +3140,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     try {
         await clearAllData();
         
-        // Reset the state of resources
         setResources(prev => prev.map(r => ({
             ...r,
             hasLocalAudio: false,
@@ -3635,3 +3632,4 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
