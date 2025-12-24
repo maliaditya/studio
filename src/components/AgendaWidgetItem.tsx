@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -64,8 +63,6 @@ export const AgendaWidgetItem = React.memo(({
     const { 
         setSelectedDeepWorkTask, 
         setSelectedUpskillTask,
-        deepWorkDefinitions,
-        upskillDefinitions,
         findRootTask
     } = useAuth();
 
@@ -83,17 +80,18 @@ export const AgendaWidgetItem = React.memo(({
         : null;
 
     const handleBadgeClick = (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent the main item click handler
+        e.stopPropagation();
     
         if (activity.completed && activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
             const rootTask = findRootTask(activity);
             if (rootTask) {
                 if (activity.linkedActivityType === 'deepwork') {
                     setSelectedDeepWorkTask(rootTask);
+                    router.push('/deep-work');
                 } else if (activity.linkedActivityType === 'upskill') {
                     setSelectedUpskillTask(rootTask);
+                    router.push('/upskill');
                 }
-                router.push('/deep-work');
             }
         }
     };
