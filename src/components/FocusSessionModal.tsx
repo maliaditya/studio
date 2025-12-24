@@ -11,7 +11,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
@@ -19,16 +18,7 @@ import { Label } from './ui/label';
 import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle, ArrowRight, Minus, Save, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import type { Activity, HabitEquation, Resource, ActivityType, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, WorkoutExercise } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  ResponsiveContainer,
-  RadialBarChart,
-  RadialBar,
-  PolarAngleAxis,
-} from 'recharts';
-import { ScrollArea } from './ui/scroll-area';
-import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-
 
 interface FocusSessionModalProps {
   isOpen: boolean;
@@ -50,26 +40,22 @@ export function FocusSessionModal({
   initialDuration,
 }: FocusSessionModalProps) {
   const { 
-    allDeepWorkLogs, 
-    allUpskillLogs,
     updateActivity, 
     skillDomains, 
     coreSkills,
-    setUpskillDefinitions,
-    setDeepWorkDefinitions,
-    setAllUpskillLogs,
-    setAllDeepWorkLogs,
+    handleCreateTask,
   } = useAuth();
   const [duration, setDuration] = useState(30);
   const [skipBreaks, setSkipBreaks] = useState(false);
   
   const [linkedActivityType, setLinkedActivityType] = useState<ActivityType | ''>(activity?.linkedActivityType || '');
 
-  // New state for hierarchical selection
+  // State for hierarchical selection
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   const [selectedSpecId, setSelectedSpecId] = useState<string | null>(null);
   const [selectedSkillAreaId, setSelectedSkillAreaId] = useState<string | null>(null);
   const [selectedMicroSkillId, setSelectedMicroSkillId] = useState<string | null>(null);
+  const [selectedParentTaskId, setSelectedParentTaskId] = useState<string>('new');
   const [createdTaskInfo, setCreatedTaskInfo] = useState<{ path: string[]; taskName: string } | null>(null);
   
   const specializations = useMemo(() => {
@@ -90,6 +76,22 @@ export function FocusSessionModal({
       const skillArea = spec.skillAreas.find(sa => sa.id === selectedSkillAreaId);
       return skillArea?.microSkills || [];
   }, [selectedSkillAreaId, selectedSpecId, coreSkills]);
+  
+  const parentTasks = useMemo(() => {
+    if (!selectedMicroSkillId || !linkedActivityType) return [];
+    const microSkill = microSkills.find(ms => ms.id === selectedMicroSkillId);
+    if (!microSkill) return [];
+    
+    const { deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType } = useAuth();
+    
+    if (linkedActivityType === 'deepwork') {
+        return deepWorkDefinitions.filter(def => def.category === microSkill.name && getDeepWorkNodeType(def) === 'Intention');
+    }
+    if (linkedActivityType === 'upskill') {
+        return upskillDefinitions.filter(def => def.category === microSkill.name && getUpskillNodeType(def) === 'Curiosity');
+    }
+    return [];
+  }, [selectedMicroSkillId, linkedActivityType, microSkills, useAuth]);
 
   useEffect(() => {
     setDuration(initialDuration > 0 ? initialDuration : 30);
@@ -99,6 +101,7 @@ export function FocusSessionModal({
     setSelectedSpecId(null);
     setSelectedSkillAreaId(null);
     setSelectedMicroSkillId(null);
+    setSelectedParentTaskId('new');
     setCreatedTaskInfo(null);
   }, [initialDuration, isOpen, activity]);
 
@@ -107,6 +110,7 @@ export function FocusSessionModal({
     setSelectedSpecId(null);
     setSelectedSkillAreaId(null);
     setSelectedMicroSkillId(null);
+    setSelectedParentTaskId('new');
     setCreatedTaskInfo(null);
   };
   
@@ -114,70 +118,46 @@ export function FocusSessionModal({
     setSelectedSpecId(specId);
     setSelectedSkillAreaId(null);
     setSelectedMicroSkillId(null);
+    setSelectedParentTaskId('new');
     setCreatedTaskInfo(null);
   };
 
   const handleSkillAreaChange = (areaId: string) => {
     setSelectedSkillAreaId(areaId);
     setSelectedMicroSkillId(null);
+    setSelectedParentTaskId('new');
     setCreatedTaskInfo(null);
   };
 
-  const handleCreateTask = () => {
-    if (!activity || !selectedMicroSkillId || !linkedActivityType) return;
+  const handleMicroSkillChange = (microSkillId: string) => {
+    setSelectedMicroSkillId(microSkillId);
+    setSelectedParentTaskId('new');
+    setCreatedTaskInfo(null);
+  }
 
+  const doCreateTask = async () => {
+    if (!activity || !selectedMicroSkillId || !linkedActivityType) return;
+    
     const microSkill = microSkills.find(ms => ms.id === selectedMicroSkillId);
     if (!microSkill) return;
 
-    const now = Date.now();
-    const taskName = activity.details;
-    
-    const childId = `def_${now}_child`;
-    const parentId = `def_${now}_parent`;
+    const taskInfo = await handleCreateTask(activity, linkedActivityType, microSkill.name, selectedParentTaskId);
+    if (taskInfo) {
+      const domain = skillDomains.find(d => d.id === selectedDomainId);
+      const spec = coreSkills.find(s => s.id === selectedSpecId);
+      const area = spec?.skillAreas.find(sa => sa.id === selectedSkillAreaId);
 
-    const childTask: ExerciseDefinition = {
-      id: childId,
-      name: taskName,
-      category: microSkill.name as any,
-      nodeType: linkedActivityType === 'deepwork' ? 'Action' : 'Visualization',
-    };
-    
-    const parentTask: ExerciseDefinition = {
-        id: parentId,
-        name: taskName,
-        category: microSkill.name as any,
-        nodeType: linkedActivityType === 'deepwork' ? 'Intention' : 'Curiosity',
-        [linkedActivityType === 'deepwork' ? 'linkedDeepWorkIds' : 'linkedUpskillIds']: [childId],
-    };
-
-    if (linkedActivityType === 'deepwork') {
-      setDeepWorkDefinitions(prev => [...prev, parentTask, childTask]);
-    } else if (linkedActivityType === 'upskill') {
-      setUpskillDefinitions(prev => [...prev, parentTask, childTask]);
+      setCreatedTaskInfo({
+        path: [
+          domain?.name || 'Unknown Domain',
+          spec?.name || 'Unknown Specialization',
+          area?.name || 'Unknown Skill Area',
+          microSkill.name,
+          taskInfo.parentName,
+        ],
+        taskName: taskInfo.childName
+      });
     }
-
-    const updatedActivity: Activity = {
-      ...activity,
-      taskIds: [childId], // Link to the leaf node (Action/Visualization)
-      linkedActivityType: linkedActivityType,
-      linkedEntityType: linkedActivityType === 'deepwork' ? 'intention' : 'curiosity',
-    };
-    updateActivity(updatedActivity);
-
-    const domain = skillDomains.find(d => d.id === selectedDomainId);
-    const spec = coreSkills.find(s => s.id === selectedSpecId);
-    const area = spec?.skillAreas.find(sa => sa.id === selectedSkillAreaId);
-
-    setCreatedTaskInfo({
-      path: [
-        domain?.name || 'Unknown Domain',
-        spec?.name || 'Unknown Specialization',
-        area?.name || 'Unknown Skill Area',
-        microSkill.name,
-        parentTask.name,
-      ],
-      taskName: childTask.name
-    });
   };
 
 
@@ -287,13 +267,27 @@ export function FocusSessionModal({
                             {selectedSkillAreaId && (
                                <div>
                                 <Label>5. Select Micro-Skill</Label>
-                                <Select onValueChange={setSelectedMicroSkillId} value={selectedMicroSkillId || ''}>
+                                <Select onValueChange={handleMicroSkillChange} value={selectedMicroSkillId || ''}>
                                     <SelectTrigger><SelectValue placeholder="Select Micro-Skill..." /></SelectTrigger>
                                     <SelectContent>
                                         {microSkills.map(ms => <SelectItem key={ms.id} value={ms.id}>{ms.name}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                                </div>
+                            )}
+                             {selectedMicroSkillId && (
+                                <div>
+                                    <Label>6. Select {linkedActivityType === 'deepwork' ? 'Intention' : 'Curiosity'}</Label>
+                                    <Select onValueChange={setSelectedParentTaskId} value={selectedParentTaskId || 'new'}>
+                                        <SelectTrigger><SelectValue placeholder="Select parent task..." /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="new">Add New Intention/Curiosity</SelectItem>
+                                            {parentTasks.map(task => (
+                                                <SelectItem key={task.id} value={task.id}>{task.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             )}
                              {createdTaskInfo && (
                                 <div className="p-3 bg-muted rounded-md text-sm">
@@ -323,7 +317,7 @@ export function FocusSessionModal({
                 <Save className="mr-2 h-4 w-4" /> Log & Complete
             </Button>
             {activity.type === 'pomodoro' ? (
-                <Button variant="secondary" onClick={handleCreateTask} disabled={!canCreateTask}>
+                <Button variant="secondary" onClick={doCreateTask} disabled={!canCreateTask}>
                     Create Task
                 </Button>
             ) : <div/>}
