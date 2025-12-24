@@ -1,12 +1,11 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition } from '@/types/workout';
 import {
-  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer
+  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer, PieChart
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -19,6 +18,7 @@ import { ScrollArea } from './ui/scroll-area';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
 import { useToast } from '@/hooks/use-toast';
 import { motion, useDragControls } from 'framer-motion';
+import { TimeAllocationChart } from './ProductivitySnapshot';
 
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
@@ -59,6 +59,7 @@ export function TodaysScheduleCard({
 
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
+  const [view, setView] = useState<'list' | 'chart'>('list');
   
   const dragControls = useDragControls()
   const listRef = useRef<HTMLUListElement>(null);
@@ -74,6 +75,8 @@ export function TodaysScheduleCard({
   };
 
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
+
+  const todaysSchedule = useMemo(() => schedule[dayKey] || {}, [schedule, dayKey]);
 
   const scheduledActivities = useMemo(() => {
     const todaysSchedule = schedule[dayKey] || {};
@@ -102,6 +105,63 @@ export function TodaysScheduleCard({
         listRef.current.scrollTop = listRef.current.scrollHeight;
     }
   }, [scheduledActivities]);
+
+  const parseDurationToMinutes = (durationStr: string | undefined): number => {
+    if (!durationStr || typeof durationStr !== 'string') return 0;
+    let totalMinutes = 0;
+    const hourMatch = durationStr.match(/(\d+(?:\.\d+)?)\s*h/);
+    const minMatch = durationStr.match(/(\d+)\s*m/);
+
+    if (hourMatch) {
+        totalMinutes += parseFloat(hourMatch[1]) * 60;
+    }
+    if (minMatch) {
+        totalMinutes += parseInt(minMatch[1], 10);
+    }
+    if (!hourMatch && !minMatch && /^\d+$/.test(durationStr.trim())) {
+        return parseInt(durationStr.trim(), 10);
+    }
+    return totalMinutes;
+  };
+
+  const timeAllocationData = useMemo(() => {
+    const dailyActivities = todaysSchedule ? Object.values(todaysSchedule).flat() as Activity[] : [];
+    const totals: Record<string, { time: number; activities: { name: string; duration: number }[] }> = {};
+    const activityNameMap: Record<ActivityType, string> = { 
+      deepwork: 'Deep Work', 
+      upskill: 'Learning', 
+      workout: 'Workout', 
+      branding: 'Branding', 
+      essentials: 'Essentials', 
+      planning: 'Planning', 
+      tracking: 'Tracking', 
+      'lead-generation': 'Lead Gen', 
+      interrupt: 'Interrupts',
+      distraction: 'Distractions', 
+      nutrition: 'Nutrition',
+      mindset: 'Mindset',
+      pomodoro: 'Pomodoro',
+    };
+  
+    dailyActivities.forEach((activity) => {
+      if (activity && activity.completed) {
+        const activityType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+        const mappedName = activityNameMap[activityType];
+        if (mappedName) {
+          const duration = parseDurationToMinutes(activityDurations[activity.id]);
+          if (duration > 0) {
+            if (!totals[mappedName]) {
+              totals[mappedName] = { time: 0, activities: [] };
+            }
+            totals[mappedName].time += duration;
+            totals[mappedName].activities.push({ name: activity.details, duration });
+          }
+        }
+      }
+    });
+  
+    return Object.entries(totals).map(([name, data]) => ({ name, time: data.time, activities: data.activities }));
+  }, [todaysSchedule, activityDurations]);
 
 
   const pendingTasks = React.useMemo(() => {
@@ -209,6 +269,10 @@ export function TodaysScheduleCard({
             >
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                 <div className="flex items-center">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView(v => v === 'list' ? 'chart' : 'list')}>
+                        <PieChart className="h-4 w-4" />
+                        <span className="sr-only">Toggle Chart View</span>
+                    </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleAddPomodoro}>
                         <Timer className="h-4 w-4" />
                         <span className="sr-only">Add Pomodoro</span>
@@ -290,7 +354,8 @@ export function TodaysScheduleCard({
             </div>
         </CardHeader>
         <CardContent className="p-3">
-            {scheduledActivities.length > 0 ? (
+            {view === 'list' ? (
+              scheduledActivities.length > 0 ? (
                  <ul ref={listRef} className="space-y-1 max-h-64 overflow-y-auto pr-2">
                     {slotOrder.map(slotName => {
                         const activitiesForSlot = scheduledActivities.filter(a => a.slot === slotName);
@@ -324,10 +389,15 @@ export function TodaysScheduleCard({
                         );
                     })}
                 </ul>
+              ) : (
+                  <div className="text-center text-muted-foreground py-4">
+                      <p className="text-sm">No activities scheduled.</p>
+                  </div>
+              )
             ) : (
-                <div className="text-center text-muted-foreground py-4">
-                    <p className="text-sm">No activities scheduled.</p>
-                </div>
+              <div className="h-[250px] w-full">
+                <TimeAllocationChart timeAllocationData={timeAllocationData} />
+              </div>
             )}
         </CardContent>
     </Card>
@@ -358,5 +428,3 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
-
-    
