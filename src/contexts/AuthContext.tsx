@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
@@ -715,8 +714,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return false;
     };
     
-    if (!findTaskAndUpdate([...allUpskillLogs], setAllUpskillLogs, 'reps')) {
-      findTaskAndUpdate([...allDeepWorkLogs], setAllDeepWorkLogs, 'weight');
+    let wasFound = findTaskAndUpdate([...allUpskillLogs], setAllUpskillLogs, 'reps');
+    if (!wasFound) {
+      wasFound = findTaskAndUpdate([...allDeepWorkLogs], setAllDeepWorkLogs, 'weight');
     }
 
     if (definitionId) {
@@ -738,10 +738,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [permanentlyLoggedTaskIds, setPermanentlyLoggedTaskIds] = useState<Set<string>>(new Set());
 
   const onLogDuration = useCallback((activity: Activity, duration: number) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
     if (activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
-      const taskLogInfo = logSubTaskTime(activity.taskIds[0], duration);
-       if (taskLogInfo?.definitionId) {
-          setPermanentlyLoggedTaskIds(prev => new Set(prev).add(taskLogInfo.definitionId!));
+      const taskInstanceId = activity.taskIds[0];
+      let definitionId: string | undefined;
+
+      // Find which log array the task instance belongs to
+      let logFound = false;
+      const upskillLog = allUpskillLogs.find(l => l.date === todayKey);
+      if (upskillLog && upskillLog.exercises.some(e => e.id === taskInstanceId)) {
+        logFound = true;
+        definitionId = upskillLog.exercises.find(e => e.id === taskInstanceId)?.definitionId;
+      }
+      
+      if (!logFound) {
+        const deepWorkLog = allDeepWorkLogs.find(l => l.date === todayKey);
+        if (deepWorkLog && deepWorkLog.exercises.some(e => e.id === taskInstanceId)) {
+          definitionId = deepWorkLog.exercises.find(e => e.id === taskInstanceId)?.definitionId;
+        }
+      }
+
+      if (definitionId) {
+          logSubTaskTime(taskInstanceId, duration);
+          setPermanentlyLoggedTaskIds(prev => new Set(prev).add(definitionId!));
           toast({ title: 'Task Completed!', description: `The underlying task has been marked as complete.` });
       }
     }
@@ -753,7 +772,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         completedAt: Date.now(),
     });
     toast({ title: 'Duration Logged & Task Completed!' });
-  }, [updateActivity, toast, logSubTaskTime]);
+  }, [updateActivity, toast, logSubTaskTime, allUpskillLogs, allDeepWorkLogs]);
   
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
@@ -2908,7 +2927,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       let activityUpdated = false;
   
       Object.keys(daySchedule).forEach(slotName => {
-        const activities = (daySchedule[slotName] as Activity[]) || [];
+        const activities = (daySchedule[slotName as SlotName] as Activity[]) || [];
         const activityIndex = activities.findIndex(act => act.id === activityId);
         
         if (activityIndex > -1) {
@@ -3713,3 +3732,6 @@ export const useAuth = (): AuthContextType => {
 
 
 
+
+
+    
