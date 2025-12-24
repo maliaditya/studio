@@ -680,21 +680,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return newSchedule;
     });
   }, [setSchedule]);
-
+  
   const onLogDuration = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const taskInstanceId = activity.taskIds?.[0];
   
     // Find the master definition ID from the daily log instance
     let definitionId: string | undefined;
-    if (taskInstanceId) {
-      const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
-      const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === taskInstanceId);
-      
-      const isUpskillLog = allUpskillLogs.some(log => log.exercises.some(ex => ex.id === taskInstanceId));
+    let isUpskillLog = false;
+    let taskLog;
 
-      if (taskLog) {
-        definitionId = taskLog.definitionId;
+    if (taskInstanceId) {
+        const deepWorkLog = allDeepWorkLogs.flatMap(log => log.exercises).find(ex => ex.id === taskInstanceId);
+        if (deepWorkLog) {
+            taskLog = deepWorkLog;
+        } else {
+            const upskillLog = allUpskillLogs.flatMap(log => log.exercises).find(ex => ex.id === taskInstanceId);
+            if (upskillLog) {
+                taskLog = upskillLog;
+                isUpskillLog = true;
+            }
+        }
+        
+        if (!taskLog) {
+            const allDefs = [...upskillDefinitions, ...deepWorkDefinitions];
+            const def = allDefs.find(d => d.id === taskInstanceId);
+            if (def) {
+                definitionId = def.id;
+                isUpskillLog = upskillDefinitions.some(d => d.id === def.id);
+            }
+        } else {
+            definitionId = taskLog.definitionId;
+        }
+    }
+  
+    if (definitionId) {
         const setDefinitions = isUpskillLog ? setUpskillDefinitions : setDeepWorkDefinitions;
         
         setDefinitions(prevDefs => prevDefs.map(def => {
@@ -708,10 +728,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
             return def;
         }));
-      }
-    }
-  
-    if (definitionId) {
+
         setPermanentlyLoggedTaskIds(prev => new Set(prev).add(definitionId!));
     }
   
@@ -723,7 +740,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   
     toast({ title: 'Task Completed!', description: `Logged ${duration} minutes.` });
-  }, [updateActivity, toast, allUpskillLogs, allDeepWorkLogs, setUpskillDefinitions, setDeepWorkDefinitions]);
+  }, [updateActivity, toast, allUpskillLogs, allDeepWorkLogs, setUpskillDefinitions, setDeepWorkDefinitions, upskillDefinitions, deepWorkDefinitions]);
   
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
@@ -1024,6 +1041,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return total;
   }, [deepWorkDefinitions, upskillDefinitions]);
   
+  const logSubTaskTime = useCallback((taskInstanceId: string, durationMinutes: number) => {
+    const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
+    const taskLog = allLogs.flatMap(log => log.exercises).find(ex => ex.id === taskInstanceId);
+  
+    if (!taskLog) {
+      console.warn(`Could not find task instance with ID: ${taskInstanceId} to log time.`);
+      return;
+    }
+  
+    const { definitionId } = taskLog;
+    const isUpskill = upskillDefinitions.some(d => d.id === definitionId);
+    const setDefinitions = isUpskill ? setUpskillDefinitions : setDeepWorkDefinitions;
+    
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+
+    setDefinitions(prevDefs => prevDefs.map(def => {
+        if (def.id === definitionId) {
+            const newLoggedDuration = (def.loggedDuration || 0) + durationMinutes;
+            return {
+                ...def,
+                loggedDuration: newLoggedDuration,
+                last_logged_date: todayKey,
+            };
+        }
+        return def;
+    }));
+    
+    return { definitionId };
+
+  }, [allUpskillLogs, allDeepWorkLogs, upskillDefinitions, deepWorkDefinitions, setUpskillDefinitions, setDeepWorkDefinitions]);
+
   const handleCreateTask = useCallback(async (activity: Activity, linkedActivityType: ActivityType, microSkillName: string, parentTaskId: string): Promise<{ parentName: string, childName: string, childId: string } | null> => {
     const setDefinitions = linkedActivityType === 'deepwork' ? setDeepWorkDefinitions : setUpskillDefinitions;
     const allDefinitions = linkedActivityType === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
@@ -3696,5 +3744,6 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
 
 
