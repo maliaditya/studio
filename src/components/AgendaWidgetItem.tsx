@@ -13,6 +13,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { EditableActivityText } from './EditableActivityText';
+import { useRouter } from 'next/navigation';
 
 
 const activityIcons: Record<ActivityType, React.ReactNode> = {
@@ -59,6 +60,14 @@ export const AgendaWidgetItem = React.memo(({
     loggedDuration,
 }: AgendaWidgetItemProps) => {
     const isTimeslot = context === 'timeslot';
+    const router = useRouter();
+    const { 
+        setSelectedDeepWorkTask, 
+        setSelectedUpskillTask,
+        deepWorkDefinitions,
+        upskillDefinitions,
+        findRootTask
+    } = useAuth();
 
     const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition'].includes(activity.type);
 
@@ -72,6 +81,23 @@ export const AgendaWidgetItem = React.memo(({
     const linkedActivityName = activity.type === 'pomodoro' && activity.linkedActivityType
         ? activity.linkedActivityType.charAt(0).toUpperCase() + activity.linkedActivityType.slice(1).replace('-', ' ')
         : null;
+
+    const handleBadgeClick = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent the main item click handler
+    
+        if (activity.completed && activity.type === 'pomodoro' && activity.taskIds && activity.taskIds.length > 0) {
+            const rootTask = findRootTask(activity);
+            if (rootTask) {
+                if (activity.linkedActivityType === 'deepwork') {
+                    setSelectedDeepWorkTask(rootTask);
+                    router.push('/deep-work');
+                } else if (activity.linkedActivityType === 'upskill') {
+                    setSelectedUpskillTask(rootTask);
+                    router.push('/deep-work'); // Both deepwork and upskill are on the same page now
+                }
+            }
+        }
+    };
 
     return (
         <li 
@@ -101,7 +127,15 @@ export const AgendaWidgetItem = React.memo(({
                     <div className="flex items-center gap-1 text-xs text-muted-foreground capitalize">
                         {activityIcons[activity.type]} {activity.type.replace('-', ' ')}
                     </div>
-                    {linkedActivityName && <Badge variant={activity.completed ? 'outline' : 'secondary'}>{linkedActivityName}</Badge>}
+                    {linkedActivityName && (
+                        <Badge 
+                            variant={activity.completed ? 'outline' : 'secondary'}
+                            onClick={handleBadgeClick}
+                            className={cn(activity.completed && "cursor-pointer hover:bg-accent")}
+                        >
+                            {linkedActivityName}
+                        </Badge>
+                    )}
                     {isPlanningTask && <Badge variant="outline">Planning</Badge>}
                     {activity.completed && loggedDuration && (
                         <Badge variant="secondary">{loggedDuration}</Badge>
