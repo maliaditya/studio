@@ -3,9 +3,9 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition, Stopper } from '@/types/workout';
 import {
-  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer, PieChart
+  Grab, Dock, Move, History, PlusCircle, BrainCircuit, Timer, PieChart, AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -13,13 +13,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useAuth } from '@/contexts/AuthContext';
-import { format, addDays } from 'date-fns';
+import { format, addDays, startOfToday, subDays, getHours } from 'date-fns';
 import { ScrollArea } from './ui/scroll-area';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
 import { useToast } from '@/hooks/use-toast';
 import { motion, useDragControls } from 'framer-motion';
 import { TimeAllocationChart } from './ProductivitySnapshot';
-
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
@@ -46,14 +45,15 @@ export function TodaysScheduleCard({
   schedule,
   activityDurations,
 }: TodaysScheduleCardProps) {
-  const {
+  const { 
     currentUser,
-    carryForwardTask,
     settings,
     setSettings,
-    handleToggleComplete,
-    toggleRoutine,
+    handleToggleComplete, 
+    toggleRoutine, 
     setSchedule: setGlobalSchedule,
+    habitCards,
+    mechanismCards,
   } = useAuth();
   const { toast } = useToast();
 
@@ -63,7 +63,6 @@ export function TodaysScheduleCard({
   
   const dragControls = useDragControls()
   const listRef = useRef<HTMLUListElement>(null);
-
 
   useEffect(() => {
     setPurposeText(settings.currentPurpose || '');
@@ -77,6 +76,61 @@ export function TodaysScheduleCard({
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
 
   const todaysSchedule = useMemo(() => schedule[dayKey] || {}, [schedule, dayKey]);
+  
+  const predictedResistances = useMemo(() => {
+    const today = new Date();
+    const sevenDaysAgo = subDays(startOfToday(today), 7);
+    const predictions: Record<string, { text: string; type: 'Urge' | 'Resistance' }[]> = {
+        'Late Night': [], 'Dawn': [], 'Morning': [], 'Afternoon': [], 'Evening': [], 'Night': [],
+    };
+
+    const allLinks: { stopper: Stopper; isUrge: boolean }[] = [];
+    habitCards.forEach(habit => {
+        (habit.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
+        (habit.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
+    });
+    mechanismCards.forEach(mechanism => {
+        (mechanism.urges || []).forEach(stopper => allLinks.push({ stopper, isUrge: true }));
+        (mechanism.resistances || []).forEach(stopper => allLinks.push({ stopper, isUrge: false }));
+    });
+    
+    const slotTimes: { name: SlotName, start: number, end: number }[] = [
+        { name: 'Late Night', start: 0, end: 4 },
+        { name: 'Dawn', start: 4, end: 8 },
+        { name: 'Morning', start: 8, end: 12 },
+        { name: 'Afternoon', start: 12, end: 16 },
+        { name: 'Evening', start: 16, end: 20 },
+        { name: 'Night', start: 20, end: 24 },
+    ];
+
+    allLinks.forEach(link => {
+        const slotCounts: Record<string, number> = {};
+        (link.stopper.timestamps || []).forEach(ts => {
+            const eventDate = new Date(ts);
+            if (eventDate >= sevenDaysAgo) {
+                const hour = getHours(eventDate);
+                const slot = slotTimes.find(s => hour >= s.start && hour < s.end);
+                if (slot) {
+                    slotCounts[slot.name] = (slotCounts[slot.name] || 0) + 1;
+                }
+            }
+        });
+
+        for (const slotName in slotCounts) {
+            if (slotCounts[slotName] > 0) { // Can be adjusted for higher frequency if needed
+                const existing = predictions[slotName].find(p => p.text === link.stopper.text);
+                if (!existing) {
+                    predictions[slotName].push({
+                        text: link.stopper.text,
+                        type: link.isUrge ? 'Urge' : 'Resistance',
+                    });
+                }
+            }
+        }
+    });
+
+    return predictions;
+  }, [habitCards, mechanismCards]);
 
   const scheduledActivities = useMemo(() => {
     const todaysSchedule = schedule[dayKey] || {};
@@ -164,15 +218,6 @@ export function TodaysScheduleCard({
   }, [todaysSchedule, activityDurations]);
 
 
-  const pendingTasks = React.useMemo(() => {
-    const yesterday = addDays(date, -1);
-    const yesterdayKey = format(yesterday, 'yyyy-MM-dd');
-    const yesterdaysSchedule = schedule[yesterdayKey] || {};
-    return Object.values(yesterdaysSchedule)
-      .flat()
-      .filter((activity): activity is Activity => !!activity && !activity.completed);
-  }, [schedule, date]);
-
   const [position, setPosition] = useState({ x: 20, y: 80 });
 
   const positionKey = currentUser ? `lifeos_agenda_widget_position_${currentUser.username}` : null;
@@ -232,31 +277,6 @@ export function TodaysScheduleCard({
         return newSchedule;
     });
   };
-  
-  const handleAddPomodoro = () => {
-    const newActivity: Activity = {
-      id: `pomodoro-${Date.now()}`,
-      type: 'pomodoro',
-      details: 'New Pomodoro',
-      completed: false,
-      slot: currentSlot,
-      habitEquationIds: [],
-      taskIds: [],
-    };
-    setGlobalSchedule(prev => {
-      const daySchedule = prev[dayKey] || {};
-      const slotActivities = (daySchedule[currentSlot as SlotName] as Activity[] || []);
-      return {
-        ...prev,
-        [dayKey]: {
-          ...daySchedule,
-          [currentSlot]: [...slotActivities, newActivity],
-        },
-      };
-    });
-    toast({ title: 'Pomodoro Added', description: `A new Pomodoro session has been added to your ${currentSlot} slot.` });
-  };
-
 
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
@@ -306,11 +326,13 @@ export function TodaysScheduleCard({
         </CardHeader>
         <CardContent className="p-3">
             {view === 'list' ? (
-              scheduledActivities.length > 0 ? (
+              scheduledActivities.length > 0 || Object.values(predictedResistances).some(v => v.length > 0) ? (
                  <ul ref={listRef} className="space-y-1 max-h-64 overflow-y-auto pr-2">
                     {slotOrder.map(slotName => {
                         const activitiesForSlot = scheduledActivities.filter(a => a.slot === slotName);
-                        if (activitiesForSlot.length === 0) return null;
+                        const predictionsForSlot = predictedResistances[slotName] || [];
+                        if (activitiesForSlot.length === 0 && predictionsForSlot.length === 0) return null;
+                        
                         const isCurrent = slotName === currentSlot;
                         return (
                             <li key={slotName}>
@@ -334,6 +356,14 @@ export function TodaysScheduleCard({
                                         context="agenda"
                                         loggedDuration={activityDurations[activity.id]}
                                     />
+                                ))}
+                                {predictionsForSlot.map((prediction, index) => (
+                                    <li key={`pred-${index}`} className="flex items-center gap-2 p-1">
+                                        <AlertCircle className={cn("h-4 w-4 flex-shrink-0", prediction.type === 'Urge' ? 'text-red-500' : 'text-yellow-500')} />
+                                        <p className="text-xs text-muted-foreground italic truncate" title={prediction.text}>
+                                            {prediction.text}
+                                        </p>
+                                    </li>
                                 ))}
                                 </ul>
                             </li>
