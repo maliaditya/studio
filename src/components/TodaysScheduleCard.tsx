@@ -60,6 +60,8 @@ export function TodaysScheduleCard({
     resources,
     setResources,
     metaRules,
+    patterns,
+    logStopperEncounter,
   } = useAuth();
   const { toast } = useToast();
 
@@ -68,7 +70,6 @@ export function TodaysScheduleCard({
   const [view, setView] = useState<'list' | 'chart' | 'urges' | 'resistances' | 'rules'>('list');
   
   const [newEntryText, setNewEntryText] = useState('');
-  const [selectedHabitId, setSelectedHabitId] = useState<string>('');
   const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
   const [selectedResistanceIds, setSelectedResistanceIds] = useState<string[]>([]);
   
@@ -358,6 +359,16 @@ export function TodaysScheduleCard({
     }));
   };
 
+  const handleRuleClick = (e: React.MouseEvent, rule: MetaRule) => {
+    const patternForRule = patterns.find(p => p.id === rule.patternId);
+    if (!patternForRule) return;
+
+    const habitPhrase = patternForRule.phrases.find(p => p.category === 'Habit Cards');
+    if (!habitPhrase || !habitPhrase.mechanismCardId) return;
+
+    onOpenHabitPopup(habitPhrase.mechanismCardId, e);
+  };
+
   const cardContent = (
     <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
         <CardHeader
@@ -484,7 +495,7 @@ export function TodaysScheduleCard({
                                 <Input 
                                     value={newEntryText}
                                     onChange={e => setNewEntryText(e.target.value)}
-                                    placeholder={`Describe the ${view}...`}
+                                    placeholder={`Describe the ${view === 'urges' ? 'urge' : 'resistance'}...`}
                                 />
                                 {view === 'urges' && (
                                     <Popover>
@@ -530,7 +541,7 @@ export function TodaysScheduleCard({
                                 
                                 return (
                                 <li key={id}>
-                                    <div className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50 group">
+                                    <div className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50 group" onClick={e => isStopper ? null : handleRuleClick(e, item as MetaRule)}>
                                         <div className="flex-grow pr-2">
                                             <p className="font-medium">{text}</p>
                                         </div>
@@ -582,5 +593,3 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
-
-    
