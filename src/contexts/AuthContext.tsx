@@ -563,7 +563,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Focus Session
   const [focusSessionModalOpen, setFocusSessionModalOpen] = useState(false);
   const [focusActivity, setFocusActivity] = useState<Activity | null>(null);
-  const [focusDuration, setFocusDuration] = useState(45);
+  const [focusDuration, setFocusDuration] = useState(25);
   const [activeFocusSession, setActiveFocusSession] = useState<ActiveFocusSession | null>(null);
 
   // Canvas State
@@ -691,25 +691,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     let taskLog;
 
     if (taskInstanceId) {
-        const deepWorkLog = allDeepWorkLogs.flatMap(log => log.exercises).find(ex => ex.id === taskInstanceId);
-        if (deepWorkLog) {
-            taskLog = deepWorkLog;
-        } else {
-            const upskillLog = allUpskillLogs.flatMap(log => log.exercises).find(ex => ex.id === taskInstanceId);
-            if (upskillLog) {
-                taskLog = upskillLog;
-                isUpskillLog = true;
-            }
-        }
+        const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
+        const taskLogInstance = allLogs.flatMap(log => log.exercises).find(ex => ex.id === taskInstanceId);
         
-        if (!taskLog) {
+        if(taskLogInstance) {
+            taskLog = taskLogInstance;
+            isUpskillLog = allUpskillLogs.some(log => log.exercises.some(ex => ex.id === taskInstanceId));
+        } else {
             const allDefs = [...upskillDefinitions, ...deepWorkDefinitions];
             const def = allDefs.find(d => d.id === taskInstanceId);
             if (def) {
                 definitionId = def.id;
                 isUpskillLog = upskillDefinitions.some(d => d.id === def.id);
             }
-        } else {
+        }
+        
+        if (taskLog) {
             definitionId = taskLog.definitionId;
         }
     }
@@ -1173,7 +1170,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             minutes = parseInt(estDurationStr.trim());
         }
     }
-    if (isNaN(minutes) || minutes <= 0) minutes = 45;
+    if (isNaN(minutes) || minutes <= 0) minutes = 25;
   
     setFocusDuration(minutes);
     setFocusActivity(activity);
@@ -3744,6 +3741,7 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
 
 
 
