@@ -5,7 +5,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,6 +39,51 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     distraction: <Wind className="h-4 w-4 text-yellow-500" />,
     mindset: <Brain className="h-4 w-4" />,
     pomodoro: <Timer className="h-4 w-4" />,
+};
+
+const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType, details: string) => void }) => {
+    const { coreSkills } = useAuth();
+    const specializations = coreSkills.filter(s => s.type === 'Specialization');
+
+    return (
+        <DropdownMenuContent className="w-56 p-2">
+            <p className="font-medium text-sm p-2">Select Activity</p>
+            {Object.entries(activityIcons).map(([type, icon]) => {
+                const activityType = type as ActivityType;
+                if (activityType === 'upskill' || activityType === 'deepwork') {
+                    return (
+                        <DropdownMenuSub key={type}>
+                            <DropdownMenuSubTrigger className="w-full justify-start">
+                                {icon}
+                                <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                                <DropdownMenuSubContent>
+                                    <ScrollArea className="h-48">
+                                        {specializations.length > 0 ? (
+                                            specializations.map(spec => (
+                                                <DropdownMenuItem key={spec.id} onClick={() => onAddActivity(activityType, spec.name)}>
+                                                    {spec.name}
+                                                </DropdownMenuItem>
+                                            ))
+                                        ) : (
+                                            <DropdownMenuItem disabled>No specializations defined</DropdownMenuItem>
+                                        )}
+                                    </ScrollArea>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                        </DropdownMenuSub>
+                    );
+                }
+                return (
+                    <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, '')}>
+                        {icon}
+                        <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
+                    </DropdownMenuItem>
+                );
+            })}
+        </DropdownMenuContent>
+    );
 };
 
 interface AgendaWidgetItemProps {
@@ -471,9 +516,9 @@ export function TodaysScheduleCard({
                     <PopoverTrigger asChild>
                         <button className="flex items-center gap-2 text-left cursor-pointer group">
                             <BrainCircuit className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                            <CardDescription className="text-xs group-hover:text-foreground transition-colors whitespace-pre-wrap break-words" title={purposeText}>
+                            <p className="text-xs group-hover:text-foreground transition-colors whitespace-pre-wrap break-words" title={purposeText}>
                                 {purposeText || "Click to set a daily purpose..."}
-                            </CardDescription>
+                            </p>
                         </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80">
@@ -552,35 +597,6 @@ export function TodaysScheduleCard({
                                     onChange={e => setNewEntryText(e.target.value)}
                                     placeholder={`Describe the ${view === 'urges' ? 'urge' : 'resistance'}...`}
                                 />
-                                {view === 'urges' && (
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                                {selectedResistanceIds.length > 0 ? `${selectedResistanceIds.length} resistance(s) selected` : "Link Resistances..."}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-64 p-0">
-                                            <ScrollArea className="h-48">
-                                                <div className="p-2 space-y-1">
-                                                    {allResistancesAndUrges.resistances.map(stopper => (
-                                                        <div key={stopper.id} className="flex items-center space-x-2">
-                                                            <Checkbox
-                                                                id={`res-check-${stopper.id}`}
-                                                                checked={selectedResistanceIds.includes(stopper.id)}
-                                                                onCheckedChange={(checked) => {
-                                                                    setSelectedResistanceIds(prev =>
-                                                                        checked ? [...prev, stopper.id] : prev.filter(id => id !== stopper.id)
-                                                                    );
-                                                                }}
-                                                            />
-                                                            <Label htmlFor={`res-check-${stopper.id}`} className="text-xs font-normal">{stopper.text}</Label>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </ScrollArea>
-                                        </PopoverContent>
-                                    </Popover>
-                                )}
                                 <Button onClick={handleAddEntry} className="w-full">Add Entry</Button>
                             </PopoverContent>
                         </Popover>
