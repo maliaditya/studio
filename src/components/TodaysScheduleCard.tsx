@@ -245,6 +245,7 @@ export function TodaysScheduleCard({
     syncWithGitHub,
     downloadFromGitHub,
     openMindsetWidget,
+    openDrawingCanvasFromHeader
   } = useAuth();
   const router = useRouter();
 
@@ -516,6 +517,18 @@ export function TodaysScheduleCard({
                         <Paintbrush className="h-4 w-4" />
                         <span className="sr-only">Canvas</span>
                     </Button>
+                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('rules')}>
+                        <Workflow className="h-4 w-4" />
+                        <span className="sr-only">Rules</span>
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('urges')}>
+                        <Flame className="h-4 w-4" />
+                        <span className="sr-only">Urges</span>
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('resistances')}>
+                        <Shield className="h-4 w-4" />
+                        <span className="sr-only">Resistances</span>
+                    </Button>
                     <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
                         {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
                     </Button>
@@ -646,9 +659,6 @@ export function TodaysScheduleCard({
                 </Button>
                 <Button variant="ghost" size="sm" onClick={openMindsetWidget}>
                   <Brain className="h-4 w-4" />
-                </Button>
-                 <Button variant="ghost" size="sm" onClick={() => setView('rules')}>
-                    <Workflow className={cn("h-4 w-4", view === 'rules' && "text-primary")} />
                 </Button>
             </div>
             <div className="flex items-center">
