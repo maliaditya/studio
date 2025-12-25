@@ -23,7 +23,7 @@ import { getExercisesForDay } from '@/lib/workoutUtils';
 import { TimeAllocationChart } from './ProductivitySnapshot';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-is-mobile';
 
 
 const activityIcons: Record<ActivityType, React.ReactNode> = {
@@ -74,14 +74,6 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
                                 </DropdownMenuSubContent>
                             </DropdownMenuPortal>
                         </DropdownMenuSub>
-                    );
-                }
-                if (activityType === 'pomodoro') {
-                    return (
-                        <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, '')}>
-                            {icon}
-                            <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
-                        </DropdownMenuItem>
                     );
                 }
                 return (
@@ -426,7 +418,7 @@ export function TodaysScheduleCard({
         const { description } = getExercisesForDay(date, 'two-muscle', {}, [], false, 'day-of-week');
         activityDetails = description || "New Workout";
     } else if (!details) {
-        if (type === 'pomodoro') activityDetails = "New Pomodoro Session";
+        if (type === 'pomodoro') activityDetails = "New Pomodoro";
         else activityDetails = `New ${type.replace('-', ' ')}`;
     }
     
@@ -502,6 +494,14 @@ export function TodaysScheduleCard({
             <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                 <div className="flex items-center">
+                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}>
+                        <UploadCloud className="h-4 w-4" />
+                        <span className="sr-only">Push to Cloud</span>
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}>
+                        <DownloadCloud className="h-4 w-4" />
+                        <span className="sr-only">Download from Cloud</span>
+                    </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleAddPomodoro}>
                         <Timer className="h-4 w-4" />
                         <span className="sr-only">Add Pomodoro</span>
@@ -509,14 +509,6 @@ export function TodaysScheduleCard({
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push('/canvas')}>
                         <Paintbrush className="h-4 w-4" />
                         <span className="sr-only">Canvas</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}>
-                        <UploadCloud className="h-4 w-4" />
-                        <span className="sr-only">Push to Cloud</span>
-                    </Button>
-                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}>
-                        <DownloadCloud className="h-4 w-4" />
-                        <span className="sr-only">Download from Cloud</span>
                     </Button>
                     <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
                         {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
@@ -638,6 +630,33 @@ export function TodaysScheduleCard({
                  </div>
             )}
         </CardContent>
+        <CardFooter className="p-2 flex justify-between items-center">
+            <div className="flex items-center">
+                <Button variant="ghost" size="sm" onClick={() => setView('list')}>
+                    <ListChecks className={cn("h-4 w-4", view === 'list' && "text-primary")} />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setView('chart')}>
+                    <PieChart className={cn("h-4 w-4", view === 'chart' && "text-primary")} />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setView('urges')}>
+                    <Flame className={cn("h-4 w-4", view === 'urges' && "text-primary")} />
+                </Button>
+                 <Button variant="ghost" size="sm" onClick={() => setView('resistances')}>
+                    <Shield className={cn("h-4 w-4", view === 'resistances' && "text-primary")} />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setView('rules')}>
+                    <Workflow className={cn("h-4 w-4", view === 'rules' && "text-primary")} />
+                </Button>
+            </div>
+            <div className="flex items-center">
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8"><PlusCircle className="h-4 w-4"/></Button>
+                    </DropdownMenuTrigger>
+                    <AddActivityMenu onAddActivity={(type, details) => handleAddActivity(type, details)} />
+                </DropdownMenu>
+            </div>
+        </CardFooter>
     </Card>
   );
 
