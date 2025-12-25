@@ -5,7 +5,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, PlusCircle } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -221,6 +221,7 @@ export function TodaysScheduleCard({
   onOpenHabitPopup,
   currentSlot,
 }: TodaysScheduleCardProps) {
+  const { toast } = useToast();
   const { 
     currentUser,
     settings,
@@ -516,9 +517,9 @@ export function TodaysScheduleCard({
                     <PopoverTrigger asChild>
                         <button className="flex items-center gap-2 text-left cursor-pointer group">
                             <BrainCircuit className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                            <p className="text-xs group-hover:text-foreground transition-colors whitespace-pre-wrap break-words" title={purposeText}>
+                            <CardDescription className="text-xs group-hover:text-foreground transition-colors whitespace-pre-wrap break-words" title={purposeText}>
                                 {purposeText || "Click to set a daily purpose..."}
-                            </p>
+                            </CardDescription>
                         </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80">
