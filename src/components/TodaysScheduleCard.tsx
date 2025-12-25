@@ -5,7 +5,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule } from '@/types/workout';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +23,8 @@ import { getExercisesForDay } from '@/lib/workoutUtils';
 import { TimeAllocationChart } from './ProductivitySnapshot';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { useIsMobile } from '@/hooks/use-mobile';
+
 
 const activityIcons: Record<ActivityType, React.ReactNode> = {
     workout: <Dumbbell className="h-4 w-4" />,
@@ -75,12 +77,12 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
                     );
                 }
                 if (activityType === 'pomodoro') {
-                   return (
-                        <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, 'New Pomodoro Session')}>
+                    return (
+                        <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, '')}>
                             {icon}
                             <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
                         </DropdownMenuItem>
-                   );
+                    );
                 }
                 return (
                     <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, '')}>
@@ -243,7 +245,8 @@ export function TodaysScheduleCard({
     resources,
     metaRules,
     patterns,
-    syncWithGitHub
+    syncWithGitHub,
+    downloadFromGitHub,
   } = useAuth();
   const router = useRouter();
 
@@ -255,6 +258,7 @@ export function TodaysScheduleCard({
   
   const dragControls = useDragControls()
   const listRef = useRef<HTMLUListElement>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     setPurposeText(settings.currentPurpose || '');
@@ -487,8 +491,10 @@ export function TodaysScheduleCard({
     onOpenHabitPopup(habitPhrase.mechanismCardId, e);
   };
 
+  const cardHeightClass = isMobile ? 'h-[80vh]' : isAgendaDocked ? 'h-full' : 'h-auto';
+
   const cardContent = (
-    <Card className={cn("shadow-2xl bg-background/80 backdrop-blur-sm", isAgendaDocked && "h-full flex flex-col")}>
+    <Card className={cn("shadow-2xl bg-background/80 backdrop-blur-sm", cardHeightClass, "flex flex-col")}>
         <CardHeader
             className={cn("p-3", !isAgendaDocked && "cursor-grab active:cursor-grabbing")}
             onPointerDown={(e) => !isAgendaDocked && dragControls.start(e)}
@@ -505,24 +511,12 @@ export function TodaysScheduleCard({
                         <span className="sr-only">Canvas</span>
                     </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}>
-                        <Github className="h-4 w-4" />
-                        <span className="sr-only">Sync with GitHub</span>
+                        <UploadCloud className="h-4 w-4" />
+                        <span className="sr-only">Push to Cloud</span>
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('rules')}>
-                        <Compass className="h-4 w-4 text-orange-500" />
-                        <span className="sr-only">Toggle Rules View</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('urges')}>
-                        <Flame className="h-4 w-4 text-red-500" />
-                        <span className="sr-only">Toggle Urges View</span>
-                    </Button>
-                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('resistances')}>
-                        <Shield className="h-4 w-4 text-blue-500" />
-                        <span className="sr-only">Toggle Resistances View</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView(v => v === 'chart' ? 'list' : 'chart')}>
-                        <PieChart className="h-4 w-4" />
-                        <span className="sr-only">Toggle Chart View</span>
+                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}>
+                        <DownloadCloud className="h-4 w-4" />
+                        <span className="sr-only">Download from Cloud</span>
                     </Button>
                     <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
                         {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
