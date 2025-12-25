@@ -5,7 +5,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow, Target, Calendar } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow, Target, Calendar, Rocket, Maximize, Clock } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule, Resource, Stopper } from '@/types/workout';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +17,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { ScrollArea } from './ui/scroll-area';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { motion, useDragControls } from 'framer-motion';
-import { format, isToday } from 'date-fns';
+import { format, isToday, differenceInDays, parseISO, startOfToday } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { TimeAllocationChart } from './ProductivitySnapshot';
@@ -239,7 +239,8 @@ export function TodaysScheduleCard({
     syncWithGitHub,
     downloadFromGitHub,
     openMindsetWidget,
-    openDrawingCanvasFromHeader
+    openDrawingCanvasFromHeader,
+    dateOfBirth,
   } = useAuth();
   const router = useRouter();
 
@@ -574,12 +575,11 @@ export function TodaysScheduleCard({
   );
   
   const MilestonesView = ({ onBack }: { onBack: () => void }) => {
-    const { dateOfBirth } = useAuth();
     if (!dateOfBirth) {
         return (
             <div className="space-y-3 text-center">
                  <h4 className="text-base font-semibold">Birthday Milestones</h4>
-                 <p className="text-sm text-muted-foreground py-8">Please set your date of birth in the settings to view milestones.</p>
+                 <p className="text-sm text-muted-foreground py-8">Please set your date of birth in settings to view milestones.</p>
                  <Button variant="ghost" size="sm" onClick={onBack}>Back</Button>
             </div>
         )
@@ -631,6 +631,11 @@ export function TodaysScheduleCard({
             <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                  <div className="flex items-center">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}><UploadCloud className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}><DownloadCloud className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openMindsetWidget()}><Brain className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push('/strategic-planning?tab=matrix')}><Rocket className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDrawingCanvasFromHeader()}><Paintbrush className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('milestones')}><Calendar className={cn("h-4 w-4", view === 'milestones' && "text-primary")} /></Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('rules')}><Workflow className={cn("h-4 w-4", view === 'rules' && "text-primary")} /></Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('urges')}><Flame className={cn("h-4 w-4", view === 'urges' && "text-primary")} /></Button>
