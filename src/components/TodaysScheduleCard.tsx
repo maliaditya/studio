@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -240,6 +240,7 @@ export function TodaysScheduleCard({
     toggleRoutine, 
     setSchedule: setGlobalSchedule,
     resources,
+    setResources,
     metaRules,
     patterns,
     syncWithGitHub,
@@ -252,7 +253,6 @@ export function TodaysScheduleCard({
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
   const [view, setView] = useState<'list' | 'chart' | 'urges' | 'resistances' | 'rules'>('list');
-  const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
   const [newEntryText, setNewEntryText] = useState('');
   
   const dragControls = useDragControls()
@@ -490,7 +490,7 @@ export function TodaysScheduleCard({
         [type]: [...(mindsetCard[type] || []), newStopper]
     };
     
-    setGlobalSchedule(prev => ({ ...prev, resources: resources.map(r => r.id === mindsetCard.id ? updatedResource : r) }));
+    setResources(prev => prev.map(r => r.id === mindsetCard.id ? updatedResource : r));
     toast({ title: 'Entry Added', description: `Your ${type === 'urges' ? 'urge' : 'resistance'} has been logged.`});
   };
 
@@ -501,7 +501,7 @@ export function TodaysScheduleCard({
     const updatedStoppers = (mindsetCard[type] || []).filter(s => s.id !== stopperId);
     const updatedResource = { ...mindsetCard, [type]: updatedStoppers };
     
-    setGlobalSchedule(prev => ({ ...prev, resources: resources.map(r => r.id === mindsetCard.id ? updatedResource : r) }));
+    setResources(prev => prev.map(r => r.id === mindsetCard.id ? updatedResource : r));
   };
 
   const handleRuleClick = (e: React.MouseEvent, rule: MetaRule) => {
@@ -590,24 +590,12 @@ export function TodaysScheduleCard({
         >
             <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
-                <div className="flex items-center">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}>
-                        <UploadCloud className="h-4 w-4" />
-                        <span className="sr-only">Push to Cloud</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}>
-                        <DownloadCloud className="h-4 w-4" />
-                        <span className="sr-only">Download from Cloud</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleAddPomodoro}>
-                        <Timer className="h-4 w-4" />
-                        <span className="sr-only">Add Pomodoro</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push('/canvas')}>
-                        <Paintbrush className="h-4 w-4" />
-                        <span className="sr-only">Canvas</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('rules')}><Workflow className="h-4 w-4" /></Button>
+                 <div className="flex items-center">
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}><UploadCloud className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}><DownloadCloud className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleAddPomodoro}><Timer className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push('/canvas')}><Paintbrush className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('rules')}><Workflow className="h-4 w-4"/></Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('urges')}><Flame className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('resistances')}><Shield className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
@@ -700,9 +688,6 @@ export function TodaysScheduleCard({
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setView('chart')}>
                     <PieChart className={cn("h-4 w-4", view === 'chart' && "text-primary")} />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={openMindsetWidget}>
-                  <Brain className="h-4 w-4" />
                 </Button>
             </div>
             <div className="flex items-center">
