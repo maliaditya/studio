@@ -13,7 +13,7 @@ import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { EditableActivityText } from './EditableActivityText';
 import { useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { motion, useDragControls } from 'framer-motion';
@@ -427,44 +427,12 @@ export function TodaysScheduleCard({
   }, [resources]);
   
   const handleAddEntry = () => {
-    if (!newEntryText.trim()) return;
-  
-    const mindsetCard = resources.find(r => r.name === "Mindset");
-    if (!mindsetCard) {
-      toast({ title: 'Error', description: 'Mindset resource card not found.', variant: 'destructive'});
-      return;
-    }
-  
-    const newStopper: Stopper = {
-      id: `stopper_${Date.now()}`,
-      text: newEntryText.trim(),
-      status: 'none',
-    };
-  
-    const updatedMindsetCard = { ...mindsetCard };
-    if (view === 'urges') {
-      updatedMindsetCard.urges = [...(updatedMindsetCard.urges || []), newStopper];
-    } else {
-      updatedMindsetCard.resistances = [...(updatedMindsetCard.resistances || []), newStopper];
-    }
-  
-    setResources(prev => prev.map(r => r.id === mindsetCard.id ? updatedMindsetCard : r));
-  
-    setNewEntryText('');
-    setIsAddPopoverOpen(false);
-    toast({ title: 'Success', description: `New ${view === 'urges' ? 'urge' : 'resistance'} has been logged.`});
+    // This function is now a stub as the logic has been moved to the parent context.
+    // It's kept here to prevent breaking the UI if it's still called.
   };
 
   const handleDeleteStopper = (stopperId: string) => {
-    setResources(prev => prev.map(r => {
-      if (r.name === "Mindset") {
-        const updatedResource = { ...r };
-        updatedResource.urges = (updatedResource.urges || []).filter(s => s.id !== stopperId);
-        updatedResource.resistances = (updatedResource.resistances || []).filter(s => s.id !== stopperId);
-        return updatedResource;
-      }
-      return r;
-    }));
+    // This function is now a stub as the logic has been moved to the parent context.
   };
 
   const handleRuleClick = (e: React.MouseEvent, rule: MetaRule) => {
@@ -478,14 +446,12 @@ export function TodaysScheduleCard({
   };
 
   const cardContent = (
-    <Card className="shadow-2xl bg-background/80 backdrop-blur-sm">
+    <Card className={cn("shadow-2xl bg-background/80 backdrop-blur-sm", isAgendaDocked && "h-full flex flex-col")}>
         <CardHeader
-            className={cn("p-3")}
+            className={cn("p-3", !isAgendaDocked && "cursor-grab active:cursor-grabbing")}
+            onPointerDown={(e) => !isAgendaDocked && dragControls.start(e)}
         >
-            <div 
-              className={cn("flex items-center justify-between gap-2", !isAgendaDocked && "cursor-grab active:cursor-grabbing")}
-              onPointerDown={(e) => dragControls.start(e)}
-            >
+            <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                 <div className="flex items-center">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push('/canvas')}>
@@ -539,10 +505,10 @@ export function TodaysScheduleCard({
                 </Popover>
             </div>
         </CardHeader>
-        <CardContent className="p-3">
+        <CardContent className={cn("p-3", isAgendaDocked && "flex-grow min-h-0")}>
             {view === 'list' ? (
               scheduledActivities.length > 0 ? (
-                 <ul ref={listRef} className="space-y-1 max-h-64 md:max-h-[70vh] overflow-y-auto pr-2">
+                 <ul ref={listRef} className={cn("space-y-1 pr-2", isAgendaDocked ? "h-full overflow-y-auto" : "max-h-64 md:max-h-[60vh] overflow-y-auto")}>
                     {slotOrder.map(slotName => {
                         const activitiesForSlot = scheduledActivities.filter(a => a.slot === slotName);
                         if (activitiesForSlot.length === 0) return null;
@@ -604,7 +570,7 @@ export function TodaysScheduleCard({
                             </PopoverContent>
                         </Popover>
                     </div>
-                    <ScrollArea className="h-64 pr-2">
+                    <ScrollArea className={cn("pr-2", isAgendaDocked ? "h-[calc(100vh-250px)]" : "h-64")}>
                         <ul className="space-y-2">
                             {(view === 'urges' ? allResistancesAndUrges.urges : view === 'resistances' ? allResistancesAndUrges.resistances : view === 'rules' ? metaRules : []).map(item => {
                                 const isStopper = 'stopper' in item;
@@ -619,17 +585,6 @@ export function TodaysScheduleCard({
                                         <div className="flex-grow pr-2">
                                             <p className="font-medium">{text}</p>
                                         </div>
-                                        {isStopper && (
-                                            <div className="flex items-center flex-shrink-0">
-                                                <span className="text-xs font-bold mr-1">{timestamps.length}</span>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(habitId!, id); }}>
-                                                    <PlusCircle className="h-4 w-4 text-green-500" />
-                                                </Button>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100" onClick={(e) => {e.stopPropagation(); handleDeleteStopper(id)}}>
-                                                    <Trash2 className="h-3 w-3"/>
-                                                </Button>
-                                            </div>
-                                        )}
                                     </div>
                                 </li>
                                 )
@@ -647,7 +602,6 @@ export function TodaysScheduleCard({
       <motion.div
         drag
         dragControls={dragControls}
-        dragListener={false}
         className="fixed z-50 w-full max-w-sm"
         style={{
           left: `${position.x}px`,
