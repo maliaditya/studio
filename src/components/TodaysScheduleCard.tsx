@@ -542,7 +542,7 @@ export function TodaysScheduleCard({
         <CardContent className="p-3">
             {view === 'list' ? (
               scheduledActivities.length > 0 ? (
-                 <ul ref={listRef} className="space-y-1 max-h-64 overflow-y-auto pr-2">
+                 <ul ref={listRef} className="space-y-1 max-h-64 md:max-h-[70vh] overflow-y-auto pr-2">
                     {slotOrder.map(slotName => {
                         const activitiesForSlot = scheduledActivities.filter(a => a.slot === slotName);
                         if (activitiesForSlot.length === 0) return null;
