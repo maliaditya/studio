@@ -5,7 +5,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, PlusCircle } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,7 +13,7 @@ import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { EditableActivityText } from './EditableActivityText';
 import { useRouter } from 'next/navigation';
-import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { motion, useDragControls } from 'framer-motion';
@@ -204,6 +204,8 @@ const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Af
 
 interface TodaysScheduleCardProps {
   date: Date;
+  schedule: FullSchedule;
+  activityDurations: Record<string, string>;
   isAgendaDocked: boolean;
   onToggleDock: () => void;
   onActivityClick?: (activity: Activity, event: React.MouseEvent) => void;
@@ -214,6 +216,8 @@ interface TodaysScheduleCardProps {
 
 export function TodaysScheduleCard({
   date,
+  schedule,
+  activityDurations,
   isAgendaDocked,
   onToggleDock,
   onActivityClick,
@@ -228,9 +232,7 @@ export function TodaysScheduleCard({
     setSettings,
     handleToggleComplete, 
     toggleRoutine, 
-    schedule,
     setSchedule: setGlobalSchedule,
-    activityDurations,
     resources,
     metaRules,
     patterns,
