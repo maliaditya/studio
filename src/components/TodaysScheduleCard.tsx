@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow } from 'lucide-react';
-import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule } from '@/types/workout';
+import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule, Resource, Stopper } from '@/types/workout';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { Textarea } from './ui/textarea';
@@ -472,12 +472,36 @@ export function TodaysScheduleCard({
     };
   }, [resources]);
   
-  const handleAddEntry = () => {
-    // This function is now a stub as the logic has been moved to the parent context.
+  const onAddEntry = (type: 'urges' | 'resistances', text: string) => {
+    const mindsetCard = resources.find(r => r.name === "Mindset");
+    if (!mindsetCard) {
+        toast({ title: "Error", description: "'Mindset' resource card not found.", variant: 'destructive' });
+        return;
+    }
+    
+    const newStopper: Stopper = {
+        id: `stopper_${Date.now()}`,
+        text: text,
+        status: 'none',
+    };
+
+    const updatedResource = {
+        ...mindsetCard,
+        [type]: [...(mindsetCard[type] || []), newStopper]
+    };
+    
+    setGlobalSchedule(prev => ({ ...prev, resources: resources.map(r => r.id === mindsetCard.id ? updatedResource : r) }));
+    toast({ title: 'Entry Added', description: `Your ${type === 'urges' ? 'urge' : 'resistance'} has been logged.`});
   };
 
-  const handleDeleteStopper = (stopperId: string) => {
-    // This function is now a stub as the logic has been moved to the parent context.
+  const handleDeleteStopper = (stopperId: string, type: 'urges' | 'resistances') => {
+    const mindsetCard = resources.find(r => r.name === "Mindset");
+    if (!mindsetCard) return;
+
+    const updatedStoppers = (mindsetCard[type] || []).filter(s => s.id !== stopperId);
+    const updatedResource = { ...mindsetCard, [type]: updatedStoppers };
+    
+    setGlobalSchedule(prev => ({ ...prev, resources: resources.map(r => r.id === mindsetCard.id ? updatedResource : r) }));
   };
 
   const handleRuleClick = (e: React.MouseEvent, rule: MetaRule) => {
@@ -489,6 +513,72 @@ export function TodaysScheduleCard({
 
     onOpenHabitPopup(habitPhrase.mechanismCardId, e);
   };
+
+  const AllResistancesAndUrgesView = ({ type, onBack }: { type: 'urges' | 'resistances', onBack: () => void }) => {
+    const items = allResistancesAndUrges[type];
+    const [newEntryText, setNewEntryText] = useState('');
+
+    const handleAddEntry = () => {
+        if (newEntryText.trim()) {
+            onAddEntry(type, newEntryText.trim());
+            setNewEntryText('');
+        }
+    };
+
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center justify-between">
+                <h4 className="text-base font-semibold capitalize">{type}</h4>
+                <Button variant="ghost" size="sm" onClick={onBack}>Back</Button>
+            </div>
+            <div className="flex gap-2">
+                <Input
+                    value={newEntryText}
+                    onChange={e => setNewEntryText(e.target.value)}
+                    placeholder={`Describe the ${type === 'urges' ? 'urge' : 'resistance'}...`}
+                    onKeyDown={e => e.key === 'Enter' && handleAddEntry()}
+                />
+                <Button onClick={handleAddEntry} size="icon"><PlusCircle className="h-4 w-4" /></Button>
+            </div>
+            <ScrollArea className="h-64">
+                <ul className="space-y-2 pr-2">
+                    {items.map(item => (
+                        <li key={item.id}>
+                            <div className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50 group">
+                                <p className="font-medium">{item.text}</p>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => handleDeleteStopper(item.id, type)}>
+                                    <Trash2 className="h-4 w-4 text-destructive"/>
+                                </Button>
+                            </div>
+                        </li>
+                    ))}
+                    {items.length === 0 && <p className="text-center text-sm text-muted-foreground pt-8">No entries yet.</p>}
+                </ul>
+            </ScrollArea>
+        </div>
+    );
+  };
+
+  const RulesView = ({ onBack }: { onBack: () => void }) => (
+    <div className="space-y-3">
+        <div className="flex items-center justify-between">
+            <h4 className="text-base font-semibold">Meta-Rules</h4>
+            <Button variant="ghost" size="sm" onClick={onBack}>Back</Button>
+        </div>
+        <ScrollArea className="h-72">
+            <ul className="space-y-1 pr-2">
+                {metaRules.map(rule => (
+                    <li key={rule.id}>
+                        <button className="text-left text-sm text-muted-foreground hover:text-foreground p-2 rounded-md hover:bg-muted/50 w-full" onClick={(e) => handleRuleClick(e, rule)}>
+                            {rule.text}
+                        </button>
+                    </li>
+                ))}
+                {metaRules.length === 0 && <p className="text-center text-sm text-muted-foreground pt-8">No meta-rules defined.</p>}
+            </ul>
+        </ScrollArea>
+    </div>
+  );
 
   const cardHeightClass = isMobile ? 'h-[80vh]' : isAgendaDocked ? 'h-full' : 'h-auto';
 
@@ -505,7 +595,7 @@ export function TodaysScheduleCard({
                         <UploadCloud className="h-4 w-4" />
                         <span className="sr-only">Push to Cloud</span>
                     </Button>
-                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}>
                         <DownloadCloud className="h-4 w-4" />
                         <span className="sr-only">Download from Cloud</span>
                     </Button>
@@ -517,18 +607,9 @@ export function TodaysScheduleCard({
                         <Paintbrush className="h-4 w-4" />
                         <span className="sr-only">Canvas</span>
                     </Button>
-                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('rules')}>
-                        <Workflow className="h-4 w-4" />
-                        <span className="sr-only">Rules</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('urges')}>
-                        <Flame className="h-4 w-4" />
-                        <span className="sr-only">Urges</span>
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('resistances')}>
-                        <Shield className="h-4 w-4" />
-                        <span className="sr-only">Resistances</span>
-                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('rules')}><Workflow className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('urges')}><Flame className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('resistances')}><Shield className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
                         {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
                     </Button>
@@ -607,46 +688,9 @@ export function TodaysScheduleCard({
                 <TimeAllocationChart timeAllocationData={timeAllocationData} />
               </div>
             ) : (
-                 <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                        <h4 className="text-base font-semibold capitalize">{view}</h4>
-                        <Popover open={isAddPopoverOpen} onOpenChange={setIsAddPopoverOpen}>
-                            <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-7 w-7"><PlusCircle className="h-4 w-4 text-green-500"/></Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-80 p-4 space-y-4">
-                                <h5 className="font-medium text-sm">Add New {view === 'urges' ? 'Urge' : 'Resistance'}</h5>
-                                <Input 
-                                    value={newEntryText}
-                                    onChange={e => setNewEntryText(e.target.value)}
-                                    placeholder={`Describe the ${view === 'urges' ? 'urge' : 'resistance'}...`}
-                                />
-                                <Button onClick={handleAddEntry} className="w-full">Add Entry</Button>
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-                    <ScrollArea className={cn("pr-2", isAgendaDocked ? "h-[calc(100vh-250px)]" : "h-64")}>
-                        <ul className="space-y-2">
-                            {(view === 'urges' ? allResistancesAndUrges.urges : view === 'resistances' ? allResistancesAndUrges.resistances : view === 'rules' ? metaRules : []).map(item => {
-                                const isStopper = 'stopper' in item;
-                                const id = isStopper ? item.stopper.id : item.id;
-                                const text = isStopper ? item.stopper.text : item.text;
-                                const habitId = isStopper ? item.habitId : undefined;
-                                const timestamps = isStopper ? item.stopper.timestamps || [] : [];
-                                
-                                return (
-                                <li key={id}>
-                                    <div className="flex justify-between items-center text-sm p-2 rounded-md bg-muted/50 group" onClick={e => isStopper ? null : handleRuleClick(e, item as MetaRule)}>
-                                        <div className="flex-grow pr-2">
-                                            <p className="font-medium">{text}</p>
-                                        </div>
-                                    </div>
-                                </li>
-                                )
-                            })}
-                        </ul>
-                    </ScrollArea>
-                 </div>
+                view === 'urges' ? <AllResistancesAndUrgesView type="urges" onBack={() => setView('list')} /> :
+                view === 'resistances' ? <AllResistancesAndUrgesView type="resistances" onBack={() => setView('list')} /> :
+                view === 'rules' ? <RulesView onBack={() => setView('list')} /> : null
             )}
         </CardContent>
         <CardFooter className="p-2 flex justify-between items-center">
