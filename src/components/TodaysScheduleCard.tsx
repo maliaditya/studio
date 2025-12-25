@@ -1,10 +1,11 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow, Target, Calendar } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule, Resource, Stopper } from '@/types/workout';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -125,7 +126,6 @@ export const AgendaWidgetItem = React.memo(({
     } = useAuth();
     const router = useRouter();
 
-    const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition', 'pomodoro'].includes(activity.type);
     const isAgendaContext = context === 'agenda';
 
     const handleItemClick = (e: React.MouseEvent) => {
@@ -169,17 +169,11 @@ export const AgendaWidgetItem = React.memo(({
                 {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
             </button>
             <div className="flex-grow min-w-0">
-                {(isAgendaContext || context === 'timeslot') && isInlineEditable ? (
-                    <EditableActivityText
-                        initialValue={activity.details}
-                        onUpdate={(newDetails) => onUpdateActivity(activity.id, newDetails)}
-                        className={cn("text-sm font-medium w-full block", activity.completed && "line-through text-muted-foreground")}
-                    />
-                ) : (
-                    <p className={cn("text-sm font-medium", activity.completed && "line-through text-muted-foreground")}>
-                        {activity.details}
-                    </p>
-                )}
+                <EditableActivityText
+                    initialValue={activity.details}
+                    onUpdate={(newDetails) => onUpdateActivity(activity.id, newDetails)}
+                    className={cn("text-sm font-medium w-full block", activity.completed && "line-through text-muted-foreground")}
+                />
                  <div className="flex flex-wrap items-center gap-2 mt-1">
                     <div className="flex items-center gap-1 text-xs text-muted-foreground capitalize">
                         {activityIcons[activity.type]} {activity.type.replace('-', ' ')}
@@ -230,7 +224,7 @@ export function TodaysScheduleCard({
   onOpenHabitPopup,
   currentSlot,
 }: TodaysScheduleCardProps) {
-  const { toast } = useToast();
+  const { toast } = useAuth();
   const { 
     currentUser,
     settings,
@@ -251,7 +245,7 @@ export function TodaysScheduleCard({
 
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
-  const [view, setView] = useState<'list' | 'chart' | 'urges' | 'resistances' | 'rules'>('list');
+  const [view, setView] = useState<'list' | 'chart' | 'urges' | 'resistances' | 'rules' | 'milestones'>('list');
   const [newEntryText, setNewEntryText] = useState('');
   
   const dragControls = useDragControls()
@@ -578,6 +572,54 @@ export function TodaysScheduleCard({
         </ScrollArea>
     </div>
   );
+  
+  const MilestonesView = ({ onBack }: { onBack: () => void }) => {
+    const { dateOfBirth } = useAuth();
+    if (!dateOfBirth) {
+        return (
+            <div className="space-y-3 text-center">
+                 <h4 className="text-base font-semibold">Birthday Milestones</h4>
+                 <p className="text-sm text-muted-foreground py-8">Please set your date of birth in the settings to view milestones.</p>
+                 <Button variant="ghost" size="sm" onClick={onBack}>Back</Button>
+            </div>
+        )
+    }
+
+    const calculateDaysLeft = (targetAge: number) => {
+        const dob = new Date(dateOfBirth);
+        const targetDate = new Date(dob.getFullYear() + targetAge, dob.getMonth(), dob.getDate());
+        return differenceInDays(targetDate, new Date());
+    }
+
+    const milestones = [30, 40, 50, 60, 70].map(age => ({
+        age,
+        daysLeft: calculateDaysLeft(age),
+    })).filter(m => m.daysLeft > 0);
+
+    return (
+        <div className="space-y-3">
+            <div className="flex items-center justify-between">
+                <h4 className="text-base font-semibold">Birthday Milestones</h4>
+                <Button variant="ghost" size="sm" onClick={onBack}>Back</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Born on: {format(new Date(dateOfBirth), 'PPP')}</p>
+            <ScrollArea className="h-72">
+                <ul className="space-y-2 pr-2">
+                    {milestones.map(m => (
+                        <li key={m.age} className="p-2 rounded-md border bg-muted/30">
+                            <div className="flex justify-between items-baseline">
+                                <span className="text-sm font-semibold">Turning {m.age}</span>
+                                <span className="text-lg font-bold text-primary">{m.daysLeft.toLocaleString()}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground text-right">days remaining</p>
+                        </li>
+                    ))}
+                    {milestones.length === 0 && <p className="text-sm text-center text-muted-foreground pt-8">No upcoming major milestones.</p>}
+                </ul>
+            </ScrollArea>
+        </div>
+    );
+  };
 
   const cardHeightClass = isMobile ? 'h-[80vh]' : isAgendaDocked ? 'h-full' : 'h-auto';
 
@@ -585,18 +627,14 @@ export function TodaysScheduleCard({
     <Card className={cn("shadow-2xl bg-background/80 backdrop-blur-sm", cardHeightClass, "flex flex-col")}>
         <CardHeader
             className={cn("p-3", !isAgendaDocked && "cursor-grab active:cursor-grabbing")}
-            onPointerDown={(e) => !isAgendaDocked && dragControls.start(e)}
         >
             <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                  <div className="flex items-center">
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}><UploadCloud className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}><DownloadCloud className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleAddPomodoro}><Timer className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push('/canvas')}><Paintbrush className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('rules')}><Workflow className="h-4 w-4"/></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('urges')}><Flame className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('resistances')}><Shield className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('milestones')}><Calendar className={cn("h-4 w-4", view === 'milestones' && "text-primary")} /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('rules')}><Workflow className={cn("h-4 w-4", view === 'rules' && "text-primary")} /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('urges')}><Flame className={cn("h-4 w-4", view === 'urges' && "text-primary")} /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('resistances')}><Shield className={cn("h-4 w-4", view === 'resistances' && "text-primary")} /></Button>
                     <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
                         {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
                     </Button>
@@ -677,7 +715,8 @@ export function TodaysScheduleCard({
             ) : (
                 view === 'urges' ? <AllResistancesAndUrgesView type="urges" onBack={() => setView('list')} /> :
                 view === 'resistances' ? <AllResistancesAndUrgesView type="resistances" onBack={() => setView('list')} /> :
-                view === 'rules' ? <RulesView onBack={() => setView('list')} /> : null
+                view === 'rules' ? <RulesView onBack={() => setView('list')} /> :
+                view === 'milestones' ? <MilestonesView onBack={() => setView('list')} /> : null
             )}
         </CardContent>
         <CardFooter className="p-2 flex justify-between items-center">
