@@ -299,14 +299,14 @@ export function StatsOverviewModal({
             <TabsContent value="total-hours" className="flex-grow mt-4 min-h-0">
                 <ScrollArea className="h-full pr-4">
                     <div>
-                        <h4 className="font-semibold mb-4 text-center md:text-left">Total Hours Logged</h4>
+                        <h4 className="font-semibold mb-4 text-center md:text-left">Total Hours Logged by Specialization</h4>
                         {totalHoursData.some(d => d.hours > 0) ? (
                             <ChartContainer config={totalHoursChartConfig} className="h-[400px] w-full">
                                 <ResponsiveContainer>
-                                    <BarChart accessibilityLayer data={totalHoursData} margin={{ top: 10, right: 20, left: 0, bottom: 5 }}>
-                                        <CartesianGrid vertical={false} />
-                                        <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} fontSize={12} />
-                                        <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={12} label={{ value: "Hours", angle: -90, position: 'insideLeft', style: { textAnchor: 'middle', fontSize: '0.8rem', fill: 'hsl(var(--muted-foreground))' }}} />
+                                    <BarChart accessibilityLayer data={totalHoursData} layout="vertical" margin={{ left: 20 }}>
+                                        <CartesianGrid horizontal={false} />
+                                        <XAxis type="number" dataKey="hours" domain={[0, 'dataMax + 2']} fontSize={12} />
+                                        <YAxis type="category" dataKey="name" width={100} tickLine={false} axisLine={false} fontSize={10} interval={0} />
                                         <RechartsTooltip
                                             cursor={{ fill: "hsl(var(--muted))" }}
                                             content={({ active, payload }) => {
@@ -322,7 +322,7 @@ export function StatsOverviewModal({
                                                 return null;
                                             }}
                                         />
-                                        <Bar dataKey="hours" fill="var(--color-hours)" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="hours" fill="var(--color-hours)" radius={[0, 4, 4, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </ChartContainer>
