@@ -24,7 +24,6 @@ import { TimeAllocationChart } from './ProductivitySnapshot';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 
-
 const activityIcons: Record<ActivityType, React.ReactNode> = {
     workout: <Dumbbell className="h-4 w-4" />,
     upskill: <BookOpenCheck className="h-4 w-4" />,
@@ -120,7 +119,7 @@ export const AgendaWidgetItem = React.memo(({
     } = useAuth();
     const router = useRouter();
 
-    const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition'].includes(activity.type);
+    const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition', 'pomodoro'].includes(activity.type);
     const isAgendaContext = context === 'agenda';
 
     const handleItemClick = (e: React.MouseEvent) => {
@@ -428,7 +427,6 @@ export function TodaysScheduleCard({
   
   const handleAddEntry = () => {
     // This function is now a stub as the logic has been moved to the parent context.
-    // It's kept here to prevent breaking the UI if it's still called.
   };
 
   const handleDeleteStopper = (stopperId: string) => {
@@ -485,9 +483,9 @@ export function TodaysScheduleCard({
                     <PopoverTrigger asChild>
                         <button className="flex items-center gap-2 text-left cursor-pointer group">
                             <BrainCircuit className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                            <p className="text-xs group-hover:text-foreground transition-colors whitespace-pre-wrap break-words text-muted-foreground" title={purposeText}>
+                            <CardDescription className="text-xs group-hover:text-foreground transition-colors whitespace-pre-wrap break-words" title={purposeText}>
                                 {purposeText || "Click to set a daily purpose..."}
-                            </p>
+                            </CardDescription>
                         </button>
                     </PopoverTrigger>
                     <PopoverContent className="w-80">
