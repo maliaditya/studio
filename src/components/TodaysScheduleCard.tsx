@@ -5,7 +5,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule } from '@/types/workout';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -49,7 +49,12 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
     return (
         <DropdownMenuContent className="w-56 p-2">
             <p className="font-medium text-sm p-2">Select Activity</p>
+            <DropdownMenuItem key="pomodoro" onClick={() => onAddActivity('pomodoro', '')}>
+                <Timer className="h-4 w-4" />
+                <span className="ml-2 capitalize">Pomodoro</span>
+            </DropdownMenuItem>
             {Object.entries(activityIcons).map(([type, icon]) => {
+                if(type === 'pomodoro') return null;
                 const activityType = type as ActivityType;
                 if (activityType === 'upskill' || activityType === 'deepwork') {
                     return (
@@ -239,6 +244,7 @@ export function TodaysScheduleCard({
     patterns,
     syncWithGitHub,
     downloadFromGitHub,
+    openMindsetWidget,
   } = useAuth();
   const router = useRouter();
 
@@ -494,11 +500,11 @@ export function TodaysScheduleCard({
             <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                 <div className="flex items-center">
-                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}>
                         <UploadCloud className="h-4 w-4" />
                         <span className="sr-only">Push to Cloud</span>
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}>
+                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}>
                         <DownloadCloud className="h-4 w-4" />
                         <span className="sr-only">Download from Cloud</span>
                     </Button>
@@ -638,13 +644,10 @@ export function TodaysScheduleCard({
                 <Button variant="ghost" size="sm" onClick={() => setView('chart')}>
                     <PieChart className={cn("h-4 w-4", view === 'chart' && "text-primary")} />
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setView('urges')}>
-                    <Flame className={cn("h-4 w-4", view === 'urges' && "text-primary")} />
+                <Button variant="ghost" size="sm" onClick={openMindsetWidget}>
+                  <Brain className="h-4 w-4" />
                 </Button>
-                 <Button variant="ghost" size="sm" onClick={() => setView('resistances')}>
-                    <Shield className={cn("h-4 w-4", view === 'resistances' && "text-primary")} />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setView('rules')}>
+                 <Button variant="ghost" size="sm" onClick={() => setView('rules')}>
                     <Workflow className={cn("h-4 w-4", view === 'rules' && "text-primary")} />
                 </Button>
             </div>
