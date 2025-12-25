@@ -5,7 +5,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule } from '@/types/workout';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -243,6 +243,7 @@ export function TodaysScheduleCard({
     resources,
     metaRules,
     patterns,
+    syncWithGitHub
   } = useAuth();
   const router = useRouter();
 
@@ -503,6 +504,10 @@ export function TodaysScheduleCard({
                         <Paintbrush className="h-4 w-4" />
                         <span className="sr-only">Canvas</span>
                     </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}>
+                        <Github className="h-4 w-4" />
+                        <span className="sr-only">Sync with GitHub</span>
+                    </Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('rules')}>
                         <Compass className="h-4 w-4 text-orange-500" />
                         <span className="sr-only">Toggle Rules View</span>
@@ -553,7 +558,7 @@ export function TodaysScheduleCard({
         <CardContent className={cn("p-3", isAgendaDocked && "flex-grow min-h-0")}>
             {view === 'list' ? (
               scheduledActivities.length > 0 ? (
-                 <ul ref={listRef} className={cn("space-y-1 pr-2", isAgendaDocked ? "h-full overflow-y-auto" : "max-h-64 md:max-h-[60vh] overflow-y-auto")}>
+                 <ul ref={listRef} className={cn("space-y-1 pr-2", isAgendaDocked ? "h-full overflow-y-auto" : "max-h-[70vh] md:max-h-[60vh] overflow-y-auto")}>
                     {slotOrder.map(slotName => {
                         const activitiesForSlot = scheduledActivities.filter(a => a.slot === slotName);
                         if (activitiesForSlot.length === 0) return null;
@@ -666,5 +671,3 @@ export function TodaysScheduleCard({
 
   return cardContent;
 }
-
-    
