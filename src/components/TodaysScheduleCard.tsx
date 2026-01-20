@@ -353,6 +353,13 @@ export function TodaysScheduleCard({
 
 
   const [position, setPosition] = useState({ x: 20, y: 80 });
+  const [isDragging, setIsDragging] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const { setNodeRef, transform } = useDraggable({
+    id: 'agenda-widget',
+    disabled: isAgendaDocked,
+  });
+
 
   const positionKey = currentUser ? `lifeos_agenda_widget_position_${currentUser.username}` : null;
 
@@ -638,8 +645,6 @@ export function TodaysScheduleCard({
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDrawingCanvasFromHeader()}><Paintbrush className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('milestones')}><Calendar className={cn("h-4 w-4", view === 'milestones' && "text-primary")} /></Button>
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('rules')}><Workflow className={cn("h-4 w-4", view === 'rules' && "text-primary")} /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('urges')}><Flame className={cn("h-4 w-4", view === 'urges' && "text-primary")} /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setView('resistances')}><Shield className={cn("h-4 w-4", view === 'resistances' && "text-primary")} /></Button>
                     <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
                         {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
                     </Button>
