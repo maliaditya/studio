@@ -107,6 +107,20 @@ async function deleteItem(storeName: string, key: string): Promise<void> {
     });
 }
 
+async function getAllKeys(storeName: string): Promise<string[]> {
+  const db = await getDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, 'readonly');
+    const store = transaction.objectStore(storeName);
+    const request = store.getAllKeys();
+    request.onsuccess = () => resolve((request.result || []) as string[]);
+    request.onerror = (event) => {
+      console.error(`Error fetching keys from ${storeName}:`, (event.target as IDBRequest).error);
+      reject(new Error(`Failed to retrieve keys from ${storeName}.`));
+    };
+  });
+}
+
 export async function clearAllData(): Promise<void> {
     const db = await getDB();
     return new Promise((resolve, reject) => {
@@ -143,6 +157,133 @@ export async function clearAllData(): Promise<void> {
 export const storeAudio = (key: string, audioBlob: Blob) => storeItem(AUDIO_STORE_NAME, key, audioBlob);
 export const getAudio = (key: string) => getItem(AUDIO_STORE_NAME, key);
 export const deleteAudio = (key: string) => deleteItem(AUDIO_STORE_NAME, key);
+export const getAllAudioKeys = () => getAllKeys(AUDIO_STORE_NAME);
+
+// Try a set of likely key variants for a resource (id, filename, filename without ext,
+// variants with underscores/spaces and trimmed quotes) and return the first found blob and key.
+export async function getAudioForResource(id?: string, audioFileName?: string): Promise<{ blob: Blob | null; key?: string }> {
+  const candidates = new Set<string>();
+  if (id) candidates.add(id);
+  if (audioFileName) candidates.add(audioFileName);
+
+  const normalize = (s: string) => s?.trim();
+
+  const addVariants = (s?: string) => {
+    if (!s) return;
+    let v = normalize(s);
+    candidates.add(v);
+    // strip surrounding quotes
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      candidates.add(v.slice(1, -1));
+      v = v.slice(1, -1);
+    }
+    // without extension
+    const dotIndex = v.lastIndexOf('.');
+    if (dotIndex > 0) candidates.add(v.slice(0, dotIndex));
+    // with underscores/spaces swapped
+    candidates.add(v.replace(/\s+/g, '_'));
+    candidates.add(v.replace(/_/g, ' '));
+    // url decoded
+    try {
+      candidates.add(decodeURIComponent(v));
+    } catch (e) {}
+    // lowercase variant
+    candidates.add(v.toLowerCase());
+    // collapse multiple spaces
+    candidates.add(v.replace(/\s+/g, ' '));
+    // remove hash/pound signs and collapse
+    candidates.add(v.replace(/#/g, ''));
+    // remove punctuation except dots, spaces, underscores, hyphens
+    candidates.add(v.replace(/[^\w.\s\-_]/g, ''));
+    // replace any non-word with underscore, collapse underscores
+    candidates.add(v.replace(/[^\w]/g, '_').replace(/_+/g, '_'));
+    // try without parentheses content
+    candidates.add(v.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim());
+    // try common audio extensions if missing
+    if (!/\.[a-zA-Z0-9]{1,4}$/.test(v)) {
+      ['mp3','m4a','wav','aac','ogg'].forEach(ext => candidates.add(`${v}.${ext}`));
+    }
+  };
+
+  addVariants(audioFileName);
+  // also try id variants
+  if (id) addVariants(id);
+
+  const normalizeForMatch = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    return trimmed
+      .replace(/\[[^\]]*\]/g, ' ')
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/#[^\s]+/g, ' ')
+      .replace(/[^\w]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toLowerCase();
+  };
+
+  // Expand with normalized variants that are common mismatch cases.
+  const expanded = new Set<string>();
+  const addSlugVariants = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    // remove bracketed and parenthetical content
+    const withoutBrackets = trimmed.replace(/\[[^\]]*\]/g, ' ').replace(/\([^)]*\)/g, ' ');
+    // remove hashtags
+    const withoutHash = withoutBrackets.replace(/#[^\s]+/g, ' ');
+    const slug = withoutHash
+      .replace(/[^\w]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (slug) {
+      expanded.add(slug);
+      expanded.add(slug.toLowerCase());
+    }
+  };
+  for (const c of candidates) {
+    if (!c) continue;
+    const trimmed = c.trim();
+    if (!trimmed) continue;
+    expanded.add(trimmed);
+    expanded.add(trimmed.replace(/\s+/g, ' '));
+    const noExt = trimmed.replace(/\.[a-zA-Z0-9]{1,5}$/, '');
+    expanded.add(noExt);
+    expanded.add(noExt.replace(/\s+/g, ' '));
+    addSlugVariants(trimmed);
+    addSlugVariants(noExt);
+  }
+
+  const tryList = Array.from(expanded).filter(Boolean);
+  // prefer longer more specific keys first
+  tryList.sort((a, b) => b.length - a.length);
+  console.debug('getAudioForResource: trying keys', tryList);
+  for (const k of tryList) {
+    try {
+      const b = await getItem(AUDIO_STORE_NAME, k);
+      if (b) return { blob: b, key: k };
+    } catch (e) {
+      // ignore
+    }
+  }
+  // Fallback: compare normalized slugs against existing keys in the store
+  try {
+    const keys = await getAllAudioKeys();
+    const targetNorms = new Set<string>();
+    if (audioFileName) targetNorms.add(normalizeForMatch(audioFileName));
+    if (id) targetNorms.add(normalizeForMatch(id));
+    for (const key of keys) {
+      const keyNorm = normalizeForMatch(key);
+      if (targetNorms.has(keyNorm) && keyNorm.length > 0) {
+        const b = await getItem(AUDIO_STORE_NAME, key);
+        if (b) return { blob: b, key };
+      }
+    }
+  } catch (e) {
+    // ignore fallback errors
+  }
+  console.debug('getAudioForResource: no key matched for', id, audioFileName);
+  return { blob: null };
+}
 
 // PDF functions
 export const storePdf = (key: string, pdfBlob: Blob) => storeItem(PDF_STORE_NAME, key, pdfBlob);

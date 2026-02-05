@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Textarea } from './ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { getAudio, storeAudio, deleteAudio } from '@/lib/audioDB';
+import { getAudio, storeAudio, deleteAudio, getAudioForResource } from '@/lib/audioDB';
 import { useRouter } from 'next/navigation';
 import { EditableResourcePoint } from './EditableFields';
 import { MindMapViewer } from './MindMapViewer';
@@ -26,6 +26,7 @@ import { MechanismResourceCard } from './MechanismResourceCard';
 import { SearchPopup } from './DrawingCanvas';
 import ReactPlayer from 'react-player/youtube';
 import { format, parseISO } from 'date-fns';
+import AudioMiniPlayer from './AudioMiniPlayer';
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
     if (!url) return null;
@@ -214,19 +215,11 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         let objectUrl: string | null = null;
         
         const loadAudio = async () => {
+          console.debug('GeneralResourcePopup: loading audio for', resource?.id, resource?.audioFileName, 'hasLocalAudio=', resource?.hasLocalAudio);
           if (resource.hasLocalAudio) {
             try {
-              const candidateKeys = [resource.id, resource.audioFileName].filter(Boolean) as string[];
-              let audioBlob: Blob | null = null;
-              let foundKey: string | null = null;
-              for (const k of candidateKeys) {
-                try {
-                  const b = await getAudio(k);
-                  if (b) { audioBlob = b; foundKey = k; break; }
-                } catch (e) {
-                  // ignore and try next key
-                }
-              }
+              const { blob: audioBlob, key: foundKey } = await getAudioForResource(resource.id, resource.audioFileName);
+              console.debug('GeneralResourcePopup: getAudioForResource result', { foundKey, hasBlob: !!audioBlob });
 
               if (audioBlob) {
                 objectUrl = URL.createObjectURL(audioBlob);
@@ -247,7 +240,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
               setAudioSrc(null);
             }
           } else {
-              setAudioSrc(null);
+            setAudioSrc(null);
           }
         };
         
@@ -442,13 +435,17 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
       }
     };
     
-    const handleDeleteLocalAudio = async () => {
-        try {
-            await deleteAudio(resource.id);
-            onUpdate({ ...resource, hasLocalAudio: false, audioFileName: undefined });
-            setAudioSrc(null);
-            if (audioRef.current) {
-                audioRef.current.src = '';
+	    const handleDeleteLocalAudio = async () => {
+	        try {
+	            const { key: foundKey } = await getAudioForResource(resource.id, resource.audioFileName);
+	            if (foundKey && foundKey !== resource.id) {
+	              await deleteAudio(foundKey);
+	            }
+	            await deleteAudio(resource.id);
+	            onUpdate({ ...resource, hasLocalAudio: false, audioFileName: undefined });
+	            setAudioSrc(null);
+	            if (audioRef.current) {
+	                audioRef.current.src = '';
             }
             setPlayingAudio(false);
         } catch (error) {
@@ -578,44 +575,49 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         </Button>
                     </div>
 
-                    <CardHeader 
-                        className="p-3 pt-8 relative flex-shrink-0"
-                    >
-                        <div
-                            className="absolute top-0 left-0 right-0 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing"
-                            {...listeners}
-                        >
-                            <GripVertical className="h-5 w-5 text-muted-foreground/30" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            {getIcon()}
-                            {editingTitle ? (
-                                 <Input 
-                                    value={resource.name || ''}
-                                    onChange={(e) => handleTitleChange(e.target.value)} 
-                                    onBlur={() => setEditingTitle(false)} 
-                                    onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-                                    className="h-8 text-base font-semibold border-none bg-transparent shadow-none focus-visible:ring-0 p-0"
-                                    autoFocus
-                                />
-                            ) : (
-                                <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
-                                    {resource.name || <span className="text-muted-foreground">[Untitled]</span>}
-                                </CardTitle>
-                            )}
-                        </div>
-                        {folderPath && (
-                            <CardDescription className="text-xs pt-1 truncate" title={folderPath}>
-                              <span className="flex items-center gap-1">
-                                {folderPath.split(' / ').map((part, index, arr) => (
-                                    <React.Fragment key={index}>
-                                        <span>{part}</span>
-                                        {index < arr.length - 1 && <ChevronRight className="h-3 w-3" />}
-                                    </React.Fragment>
-                                ))}
-                              </span>
-                            </CardDescription>
-                        )}
+	                    <CardHeader 
+	                        className="p-3 pt-8 relative flex-shrink-0"
+	                    >
+	                        <div
+	                            className="absolute top-0 left-0 right-0 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing"
+	                            {...listeners}
+	                        >
+	                            <GripVertical className="h-5 w-5 text-muted-foreground/30" />
+	                        </div>
+	                        <div className="flex items-center gap-2">
+	                          {getIcon()}
+	                            {editingTitle ? (
+	                                 <Input 
+	                                    value={resource.name || ''}
+	                                    onChange={(e) => handleTitleChange(e.target.value)} 
+	                                    onBlur={() => setEditingTitle(false)} 
+	                                    onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
+	                                    className="h-8 text-base font-semibold border-none bg-transparent shadow-none focus-visible:ring-0 p-0"
+	                                    autoFocus
+	                                />
+	                            ) : (
+	                                <CardTitle className="text-base truncate cursor-pointer" onClick={() => setEditingTitle(true)}>
+	                                    {resource.name || <span className="text-muted-foreground">[Untitled]</span>}
+	                                </CardTitle>
+	                            )}
+	                          </div>
+	                          {resource.hasLocalAudio && (
+	                            <div className="mt-2">
+	                              <AudioMiniPlayer resource={resource} />
+	                            </div>
+	                          )}
+	                        {folderPath && (
+	                            <CardDescription className="text-xs pt-1 truncate" title={folderPath}>
+	                              <span className="flex items-center gap-1">
+	                                {folderPath.split(' / ').map((part, index, arr) => (
+	                                    <React.Fragment key={index}>
+	                                        <span>{part}</span>
+	                                        {index < arr.length - 1 && <ChevronRight className="h-3 w-3" />}
+	                                    </React.Fragment>
+	                                ))}
+	                              </span>
+	                            </CardDescription>
+	                        )}
                          {(audioSrc || youtubeEmbedUrl) && (
                             <div className="w-full space-y-2 pt-2">
                                 <div className="flex items-center gap-2">

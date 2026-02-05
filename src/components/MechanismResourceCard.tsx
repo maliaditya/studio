@@ -5,6 +5,7 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Workflow, Link as LinkIcon, MoreVertical } from 'lucide-react';
+import AudioMiniPlayer from './AudioMiniPlayer';
 import { EditableField, DoubleEditableField, EmotionEditableField } from './EditableFields';
 import type { Resource, PopupState } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -35,6 +36,9 @@ export function MechanismResourceCard({ resource, onUpdate, onDelete, onLinkClic
                         <EditableField field="name" prefix="" resource={resource} onUpdate={onUpdate} placeholder="Mechanism Name..." />
                     </CardTitle>
                      <div className="flex items-center">
+                        {resource.hasLocalAudio && (
+                            <AudioMiniPlayer resource={resource} />
+                        )}
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onLinkClick(resource.id)}>
                             <LinkIcon className="h-4 w-4" />
                         </Button>

@@ -36,7 +36,7 @@ import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { HabitDetailPopup } from '@/components/HabitDetailPopup';
-import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, storeExcalidrawFile, type ExcalidrawFileRecord, storeAudio, getAudio, storePdf, getPdf } from '@/lib/audioDB';
+import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, storeExcalidrawFile, type ExcalidrawFileRecord, storeAudio, getAudioForResource, storePdf, getPdf } from '@/lib/audioDB';
 
 // Helper: convert ArrayBuffer to base64 in safe chunks to avoid "call stack size exceeded"
 const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
@@ -3489,6 +3489,19 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
         setSettings(prev => ({ ...prev, githubModuleHashes: nextHashes }));
 
+        // After pushing modules and metadata, also push binary assets (images, audio, PDFs)
+        try {
+          syncToast.update({ title: 'Uploading assets', description: 'Uploading images...' });
+          await syncCanvasImagesToGitHub();
+          syncToast.update({ title: 'Uploading assets', description: 'Uploading audio...' });
+          await syncAudioFilesToGitHub();
+          syncToast.update({ title: 'Uploading assets', description: 'Uploading PDFs...' });
+          await syncPdfFilesToGitHub();
+        } catch (assetErr) {
+          console.error('Asset upload during sync failed:', assetErr);
+          syncToast.update({ title: 'Asset Upload Failed', description: assetErr instanceof Error ? assetErr.message : String(assetErr), variant: 'destructive' });
+        }
+
         syncToast.update({
           title: "Sync Complete",
           description: `${pushed} pushed • ${skipped} skipped`,
@@ -3509,29 +3522,52 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       toast({ title: "Sync Cancelled", description: "Cannot push empty data.", variant: "destructive" });
       return;
     }
-    const pushResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-        method: 'PUT',
-        headers: {
-            'Authorization': `token ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            message,
-            content: btoa(unescape(encodeURIComponent(content))),
-            sha
-        })
-    });
+    const encoded = btoa(unescape(encodeURIComponent(content)));
+    let lastError: any = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const pushResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `token ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message,
+                content: encoded,
+                sha
+            })
+        });
 
-    const result = await pushResponse.json();
-    if (!pushResponse.ok) {
-        throw new Error(result.message || 'Failed to push file to GitHub.');
+        const result = await pushResponse.json();
+        if (!pushResponse.ok) {
+          // If conflict/sha mismatch, refetch latest sha and retry
+          if (pushResponse.status === 409 || /expected .* but/.test(String(result.message || ''))) {
+            const latestSha = await getGitHubFileSha(token, owner, repo, path);
+            if (latestSha && latestSha !== sha) {
+              sha = latestSha;
+              lastError = result;
+              // retry
+              continue;
+            }
+          }
+          throw new Error(result.message || 'Failed to push file to GitHub.');
+        }
+
+        setSettings(prev => ({...prev, lastSync: { sha: result.content.sha, timestamp: Date.now() }}));
+        setLocalChangeCount(0);
+        if (!opts?.suppressToast) {
+          toast({ title: "Success", description: "Your data has been backed up to GitHub." });
+        }
+        return;
+      } catch (e) {
+        lastError = e;
+        // small backoff before retrying
+        await new Promise(r => setTimeout(r, 300 * attempt));
+      }
     }
-    
-    setSettings(prev => ({...prev, lastSync: { sha: result.content.sha, timestamp: Date.now() }}));
-    setLocalChangeCount(0);
-    if (!opts?.suppressToast) {
-      toast({ title: "Success", description: "Your data has been backed up to GitHub." });
-    }
+    console.error('pushToGitHub failed after retries for', path, lastError);
+    throw lastError;
   }
 
   async function hashString(content: string): Promise<string> {
@@ -3565,6 +3601,14 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     throw new Error(errorData.message || `Failed to fetch file details for ${path}.`);
   }
 
+  const decodeBase64Utf8 = (base64: string) => {
+    const cleaned = String(base64).replace(/\n/g, '');
+    const binary = atob(cleaned);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  };
+
   async function getGitHubJson<T>(token: string, owner: string, repo: string, path?: string): Promise<T | null> {
     if (!path) return null;
     const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
@@ -3577,7 +3621,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     }
     const data = await response.json();
     if (!data?.content) return null;
-    const content = atob(data.content);
+    const content = decodeBase64Utf8(data.content);
     return JSON.parse(content) as T;
   }
 
@@ -3671,7 +3715,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       }
       const data = await response.json();
       
-      const content = atob(data.content);
+      const content = decodeBase64Utf8(data.content);
       
       const localDataIsEmpty = coreSkills.length === 0 && projects.length === 0;
 
@@ -3746,7 +3790,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         let blob: Blob | null = null;
 
         if (data?.content) {
-            const content = atob(String(data.content).replace(/\n/g, ''));
+            const content = decodeBase64Utf8(data.content);
             blob = new Blob([content], { type: 'application/json' });
         } else if (data?.download_url) {
             const fileResponse = await fetch(data.download_url);
@@ -3931,7 +3975,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           return;
         }
 
-        const folderPath = `audios_${username}`;
+        const folderPath = `audio_${username}`;
         const syncToast = toast({ title: "Uploading audio...", description: `Preparing ${audios.length} files...` });
 
         try {
@@ -3939,8 +3983,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           let skipped = 0;
 
           for (const res of audios) {
-            const key = res.audioFileName || `${res.id}`;
-            const blob = await getAudio(key);
+            const { blob, key: foundKey } = await getAudioForResource(res.id, res.audioFileName);
             if (!blob) { skipped += 1; continue; }
 
             const buffer = await blob.arrayBuffer();
@@ -3949,7 +3992,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
             const mimeType = blob.type || 'audio/mpeg';
             const ext = mimeType.includes('mpeg') || mimeType.includes('mp3') ? 'mp3' : mimeType.split('/').pop() || 'bin';
-            const filename = `${key}.${ext}`.replace(/\s+/g, '_');
+            const rawName = String(res.audioFileName || foundKey || res.id || 'audio');
+            const safeName = rawName.replace(/\s+/g, '_');
+            const hasExt = /\.[a-zA-Z0-9]{1,5}$/.test(safeName);
+            const filename = (hasExt ? safeName : `${safeName}.${ext}`);
             const path = `${folderPath}/${filename}`;
 
             const existingHash = settings.githubModuleHashes?.[path];
@@ -4023,7 +4069,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         return;
       }
 
-      const folderPath = `audios_${username}`;
+      const folderPath = `audio_${username}`;
       toast({ title: "Fetching audio...", description: "Downloading audio files from GitHub to this browser." });
 
       try {
@@ -4031,31 +4077,102 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           headers: { 'Authorization': `token ${githubToken}` }
         });
         if (!listResponse.ok) {
-          const err = await listResponse.json();
-          if (listResponse.status === 404) throw new Error(`Folder "${folderPath}" not found.`);
+          if (listResponse.status === 404) {
+            console.info(`GitHub folder ${folderPath} not found; nothing to fetch.`);
+            toast({ title: 'No audio folder', description: `No folder "${folderPath}" found on GitHub. Nothing to fetch.` });
+            return;
+          }
+          const err = await listResponse.json().catch(() => ({ message: 'Failed to list audios on GitHub' }));
           throw new Error(err.message || 'Failed to list audios on GitHub');
         }
 
         const listData = await listResponse.json();
+        console.info(`Found ${Array.isArray(listData) ? listData.length : 0} items in ${folderPath}`, listData);
         let downloaded = 0;
 
         for (const item of listData || []) {
           if (item.type !== 'file' || !item.name) continue;
           const filePath = `${folderPath}/${item.name}`;
           try {
-            const fileResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${filePath}`, {
-              headers: { 'Authorization': `token ${githubToken}` }
-            });
-            if (!fileResponse.ok) continue;
-            const fileData = await fileResponse.json();
-            if (!fileData?.content) continue;
-            const cleaned = String(fileData.content).replace(/\n/g, '');
-            const binary = atob(cleaned);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-            const ext = item.name.split('.').pop() || 'mp3';
-            const mimeType = ext === 'mp3' ? 'audio/mpeg' : `audio/${ext}`;
-            const blob = new Blob([bytes], { type: mimeType });
+            // Prefer the provided download_url when available (raw content), fallback to GitHub contents API
+            const downloadUrl = item.download_url as string | undefined;
+            let blob: Blob | null = null;
+
+            // If the download_url points to raw.githubusercontent.com it often fails CORS from the browser.
+            // Prefer using the GitHub Contents API when we have an auth token, or when the download_url host is raw.githubusercontent.com.
+            if (downloadUrl) {
+              const isRawHost = downloadUrl.includes('raw.githubusercontent.com');
+              if (githubToken || isRawHost === false) {
+                try {
+                  // Only attempt direct download when not raw.githubusercontent (to avoid CORS) or when no token is present
+                  if (!isRawHost) {
+                    const dataResp = await fetch(downloadUrl);
+                    if (!dataResp.ok) {
+                      console.warn('Download URL fetch failed', downloadUrl, dataResp.status);
+                    } else {
+                      const arrayBuffer = await dataResp.arrayBuffer();
+                      const ext = item.name.split('.').pop() || 'mp3';
+                      const mimeType = ext === 'mp3' ? 'audio/mpeg' : `audio/${ext}`;
+                      blob = new Blob([arrayBuffer], { type: mimeType });
+                    }
+                  }
+                } catch (dd) {
+                  console.warn('Failed to fetch download_url for', item.name, dd);
+                }
+              }
+            }
+
+            if (!blob) {
+              // Use the GitHub Contents API which returns base64 content. This works with the Authorization header and avoids CORS issues.
+              const fileResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${filePath}`, {
+                headers: { 'Authorization': `token ${githubToken}` }
+              });
+              if (!fileResponse.ok) {
+                console.warn('Contents API fetch failed for', filePath, fileResponse.status);
+                const errText = await fileResponse.text().catch(() => 'no-response-text');
+                console.warn('Contents API response text:', errText);
+                continue;
+              }
+              const fileData = await fileResponse.json();
+              // GitHub may omit `content` for large files in the Contents API response.
+              // If content is missing but we have a SHA, fetch the blob via the Git Data API.
+              let base64Content: string | undefined = fileData?.content;
+              if (!base64Content && fileData?.sha) {
+                try {
+                  const blobResp = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/git/blobs/${fileData.sha}`, {
+                    headers: { 'Authorization': `token ${githubToken}` }
+                  });
+                  if (blobResp.ok) {
+                    const blobData = await blobResp.json();
+                    if (blobData?.content) base64Content = blobData.content;
+                    else console.warn('Git blobs API returned no content for', filePath, fileData.sha, blobData);
+                  } else {
+                    console.warn('Git blobs API fetch failed for', filePath, fileData.sha, blobResp.status);
+                  }
+                } catch (blobErr) {
+                  console.warn('Error fetching git blob for', filePath, fileData.sha, blobErr);
+                }
+              }
+              if (!base64Content) {
+                console.warn('Contents API returned no content for', filePath, fileData);
+                continue;
+              }
+              const cleaned = String(base64Content).replace(/\n/g, '');
+              try {
+                const binary = atob(cleaned);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                const ext = item.name.split('.').pop() || 'mp3';
+                const mimeType = ext === 'mp3' ? 'audio/mpeg' : `audio/${ext}`;
+                blob = new Blob([bytes], { type: mimeType });
+              } catch (decodeErr) {
+                console.warn('Failed to decode base64 content for', filePath, decodeErr);
+                continue;
+              }
+            }
+
+            if (!blob) continue;
+
             const key = item.name.split('.').slice(0, -1).join('.') || item.name;
             await storeAudio(key, blob);
 
@@ -4068,7 +4185,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             }));
             downloaded += 1;
           } catch (e) {
-            // continue
+            console.warn('Error fetching audio item', item.name, e);
+            continue;
           }
         }
 
@@ -4192,8 +4310,12 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           headers: { 'Authorization': `token ${githubToken}` }
         });
         if (!listResponse.ok) {
-          const err = await listResponse.json();
-          if (listResponse.status === 404) throw new Error(`Folder "${folderPath}" not found.`);
+          if (listResponse.status === 404) {
+            console.info(`GitHub folder ${folderPath} not found; nothing to fetch.`);
+            toast({ title: 'No PDF folder', description: `No folder "${folderPath}" found on GitHub. Nothing to fetch.` });
+            return;
+          }
+          const err = await listResponse.json().catch(() => ({ message: 'Failed to list pdfs on GitHub' }));
           throw new Error(err.message || 'Failed to list pdfs on GitHub');
         }
 
@@ -4268,13 +4390,15 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
               headers: { 'Authorization': `token ${githubToken}` }
           });
 
-          if (!listResponse.ok) {
-              const errorData = await listResponse.json();
+            if (!listResponse.ok) {
               if (listResponse.status === 404) {
-                  throw new Error(`Folder "${folderPath}" not found in ${githubOwner}/${githubRepo}.`);
+                console.info(`GitHub image folder ${folderPath} not found; nothing to fetch.`);
+                toast({ title: 'No image folder', description: `No folder "${folderPath}" found on GitHub. Nothing to fetch.` });
+                return;
               }
+              const errorData = await listResponse.json().catch(() => ({ message: 'Could not list image folder on GitHub.' }));
               throw new Error(errorData.message || 'Could not list image folder on GitHub.');
-          }
+            }
 
           const listData = await listResponse.json();
           const fileMap = new Map<string, { name: string }>();

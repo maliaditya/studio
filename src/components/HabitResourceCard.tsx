@@ -5,6 +5,7 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Zap, Link as LinkIcon, MoreVertical } from 'lucide-react';
+import AudioMiniPlayer from './AudioMiniPlayer';
 import { EditableField, EditableResponse } from './EditableFields';
 import type { Resource, PopupState } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -28,6 +29,9 @@ export function HabitResourceCard({ resource, onUpdate, onDelete, onLinkClick, l
                         <EditableField field="name" prefix="" resource={resource} onUpdate={onUpdate} placeholder="Habit Name..." />
                     </CardTitle>
                     <div className="flex items-center">
+                        {resource.hasLocalAudio && (
+                            <AudioMiniPlayer resource={resource} />
+                        )}
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onLinkClick(resource.id)}>
                             <LinkIcon className="h-4 w-4" />
                         </Button>

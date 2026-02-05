@@ -20,7 +20,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { getAudio } from '@/lib/audioDB';
+import { getAudio, getAudioForResource } from '@/lib/audioDB';
 import ReactPlayer from 'react-player/youtube';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -690,7 +690,8 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
             const loadAudio = async () => {
                 if (selectedResource.hasLocalAudio && selectedResource.id) {
                     try {
-                        const audioBlob = await getAudio(selectedResource.id);
+                        const { blob: audioBlob } = await getAudioForResource(selectedResource.id, selectedResource.audioFileName);
+
                         if (audioBlob) {
                             objectUrl = URL.createObjectURL(audioBlob);
                             setAudioSrc(objectUrl);
