@@ -19,7 +19,7 @@ import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, Comma
 import type { Resource, ResourcePoint, MicroSkill, Activity, SlotName, WorkoutExercise, ExerciseDefinition, Stopper } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
-import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter, subDays, startOfDay } from 'date-fns';
+import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter, subDays, startOfDay, startOfMonth } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,6 +27,7 @@ import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { TimesheetPageContent } from '@/app/timesheet/page';
 
 
 const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolean) => void }) => {
@@ -611,6 +612,8 @@ export function Header() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUpcomingTasksModalOpen, setIsUpcomingTasksModalOpen] = useState(false);
+  const [isHabitDashboardOpen, setIsHabitDashboardOpen] = useState(false);
+  const [habitDashboardMonth, setHabitDashboardMonth] = useState(startOfMonth(new Date()));
   const isMobile = useIsMobile();
   
   if (isMobile) {
@@ -634,6 +637,11 @@ export function Header() {
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsSearchOpen(true)}>
                 <Search className="h-4 w-4" />
                 <span className="sr-only">Search</span>
+              </Button>
+
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsHabitDashboardOpen(true)}>
+                <ListChecks className="h-4 w-4" />
+                <span className="sr-only">Habit Dashboard</span>
               </Button>
               
               <GlobalSearch open={isSearchOpen} setOpen={setIsSearchOpen} />
@@ -681,6 +689,20 @@ export function Header() {
       <DemoTokenModal isOpen={isDemoTokenModalOpen} onOpenChange={setIsDemoTokenModalOpen} onSubmit={pushDemoDataWithToken} />
       <SettingsModal isOpen={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen} />
       <UpcomingTasksModal isOpen={isUpcomingTasksModalOpen} onOpenChange={setIsUpcomingTasksModalOpen} />
+      <Dialog open={isHabitDashboardOpen} onOpenChange={setIsHabitDashboardOpen}>
+        <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] p-0 overflow-hidden">
+          <ScrollArea className="h-full w-full">
+            <TimesheetPageContent
+              isModal={true}
+              modalTab="habit-dashboard"
+              showModalTabs={false}
+              dashboardMonth={habitDashboardMonth}
+              onDashboardMonthChange={setHabitDashboardMonth}
+              showHabitDashboardMonthControls={true}
+            />
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

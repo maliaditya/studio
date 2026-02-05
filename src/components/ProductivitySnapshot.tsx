@@ -14,7 +14,7 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart as RechartsPieChart, Pie, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfMonth } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Carousel } from './ui/carousel';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,7 +32,7 @@ import type { Release, ExerciseDefinition, SharingStatus, Activity, DailySchedul
 import { ScrollArea } from './ui/scroll-area';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ChartsPageContent as ChartsPageContentActual } from '@/app/charts/page';
-import { TimesheetPageContent } from '@/app/timesheet/page';
+import { HabitDashboardMonthControls, TimesheetPageContent } from '@/app/timesheet/page';
 import { TimetablePageContent } from '@/app/timetable/page';
 import { WeeklyReviewModal } from './WeeklyReviewModal';
 
@@ -271,11 +271,19 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
   const { microSkillMap, deepWorkDefinitions, upskillDefinitions, allDeepWorkLogs, allUpskillLogs, toggleProjectBrandingStatus } = useAuth();
   const [isChartModalOpen, setIsChartModalOpen] = useState(false);
   const [isTimesheetModalOpen, setIsTimesheetModalOpen] = useState(false);
+  const [timesheetModalTab, setTimesheetModalTab] = useState<'timesheet' | 'habit-dashboard'>('habit-dashboard');
+  const [timesheetDashboardMonth, setTimesheetDashboardMonth] = useState(startOfMonth(new Date()));
   const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
   const [isWeeklyReviewModalOpen, setIsWeeklyReviewModalOpen] = useState(false);
 
 
   const themeColors = useThemeColors();
+
+  const handleTimesheetDashboardMonthChange = (direction: -1 | 1) => {
+    const nextMonth = new Date(timesheetDashboardMonth);
+    nextMonth.setMonth(nextMonth.getMonth() + direction);
+    setTimesheetDashboardMonth(startOfMonth(nextMonth));
+  };
   
   const topSpecializations = useMemo(() => {
     return Object.entries(stats.learningStats || {})
@@ -621,10 +629,41 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
       <Dialog open={isTimesheetModalOpen} onOpenChange={setIsTimesheetModalOpen}>
         <DialogContent className="max-w-[98vw] w-[98vw] h-[90vh] p-0 flex flex-col">
           <DialogHeader className="p-4 border-b">
-            <DialogTitle>Timesheet</DialogTitle>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center justify-start gap-2">
+                <Button
+                  variant={timesheetModalTab === 'timesheet' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setTimesheetModalTab('timesheet')}
+                >
+                  Timesheet
+                </Button>
+                <Button
+                  variant={timesheetModalTab === 'habit-dashboard' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setTimesheetModalTab('habit-dashboard')}
+                >
+                  Habit Dashboard
+                </Button>
+              </div>
+              {timesheetModalTab === 'habit-dashboard' && (
+                <HabitDashboardMonthControls
+                  month={timesheetDashboardMonth}
+                  onChange={handleTimesheetDashboardMonthChange}
+                  className="mr-10"
+                />
+              )}
+            </div>
           </DialogHeader>
           <div className="flex-grow min-h-0">
-              <TimesheetPageContent isModal={true} />
+              <TimesheetPageContent
+                isModal={true}
+                modalTab={timesheetModalTab}
+                onModalTabChange={setTimesheetModalTab}
+                showModalTabs={false}
+                dashboardMonth={timesheetDashboardMonth}
+                onDashboardMonthChange={setTimesheetDashboardMonth}
+              />
           </div>
         </DialogContent>
       </Dialog>

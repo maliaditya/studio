@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from 'date-fns';
-import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide, Check, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide, Check, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
@@ -25,11 +25,39 @@ import { ProductivityInsights } from '@/components/ProductivityInsights';
 
 interface TimesheetPageContentProps {
   isModal?: boolean;
+  modalTab?: 'timesheet' | 'habit-dashboard';
+  onModalTabChange?: (tab: 'timesheet' | 'habit-dashboard') => void;
+  showModalTabs?: boolean;
+  dashboardMonth?: Date;
+  onDashboardMonthChange?: (nextMonth: Date) => void;
+  showHabitDashboardMonthControls?: boolean;
 }
 
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
 type ViewMode = "day" | "week" | "month";
 type TimeAllocationView = "bar" | "pie";
+
+type HabitDashboardMonthControlsProps = {
+    month: Date;
+    onChange: (direction: -1 | 1) => void;
+    className?: string;
+};
+
+export function HabitDashboardMonthControls({ month, onChange, className }: HabitDashboardMonthControlsProps) {
+    return (
+        <div className={cn("flex items-center gap-2", className)}>
+            <Button variant="outline" size="icon" onClick={() => onChange(-1)}>
+                <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="px-3 py-2 rounded-md border border-muted/50 bg-muted/30 text-sm font-semibold">
+                {format(month, 'MMMM yyyy')}
+            </div>
+            <Button variant="outline" size="icon" onClick={() => onChange(1)}>
+                <ChevronRight className="h-4 w-4" />
+            </Button>
+        </div>
+    );
+}
 
 const formatMinutes = (minutes: number) => {
     if (minutes <= 0) return "0m";
@@ -244,14 +272,40 @@ const getLoggedMinutes = (activity: Activity, allDeepWorkLogs: any[], allUpskill
     }
 };
 
-export function TimesheetPageContent({ isModal = false }: TimesheetPageContentProps) {
-    const { schedule, allDeepWorkLogs, allUpskillLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs } = useAuth();
+export function TimesheetPageContent({
+    isModal = false,
+    modalTab,
+    onModalTabChange,
+    showModalTabs = true,
+    dashboardMonth,
+    onDashboardMonthChange,
+    showHabitDashboardMonthControls,
+}: TimesheetPageContentProps) {
+    const {
+        schedule,
+        allDeepWorkLogs,
+        allUpskillLogs,
+        allWorkoutLogs,
+        brandingLogs,
+        allLeadGenLogs,
+        allMindProgrammingLogs,
+        upskillDefinitions,
+        deepWorkDefinitions,
+        microSkillMap,
+    } = useAuth();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>("day");
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
     const [modalData, setModalData] = useState<{ date: Date; activities: ProcessedActivity[], pieData: any[] } | null>(null);
-    const [modalTab, setModalTab] = useState<'timesheet' | 'habit-dashboard'>('timesheet');
-    const [dashboardMonth, setDashboardMonth] = useState(startOfMonth(new Date()));
+    const [localModalTab, setLocalModalTab] = useState<'timesheet' | 'habit-dashboard'>('habit-dashboard');
+    const [localDashboardMonth, setLocalDashboardMonth] = useState(startOfMonth(new Date()));
+    const [collapsedHabitGroups, setCollapsedHabitGroups] = useState<Record<string, boolean>>({});
+    const [collapsedSpecializations, setCollapsedSpecializations] = useState<Record<string, boolean>>({});
+    const dashboardOuterRef = useRef<HTMLDivElement>(null);
+    const dashboardInnerRef = useRef<HTMLDivElement>(null);
+    const [dashboardScale, setDashboardScale] = useState(1);
+    const effectiveDashboardMonth = dashboardMonth ?? localDashboardMonth;
+    const setEffectiveDashboardMonth = onDashboardMonthChange ?? setLocalDashboardMonth;
 
     const handlePrev = () => {
         if (viewMode === 'day') {
@@ -274,10 +328,31 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     };
 
     const handleDashboardMonthChange = (direction: -1 | 1) => {
-        const newMonth = new Date(dashboardMonth);
+        const newMonth = new Date(effectiveDashboardMonth);
         newMonth.setMonth(newMonth.getMonth() + direction);
-        setDashboardMonth(startOfMonth(newMonth));
+        setEffectiveDashboardMonth(startOfMonth(newMonth));
     };
+
+    const shouldShowHabitDashboardMonthControls = showHabitDashboardMonthControls ?? !isModal;
+
+    useEffect(() => {
+        const outer = dashboardOuterRef.current;
+        const inner = dashboardInnerRef.current;
+        if (!outer || !inner) return;
+
+        const updateScale = () => {
+            const outerWidth = outer.clientWidth || 1;
+            const innerWidth = inner.scrollWidth || 1;
+            const nextScale = Math.min(1, outerWidth / innerWidth);
+            setDashboardScale(prev => (Math.abs(prev - nextScale) > 0.01 ? nextScale : prev));
+        };
+
+        updateScale();
+        const observer = new ResizeObserver(() => updateScale());
+        observer.observe(outer);
+        observer.observe(inner);
+        return () => observer.disconnect();
+    }, [effectiveDashboardMonth]);
 
     const timeData = useMemo(() => {
         const filterActivity = (activity: Activity): boolean => {
@@ -663,8 +738,8 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
 
     const habitDashboard = useMemo(() => {
         const daysInMonth = eachDayOfInterval({
-            start: startOfMonth(dashboardMonth),
-            end: endOfMonth(dashboardMonth),
+            start: startOfMonth(effectiveDashboardMonth),
+            end: endOfMonth(effectiveDashboardMonth),
         });
 
         const monthActivities = daysInMonth.flatMap(day => {
@@ -710,6 +785,44 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
             .slice(0, 12)
             .map(([, meta]) => ({ name: meta.name, type: meta.type }));
 
+        const habitsByType = habits.reduce((acc, habit) => {
+            const key = habit.type;
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(habit);
+            return acc;
+        }, {} as Record<string, { name: string; type: ActivityTypeType }[]>);
+
+        const getSpecializationForHabit = (habit: { name: string; type: ActivityTypeType }) => {
+            if (habit.type !== 'deepwork' && habit.type !== 'upskill') return null;
+            const defs = habit.type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
+            const def = defs.find(d => d.name.trim() === habit.name.trim());
+            const microSkillName = def?.category;
+            if (!microSkillName) return null;
+            const microSkillInfo = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === microSkillName);
+            return microSkillInfo?.coreSkillName || microSkillName;
+        };
+
+        const getGroupedHabitsForType = (type: ActivityTypeType, list: { name: string; type: ActivityTypeType }[]) => {
+            if (type !== 'deepwork' && type !== 'upskill') {
+                return [{ label: null as string | null, habits: list }];
+            }
+            const groups = new Map<string, { name: string; type: ActivityTypeType }[]>();
+            list.forEach(habit => {
+                const specialization = getSpecializationForHabit(habit);
+                if (!specialization) return;
+                const bucket = groups.get(specialization) || [];
+                bucket.push(habit);
+                groups.set(specialization, bucket);
+            });
+            return Array.from(groups.entries()).map(([label, habits]) => ({ label, habits }));
+        };
+
+        const orderedTypes = Object.keys(habitsByType).sort((a, b) => {
+            const aName = activityNameMap[a] || a;
+            const bName = activityNameMap[b] || b;
+            return aName.localeCompare(bName);
+        });
+
         const dayCompletion = daysInMonth.map(day => {
             const dateKey = format(day, 'yyyy-MM-dd');
             const daySchedule = schedule[dateKey] || {};
@@ -746,87 +859,84 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
         const overallPercent = overallTotal === 0 ? 0 : Math.round((overallCompleted / overallTotal) * 100);
 
         const maxBar = Math.max(1, ...dayCompletion.map(day => day.percent));
+        const isAltWeek = (index: number) => Math.floor(index / 7) % 2 === 1;
+
+        const habitTotals = habits.map(habit => {
+            let totalMinutes = 0;
+            daysInMonth.forEach(day => {
+                const dateKey = format(day, 'yyyy-MM-dd');
+                const daySchedule = schedule[dateKey] || {};
+                const allSlots = Object.values(daySchedule) as Activity[][];
+                const activities = allSlots.flat();
+                const habitKey = `${habit.type}::${habit.name}`;
+                const matches = activities.filter(act => getHabitKey(act) === habitKey);
+                matches.forEach(act => {
+                    totalMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
+                });
+            });
+            return { habitKey: `${habit.type}::${habit.name}`, totalMinutes };
+        });
+        const maxHabitMinutes = Math.max(1, ...habitTotals.map(h => h.totalMinutes));
+
+        const dayTotals = daysInMonth.map(day => {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            const daySchedule = schedule[dateKey] || {};
+            const allSlots = Object.values(daySchedule) as Activity[][];
+            const activities = allSlots.flat();
+            const totalMinutes = activities.reduce((sum, act) => {
+                return sum + getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
+            }, 0);
+            return { date: day, totalMinutes };
+        });
+        const maxDayMinutes = Math.max(1, ...dayTotals.map(d => d.totalMinutes));
+
+        const groupTotals = orderedTypes.map(type => {
+            const groupHabits = habitsByType[type] || [];
+            const totalMinutes = groupHabits.reduce((sum, habit) => {
+                const habitKey = `${habit.type}::${habit.name}`;
+                return sum + (habitTotals.find(h => h.habitKey === habitKey)?.totalMinutes || 0);
+            }, 0);
+            return { type, totalMinutes };
+        });
+        const maxGroupMinutes = Math.max(1, ...groupTotals.map(g => g.totalMinutes));
 
         return (
+            <div ref={dashboardOuterRef} className="w-full overflow-hidden">
+                <div ref={dashboardInnerRef} className="origin-top-left" style={{ zoom: dashboardScale } as React.CSSProperties}>
             <div className="grid gap-6 w-full">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                    <div />
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="icon" onClick={() => handleDashboardMonthChange(-1)}>
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <div className="px-3 py-2 rounded-md border border-muted/50 bg-muted/30 text-sm font-semibold">
-                            {format(dashboardMonth, 'MMMM yyyy')}
-                        </div>
-                        <Button variant="outline" size="icon" onClick={() => handleDashboardMonthChange(1)}>
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
+                {shouldShowHabitDashboardMonthControls && (
+                    <div className="flex flex-wrap items-center gap-4">
+                        <HabitDashboardMonthControls
+                            month={effectiveDashboardMonth}
+                            onChange={handleDashboardMonthChange}
+                        />
                     </div>
-                </div>
+                )}
 
-                <div className="grid gap-4 xl:grid-cols-3 w-full">
-                    <div className="rounded-xl border border-muted/50 bg-card/60 p-4">
-                        <h3 className="font-semibold">Progress</h3>
-                        <div className="mt-4 flex items-center gap-4">
-                            <div className="h-24 w-24 rounded-full border-4 border-emerald-400/30 flex items-center justify-center text-xl font-bold text-emerald-300">
-                                {overallPercent}%
-                            </div>
-                            <div className="space-y-1 text-sm text-muted-foreground">
-                                <p>Total completed: <span className="text-foreground font-semibold">{overallCompleted}</span></p>
-                                <p>Total scheduled: <span className="text-foreground font-semibold">{overallTotal}</span></p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="rounded-xl border border-muted/50 bg-card/60 p-4">
-                        <h3 className="font-semibold">Top Habits</h3>
-                        <div className="mt-3 space-y-2 text-sm">
-                            {habits.length === 0 && (
-                                <p className="text-muted-foreground">No habits found this month.</p>
-                            )}
-                            {habits.map(habit => (
-                                <div key={habit.name} className="flex items-center gap-2">
-                                    <span className="text-muted-foreground">{activityTypeIcons[habit.type] || <CheckCircle className="h-4 w-4" />}</span>
-                                    <span className="truncate">{habit.name}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="rounded-xl border border-muted/50 bg-card/60 p-4 overflow-hidden">
-                        <h3 className="font-semibold">Month Breakdown</h3>
-                        <p className="text-xs text-muted-foreground">By activity category</p>
-                        <div className="mt-2 h-40 flex items-center justify-center">
-                            <ChartContainer config={{}} className="h-full w-full">
-                                <ResponsiveContainer>
-                                    <RechartsPieChart>
-                                        <ChartTooltip content={<ChartTooltipContent />} />
-                                        <Pie data={monthTypeData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="55%" outerRadius="80%" stroke="hsl(var(--background))" strokeWidth={2}>
-                                            {monthTypeData.map((entry) => (
-                                                <Cell key={`month-type-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
-                                            ))}
-                                        </Pie>
-                                    </RechartsPieChart>
-                                </ResponsiveContainer>
-                            </ChartContainer>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="overflow-auto border border-muted/50 rounded-xl bg-card/50 w-full">
-                    <div className="min-w-full">
+                <div className="overflow-y-auto overflow-x-hidden border border-muted/50 rounded-xl bg-card/50 w-full">
+                    <div className="min-w-full px-4">
                         <div
                             className="grid gap-0 text-xs"
-                            style={{ gridTemplateColumns: `260px repeat(${daysInMonth.length}, minmax(16px, 1fr))` }}
+                            style={{ gridTemplateColumns: `260px repeat(${daysInMonth.length}, minmax(16px, 1fr)) 140px` }}
                         >
-                            <div className="h-8 px-2 flex items-center text-xs text-muted-foreground border-b border-muted/30">Day %</div>
-                            <div className="relative border-b border-muted/30" style={{ gridColumn: `2 / span ${daysInMonth.length}` }}>
-                                <div className="grid" style={{ gridTemplateColumns: `repeat(${daysInMonth.length}, minmax(0, 1fr))` }}>
-                                    {dayCompletion.map((day) => (
-                                        <div key={`bar-${day.date.toISOString()}`} className="p-2">
-                                            <div className="h-28 flex items-end">
+                            <div className="h-40 px-2 flex flex-col justify-center gap-2 text-xs text-muted-foreground border-b border-muted/30">
+                                <div className="flex items-center gap-4">
+                                    <div className="h-20 w-20 rounded-full border-4 border-emerald-400/30 flex items-center justify-center text-base font-bold text-emerald-300">
+                                        {overallPercent}%
+                                    </div>
+                                    <div className="space-y-1 text-[13px] text-muted-foreground">
+                                        <p>Total completed: <span className="text-foreground font-semibold">{overallCompleted}</span></p>
+                                        <p>Total scheduled: <span className="text-foreground font-semibold">{overallTotal}</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="relative border-b border-muted/30 h-40" style={{ gridColumn: `2 / span ${daysInMonth.length}` }}>
+                                <div className="grid h-full items-end pt-4" style={{ gridTemplateColumns: `repeat(${daysInMonth.length}, minmax(0, 1fr))` }}>
+                                    {dayCompletion.map((day, index) => (
+                                        <div key={`bar-${day.date.toISOString()}`} className={cn("p-2", isAltWeek(index) && "bg-muted/20")}>
+                                            <div className="h-20 flex items-end">
                                                 <div
-                                                    className="w-full rounded-md border border-emerald-200/70 bg-emerald-400/20"
+                                                    className="w-full rounded-md border border-sky-200/60 bg-sky-400/20"
                                                     style={{ height: `${(day.percent / maxBar) * 100}%` }}
                                                     title={`${format(day.date, 'MMM d')}: ${day.percent}%`}
                                                 />
@@ -856,52 +966,261 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                                             return d;
                                         })()}
                                         fill="none"
-                                        stroke="rgba(226,232,240,0.9)"
+                                        stroke="rgba(148,163,184,0.9)"
                                         strokeWidth="1.6"
                                     />
                                 </svg>
                             </div>
-                            <div className="h-8 px-2 flex items-center font-semibold text-muted-foreground border-b border-muted/30">Daily Habits</div>
-                            {daysInMonth.map((day) => (
-                                <div key={day.toISOString()} className="h-8 flex items-center justify-center font-semibold text-muted-foreground border-b border-muted/30">
+                            <div className="h-40 px-2 flex items-center justify-center text-xs text-muted-foreground border-b border-muted/30">
+                                <div className="flex flex-col items-center gap-1">
+                                    <div className="h-36 w-44">
+                                        <ChartContainer config={{}} className="h-full w-full">
+                                            <ResponsiveContainer>
+                                                <RechartsPieChart>
+                                                    <ChartTooltip content={<ChartTooltipContent />} />
+                                                    <Pie data={monthTypeData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="45%" outerRadius="85%" stroke="hsl(var(--background))" strokeWidth={2}>
+                                                        {monthTypeData.map((entry) => (
+                                                            <Cell key={`month-type-mini-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
+                                                        ))}
+                                                    </Pie>
+                                                </RechartsPieChart>
+                                            </ResponsiveContainer>
+                                        </ChartContainer>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="h-8 px-2 flex items-center gap-2 font-semibold text-muted-foreground border-b border-muted/30">
+                                <CheckCircle className="h-4 w-4 text-emerald-400" />
+                                Daily Habits
+                            </div>
+                            {daysInMonth.map((day, index) => (
+                                <div key={day.toISOString()} className={cn("h-8 flex items-center justify-center font-semibold text-muted-foreground border-b border-muted/30", isAltWeek(index) && "bg-muted/20")}>
                                     {format(day, 'd')}
                                 </div>
                             ))}
-                            {habits.map((habit) => (
-                                <React.Fragment key={habit.name}>
-                                    <div className="h-8 px-2 border-b border-muted/20 text-sm truncate flex items-center" title={habit.name}>
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <span className="text-muted-foreground">{activityTypeIcons[habit.type] || <CheckCircle className="h-4 w-4" />}</span>
-                                            <span className="truncate">{habit.name}</span>
-                                        </div>
-                                    </div>
-                                    {daysInMonth.map((day) => {
-                                        const dateKey = format(day, 'yyyy-MM-dd');
-                                        const daySchedule = schedule[dateKey] || {};
-                                        const allSlots = Object.values(daySchedule) as Activity[][];
-                                        const activities = allSlots.flat();
-                                        const habitKey = `${habit.type}::${habit.name}`;
-                                        const matches = activities.filter(act => getHabitKey(act) === habitKey);
-                                        const completed = matches.some(act => act.completed);
-                                        const hasHabit = matches.length > 0;
-                                        return (
-                                            <div key={`${habit.name}-${dateKey}`} className="h-8 flex items-center justify-center border-b border-muted/20">
-                                                <div className={cn(
-                                                    "h-4 w-4 mx-auto rounded-sm border border-muted-foreground/30",
-                                                    hasHabit && !completed && "bg-muted/40",
-                                                    completed && "bg-emerald-400/80 border-emerald-400"
-                                                )} />
+                            <div className="h-8 px-2 flex items-center justify-end font-semibold text-muted-foreground border-b border-muted/30">Total hrs</div>
+                            {orderedTypes.map(type => (
+                                <React.Fragment key={`group-${type}`}>
+                                    {collapsedHabitGroups[type] ? (
+                                        <>
+                                            <div className="h-8 px-2 flex items-center text-xs font-semibold text-muted-foreground border-b border-muted/30 bg-muted/20">
+                                                <button
+                                                    className="flex items-center gap-2"
+                                                    onClick={() => setCollapsedHabitGroups(prev => ({ ...prev, [type]: !prev[type] }))}
+                                                >
+                                                    <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedHabitGroups[type] && "-rotate-90")} />
+                                                    <span>{activityNameMap[type] || type}</span>
+                                                </button>
                                             </div>
-                                        );
-                                    })}
+                                            {daysInMonth.map((day, index) => {
+                                                const dateKey = format(day, 'yyyy-MM-dd');
+                                                const daySchedule = schedule[dateKey] || {};
+                                                const allSlots = Object.values(daySchedule) as Activity[][];
+                                                const activities = allSlots.flat();
+                                                const groupHabits = habitsByType[type] || [];
+                                                const matches = activities.filter(act => {
+                                                    const key = getHabitKey(act);
+                                                    return groupHabits.some(h => key === `${h.type}::${h.name}`);
+                                                });
+                                                const completed = matches.some(act => act.completed);
+                                                const hasHabit = matches.length > 0;
+                                                return (
+                                                    <div key={`${type}-combined-${dateKey}`} className={cn("h-8 flex items-center justify-center border-b border-muted/20 bg-muted/20", isAltWeek(index) && "bg-muted/30")}>
+                                                        <div className={cn(
+                                                            "h-4 w-4 mx-auto rounded-sm border border-muted-foreground/30",
+                                                            hasHabit && !completed && "bg-muted/40",
+                                                            completed && "bg-emerald-400/80 border-emerald-400"
+                                                        )} />
+                                                    </div>
+                                                );
+                                            })}
+                                            <div className="h-8 px-2 border-b border-muted/20 flex items-center bg-muted/20">
+                                                {(() => {
+                                                    const total = groupTotals.find(g => g.type === type)?.totalMinutes || 0;
+                                                    const hours = total / 60;
+                                                    const accent = total > 0 ? "text-amber-300" : "text-muted-foreground";
+                                                    return (
+                                                        <div className="w-full flex items-center gap-2">
+                                                            <div className="h-2 flex-1 rounded-full bg-muted/40 overflow-hidden">
+                                                                <div
+                                                                    className={cn("h-full", total > 0 ? "bg-amber-400/80" : "bg-muted/30")}
+                                                                    style={{ width: `${Math.min(100, (total / maxGroupMinutes) * 100)}%` }}
+                                                                />
+                                                            </div>
+                                                            <span className={cn("text-[10px] tabular-nums min-w-[32px] text-right", accent)}>{hours.toFixed(1)}</span>
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div
+                                                className="h-8 px-2 flex items-center text-xs font-semibold text-muted-foreground border-b border-muted/30 bg-muted/20"
+                                                style={{ gridColumn: `1 / span ${daysInMonth.length + 2}` }}
+                                            >
+                                                <button
+                                                    className="flex items-center gap-2"
+                                                    onClick={() => setCollapsedHabitGroups(prev => ({ ...prev, [type]: !prev[type] }))}
+                                                >
+                                                    <ChevronDown className={cn("h-4 w-4 transition-transform", collapsedHabitGroups[type] && "-rotate-90")} />
+                                                    <span>{activityNameMap[type] || type}</span>
+                                                </button>
+                                            </div>
+                                            {getGroupedHabitsForType(type, habitsByType[type]).map(group => {
+                                                const groupKey = `${type}::${group.label ?? 'all'}`;
+                                                const isCollapsed = group.label ? (collapsedSpecializations[groupKey] ?? true) : false;
+                                                const groupTotalMinutes = group.habits.reduce((sum, habit) => {
+                                                    const habitKey = `${habit.type}::${habit.name}`;
+                                                    return sum + (habitTotals.find(h => h.habitKey === habitKey)?.totalMinutes || 0);
+                                                }, 0);
+                                                return (
+                                                <React.Fragment key={`${type}-${group.label ?? 'all'}`}>
+                                                    {group.label && (
+                                                        <>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setCollapsedSpecializations(prev => ({ ...prev, [groupKey]: !isCollapsed }))}
+                                                                className="h-7 px-2 border-b border-muted/20 text-[11px] uppercase tracking-wide text-muted-foreground/80 bg-muted/10 flex items-center gap-2"
+                                                            >
+                                                                <ChevronDown className={cn("h-3 w-3 transition-transform", isCollapsed && "-rotate-90")} />
+                                                                {group.label}
+                                                            </button>
+                                                            {isCollapsed ? (
+                                                                <>
+                                                                    {daysInMonth.map((day, index) => {
+                                                                        const dateKey = format(day, 'yyyy-MM-dd');
+                                                                        const daySchedule = schedule[dateKey] || {};
+                                                                        const allSlots = Object.values(daySchedule) as Activity[][];
+                                                                        const activities = allSlots.flat();
+                                                                        const groupHabitKeys = new Set(group.habits.map(h => `${h.type}::${h.name}`));
+                                                                        const matches = activities.filter(act => {
+                                                                            const key = getHabitKey(act);
+                                                                            return key ? groupHabitKeys.has(key) : false;
+                                                                        });
+                                                                        const completed = matches.some(act => act.completed);
+                                                                        const hasHabit = matches.length > 0;
+                                                                        return (
+                                                                            <div key={`${groupKey}-${dateKey}`} className={cn("h-7 flex items-center justify-center border-b border-muted/20 bg-muted/10", isAltWeek(index) && "bg-muted/20")}>
+                                                                                <div className={cn(
+                                                                                    "h-4 w-4 mx-auto rounded-sm border border-muted-foreground/30",
+                                                                                    hasHabit && !completed && "bg-muted/40",
+                                                                                    completed && "bg-emerald-400/80 border-emerald-400"
+                                                                                )} />
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                    <div className="h-7 px-2 border-b border-muted/20 flex items-center bg-muted/10">
+                                                                        {(() => {
+                                                                            const hours = groupTotalMinutes / 60;
+                                                                            const accent = groupTotalMinutes > 0 ? "text-amber-300" : "text-muted-foreground";
+                                                                            return (
+                                                                                <div className="w-full flex items-center gap-2">
+                                                                                    <div className="h-2 flex-1 rounded-full bg-muted/40 overflow-hidden">
+                                                                                        <div
+                                                                                            className={cn("h-full", groupTotalMinutes > 0 ? "bg-amber-400/80" : "bg-muted/30")}
+                                                                                            style={{ width: `${Math.min(100, (groupTotalMinutes / maxHabitMinutes) * 100)}%` }}
+                                                                                        />
+                                                                                    </div>
+                                                                                    <span className={cn("text-[10px] tabular-nums min-w-[32px] text-right", accent)}>{hours.toFixed(1)}</span>
+                                                                                </div>
+                                                                            );
+                                                                        })()}
+                                                                    </div>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    {daysInMonth.map((day, index) => (
+                                                                        <div key={`${groupKey}-empty-${day.toISOString()}`} className={cn("h-7 border-b border-muted/20 bg-muted/10", isAltWeek(index) && "bg-muted/20")} />
+                                                                    ))}
+                                                                    <div className="h-7 border-b border-muted/20 bg-muted/10" />
+                                                                </>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                    {!isCollapsed && group.habits.map((habit) => (
+                                                        <React.Fragment key={habit.name}>
+                                                            <div className="h-8 px-2 border-b border-muted/20 text-sm truncate flex items-center" title={habit.name}>
+                                                                <div className="flex items-center gap-2 min-w-0">
+                                                                    <span className="text-muted-foreground">{activityTypeIcons[habit.type] || <CheckCircle className="h-4 w-4" />}</span>
+                                                                    <span className="truncate">{habit.name}</span>
+                                                                </div>
+                                                            </div>
+                                                            {daysInMonth.map((day, index) => {
+                                                                const dateKey = format(day, 'yyyy-MM-dd');
+                                                                const daySchedule = schedule[dateKey] || {};
+                                                                const allSlots = Object.values(daySchedule) as Activity[][];
+                                                                const activities = allSlots.flat();
+                                                                const habitKey = `${habit.type}::${habit.name}`;
+                                                                const matches = activities.filter(act => getHabitKey(act) === habitKey);
+                                                                const completed = matches.some(act => act.completed);
+                                                                const hasHabit = matches.length > 0;
+                                                                return (
+                                                                    <div key={`${habit.name}-${dateKey}`} className={cn("h-8 flex items-center justify-center border-b border-muted/20", isAltWeek(index) && "bg-muted/20")}>
+                                                                        <div className={cn(
+                                                                            "h-4 w-4 mx-auto rounded-sm border border-muted-foreground/30",
+                                                                            hasHabit && !completed && "bg-muted/40",
+                                                                            completed && "bg-emerald-400/80 border-emerald-400"
+                                                                        )} />
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                            <div className="h-8 px-2 border-b border-muted/20 flex items-center">
+                                                                {(() => {
+                                                                    const habitKey = `${habit.type}::${habit.name}`;
+                                                                    const total = habitTotals.find(h => h.habitKey === habitKey)?.totalMinutes || 0;
+                                                                    const hours = total / 60;
+                                                                    const accent = total > 0 ? "text-amber-300" : "text-muted-foreground";
+                                                                    return (
+                                                                        <div className="w-full flex items-center gap-2">
+                                                                            <div className="h-2 flex-1 rounded-full bg-muted/40 overflow-hidden">
+                                                                                <div
+                                                                                    className={cn("h-full", total > 0 ? "bg-amber-400/80" : "bg-muted/30")}
+                                                                                    style={{ width: `${Math.min(100, (total / maxHabitMinutes) * 100)}%` }}
+                                                                                />
+                                                                            </div>
+                                                                            <span className={cn("text-[10px] tabular-nums min-w-[32px] text-right", accent)}>{hours.toFixed(1)}</span>
+                                                                        </div>
+                                                                    );
+                                                                })()}
+                                                            </div>
+                                                        </React.Fragment>
+                                                    ))}
+                                                </React.Fragment>
+                                                );
+                                            })}
+                                        </>
+                                    )}
                                 </React.Fragment>
                             ))}
+                            <div className="h-8 px-2 flex items-center font-semibold text-muted-foreground border-b border-muted/30">
+                                Hours
+                            </div>
+                            {dayTotals.map((day, index) => {
+                                const hours = day.totalMinutes / 60;
+                                return (
+                                    <div key={`day-total-${day.date.toISOString()}`} className={cn("h-20 flex flex-col items-center justify-start gap-1 border-b border-muted/30", isAltWeek(index) && "bg-muted/20")}>
+                                        <div className="relative h-16 w-5">
+                                            <div
+                                                className="absolute left-0 top-0 w-full rounded-sm bg-indigo-400/80"
+                                                style={{ height: `${(day.totalMinutes / maxDayMinutes) * 100}%` }}
+                                            />
+                                        </div>
+                                        <span className={cn("text-[10px] tabular-nums", hours > 0 ? "text-indigo-300" : "text-muted-foreground")}>{hours > 0 ? hours.toFixed(1) : "0.0"}</span>
+                                    </div>
+                                );
+                            })}
+                            <div className="h-12 px-2 flex items-center justify-end font-semibold text-muted-foreground border-b border-muted/30">
+                                Total
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
+                </div>
+            </div>
         );
-    }, [dashboardMonth, schedule]);
+    }, [effectiveDashboardMonth, schedule, collapsedHabitGroups, collapsedSpecializations, upskillDefinitions, deepWorkDefinitions, microSkillMap]);
 
     const timesheetBody = (
         <>
@@ -954,7 +1273,7 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     );
 
     return (
-        <div className={cn("container mx-auto", isModal ? "p-0 h-full flex flex-col bg-transparent" : "p-4 sm:p-6 lg:p-8")}>
+        <div className={cn(isModal ? "w-full h-full flex flex-col bg-transparent" : "container mx-auto p-4 sm:p-6 lg:p-8")}>
             <Card className={cn(isModal && "border-0 shadow-none flex-grow flex flex-col min-h-0 bg-transparent")}>
                  {!isModal && (
                     <CardHeader>
@@ -962,26 +1281,46 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                         <CardDescription>Review your logged time. Durations for Deep Work and Upskill tasks are calculated from your logged sessions.</CardDescription>
                     </CardHeader>
                 )}
-                <CardContent className={cn("space-y-6", isModal ? "p-4 flex-grow min-h-0 flex flex-col" : "")}>
-                    {isModal ? (
-                        <Tabs value={modalTab} onValueChange={(v) => setModalTab(v as 'timesheet' | 'habit-dashboard')} className="flex flex-col flex-grow min-h-0">
-                            <TabsList className="self-start">
-                                <TabsTrigger value="timesheet">Timesheet</TabsTrigger>
-                                <TabsTrigger value="habit-dashboard">Habit Dashboard</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="timesheet" className="flex flex-col flex-grow min-h-0">
-                                {timesheetBody}
-                            </TabsContent>
-                            <TabsContent value="habit-dashboard" className="flex-grow min-h-0 w-full">
+                {isModal ? (
+                    showModalTabs ? (
+                        <Tabs
+                            value={modalTab ?? localModalTab}
+                            onValueChange={(v) => (onModalTabChange ?? setLocalModalTab)(v as 'timesheet' | 'habit-dashboard')}
+                            className="flex flex-col flex-grow min-h-0"
+                        >
+                            <CardContent className="p-4 pb-0">
+                                <TabsList className="self-start">
+                                    <TabsTrigger value="timesheet">Timesheet</TabsTrigger>
+                                    <TabsTrigger value="habit-dashboard">Habit Dashboard</TabsTrigger>
+                                </TabsList>
+                            </CardContent>
+                            <CardContent className="pt-0 flex-grow min-h-0 flex flex-col">
+                                <TabsContent value="timesheet" className="flex flex-col flex-grow min-h-0">
+                                    {timesheetBody}
+                                </TabsContent>
+                                <TabsContent value="habit-dashboard" className="flex-grow min-h-0 w-full">
+                                    <ScrollArea className="h-full w-full">
+                                        {habitDashboard}
+                                    </ScrollArea>
+                                </TabsContent>
+                            </CardContent>
+                        </Tabs>
+                    ) : (
+                        <CardContent className="p-4 flex-grow min-h-0 flex flex-col">
+                            {(modalTab ?? localModalTab) === 'timesheet' ? (
+                                timesheetBody
+                            ) : (
                                 <ScrollArea className="h-full w-full">
                                     {habitDashboard}
                                 </ScrollArea>
-                            </TabsContent>
-                        </Tabs>
-                    ) : (
-                        timesheetBody
-                    )}
-                </CardContent>
+                            )}
+                        </CardContent>
+                    )
+                ) : (
+                    <CardContent className={cn("space-y-6", isModal ? "p-4 flex-grow min-h-0 flex flex-col" : "")}>
+                        {timesheetBody}
+                    </CardContent>
+                )}
             </Card>
             
             {modalData && (

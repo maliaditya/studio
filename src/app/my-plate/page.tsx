@@ -6,7 +6,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project, CoreSkill } from '@/types/workout';
-import { format, startOfToday, isAfter, parseISO, differenceInDays, subDays, isSameDay, getISOWeekYear, getISOWeek } from 'date-fns';
+import { format, startOfToday, isAfter, parseISO, differenceInDays, subDays, isSameDay, getISOWeekYear, getISOWeek, startOfMonth } from 'date-fns';
 import { motion } from 'framer-motion';
 import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 
@@ -28,7 +28,7 @@ import { DietPlanModal } from '@/components/DietPlanModal';
 import { MindMapViewer } from '@/components/MindMapViewer';
 import { KanbanPageContent } from '@/app/kanban/page';
 import { ChartsPageContent as ChartsPageContentActual } from '@/app/charts/page';
-import { TimesheetPageContent } from '@/app/timesheet/page';
+import { HabitDashboardMonthControls, TimesheetPageContent } from '@/app/timesheet/page';
 import { TimetablePageContent } from '@/app/timetable/page';
 import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import { Link as LinkIconLucide, X } from 'lucide-react';
@@ -69,6 +69,7 @@ function MyPlatePageContent() {
         projects,
         coreSkills,
         microSkillMap,
+        findRootTask,
         onOpenIntentionPopup,
         getDescendantLeafNodes,
         permanentlyLoggedTaskIds,
@@ -112,6 +113,8 @@ function MyPlatePageContent() {
     const [selectedDate, setSelectedDate] = useState<Date>(startOfToday());
     const [isTodaysWorkoutModalOpen, setIsTodaysWorkoutModalOpen] = useState(false);
     const [isTodaysMindsetModalOpen, setIsTodaysMindsetModalOpen] = useState(false);
+    const [timesheetModalTab, setTimesheetModalTab] = useState<'timesheet' | 'habit-dashboard'>('habit-dashboard');
+    const [timesheetDashboardMonth, setTimesheetDashboardMonth] = useState(startOfMonth(new Date()));
     const [isLeadGenModalOpen, setIsLeadGenModalOpen] = useState(false);
     const [isDeepWorkModalOpen, setIsDeepWorkModalOpen] = useState(false);
     const [learningActivity, setLearningActivity] = useState<Activity | null>(null);
@@ -144,10 +147,35 @@ function MyPlatePageContent() {
         }
     }, [isDeepWorkModalOpen]);
 
+    const handleTimesheetDashboardMonthChange = (direction: -1 | 1) => {
+        const nextMonth = new Date(timesheetDashboardMonth);
+        nextMonth.setMonth(nextMonth.getMonth() + direction);
+        setTimesheetDashboardMonth(startOfMonth(nextMonth));
+    };
+
 
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
     const todaysSchedule = useMemo(() => schedule[selectedDateKey] || {}, [schedule, selectedDateKey]);
     
+    const findSpecializationForTask = useCallback((def: ExerciseDefinition | null | undefined) => {
+        if (!def) return null;
+        const targetNames = new Set<string>();
+        if (def.category) targetNames.add(def.category);
+        if (def.name) targetNames.add(def.name);
+
+        for (const coreSkill of coreSkills) {
+            if (coreSkill.type !== 'Specialization') continue;
+            for (const skillArea of coreSkill.skillAreas || []) {
+                for (const microSkill of skillArea.microSkills || []) {
+                    if (targetNames.has(microSkill.name)) {
+                        return coreSkill;
+                    }
+                }
+            }
+        }
+        return null;
+    }, [coreSkills]);
+
     const handleOpenFocusModalForPlanning = useCallback((activity: Activity) => {
         const { type, details } = activity;
         if (type === 'workout') {
@@ -160,8 +188,25 @@ function MyPlatePageContent() {
             return false;
         }
 
+        const rootTask = findRootTask(activity);
+        if (rootTask) {
+            if (type === 'deepwork') {
+                setSelectedDeepWorkTask(rootTask);
+                setSelectedUpskillTask(null);
+            } else {
+                setSelectedUpskillTask(rootTask);
+                setSelectedDeepWorkTask(null);
+            }
+            const coreSkill = findSpecializationForTask(rootTask) || coreSkills.find(cs => cs.name === details && cs.type === 'Specialization');
+            if (coreSkill) {
+                setSelectedDomainId(coreSkill.domainId);
+                setSelectedSkillId(coreSkill.id);
+            }
+            setIsDeepWorkModalOpen(true);
+            return true;
+        }
+
         const coreSkill = coreSkills.find(cs => cs.name === details && cs.type === 'Specialization');
-        
         if (coreSkill) {
             setSelectedDomainId(coreSkill.domainId);
             setSelectedSkillId(coreSkill.id);
@@ -172,7 +217,7 @@ function MyPlatePageContent() {
         }
         
         return false;
-    }, [coreSkills, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, setIsDeepWorkModalOpen]);
+    }, [coreSkills, findRootTask, findSpecializationForTask, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, setIsDeepWorkModalOpen, setIsTodaysWorkoutModalOpen, setWorkoutActivityToLog]);
 
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
@@ -670,10 +715,41 @@ function MyPlatePageContent() {
             <Dialog open={isTimesheetModalOpen} onOpenChange={setIsTimesheetModalOpen}>
                 <DialogContent className="max-w-[98vw] w-[98vw] h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <DialogTitle>Timesheet</DialogTitle>
+                        <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center justify-start gap-2">
+                                <Button
+                                    variant={timesheetModalTab === 'timesheet' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setTimesheetModalTab('timesheet')}
+                                >
+                                    Timesheet
+                                </Button>
+                                <Button
+                                    variant={timesheetModalTab === 'habit-dashboard' ? 'default' : 'outline'}
+                                    size="sm"
+                                    onClick={() => setTimesheetModalTab('habit-dashboard')}
+                                >
+                                    Habit Dashboard
+                                </Button>
+                            </div>
+                            {timesheetModalTab === 'habit-dashboard' && (
+                                <HabitDashboardMonthControls
+                                    month={timesheetDashboardMonth}
+                                    onChange={handleTimesheetDashboardMonthChange}
+                                    className="mr-10"
+                                />
+                            )}
+                        </div>
                     </DialogHeader>
                     <div className="flex-grow min-h-0">
-                        <TimesheetPageContent isModal={true} />
+                        <TimesheetPageContent
+                            isModal={true}
+                            modalTab={timesheetModalTab}
+                            onModalTabChange={setTimesheetModalTab}
+                            showModalTabs={false}
+                            dashboardMonth={timesheetDashboardMonth}
+                            onDashboardMonthChange={setTimesheetDashboardMonth}
+                        />
                     </div>
                 </DialogContent>
             </Dialog>

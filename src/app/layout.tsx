@@ -169,6 +169,20 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => {
+      const first = args[0];
+      if (typeof first === "string" && first.includes("ResponsiveContainer") && first.includes("width(") && first.includes("height(")) {
+        return;
+      }
+      originalWarn(...args);
+    };
+    return () => {
+      console.warn = originalWarn;
+    };
+  }, []);
+
+  useEffect(() => {
       if (!currentSlot) return;
       const timerInterval = setInterval(() => {
           const now = new Date();

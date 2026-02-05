@@ -1297,43 +1297,68 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
 
   const loadImportedData = useCallback((mainData: any, uiData: any) => {
+    const fixMojibake = (input: string) => {
+      if (!/[ÃÂà¤â€“â€”â€˜â€™â€œâ€�]/.test(input)) return input;
+      try {
+        const bytes = new Uint8Array(input.length);
+        for (let i = 0; i < input.length; i++) bytes[i] = input.charCodeAt(i);
+        const decoded = new TextDecoder().decode(bytes);
+        return decoded || input;
+      } catch {
+        return input;
+      }
+    };
+
+    const normalizeText = (value: any): any => {
+      if (typeof value === 'string') return fixMojibake(value);
+      if (Array.isArray(value)) return value.map(normalizeText);
+      if (value && typeof value === 'object') {
+        const out: Record<string, any> = {};
+        for (const [k, v] of Object.entries(value)) out[k] = normalizeText(v);
+        return out;
+      }
+      return value;
+    };
+
+    const sanitizedMain = normalizeText(mainData || {});
+    const sanitizedUi = normalizeText(uiData || {});
     setIsLoadingState(true);
 
-    setWeightLogs(mainData.weightLogs || []);
-    setGoalWeight(mainData.goalWeight || null);
-    setHeight(mainData.height || null);
-    setDateOfBirth(mainData.dateOfBirth || null);
-    setGender(mainData.gender || null);
-    setDietPlan(mainData.dietPlan || []);
-    setSchedule(mainData.schedule || {});
-    setDailyPurposes(mainData.dailyPurposes || {});
-    setAllUpskillLogs(mainData.allUpskillLogs || mainData.upskillLogs || []);
-    setAllDeepWorkLogs(mainData.allDeepWorkLogs || mainData.deepWorkLogs || []);
-    setAllWorkoutLogs(mainData.allWorkoutLogs || mainData.workoutLogs || []);
-    setBrandingLogs(mainData.brandingLogs || []);
-    setAllLeadGenLogs(mainData.allLeadGenLogs || []);
-    setAllMindProgrammingLogs(mainData.allMindProgrammingLogs || []);
-    setWorkoutMode(mainData.workoutMode || 'two-muscle');
-    setStrengthTrainingMode(mainData.strengthTrainingMode || 'resistance');
-    setWorkoutPlanRotation(mainData.workoutPlanRotation === undefined ? true : mainData.workoutPlanRotation);
-    setWorkoutPlans(mainData.workoutPlans || INITIAL_PLANS);
-    setExerciseDefinitions(mainData.exerciseDefinitions || DEFAULT_EXERCISE_DEFINITIONS);
-    setUpskillDefinitions(mainData.upskillDefinitions || []);
-    setTopicGoals(mainData.topicGoals || mainData.upskillTopicGoals || {});
-    setDeepWorkDefinitions(mainData.deepWorkDefinitions || []);
-    setLeadGenDefinitions(mainData.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
-    setMindProgrammingDefinitions(mainData.mindProgrammingDefinitions || DEFAULT_MIND_PROGRAMMING_DEFINITIONS);
-    setMindProgrammingCategories(mainData.mindProgrammingCategories || defaultMindsetCategories);
-    setMindProgrammingMode(mainData.mindProgrammingMode || 'two-muscle');
-    setMindProgrammingPlans(mainData.mindProgrammingPlans || INITIAL_PLANS);
-    setMindProgrammingPlanRotation(mainData.mindProgrammingPlanRotation === undefined ? true : mainData.mindProgrammingPlanRotation);
-    setProductizationPlans(mainData.productizationPlans || {});
-    setOfferizationPlans(mainData.offerizationPlans || {});
-    setResourceFolders(mainData.resourceFolders || []);
+    setWeightLogs(sanitizedMain.weightLogs || []);
+    setGoalWeight(sanitizedMain.goalWeight || null);
+    setHeight(sanitizedMain.height || null);
+    setDateOfBirth(sanitizedMain.dateOfBirth || null);
+    setGender(sanitizedMain.gender || null);
+    setDietPlan(sanitizedMain.dietPlan || []);
+    setSchedule(sanitizedMain.schedule || {});
+    setDailyPurposes(sanitizedMain.dailyPurposes || {});
+    setAllUpskillLogs(sanitizedMain.allUpskillLogs || sanitizedMain.upskillLogs || []);
+    setAllDeepWorkLogs(sanitizedMain.allDeepWorkLogs || sanitizedMain.deepWorkLogs || []);
+    setAllWorkoutLogs(sanitizedMain.allWorkoutLogs || sanitizedMain.workoutLogs || []);
+    setBrandingLogs(sanitizedMain.brandingLogs || []);
+    setAllLeadGenLogs(sanitizedMain.allLeadGenLogs || []);
+    setAllMindProgrammingLogs(sanitizedMain.allMindProgrammingLogs || []);
+    setWorkoutMode(sanitizedMain.workoutMode || 'two-muscle');
+    setStrengthTrainingMode(sanitizedMain.strengthTrainingMode || 'resistance');
+    setWorkoutPlanRotation(sanitizedMain.workoutPlanRotation === undefined ? true : sanitizedMain.workoutPlanRotation);
+    setWorkoutPlans(sanitizedMain.workoutPlans || INITIAL_PLANS);
+    setExerciseDefinitions(sanitizedMain.exerciseDefinitions || DEFAULT_EXERCISE_DEFINITIONS);
+    setUpskillDefinitions(sanitizedMain.upskillDefinitions || []);
+    setTopicGoals(sanitizedMain.topicGoals || sanitizedMain.upskillTopicGoals || {});
+    setDeepWorkDefinitions(sanitizedMain.deepWorkDefinitions || []);
+    setLeadGenDefinitions(sanitizedMain.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
+    setMindProgrammingDefinitions(sanitizedMain.mindProgrammingDefinitions || DEFAULT_MIND_PROGRAMMING_DEFINITIONS);
+    setMindProgrammingCategories(sanitizedMain.mindProgrammingCategories || defaultMindsetCategories);
+    setMindProgrammingMode(sanitizedMain.mindProgrammingMode || 'two-muscle');
+    setMindProgrammingPlans(sanitizedMain.mindProgrammingPlans || INITIAL_PLANS);
+    setMindProgrammingPlanRotation(sanitizedMain.mindProgrammingPlanRotation === undefined ? true : sanitizedMain.mindProgrammingPlanRotation);
+    setProductizationPlans(sanitizedMain.productizationPlans || {});
+    setOfferizationPlans(sanitizedMain.offerizationPlans || {});
+    setResourceFolders(sanitizedMain.resourceFolders || []);
     // Ensure default dashboard resources exist so dashboard cards can open popups
     (function ensureDefaultDashboardResources() {
-      const incomingFolders = (mainData.resourceFolders || []);
-      const incomingResources = (mainData.resources || []);
+      const incomingFolders = (sanitizedMain.resourceFolders || []);
+      const incomingResources = (sanitizedMain.resources || []);
 
       const updatedFolders = [...incomingFolders];
       let dashboardFolder = updatedFolders.find((f: any) => f.name === 'Dashboard');
@@ -1364,48 +1389,48 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setResources(updatedResources);
     })();
-    setCanvasLayout(mainData.canvasLayout || { nodes: [], edges: [] });
-    setMindsetCards(mainData.mindsetCards || []);
-    setPistons(mainData.pistons || {});
-    setSkillDomains(mainData.skillDomains || []);
-    setCoreSkills(mainData.coreSkills || []);
-    setProjects(mainData.projects || []);
-    setCompanies(mainData.companies || []);
-    setPositions(mainData.positions || []);
-    setPurposeData(mainData.purposeData || { statement: '', specializationPurposes: {}, pillarCards: [] });
-    setPatterns(mainData.patterns || []);
-    setMetaRules(mainData.metaRules || []);
-    setPillarEquations(mainData.pillarEquations || {});
-    setSkillAcquisitionPlans(mainData.skillAcquisitionPlans || []);
-    setAutoSuggestions(mainData.autoSuggestions || {});
-    setPathNodes(mainData.pathNodes || []);
-    setMissedSlotReviews(mainData.missedSlotReviews || {});
-    setTopPriorities(mainData.topPriorities || []);
-    setBrainHacks(mainData.brainHacks || []);
-    setSpacedRepetitionData(mainData.spacedRepetitionData || {});
-    setDailyReviewLogs(mainData.dailyReviewLogs || []);
-    setAbandonmentLogs(mainData.abandonmentLogs || []);
+    setCanvasLayout(sanitizedMain.canvasLayout || { nodes: [], edges: [] });
+    setMindsetCards(sanitizedMain.mindsetCards || []);
+    setPistons(sanitizedMain.pistons || {});
+    setSkillDomains(sanitizedMain.skillDomains || []);
+    setCoreSkills(sanitizedMain.coreSkills || []);
+    setProjects(sanitizedMain.projects || []);
+    setCompanies(sanitizedMain.companies || []);
+    setPositions(sanitizedMain.positions || []);
+    setPurposeData(sanitizedMain.purposeData || { statement: '', specializationPurposes: {}, pillarCards: [] });
+    setPatterns(sanitizedMain.patterns || []);
+    setMetaRules(sanitizedMain.metaRules || []);
+    setPillarEquations(sanitizedMain.pillarEquations || {});
+    setSkillAcquisitionPlans(sanitizedMain.skillAcquisitionPlans || []);
+    setAutoSuggestions(sanitizedMain.autoSuggestions || {});
+    setPathNodes(sanitizedMain.pathNodes || []);
+    setMissedSlotReviews(sanitizedMain.missedSlotReviews || {});
+    setTopPriorities(sanitizedMain.topPriorities || []);
+    setBrainHacks(sanitizedMain.brainHacks || []);
+    setSpacedRepetitionData(sanitizedMain.spacedRepetitionData || {});
+    setDailyReviewLogs(sanitizedMain.dailyReviewLogs || []);
+    setAbandonmentLogs(sanitizedMain.abandonmentLogs || []);
     
     // UI State
-    setPinnedFolderIds(new Set(uiData.pinnedFolderIds || []));
-    setActiveResourceTabIds(uiData.activeResourceTabIds || []);
-    setSelectedResourceFolderId(uiData.selectedResourceFolderId || null);
-    setLastSelectedHabitFolder(uiData.lastSelectedHabitFolder || null);
-    setSelectedUpskillTask(uiData.selectedUpskillTask || null);
-    setSelectedDeepWorkTask(uiData.selectedDeepWorkTask || null);
-    setSelectedMicroSkill(uiData.selectedMicroSkill || null);
-    setSelectedFormalizationSpecId(uiData.selectedFormalizationSpecId || null);
-    setExpandedItems(uiData.expandedItems || []);
-    setSelectedDomainId(uiData.selectedDomainId || null);
-    setSelectedSkillId(uiData.selectedSkillId || null);
-    setSelectedProjectId(uiData.selectedProjectId || null);
-    setSelectedCompanyId(uiData.selectedCompanyId || null);
-    setRecentItems(uiData.recentItems || []);
-    setIsAgendaDocked(uiData.isAgendaDocked === undefined ? true : uiData.isAgendaDocked);
-    setPipState(uiData.pipState || { isOpen: false, position: { x: 0, y: 0 }, size: { width: 448, height: 252 } });
+    setPinnedFolderIds(new Set(sanitizedUi.pinnedFolderIds || []));
+    setActiveResourceTabIds(sanitizedUi.activeResourceTabIds || []);
+    setSelectedResourceFolderId(sanitizedUi.selectedResourceFolderId || null);
+    setLastSelectedHabitFolder(sanitizedUi.lastSelectedHabitFolder || null);
+    setSelectedUpskillTask(sanitizedUi.selectedUpskillTask || null);
+    setSelectedDeepWorkTask(sanitizedUi.selectedDeepWorkTask || null);
+    setSelectedMicroSkill(sanitizedUi.selectedMicroSkill || null);
+    setSelectedFormalizationSpecId(sanitizedUi.selectedFormalizationSpecId || null);
+    setExpandedItems(sanitizedUi.expandedItems || []);
+    setSelectedDomainId(sanitizedUi.selectedDomainId || null);
+    setSelectedSkillId(sanitizedUi.selectedSkillId || null);
+    setSelectedProjectId(sanitizedUi.selectedProjectId || null);
+    setSelectedCompanyId(sanitizedUi.selectedCompanyId || null);
+    setRecentItems(sanitizedUi.recentItems || []);
+    setIsAgendaDocked(sanitizedUi.isAgendaDocked === undefined ? true : sanitizedUi.isAgendaDocked);
+    setPipState(sanitizedUi.pipState || { isOpen: false, position: { x: 0, y: 0 }, size: { width: 448, height: 252 } });
     
-    if (uiData.activeFocusSession) {
-        const restoredSession: ActiveFocusSession = uiData.activeFocusSession;
+    if (sanitizedUi.activeFocusSession) {
+        const restoredSession: ActiveFocusSession = sanitizedUi.activeFocusSession;
         if (restoredSession.state === 'running' && restoredSession.startTime) {
             const timeElapsedSinceSave = (Date.now() - restoredSession.startTime) / 1000;
             const newSecondsLeft = Math.max(0, restoredSession.totalSeconds - timeElapsedSinceSave);
@@ -1429,7 +1454,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           pinnedCanvasIds: [],
           githubModuleHashes: {},
       };
-    setSettings({ ...defaultSettings, ...(mainData.settings || {}) });
+    setSettings({ ...defaultSettings, ...(sanitizedMain.settings || {}) });
 
 
     setTimeout(() => setIsLoadingState(false), 100);
@@ -3355,6 +3380,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     const token = settings.githubToken;
     const owner = settings.githubOwner;
     const repo = settings.githubRepo;
+    const username = currentUser?.username?.toLowerCase();
     const path = settings.githubPath;
 
     if (!token || !owner || !repo || !path) {
@@ -3363,6 +3389,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             description: "Please configure your GitHub details in the settings.",
             variant: "destructive",
         });
+        return;
+    }
+    if (!username) {
+        toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
         return;
     }
 
@@ -3374,7 +3404,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         const nextHashes: Record<string, string> = { ...(settings.githubModuleHashes || {}) };
 
         // Modular sync (writes alongside the single backup)
-        const { dir } = getGitHubBaseDir(path);
+        const prefixedPath = withUserGitHubPrefix(path, username);
+        const { dir } = getGitHubBaseDir(prefixedPath);
         const modulesBase = dir ? `${dir}/modules` : 'modules';
         const manifestPath = dir ? `${dir}/manifest.json` : 'manifest.json';
         const modules = buildModuleData(allData);
@@ -3384,10 +3415,43 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         const moduleEntries: { name: string; path: string; content: string }[] = [
           { name: 'core', path: `${modulesBase}/core.json`, content: JSON.stringify(modules.core, null, 2) },
           { name: 'workouts', path: `${modulesBase}/workouts.json`, content: JSON.stringify(modules.workouts, null, 2) },
-          { name: 'resources', path: `${modulesBase}/resources.json`, content: JSON.stringify(modules.resources, null, 2) },
           { name: 'knowledge', path: `${modulesBase}/knowledge.json`, content: JSON.stringify(modules.knowledge, null, 2) },
           { name: 'ui', path: `${modulesBase}/ui.json`, content: JSON.stringify(modules.ui, null, 2) },
         ];
+
+        // Per-folder resource modules for incremental updates
+        const resourcesByFolder = new Map<string, Resource[]>();
+        (modules.resources?.resources || []).forEach((res: Resource) => {
+          const folderKey = res.folderId || 'unfoldered';
+          const list = resourcesByFolder.get(folderKey) || [];
+          list.push(res);
+          resourcesByFolder.set(folderKey, list);
+        });
+        const resourceFoldersById = new Map<string, ResourceFolder>();
+        (modules.resources?.resourceFolders || []).forEach((folder: ResourceFolder) => {
+          if (folder?.id) resourceFoldersById.set(folder.id, folder);
+        });
+        const resourcesFoldersBase = `${modulesBase}/resources-folders`;
+        const resourcesFolderIndex = {
+          version: 1,
+          updatedAt,
+          folders: [] as Array<{ id: string; path: string }>,
+        };
+        for (const [folderId, list] of resourcesByFolder.entries()) {
+          const folder = resourceFoldersById.get(folderId);
+          const folderPath = `${resourcesFoldersBase}/folder_${folderId}.json`;
+          moduleEntries.push({
+            name: `resources-folder-${folderId}`,
+            path: folderPath,
+            content: JSON.stringify({ folderId, folder, resources: list }, null, 2),
+          });
+          resourcesFolderIndex.folders.push({ id: folderId, path: folderPath });
+        }
+        moduleEntries.push({
+          name: 'resources-folders-index',
+          path: `${resourcesFoldersBase}/index.json`,
+          content: JSON.stringify(resourcesFolderIndex, null, 2),
+        });
 
         // Per-canvas image metadata files
         const canvasFilesBase = `${modulesBase}/canvas-files`;
@@ -3424,17 +3488,17 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         };
 
         const backupHash = await hashString(content);
-        if (nextHashes[path] !== backupHash) {
-          const sha = await getGitHubFileSha(token, owner, repo, path);
-          await pushToGitHub(token, owner, repo, path, content, message, sha, { suppressToast: true });
-          nextHashes[path] = backupHash;
+        if (nextHashes[prefixedPath] !== backupHash) {
+          const sha = await getGitHubFileSha(token, owner, repo, prefixedPath);
+          await pushToGitHub(token, owner, repo, prefixedPath, content, message, sha, { suppressToast: true });
+          nextHashes[prefixedPath] = backupHash;
           pushed += 1;
           processed += 1;
-          updateProgress(`Pushed ${path}`);
+          updateProgress(`Pushed ${prefixedPath}`);
         } else {
           skipped += 1;
           processed += 1;
-          updateProgress(`Skipped ${path}`);
+          updateProgress(`Skipped ${prefixedPath}`);
         }
 
         for (const entry of moduleEntries) {
@@ -3451,6 +3515,35 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           pushed += 1;
           processed += 1;
           updateProgress(`Pushed ${entry.path}`);
+        }
+
+        // Delete stale resource-folder files that are no longer present locally
+        try {
+          const listResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${resourcesFoldersBase}`, {
+            headers: { 'Authorization': `token ${token}` }
+          });
+          if (listResp.ok) {
+            const listData = await listResp.json();
+            const expectedFolderFiles = new Set(
+              moduleEntries
+                .filter(m => m.name.startsWith('resources-folder-'))
+                .map(m => m.path.split('/').pop() as string)
+            );
+            for (const item of listData || []) {
+              if (item?.type !== 'file' || !item?.name || !item?.sha) continue;
+              if (item.name === 'index.json') continue;
+              if (!expectedFolderFiles.has(item.name)) {
+                const delPath = `${resourcesFoldersBase}/${item.name}`;
+                await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${delPath}`, {
+                  method: 'DELETE',
+                  headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ message: `Delete stale resources folder file: ${item.name}`, sha: item.sha }),
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.debug('Failed to prune resource folder files', e);
         }
 
         // Write per-canvas files
@@ -3526,6 +3619,13 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     let lastError: any = null;
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
+        if (!sha) {
+          try {
+            sha = await getGitHubFileSha(token, owner, repo, path);
+          } catch (e) {
+            // ignore; file may not exist yet
+          }
+        }
         const pushResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
             method: 'PUT',
             headers: {
@@ -3535,21 +3635,27 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             body: JSON.stringify({
                 message,
                 content: encoded,
-                sha
+                ...(sha ? { sha } : {})
             })
         });
 
         const result = await pushResponse.json();
         if (!pushResponse.ok) {
+          const messageText = String(result.message || '');
           // If conflict/sha mismatch, refetch latest sha and retry
-          if (pushResponse.status === 409 || /expected .* but/.test(String(result.message || ''))) {
-            const latestSha = await getGitHubFileSha(token, owner, repo, path);
-            if (latestSha && latestSha !== sha) {
-              sha = latestSha;
+          if (pushResponse.status === 409 || /expected .* but/.test(messageText) || /sha.*wasn'?t supplied/i.test(messageText)) {
+            // Try to parse the latest sha from the error message
+            const match = messageText.match(/is at ([0-9a-f]{40})/i);
+            if (match?.[1]) {
+              sha = match[1];
               lastError = result;
-              // retry
               continue;
             }
+            const latestSha = await getGitHubFileSha(token, owner, repo, path).catch(() => undefined);
+            sha = latestSha;
+            lastError = result;
+            // retry
+            continue;
           }
           throw new Error(result.message || 'Failed to push file to GitHub.');
         }
@@ -3631,6 +3737,14 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     const base = parts.pop() as string;
     const dir = parts.join('/');
     return { dir, base };
+  }
+
+  function withUserGitHubPrefix(path: string, username?: string | null): string {
+    if (!username) return path;
+    const cleaned = path.replace(/^\/+/, '');
+    const prefix = `${username.toLowerCase()}/`;
+    if (cleaned.startsWith(prefix)) return cleaned;
+    return `${prefix}${cleaned}`;
   }
 
   function buildModuleData(allData: ReturnType<typeof getAllUserData>) {
@@ -3740,13 +3854,19 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
   const downloadFromGitHub = async () => {
     const { githubToken, githubOwner, githubRepo, githubPath } = settings;
+    const username = currentUser?.username?.toLowerCase();
     if (!githubToken || !githubOwner || !githubRepo || !githubPath) {
         toast({ title: 'GitHub settings not configured', variant: 'destructive' });
         return;
     }
+    if (!username) {
+        toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
+        return;
+    }
     toast({ title: "Downloading...", description: "Backup will be stored locally." });
     try {
-        const { dir } = getGitHubBaseDir(githubPath);
+        const prefixedPath = withUserGitHubPrefix(githubPath, username);
+        const { dir } = getGitHubBaseDir(prefixedPath);
         const manifestPath = dir ? `${dir}/manifest.json` : 'manifest.json';
         const manifest = await getGitHubJson<{ version: number; modules: Record<string, { path: string }> }>(githubToken, githubOwner, githubRepo, manifestPath);
 
@@ -3754,13 +3874,54 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         if (manifest && manifest.modules) {
             const core = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.core?.path);
             const workouts = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.workouts?.path);
-            const resourcesMod = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.resources?.path);
+            let resourcesMod = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.resources?.path);
             const knowledge = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.knowledge?.path);
             const ui = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.ui?.path);
             const canvasFilesIndex = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules['canvas-files-index']?.path);
 
+            // Prefer per-folder resource modules when present
+            let folderModuleEntries = Object.entries(manifest.modules)
+              .filter(([key]) => key.startsWith('resources-folder-'))
+              .map(([, value]) => value?.path)
+              .filter(Boolean) as string[];
+
+            // If an index exists, use it for faster import
+            const folderIndexPath = manifest.modules['resources-folders-index']?.path;
+            if (folderIndexPath) {
+                const indexPayload = await getGitHubJson<{ folders?: Array<{ id: string; path: string }> }>(githubToken, githubOwner, githubRepo, folderIndexPath);
+                if (indexPayload?.folders && Array.isArray(indexPayload.folders)) {
+                    folderModuleEntries = indexPayload.folders.map(f => f.path).filter(Boolean);
+                }
+            }
+
+            if (folderModuleEntries.length > 0) {
+                const folderResources: Resource[] = [];
+                const folderFolders: ResourceFolder[] = [];
+                for (const folderPath of folderModuleEntries) {
+                    const folderPayload = await getGitHubJson<{ folderId?: string; folder?: ResourceFolder; resources?: Resource[] }>(githubToken, githubOwner, githubRepo, folderPath);
+                    if (folderPayload?.folder) folderFolders.push(folderPayload.folder);
+                    if (folderPayload?.resources && Array.isArray(folderPayload.resources)) {
+                        folderResources.push(...folderPayload.resources);
+                    }
+                }
+                if (folderResources.length > 0) {
+                    const byId = new Map<string, Resource>();
+                    folderResources.forEach(r => {
+                      if (r?.id) byId.set(r.id, r);
+                    });
+                    const foldersById = new Map<string, ResourceFolder>();
+                    folderFolders.forEach(f => {
+                      if (f?.id) foldersById.set(f.id, f);
+                    });
+                    resourcesMod = {
+                      resources: Array.from(byId.values()),
+                      resourceFolders: Array.from(foldersById.values()),
+                    };
+                }
+            }
+
             const hasCore = !!core;
-            const hasResources = !!resourcesMod;
+            const hasResources = !!resourcesMod || folderModuleEntries.length > 0;
             if (!hasCore || !hasResources) {
                 useFullBackup = true;
             } else {
@@ -3781,7 +3942,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             }
         }
 
-        const response = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${githubPath}`, {
+        const response = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${prefixedPath}`, {
             headers: { 'Authorization': `token ${githubToken}` }
         });
         if (!response.ok) throw new Error('Failed to fetch file metadata from GitHub.');
@@ -3879,7 +4040,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           return;
       }
 
-      const folderPath = `images_${username}`;
+      const folderPath = withUserGitHubPrefix(`images_${username}`, username);
       toast({ title: "Uploading images...", description: `Pushing ${entries.length} images to GitHub.` });
 
       try {
@@ -3975,7 +4136,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           return;
         }
 
-        const folderPath = `audio_${username}`;
+        const folderPath = withUserGitHubPrefix(`audio_${username}`, username);
         const syncToast = toast({ title: "Uploading audio...", description: `Preparing ${audios.length} files...` });
 
         try {
@@ -4069,7 +4230,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         return;
       }
 
-      const folderPath = `audio_${username}`;
+      const folderPath = withUserGitHubPrefix(`audio_${username}`, username);
       toast({ title: "Fetching audio...", description: "Downloading audio files from GitHub to this browser." });
 
       try {
@@ -4216,7 +4377,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           return;
         }
 
-        const folderPath = `pdfs_${username}`;
+        const folderPath = withUserGitHubPrefix(`pdfs_${username}`, username);
         const syncToast = toast({ title: "Uploading PDFs...", description: `Preparing ${pdfs.length} files...` });
 
         try {
@@ -4302,7 +4463,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         return;
       }
 
-      const folderPath = `pdfs_${username}`;
+      const folderPath = withUserGitHubPrefix(`pdfs_${username}`, username);
       toast({ title: "Fetching PDFs...", description: "Downloading PDFs from GitHub to this browser." });
 
       try {
@@ -4379,8 +4540,9 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           return;
       }
 
-      const folderPath = `images_${username}`;
-      const { dir } = getGitHubBaseDir(settings.githubPath || 'backup.json');
+      const folderPath = withUserGitHubPrefix(`images_${username}`, username);
+      const prefixedPath = withUserGitHubPrefix(settings.githubPath || 'backup.json', username);
+      const { dir } = getGitHubBaseDir(prefixedPath);
       const modulesBase = dir ? `${dir}/modules` : 'modules';
       const canvasFilesBase = `${modulesBase}/canvas-files`;
       toast({ title: "Fetching images...", description: "Downloading images from GitHub to this browser." });
