@@ -6,7 +6,7 @@ import ReactDOM from 'react-dom';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { format, startOfWeek, addDays, isToday, isBefore, startOfToday, parseISO, differenceInDays } from 'date-fns';
+import { format, startOfWeek, addDays, isToday, isBefore, startOfToday, parseISO, differenceInDays, getISODay } from 'date-fns';
 import { ChevronLeft, ChevronRight, PlusCircle, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, Wind, AlertCircle, Brain, Trash2, Repeat } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { Activity, ActivityType, DailySchedule, SlotName, RecurrenceRule, ExerciseDefinition, WorkoutExercise, DatedWorkout } from '@/types/workout';
@@ -348,11 +348,48 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
                     {weekDates.map(date => {
                         const dateKey = format(date, 'yyyy-MM-dd');
                         const allActivities = (schedule[dateKey]?.[slot] as Activity[] | undefined) || [];
+                        // Build routine instances for this date+slot
+                        const routineInstances = (settings.routines || []).flatMap(r => {
+                            if (!r || !r.routine) return [] as Activity[];
+                            if (r.slot !== slot) return [] as Activity[];
+                            const rule = r.routine;
+                            // determine base date for recurrence calculations
+                            const base = r.baseDate || r.createdAt;
+                            try {
+                                if (rule.type === 'daily') {
+                                    return [{ ...r, id: `${r.id}_${dateKey}` } as Activity];
+                                }
+                                if (rule.type === 'weekly') {
+                                    if (!base) return [] as Activity[];
+                                    const baseDow = getISODay(parseISO(base));
+                                    const thisDow = getISODay(date);
+                                    if (baseDow === thisDow) return [{ ...r, id: `${r.id}_${dateKey}` } as Activity];
+                                    return [] as Activity[];
+                                }
+                                if (rule.type === 'custom') {
+                                    if (!base || !rule.days) return [] as Activity[];
+                                    const diff = differenceInDays(date, parseISO(base));
+                                    if (diff >= 0 && diff % rule.days === 0) {
+                                        return [{ ...r, id: `${r.id}_${dateKey}` } as Activity];
+                                    }
+                                    return [] as Activity[];
+                                }
+                            } catch (e) {
+                                return [] as Activity[];
+                            }
+                            return [] as Activity[];
+                        });
+
+                        // Merge routines with explicit schedule, avoiding duplicates by details/type/slot
+                        const mergedActivities = [
+                            ...allActivities,
+                            ...routineInstances.filter(ri => !allActivities.some(a => a.details === ri.details && a.type === ri.type && a.slot === ri.slot))
+                        ];
                         const isPastDay = isBefore(date, startOfToday());
                         
                         const activitiesToDisplay = isPastDay
-                            ? allActivities.filter(act => act.completed)
-                            : allActivities;
+                            ? mergedActivities.filter(act => act.completed)
+                            : mergedActivities;
                         
                         const isCurrentSlot = isToday(date) && slot === currentSlot;
 
@@ -364,7 +401,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
                                     activities={activitiesToDisplay}
                                     onAddActivity={handleAddActivity(date, slot)}
                                     onRemoveActivity={(id) => handleRemoveActivity(date, slot, id)}
-                                    onSetRoutine={(activity, rule) => toggleRoutine(activity, rule)}
+                                    onSetRoutine={(activity, rule) => toggleRoutine(activity, rule, format(date, 'yyyy-MM-dd'))}
                                 />
                             </div>
                         );

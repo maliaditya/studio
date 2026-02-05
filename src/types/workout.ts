@@ -209,6 +209,7 @@ export interface Activity {
   subTasks?: SubTask[]; // Added for sub-task functionality
   routine?: RecurrenceRule | null;
   isRoutine?: boolean;
+  baseDate?: string;
   linkedEntityType?: 'specialization' | 'intention' | 'curiosity';
   linkedActivityType?: ActivityType;
 };

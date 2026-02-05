@@ -4,8 +4,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
-  DialogContent,
   DialogHeader,
+  DialogContent,
   DialogTitle,
   DialogDescription,
   DialogFooter,
@@ -59,7 +59,7 @@ const SLOT_NAMES: SlotName[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'E
 
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
-  const { currentUser, theme, setTheme, settings, setSettings, habitCards, schedule, setSchedule, recalculateAndFixTaskTypes, clearAllLocalFiles, syncCanvasImagesToGitHub, fetchCanvasImagesFromGitHub } = useAuth();
+  const { currentUser, theme, setTheme, settings, setSettings, habitCards, schedule, setSchedule, recalculateAndFixTaskTypes, clearAllLocalFiles, syncCanvasImagesToGitHub, fetchCanvasImagesFromGitHub, syncAudioFilesToGitHub, fetchAudioFilesFromGitHub, syncPdfFilesToGitHub, fetchPdfFilesFromGitHub } = useAuth();
   const { toast } = useToast();
 
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
@@ -68,6 +68,47 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
 
   // State for GitHub settings inputs
   const [localSettings, setLocalSettings] = useState(settings);
+
+  // Drag state for non-modal popup
+  const popupRef = React.useRef<HTMLDivElement | null>(null);
+  const dragState = React.useRef<{ dragging: boolean; startX: number; startY: number; origLeft: number; origTop: number } | null>(null);
+
+  const startDrag = (e: React.PointerEvent) => {
+    const el = popupRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    dragState.current = {
+      dragging: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      origLeft: rect.left,
+      origTop: rect.top,
+    };
+    (e.target as HTMLElement).setPointerCapture?.((e as any).pointerId);
+    window.addEventListener('pointermove', onDragMove);
+    window.addEventListener('pointerup', onDragEnd);
+  };
+
+  const onDragMove = (ev: PointerEvent) => {
+    const state = dragState.current;
+    const el = popupRef.current;
+    if (!state || !state.dragging || !el) return;
+    const dx = ev.clientX - state.startX;
+    const dy = ev.clientY - state.startY;
+    el.style.left = `${state.origLeft + dx}px`;
+    el.style.top = `${state.origTop + dy}px`;
+    el.style.right = 'auto';
+    el.style.transform = 'none';
+  };
+
+  const onDragEnd = (ev: PointerEvent) => {
+    const state = dragState.current;
+    if (state) state.dragging = false;
+    try {
+      window.removeEventListener('pointermove', onDragMove);
+      window.removeEventListener('pointerup', onDragEnd);
+    } catch (e) {}
+  };
 
   
   const defaultFileName = useMemo(() => {
@@ -85,6 +126,91 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
       });
     }
   }, [isOpen, settings, defaultFileName]);
+
+  const handleModalOpenChange = (open: boolean) => {
+    onOpenChange(open);
+    if (!open) {
+      // Diagnostic + stronger blur: log active element and blur any contentEditable inputs
+      setTimeout(() => {
+        try {
+          const active = document.activeElement as HTMLElement | null;
+          console.debug('[SettingsModal] handleModalOpenChange closing, activeElement:', {
+            tag: active?.tagName,
+            id: active?.id,
+            class: active?.className,
+            isContentEditable: active?.isContentEditable,
+          });
+
+          if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
+            try { active.blur(); } catch (e) { /* ignore */ }
+          }
+
+          // Blur any remaining contentEditable elements in the document
+          try {
+            const editables = Array.from(document.querySelectorAll('[contenteditable]')) as HTMLElement[];
+            editables.forEach((el) => {
+              if (el.isContentEditable) {
+                try {
+                  el.blur();
+                  console.debug('[SettingsModal] blurred contentEditable element', { tag: el.tagName, id: el.id, class: el.className });
+                } catch (e) { /* ignore */ }
+              }
+            });
+          } catch (e) {
+            /* ignore */
+          }
+
+          // If body somehow became editable, ensure it's not and blur it too
+          try {
+            if (document.body.isContentEditable) {
+              document.body.contentEditable = 'false';
+              try { (document.body as HTMLElement).blur(); } catch (e) {}
+              console.debug('[SettingsModal] body was contentEditable; cleared and blurred');
+            }
+          } catch (e) {}
+
+          // focus a neutral element (body) to reset caret; preserve previous tabindex
+          const prevTab = document.body.getAttribute('tabindex');
+          document.body.setAttribute('tabindex', '-1');
+          try { (document.body as HTMLElement).focus(); } catch (e) {}
+          if (prevTab === null) document.body.removeAttribute('tabindex');
+          else document.body.setAttribute('tabindex', prevTab);
+
+          console.debug('[SettingsModal] post-close activeElement:', document.activeElement?.tagName);
+          // Defensive check: if some overlay element is still covering the viewport
+          try {
+            const testPoints = [
+              { x: window.innerWidth / 2, y: window.innerHeight / 2 },
+              { x: 10, y: 10 },
+              { x: window.innerWidth - 10, y: 10 },
+            ];
+            testPoints.forEach(({ x, y }) => {
+              const top = document.elementsFromPoint(x, y)[0] as HTMLElement | undefined;
+              if (top && top !== document.body && top !== document.documentElement) {
+                const style = window.getComputedStyle(top);
+                const z = parseInt(style.zIndex || '0', 10) || 0;
+                const name = top.tagName;
+                console.debug('[SettingsModal] top element at', x, y, { name, id: top.id, class: top.className, z });
+                if (z >= 40 || /overlay|backdrop|portal|radix|dialog/i.test(top.className || '')) {
+                  try {
+                    // temporarily disable pointer events on the blocking element
+                    (top as HTMLElement).style.pointerEvents = 'none';
+                    console.debug('[SettingsModal] disabled pointer events on', { name, id: top.id, class: top.className });
+                    // restore after short delay
+                    setTimeout(() => {
+                      try { top.style.pointerEvents = ''; } catch (e) {}
+                    }, 1000);
+                  } catch (e) {}
+                }
+              }
+            });
+          } catch (e) {}
+        } catch (e) {
+          console.error('[SettingsModal] error during close blur diagnostic', e);
+        }
+      }, 0);
+    }
+  };
 
   const handleLocalSettingChange = (key: keyof typeof settings, value: any) => {
     setLocalSettings(prev => ({...prev, [key]: value}));
@@ -337,31 +463,16 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
         ? `Generate a single, valid JSON array that represents a complete learning path for the micro-skill cluster: **\`${topicName}\`**.`
         : `Generate a single, valid JSON object that represents a complete learning path for the specialization: **\`${topicName}\`**.`;
 
-    const fullPrompt = `### AI Prompt for Generating a Comprehensive ${isMicro ? 'Micro-Skill Cluster' : 'Specialization'} JSON
+    const fullPrompt = [
+      `AI Prompt for Generating a Comprehensive ${isMicro ? 'Micro-Skill Cluster' : 'Specialization'} JSON`,
+      `Role: ${roleText}`,
+      `Goal: ${goalText}`,
+      'Crucial Instructions: Follow the JSON schema and provide detailed entries.',
+      'Example JSON:',
+      JSON.stringify(finalTemplate, null, 2),
+    ].join('\n\n');
 
-**Your Role:** You are an expert curriculum designer and technical writer. ${roleText}
-
-**Your Goal:** ${goalText}
-
-**Crucial Instructions:**
-
-1.  **Be Thorough and Expansive:** Do not provide a minimal or superficial outline. The goal is a detailed, rich curriculum. Each level of the hierarchy should contain **multiple entries** where appropriate. For example, a "Curiosity" should branch into multiple "Objectives," and an "Objective" should have multiple "Visualizations."
-2.  **Follow the JSON Schema Strictly:** The output must be a single, valid JSON ${isMicro ? 'array' : 'object'} matching the structure provided below.
-3.  **Logical Hierarchy:** Ensure the breakdown is logical. "Curiosities" are high-level learning goals. "Objectives" are measurable steps. "Visualizations" are the smallest, concrete, loggable tasks.
-4.  **Estimate Durations:** Provide realistic \`estimatedDuration\` values in **minutes** for all learning tasks.
-5.  **Define \`resourceCards\` with Meaningful Structure:** For each \`visualization\` task, populate the \`resourceCards\` array. Use this mental model:
-    *   **Elements Card:** What exists? List fundamental nouns or concepts (e.g., for 3D modeling: Vertex, Edge, Face; for React: Component, State, Prop).
-    *   **Tools Card:** How does it interact? List verbs or operations that act upon the Elements (e.g., for 3D modeling: Extrude, Bevel; for React: \`useState\`, \`useEffect\`, \`.map()\`).
-    *   **Patterns Card:** What are the recurring use cases? Describe workflows combining Elements and Tools to achieve a specific goal.
-6.  **Use Diverse Content Types:** Within the \`points\` array of a \`resourceCard\`, demonstrate the use of different types: \`"type": "text"\`, \`"type": "code"\`, and \`"type": "markdown"\`.
-
-**JSON Schema Definition & Example:**
-
-\`\`\`json
-${JSON.stringify(finalTemplate, null, 2)}
-\`\`\``;
-
-    navigator.clipboard.writeText(fullPrompt);
+    try { navigator.clipboard.writeText(fullPrompt); } catch (e) { console.debug('clipboard write failed', e); }
     toast({
       title: "Prompt Copied!",
       description: `The AI prompt for "${specializationName}" has been copied.`,
@@ -383,45 +494,63 @@ ${JSON.stringify(finalTemplate, null, 2)}
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Application Settings</DialogTitle>
-            <DialogDescription>
-              Manage your application preferences here. Changes are saved automatically.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex-grow min-h-0 overflow-hidden">
-            <ScrollArea className="h-[60vh] pr-4">
-              <div className="space-y-6 py-4">
-                <div className="space-y-4 rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <Label className="text-base">Theme</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Select a visual theme for the application.
-                    </p>
+      {isOpen && (
+        <div
+          ref={popupRef}
+          role="dialog"
+          aria-label="Settings Popup"
+          className="fixed z-50"
+          style={{ left: 'calc(50% - 360px)', top: '80px' }}
+        >
+          <div
+            id="settings-popup"
+            className="w-[720px] max-w-[95vw] grid gap-4 border bg-background p-6 shadow-lg sm:rounded-lg"
+            style={{ touchAction: 'none' }}
+          >
+            <div
+              id="settings-popup-header"
+              className="flex items-center justify-between cursor-move -mx-6 -mt-6 px-6 pt-4 pb-2"
+              onPointerDown={(e) => startDrag(e)}
+            >
+              <div>
+                <h3 className="text-lg font-semibold">Application Settings</h3>
+                <p className="text-sm text-muted-foreground">Manage your application preferences here. Changes are saved automatically.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => handleModalOpenChange(false)}>Close</Button>
+              </div>
+            </div>
+            <div className="flex-grow min-h-0 overflow-hidden">
+              <ScrollArea className="h-[60vh] pr-4">
+                <div className="space-y-6 py-4">
+                  <div className="space-y-4 rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <Label className="text-base">Theme</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Select a visual theme for the application.
+                      </p>
+                    </div>
+                    <RadioGroup
+                      value={theme}
+                      onValueChange={handleThemeChange}
+                      className="grid grid-cols-3 gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="default" id="theme-default" />
+                        <Label htmlFor="theme-default" className="font-normal">Default</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="matrix" id="theme-matrix" />
+                        <Label htmlFor="theme-matrix" className="font-normal">Matrix</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="ad-dark" id="theme-ad-dark" />
+                        <Label htmlFor="theme-ad-dark" className="font-normal">Ad Dark</Label>
+                      </div>
+                    </RadioGroup>
                   </div>
-                  <RadioGroup
-                    value={theme}
-                    onValueChange={handleThemeChange}
-                    className="grid grid-cols-3 gap-4"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="default" id="theme-default" />
-                      <Label htmlFor="theme-default" className="font-normal">Default</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="matrix" id="theme-matrix" />
-                      <Label htmlFor="theme-matrix" className="font-normal">Matrix</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="ad-dark" id="theme-ad-dark" />
-                      <Label htmlFor="theme-ad-dark" className="font-normal">Ad Dark</Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-                
-                <Accordion type="multiple" className="w-full space-y-4">
+                  
+                  <Accordion type="multiple" className="w-full space-y-4">
                    <AccordionItem value="item-github" className="border rounded-lg">
                     <AccordionTrigger className="px-4 py-3">
                       <div className="space-y-0.5 text-left">
@@ -451,6 +580,10 @@ ${JSON.stringify(finalTemplate, null, 2)}
                             <Button onClick={handleGithubSettingsSave}>Save GitHub Settings</Button>
                             <Button variant="secondary" onClick={syncCanvasImagesToGitHub}>Upload Canvas Images</Button>
                             <Button variant="outline" onClick={fetchCanvasImagesFromGitHub}>Fetch Canvas Images</Button>
+                            <Button variant="secondary" onClick={syncAudioFilesToGitHub}>Upload Audio</Button>
+                            <Button variant="outline" onClick={fetchAudioFilesFromGitHub}>Fetch Audio</Button>
+                            <Button variant="secondary" onClick={syncPdfFilesToGitHub}>Upload PDFs</Button>
+                            <Button variant="outline" onClick={fetchPdfFilesFromGitHub}>Fetch PDFs</Button>
                           </div>
                       </div>
                     </AccordionContent>
@@ -741,8 +874,9 @@ ${JSON.stringify(finalTemplate, null, 2)}
               </div>
             </ScrollArea>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </div>
+      )}
       <Dialog open={isCopyModalOpen} onOpenChange={setIsCopyModalOpen}>
         <DialogContent>
           <DialogHeader>

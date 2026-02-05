@@ -216,10 +216,29 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         const loadAudio = async () => {
           if (resource.hasLocalAudio) {
             try {
-              const audioBlob = await getAudio(resource.id);
+              const candidateKeys = [resource.id, resource.audioFileName].filter(Boolean) as string[];
+              let audioBlob: Blob | null = null;
+              let foundKey: string | null = null;
+              for (const k of candidateKeys) {
+                try {
+                  const b = await getAudio(k);
+                  if (b) { audioBlob = b; foundKey = k; break; }
+                } catch (e) {
+                  // ignore and try next key
+                }
+              }
+
               if (audioBlob) {
                 objectUrl = URL.createObjectURL(audioBlob);
                 setAudioSrc(objectUrl);
+                // If we loaded audio from a filename key different from the resource id, update the resource so future loads are consistent
+                if (foundKey && foundKey !== resource.id) {
+                  try {
+                    onUpdate({ ...resource, hasLocalAudio: true, audioFileName: foundKey });
+                  } catch (e) {
+                    // ignore update errors
+                  }
+                }
               } else {
                 setAudioSrc(null);
               }

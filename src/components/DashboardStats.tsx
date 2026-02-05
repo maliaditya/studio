@@ -5,6 +5,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import { HeartPulse, Briefcase, TrendingUp, ClipboardCheck, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -39,6 +40,7 @@ const StatChange = ({ value }: { value: number }) => {
 
 export function DashboardStats({ stats }: DashboardStatsProps) {
   const router = useRouter();
+  const { resources, openGeneralPopup } = useAuth();
   const {
     latestConsistency,
     consistencyChange,
@@ -52,7 +54,11 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
 
   return (
     <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      <Card className="cursor-pointer hover:bg-muted/50" onClick={() => router.push('/workout-tracker')}>
+      <Card className="cursor-pointer hover:bg-muted/50" onClick={(e: React.MouseEvent) => {
+        const res = resources.find(r => r.name === 'Health');
+        if (res) openGeneralPopup(res.id, e);
+        else router.push('/workout-tracker');
+      }}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Health</CardTitle>
           <HeartPulse className="h-4 w-4 text-muted-foreground" />
@@ -64,7 +70,11 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
         </CardContent>
       </Card>
 
-      <Card className="cursor-pointer hover:bg-muted/50" onClick={() => router.push('/deep-work')}>
+      <Card className="cursor-pointer hover:bg-muted/50" onClick={(e: React.MouseEvent) => {
+        const res = resources.find(r => r.name === 'Wealth');
+        if (res) openGeneralPopup(res.id, e);
+        else router.push('/deep-work');
+      }}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Wealth</CardTitle>
           <Briefcase className="h-4 w-4 text-muted-foreground" />
@@ -78,7 +88,11 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
 
       <Popover>
         <PopoverTrigger asChild>
-          <Card className="cursor-pointer hover:bg-muted/50" onClick={() => router.push('/upskill')}>
+          <Card className="cursor-pointer hover:bg-muted/50" onClick={(e: React.MouseEvent) => {
+            const res = resources.find(r => r.name === 'Growth');
+            if (res) openGeneralPopup(res.id, e);
+            else router.push('/upskill');
+          }}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Growth</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -112,7 +126,10 @@ export function DashboardStats({ stats }: DashboardStatsProps) {
         )}
       </Popover>
 
-      <Card>
+      <Card className="cursor-pointer hover:bg-muted/50" onClick={(e: React.MouseEvent) => {
+        const res = resources.find(r => r.name === 'Direction');
+        if (res) openGeneralPopup(res.id, e);
+      }}>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Direction</CardTitle>
           <ClipboardCheck className="h-4 w-4 text-muted-foreground" />

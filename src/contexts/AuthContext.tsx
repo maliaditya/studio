@@ -36,7 +36,19 @@ import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { HabitDetailPopup } from '@/components/HabitDetailPopup';
-import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, storeExcalidrawFile, type ExcalidrawFileRecord } from '@/lib/audioDB';
+import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, storeExcalidrawFile, type ExcalidrawFileRecord, storeAudio, getAudio, storePdf, getPdf } from '@/lib/audioDB';
+
+// Helper: convert ArrayBuffer to base64 in safe chunks to avoid "call stack size exceeded"
+const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 0x8000; // 32KB per chunk
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, Array.from(chunk));
+  }
+  return btoa(binary);
+};
 import { PillarPopup } from '@/components/PillarPopup';
 import { BrainHacksCard } from '@/components/BrainHacksCard';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -94,6 +106,10 @@ interface AuthContextType {
   downloadFromGitHub: () => Promise<void>;
   syncCanvasImagesToGitHub: () => Promise<void>;
   fetchCanvasImagesFromGitHub: () => Promise<void>;
+  syncAudioFilesToGitHub: () => Promise<void>;
+  fetchAudioFilesFromGitHub: () => Promise<void>;
+  syncPdfFilesToGitHub: () => Promise<void>;
+  fetchPdfFilesFromGitHub: () => Promise<void>;
   handleCreateTask: (activity: Activity, linkedActivityType: ActivityType, microSkillName: string, parentTaskId: string) => Promise<{ parentName: string, childName: string, childId: string } | null>;
   
   // App Data States
@@ -376,7 +392,7 @@ interface AuthContextType {
   updateActivitySubtask: (activityId: string, subTaskId: string, updates: Partial<SubTask>) => void;
   deleteActivitySubtask: (activityId: string, subTaskId: string) => void;
   handleLinkHabit: (activityId: string, habitId: string, date: Date) => void;
-  toggleRoutine: (activity: Activity, rule: RecurrenceRule | null) => void;
+  toggleRoutine: (activity: Activity, rule: RecurrenceRule | null, baseDate?: string) => void;
   missedSlotReviews: Record<string, MissedSlotReview>;
   setMissedSlotReviews: React.Dispatch<React.SetStateAction<Record<string, MissedSlotReview>>>;
   
@@ -1314,7 +1330,40 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProductizationPlans(mainData.productizationPlans || {});
     setOfferizationPlans(mainData.offerizationPlans || {});
     setResourceFolders(mainData.resourceFolders || []);
-    setResources(mainData.resources || []);
+    // Ensure default dashboard resources exist so dashboard cards can open popups
+    (function ensureDefaultDashboardResources() {
+      const incomingFolders = (mainData.resourceFolders || []);
+      const incomingResources = (mainData.resources || []);
+
+      const updatedFolders = [...incomingFolders];
+      let dashboardFolder = updatedFolders.find((f: any) => f.name === 'Dashboard');
+      if (!dashboardFolder) {
+        dashboardFolder = { id: 'folder_dashboard', name: 'Dashboard', parentId: null, icon: 'Grid' };
+        updatedFolders.push(dashboardFolder);
+        setResourceFolders(updatedFolders);
+      }
+
+      const updatedResources = [...incomingResources];
+      const addIfMissing = (name: string, id: string) => {
+        if (!updatedResources.some((r: any) => r.name === name)) {
+          updatedResources.push({
+            id,
+            name,
+            folderId: dashboardFolder.id,
+            type: 'card',
+            createdAt: new Date().toISOString(),
+            points: [{ id: `point_${id}_1`, text: `${name} resources`, type: 'text' }],
+          });
+        }
+      };
+
+      addIfMissing('Health', 'res_health');
+      addIfMissing('Wealth', 'res_wealth');
+      addIfMissing('Growth', 'res_growth');
+      addIfMissing('Direction', 'res_direction');
+
+      setResources(updatedResources);
+    })();
     setCanvasLayout(mainData.canvasLayout || { nodes: [], edges: [] });
     setMindsetCards(mainData.mindsetCards || []);
     setPistons(mainData.pistons || {});
@@ -3039,7 +3088,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     });
   };
   
-  const toggleRoutine = (activity: Activity, rule: RecurrenceRule | null) => {
+  const toggleRoutine = (activity: Activity, rule: RecurrenceRule | null, baseDate?: string) => {
     setSettings(prev => {
       const newRoutines = (prev.routines || []).filter(r => 
           !(r.details === activity.details && r.type === activity.type && r.slot === activity.slot)
@@ -3051,7 +3100,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
               completed: false,
               routine: rule,
               isRoutine: true,
-              createdAt: new Date().toISOString()
+              createdAt: new Date().toISOString(),
+              baseDate: baseDate || undefined,
           });
       }
       return {...prev, routines: newRoutines};
@@ -3722,34 +3772,43 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       (resources || []).forEach(resource => {
           (resource.points || []).forEach(point => {
               if (point.type !== 'paint' || !point.drawing) return;
-              try {
-                  const parsed = JSON.parse(point.drawing);
+                try {
+                  const drawing = point.drawing;
                   const canvasId = `${resource.id}-${point.id}`;
 
-                  if (parsed && parsed.files && typeof parsed.files === 'object' && Object.keys(parsed.files).length > 0) {
+                  // If drawing is a JSON string (starts with { or [), attempt to parse it.
+                  // Otherwise it's likely a data URL or other inline content and there are no external files to fetch.
+                  if (typeof drawing === 'string' && (drawing.trim().startsWith('{') || drawing.trim().startsWith('['))) {
+                    const parsed = JSON.parse(drawing);
+
+                    if (parsed && parsed.files && typeof parsed.files === 'object' && Object.keys(parsed.files).length > 0) {
                       canvasFilesById.set(canvasId, parsed.files);
                       return;
-                  }
+                    }
 
-                  // Fallback: derive file IDs from image elements if files metadata is missing.
-                  const fileIds = new Set<string>();
-                  const elements = Array.isArray(parsed?.elements) ? parsed.elements : [];
-                  elements.forEach((el: any) => {
+                    // Fallback: derive file IDs from image elements if files metadata is missing.
+                    const fileIds = new Set<string>();
+                    const elements = Array.isArray(parsed?.elements) ? parsed.elements : [];
+                    elements.forEach((el: any) => {
                       if (el?.type === 'image' && typeof el.fileId === 'string') {
-                          fileIds.add(el.fileId);
+                        fileIds.add(el.fileId);
                       }
-                  });
+                    });
 
-                  if (fileIds.size > 0) {
+                    if (fileIds.size > 0) {
                       const derivedMeta: Record<string, any> = {};
                       fileIds.forEach(fileId => {
-                          derivedMeta[fileId] = { mimeType: 'image/png' };
+                        derivedMeta[fileId] = { mimeType: 'image/png' };
                       });
                       canvasFilesById.set(canvasId, derivedMeta);
+                    }
+                  } else {
+                    // Non-JSON drawing (e.g., data URL) — nothing to fetch from GitHub for this canvas.
+                    return;
                   }
-              } catch (e) {
-                  console.error("Failed to parse canvas drawing JSON while collecting file metadata:", e);
-              }
+                } catch (e) {
+                  console.debug("Skipping invalid canvas drawing while collecting file metadata:", e && (e as Error).message ? (e as Error).message : e);
+                }
           });
       });
 
@@ -3782,58 +3841,69 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       try {
           let uploaded = 0;
 
-          for (const { key, record } of entries) {
+            // Pre-list existing files in the target folder to avoid many 404 GETs
+            const existingFilesMap = new Map<string, string>();
+            try {
+            const listResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${folderPath}`, {
+              headers: { 'Authorization': `token ${githubToken}` }
+            });
+            if (listResponse.ok) {
+              const listData = await listResponse.json();
+              for (const item of listData || []) {
+              if (item && item.type === 'file' && item.name && item.sha) {
+                existingFilesMap.set(item.name, item.sha);
+              }
+              }
+            } else if (listResponse.status !== 404) {
+              const err = await listResponse.json();
+              throw new Error(err.message || 'Failed to list images on GitHub');
+            }
+            } catch (e) {
+            console.debug('Could not list existing GitHub image folder, continuing with per-file upload', e);
+            }
+
+            for (const { key, record } of entries) {
               const fileId = key.split(':').pop();
               if (!fileId || !record?.blob) continue;
 
               const mimeType = record.mimeType || record.blob.type || 'application/octet-stream';
               const ext = mimeType.includes('png') ? 'png'
-                  : mimeType.includes('jpeg') ? 'jpg'
-                  : mimeType.includes('jpg') ? 'jpg'
-                  : mimeType.includes('webp') ? 'webp'
-                  : mimeType.includes('gif') ? 'gif'
-                  : 'bin';
+                : mimeType.includes('jpeg') ? 'jpg'
+                : mimeType.includes('jpg') ? 'jpg'
+                : mimeType.includes('webp') ? 'webp'
+                : mimeType.includes('gif') ? 'gif'
+                : 'bin';
 
               const filename = `${fileId}.${ext}`;
               const path = `${folderPath}/${filename}`;
 
-              const fileResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${path}`, {
-                  headers: { 'Authorization': `token ${githubToken}` }
-              });
-
-              let sha: string | undefined;
-              if (fileResponse.ok) {
-                  const fileData = await fileResponse.json();
-                  sha = fileData.sha;
-              } else if (fileResponse.status !== 404) {
-                  const errorData = await fileResponse.json();
-                  throw new Error(`Could not fetch image details from GitHub: ${errorData.message}`);
-              }
+              // Use pre-fetched sha if available
+              const sha = existingFilesMap.get(filename);
 
               const buffer = await record.blob.arrayBuffer();
-              const base64Content = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+              const base64Content = arrayBufferToBase64(buffer);
               const message = `LifeOS canvas image: ${filename}`;
 
               const pushResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${path}`, {
-                  method: 'PUT',
-                  headers: {
-                      'Authorization': `token ${githubToken}`,
-                      'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                      message,
-                      content: base64Content,
-                      sha,
-                  }),
+                method: 'PUT',
+                headers: {
+                  'Authorization': `token ${githubToken}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  message,
+                  content: base64Content,
+                  sha,
+                }),
               });
 
               const result = await pushResponse.json();
               if (!pushResponse.ok) {
-                  throw new Error(result.message || `Failed to upload ${filename}.`);
+                throw new Error(result.message || `Failed to upload ${filename}.`);
               }
 
               uploaded += 1;
-          }
+            }
 
           toast({ title: "Images Uploaded", description: `${uploaded} images uploaded to GitHub.` });
       } catch (error) {
@@ -3841,6 +3911,331 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           toast({ title: "Upload Failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
       }
   };
+
+    const syncAudioFilesToGitHub = async () => {
+        const username = currentUser?.username?.toLowerCase();
+        const { githubToken, githubOwner, githubRepo } = settings;
+
+        if (!username) {
+          toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
+          return;
+        }
+        if (!githubToken || !githubOwner || !githubRepo) {
+          toast({ title: 'GitHub settings not configured', variant: 'destructive' });
+          return;
+        }
+
+        const audios = (resources || []).filter(r => r.hasLocalAudio || r.audioFileName);
+        if (audios.length === 0) {
+          toast({ title: "No audio files", description: "No local audio files found to upload." });
+          return;
+        }
+
+        const folderPath = `audios_${username}`;
+        const syncToast = toast({ title: "Uploading audio...", description: `Preparing ${audios.length} files...` });
+
+        try {
+          let uploaded = 0;
+          let skipped = 0;
+
+          for (const res of audios) {
+            const key = res.audioFileName || `${res.id}`;
+            const blob = await getAudio(key);
+            if (!blob) { skipped += 1; continue; }
+
+            const buffer = await blob.arrayBuffer();
+            const base64Content = arrayBufferToBase64(buffer);
+            const fileHash = await hashString(base64Content);
+
+            const mimeType = blob.type || 'audio/mpeg';
+            const ext = mimeType.includes('mpeg') || mimeType.includes('mp3') ? 'mp3' : mimeType.split('/').pop() || 'bin';
+            const filename = `${key}.${ext}`.replace(/\s+/g, '_');
+            const path = `${folderPath}/${filename}`;
+
+            const existingHash = settings.githubModuleHashes?.[path];
+            if (existingHash === fileHash) {
+              skipped += 1;
+              syncToast.update({ title: 'Skipping', description: `Unchanged: ${filename}` });
+              continue;
+            }
+
+            // retry loop
+            let success = false;
+            let lastError: any = null;
+            for (let attempt = 1; attempt <= 3 && !success; attempt++) {
+              try {
+                const fileResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${path}`, {
+                  headers: { 'Authorization': `token ${githubToken}` }
+                });
+                let sha: string | undefined;
+                if (fileResponse.ok) {
+                  const fileData = await fileResponse.json();
+                  sha = fileData.sha;
+                } else if (fileResponse.status !== 404) {
+                  const err = await fileResponse.json();
+                  throw new Error(err.message || 'Failed to check existing file');
+                }
+
+                const message = `LifeOS audio: ${filename}`;
+                const pushResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${path}`, {
+                  method: 'PUT',
+                  headers: { 'Authorization': `token ${githubToken}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ message, content: base64Content, sha }),
+                });
+
+                const result = await pushResponse.json();
+                if (!pushResponse.ok) throw new Error(result.message || 'Failed to push audio');
+
+                // update hash store
+                setSettings(prev => ({ ...prev, githubModuleHashes: { ...(prev.githubModuleHashes || {}), [path]: fileHash } }));
+                uploaded += 1;
+                success = true;
+                syncToast.update({ title: 'Uploading', description: `Uploaded ${uploaded} / ${audios.length}` });
+              } catch (e) {
+                lastError = e;
+                const delay = 500 * Math.pow(2, attempt);
+                await new Promise(r => setTimeout(r, delay));
+              }
+            }
+
+            if (!success) {
+              console.error('Upload audio failed for', res.id, lastError);
+            }
+          }
+
+          syncToast.update({ title: "Audio Upload Complete", description: `${uploaded} uploaded • ${skipped} skipped` });
+        } catch (error) {
+          console.error('Audio upload failed:', error);
+          syncToast.update({ title: 'Upload Failed', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
+        }
+    };
+
+    const fetchAudioFilesFromGitHub = async () => {
+      const username = currentUser?.username?.toLowerCase();
+      const { githubToken, githubOwner, githubRepo } = settings;
+
+      if (!username) {
+        toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
+        return;
+      }
+      if (!githubToken || !githubOwner || !githubRepo) {
+        toast({ title: 'GitHub settings not configured', variant: 'destructive' });
+        return;
+      }
+
+      const folderPath = `audios_${username}`;
+      toast({ title: "Fetching audio...", description: "Downloading audio files from GitHub to this browser." });
+
+      try {
+        const listResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${folderPath}`, {
+          headers: { 'Authorization': `token ${githubToken}` }
+        });
+        if (!listResponse.ok) {
+          const err = await listResponse.json();
+          if (listResponse.status === 404) throw new Error(`Folder "${folderPath}" not found.`);
+          throw new Error(err.message || 'Failed to list audios on GitHub');
+        }
+
+        const listData = await listResponse.json();
+        let downloaded = 0;
+
+        for (const item of listData || []) {
+          if (item.type !== 'file' || !item.name) continue;
+          const filePath = `${folderPath}/${item.name}`;
+          try {
+            const fileResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${filePath}`, {
+              headers: { 'Authorization': `token ${githubToken}` }
+            });
+            if (!fileResponse.ok) continue;
+            const fileData = await fileResponse.json();
+            if (!fileData?.content) continue;
+            const cleaned = String(fileData.content).replace(/\n/g, '');
+            const binary = atob(cleaned);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const ext = item.name.split('.').pop() || 'mp3';
+            const mimeType = ext === 'mp3' ? 'audio/mpeg' : `audio/${ext}`;
+            const blob = new Blob([bytes], { type: mimeType });
+            const key = item.name.split('.').slice(0, -1).join('.') || item.name;
+            await storeAudio(key, blob);
+
+            // Update resources that might reference this audio by id/key
+            setResources(prev => prev.map(r => {
+              if (r.audioFileName === key || r.id === key) {
+                return { ...r, hasLocalAudio: true, audioFileName: key };
+              }
+              return r;
+            }));
+            downloaded += 1;
+          } catch (e) {
+            // continue
+          }
+        }
+
+        toast({ title: "Audio Fetch Complete", description: `Downloaded ${downloaded} audio files.` });
+      } catch (error) {
+        console.error('Fetch audio failed:', error);
+        toast({ title: 'Fetch Failed', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
+      }
+    };
+
+    const syncPdfFilesToGitHub = async () => {
+        const username = currentUser?.username?.toLowerCase();
+        const { githubToken, githubOwner, githubRepo } = settings;
+
+        if (!username) {
+          toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
+          return;
+        }
+        if (!githubToken || !githubOwner || !githubRepo) {
+          toast({ title: 'GitHub settings not configured', variant: 'destructive' });
+          return;
+        }
+
+        const pdfs = (resources || []).filter(r => r.hasLocalPdf || r.pdfFileName);
+        if (pdfs.length === 0) {
+          toast({ title: "No PDFs", description: "No local PDFs found to upload." });
+          return;
+        }
+
+        const folderPath = `pdfs_${username}`;
+        const syncToast = toast({ title: "Uploading PDFs...", description: `Preparing ${pdfs.length} files...` });
+
+        try {
+          let uploaded = 0;
+          let skipped = 0;
+
+          for (const res of pdfs) {
+            const key = res.pdfFileName || `${res.id}`;
+            const blob = await getPdf(key);
+            if (!blob) { skipped += 1; continue; }
+
+            const buffer = await blob.arrayBuffer();
+            const base64Content = arrayBufferToBase64(buffer);
+            const fileHash = await hashString(base64Content);
+
+            const filename = `${key}.pdf`.replace(/\s+/g, '_');
+            const path = `${folderPath}/${filename}`;
+
+            const existingHash = settings.githubModuleHashes?.[path];
+            if (existingHash === fileHash) {
+              skipped += 1;
+              syncToast.update({ title: 'Skipping', description: `Unchanged: ${filename}` });
+              continue;
+            }
+
+            let success = false;
+            let lastError: any = null;
+            for (let attempt = 1; attempt <= 3 && !success; attempt++) {
+              try {
+                const fileResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${path}`, {
+                  headers: { 'Authorization': `token ${githubToken}` }
+                });
+                let sha: string | undefined;
+                if (fileResponse.ok) {
+                  const fileData = await fileResponse.json();
+                  sha = fileData.sha;
+                } else if (fileResponse.status !== 404) {
+                  const err = await fileResponse.json();
+                  throw new Error(err.message || 'Failed to check existing file');
+                }
+
+                const message = `LifeOS pdf: ${filename}`;
+                const pushResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${path}`, {
+                  method: 'PUT',
+                  headers: { 'Authorization': `token ${githubToken}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ message, content: base64Content, sha }),
+                });
+
+                const result = await pushResponse.json();
+                if (!pushResponse.ok) throw new Error(result.message || 'Failed to push pdf');
+
+                setSettings(prev => ({ ...prev, githubModuleHashes: { ...(prev.githubModuleHashes || {}), [path]: fileHash } }));
+                uploaded += 1;
+                success = true;
+                syncToast.update({ title: 'Uploading', description: `Uploaded ${uploaded} / ${pdfs.length}` });
+              } catch (e) {
+                lastError = e;
+                const delay = 500 * Math.pow(2, attempt);
+                await new Promise(r => setTimeout(r, delay));
+              }
+            }
+
+            if (!success) console.error('Upload pdf failed for', res.id, lastError);
+          }
+
+          syncToast.update({ title: "PDF Upload Complete", description: `${uploaded} uploaded • ${skipped} skipped` });
+        } catch (error) {
+          console.error('PDF upload failed:', error);
+          syncToast.update({ title: 'Upload Failed', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
+        }
+    };
+
+    const fetchPdfFilesFromGitHub = async () => {
+      const username = currentUser?.username?.toLowerCase();
+      const { githubToken, githubOwner, githubRepo } = settings;
+
+      if (!username) {
+        toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
+        return;
+      }
+      if (!githubToken || !githubOwner || !githubRepo) {
+        toast({ title: 'GitHub settings not configured', variant: 'destructive' });
+        return;
+      }
+
+      const folderPath = `pdfs_${username}`;
+      toast({ title: "Fetching PDFs...", description: "Downloading PDFs from GitHub to this browser." });
+
+      try {
+        const listResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${folderPath}`, {
+          headers: { 'Authorization': `token ${githubToken}` }
+        });
+        if (!listResponse.ok) {
+          const err = await listResponse.json();
+          if (listResponse.status === 404) throw new Error(`Folder "${folderPath}" not found.`);
+          throw new Error(err.message || 'Failed to list pdfs on GitHub');
+        }
+
+        const listData = await listResponse.json();
+        let downloaded = 0;
+
+        for (const item of listData || []) {
+          if (item.type !== 'file' || !item.name) continue;
+          const filePath = `${folderPath}/${item.name}`;
+          try {
+            const fileResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${filePath}`, {
+              headers: { 'Authorization': `token ${githubToken}` }
+            });
+            if (!fileResponse.ok) continue;
+            const fileData = await fileResponse.json();
+            if (!fileData?.content) continue;
+            const cleaned = String(fileData.content).replace(/\n/g, '');
+            const binary = atob(cleaned);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            const blob = new Blob([bytes], { type: 'application/pdf' });
+            const key = item.name.split('.').slice(0, -1).join('.') || item.name;
+            await storePdf(key, blob);
+
+            setResources(prev => prev.map(r => {
+              if (r.pdfFileName === key || r.id === key) {
+                return { ...r, hasLocalPdf: true, pdfFileName: key };
+              }
+              return r;
+            }));
+            downloaded += 1;
+          } catch (e) {
+            // continue
+          }
+        }
+
+        toast({ title: "PDF Fetch Complete", description: `Downloaded ${downloaded} PDFs.` });
+      } catch (error) {
+        console.error('Fetch pdf failed:', error);
+        toast({ title: 'Fetch Failed', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
+      }
+    };
 
   const fetchCanvasImagesFromGitHub = async () => {
       const username = currentUser?.username?.toLowerCase();
@@ -4110,6 +4505,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       downloadFromGitHub,
       syncCanvasImagesToGitHub,
       fetchCanvasImagesFromGitHub,
+      syncAudioFilesToGitHub,
+      fetchAudioFilesFromGitHub,
+      syncPdfFilesToGitHub,
+      fetchPdfFilesFromGitHub,
     handleCreateTask,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
