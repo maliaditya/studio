@@ -36,7 +36,7 @@ import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { HabitDetailPopup } from '@/components/HabitDetailPopup';
-import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup } from '@/lib/audioDB';
+import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, storeExcalidrawFile, type ExcalidrawFileRecord } from '@/lib/audioDB';
 import { PillarPopup } from '@/components/PillarPopup';
 import { BrainHacksCard } from '@/components/BrainHacksCard';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -92,6 +92,8 @@ interface AuthContextType {
   setIsTodaysPredictionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   syncWithGitHub: () => Promise<void>;
   downloadFromGitHub: () => Promise<void>;
+  syncCanvasImagesToGitHub: () => Promise<void>;
+  fetchCanvasImagesFromGitHub: () => Promise<void>;
   handleCreateTask: (activity: Activity, linkedActivityType: ActivityType, microSkillName: string, parentTaskId: string) => Promise<{ parentName: string, childName: string, childId: string } | null>;
   
   // App Data States
@@ -726,7 +728,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return def;
         }));
 
-        setPermanentlyLoggedTaskIds(prev => new Set(prev).add(definitionId!));
     }
   
     updateActivity({
@@ -1366,7 +1367,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setActiveFocusSession(null);
     }
     
-    const defaultSettings: UserSettings = { 
+  const defaultSettings: UserSettings = { 
         carryForward: true, autoPush: false, autoPushLimit: 100, 
         carryForwardEssentials: true, carryForwardNutrition: false,
         smartLogging: false, defaultHabitLinks: {}, routines: [],
@@ -1376,8 +1377,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         allWidgetsVisible: true,
         agendaShowCurrentSlotOnly: false,
         spacedRepetitionSlot: 'Late Night',
-        pinnedCanvasIds: [],
-    };
+          pinnedCanvasIds: [],
+          githubModuleHashes: {},
+      };
     setSettings({ ...defaultSettings, ...(mainData.settings || {}) });
 
 
@@ -1416,14 +1418,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signIn = async (username: string, password: string) => {
-    setLoading(true);
-    const { success, message, user } = await localLoginUser(username, password);
-    if (success && user) {
-        setCurrentUser(user);
-
-        if (user.username === 'demo') {
-            await pullDataFromCloud(user.username);
-        } else {
+      setLoading(true);
+      const trimmedUsername = username.trim();
+      const isDemoLogin = trimmedUsername.toLowerCase() === 'demo';
+      const loginUsername = isDemoLogin ? 'demo' : trimmedUsername;
+      const { success, message, user } = await localLoginUser(loginUsername, password);
+      if (success && user) {
+          setCurrentUser(user);
+  
+          if (user.username === 'demo') {
+              await pullDataFromCloud(user.username);
+          } else {
             const mainDataString = localStorage.getItem(`lifeos_data_${user.username}`);
             const ghSettingsString = localStorage.getItem(`github_settings_${user.username}`);
 
@@ -1458,11 +1463,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
         
-        router.push('/my-plate');
-        toast({ title: "Success", description: message });
-    } else {
-        toast({ title: "Error", description: message, variant: "destructive" });
-    }
+          router.push('/my-plate');
+          toast({ title: "Success", description: message });
+      } else {
+          toast({ title: "Error", description: message, variant: "destructive" });
+      }
     setLoading(false);
   };
 
@@ -3295,7 +3300,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const syncWithGitHub = async () => {
-    toast({ title: "Syncing...", description: "Pushing your data to GitHub." });
+    const syncToast = toast({ title: "Syncing...", description: "Preparing upload..." });
 
     const token = settings.githubToken;
     const owner = settings.githubOwner;
@@ -3312,28 +3317,136 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     }
 
     try {
-        let sha: string | undefined;
-
-        const fileResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
-            headers: { 'Authorization': `token ${token}` }
-        });
-
-        if (fileResponse.ok) {
-            const fileData = await fileResponse.json();
-            sha = fileData.sha;
-        } else if (fileResponse.status !== 404) {
-            const errorData = await fileResponse.json();
-            throw new Error(`Could not fetch file details from GitHub: ${errorData.message}`);
-        }
-        
-        const content = JSON.stringify(getAllUserData(), null, 2);
+        const allData = getAllUserData();
+        const content = JSON.stringify(allData, null, 2);
         const message = `LifeOS backup: ${new Date().toISOString()}`;
 
-        await pushToGitHub(token, owner, repo, path, content, message, sha);
+        const nextHashes: Record<string, string> = { ...(settings.githubModuleHashes || {}) };
+
+        // Modular sync (writes alongside the single backup)
+        const { dir } = getGitHubBaseDir(path);
+        const modulesBase = dir ? `${dir}/modules` : 'modules';
+        const manifestPath = dir ? `${dir}/manifest.json` : 'manifest.json';
+        const modules = buildModuleData(allData);
+        const canvasFileIndex = Object.fromEntries(getCanvasFilesMetaByCanvasId());
+        const updatedAt = new Date().toISOString();
+
+        const moduleEntries: { name: string; path: string; content: string }[] = [
+          { name: 'core', path: `${modulesBase}/core.json`, content: JSON.stringify(modules.core, null, 2) },
+          { name: 'workouts', path: `${modulesBase}/workouts.json`, content: JSON.stringify(modules.workouts, null, 2) },
+          { name: 'resources', path: `${modulesBase}/resources.json`, content: JSON.stringify(modules.resources, null, 2) },
+          { name: 'knowledge', path: `${modulesBase}/knowledge.json`, content: JSON.stringify(modules.knowledge, null, 2) },
+          { name: 'ui', path: `${modulesBase}/ui.json`, content: JSON.stringify(modules.ui, null, 2) },
+        ];
+
+        // Per-canvas image metadata files
+        const canvasFilesBase = `${modulesBase}/canvas-files`;
+        const canvasFilesIndex = {
+          version: 1,
+          updatedAt,
+          folder: `images_${currentUser?.username?.toLowerCase() || 'unknown'}`,
+          canvases: Object.keys(canvasFileIndex),
+        };
+        moduleEntries.push({
+          name: 'canvas-files-index',
+          path: `${canvasFilesBase}/index.json`,
+          content: JSON.stringify(canvasFilesIndex, null, 2),
+        });
+
+        const manifest = {
+          version: 1,
+          updatedAt,
+          modules: moduleEntries.reduce((acc, entry) => {
+            acc[entry.name] = { path: entry.path, updatedAt };
+            return acc;
+          }, {} as Record<string, { path: string; updatedAt: string }>),
+        };
+
+        const totalCandidates = 1 + moduleEntries.length + Object.keys(canvasFileIndex).length + 1;
+        let processed = 0;
+        let pushed = 0;
+        let skipped = 0;
+        const updateProgress = (label: string) => {
+          syncToast.update({
+            title: "Syncing...",
+            description: `${processed}/${totalCandidates} processed | ${pushed} pushed | ${skipped} skipped\n${label}`,
+          });
+        };
+
+        const backupHash = await hashString(content);
+        if (nextHashes[path] !== backupHash) {
+          const sha = await getGitHubFileSha(token, owner, repo, path);
+          await pushToGitHub(token, owner, repo, path, content, message, sha, { suppressToast: true });
+          nextHashes[path] = backupHash;
+          pushed += 1;
+          processed += 1;
+          updateProgress(`Pushed ${path}`);
+        } else {
+          skipped += 1;
+          processed += 1;
+          updateProgress(`Skipped ${path}`);
+        }
+
+        for (const entry of moduleEntries) {
+          const moduleHash = await hashString(entry.content);
+          if (nextHashes[entry.path] === moduleHash) {
+            skipped += 1;
+            processed += 1;
+            updateProgress(`Skipped ${entry.path}`);
+            continue;
+          }
+          const moduleSha = await getGitHubFileSha(token, owner, repo, entry.path);
+          await pushToGitHub(token, owner, repo, entry.path, entry.content, `LifeOS module: ${entry.name}`, moduleSha, { suppressToast: true });
+          nextHashes[entry.path] = moduleHash;
+          pushed += 1;
+          processed += 1;
+          updateProgress(`Pushed ${entry.path}`);
+        }
+
+        // Write per-canvas files
+        for (const [canvasId, filesMeta] of Object.entries(canvasFileIndex)) {
+          const canvasPath = `${canvasFilesBase}/${canvasId}.json`;
+          const canvasContent = JSON.stringify({ canvasId, files: filesMeta }, null, 2);
+          const canvasHash = await hashString(canvasContent);
+          if (nextHashes[canvasPath] === canvasHash) {
+            skipped += 1;
+            processed += 1;
+            updateProgress(`Skipped ${canvasPath}`);
+            continue;
+          }
+          const canvasSha = await getGitHubFileSha(token, owner, repo, canvasPath);
+          await pushToGitHub(token, owner, repo, canvasPath, canvasContent, `LifeOS canvas files: ${canvasId}`, canvasSha, { suppressToast: true });
+          nextHashes[canvasPath] = canvasHash;
+          pushed += 1;
+          processed += 1;
+          updateProgress(`Pushed ${canvasPath}`);
+        }
+
+        const manifestContent = JSON.stringify(manifest, null, 2);
+        const manifestHash = await hashString(manifestContent);
+        if (nextHashes[manifestPath] !== manifestHash) {
+          const manifestSha = await getGitHubFileSha(token, owner, repo, manifestPath);
+          await pushToGitHub(token, owner, repo, manifestPath, manifestContent, `LifeOS manifest`, manifestSha, { suppressToast: true });
+          nextHashes[manifestPath] = manifestHash;
+          pushed += 1;
+          processed += 1;
+          updateProgress(`Pushed ${manifestPath}`);
+        } else {
+          skipped += 1;
+          processed += 1;
+          updateProgress(`Skipped ${manifestPath}`);
+        }
+
+        setSettings(prev => ({ ...prev, githubModuleHashes: nextHashes }));
+
+        syncToast.update({
+          title: "Sync Complete",
+          description: `${pushed} pushed • ${skipped} skipped`,
+        });
 
     } catch (error) {
         console.error("GitHub sync failed:", error);
-        toast({
+        syncToast.update({
             title: "Sync Failed",
             description: error instanceof Error ? error.message : "An unknown error occurred.",
             variant: "destructive",
@@ -3341,7 +3454,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     }
   };
 
-  async function pushToGitHub(token: string, owner: string, repo: string, path: string, content: string, message: string, sha?: string) {
+  async function pushToGitHub(token: string, owner: string, repo: string, path: string, content: string, message: string, sha?: string, opts?: { suppressToast?: boolean }) {
     if (!content || content === "{}") {
       toast({ title: "Sync Cancelled", description: "Cannot push empty data.", variant: "destructive" });
       return;
@@ -3366,7 +3479,137 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     
     setSettings(prev => ({...prev, lastSync: { sha: result.content.sha, timestamp: Date.now() }}));
     setLocalChangeCount(0);
-    toast({ title: "Success", description: "Your data has been backed up to GitHub." });
+    if (!opts?.suppressToast) {
+      toast({ title: "Success", description: "Your data has been backed up to GitHub." });
+    }
+  }
+
+  async function hashString(content: string): Promise<string> {
+    if (typeof window !== 'undefined' && window.crypto?.subtle) {
+      const data = new TextEncoder().encode(content);
+      const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    // Fallback: lightweight hash
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+      hash = (hash << 5) - hash + content.charCodeAt(i);
+      hash |= 0;
+    }
+    return `fallback-${hash}`;
+  }
+
+  async function getGitHubFileSha(token: string, owner: string, repo: string, path: string): Promise<string | undefined> {
+    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+        headers: { 'Authorization': `token ${token}` }
+    });
+    if (response.ok) {
+        const data = await response.json();
+        return data.sha as string | undefined;
+    }
+    if (response.status === 404) {
+        return undefined;
+    }
+    const errorData = await response.json();
+    throw new Error(errorData.message || `Failed to fetch file details for ${path}.`);
+  }
+
+  async function getGitHubJson<T>(token: string, owner: string, repo: string, path?: string): Promise<T | null> {
+    if (!path) return null;
+    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+        headers: { 'Authorization': `token ${token}` }
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Failed to fetch ${path}.`);
+    }
+    const data = await response.json();
+    if (!data?.content) return null;
+    const content = atob(data.content);
+    return JSON.parse(content) as T;
+  }
+
+  function getGitHubBaseDir(path: string): { dir: string; base: string } {
+    if (!path.includes('/')) return { dir: '', base: path };
+    const parts = path.split('/');
+    const base = parts.pop() as string;
+    const dir = parts.join('/');
+    return { dir, base };
+  }
+
+  function buildModuleData(allData: ReturnType<typeof getAllUserData>) {
+    const main = allData.main;
+    const ui = allData.ui;
+
+    const core = {
+      weightLogs: main.weightLogs,
+      goalWeight: main.goalWeight,
+      height: main.height,
+      dateOfBirth: main.dateOfBirth,
+      gender: main.gender,
+      dietPlan: main.dietPlan,
+      schedule: main.schedule,
+      dailyPurposes: main.dailyPurposes,
+      settings: main.settings,
+    };
+
+    const workouts = {
+      allUpskillLogs: main.allUpskillLogs,
+      allDeepWorkLogs: main.allDeepWorkLogs,
+      allWorkoutLogs: main.allWorkoutLogs,
+      brandingLogs: main.brandingLogs,
+      allLeadGenLogs: main.allLeadGenLogs,
+      workoutMode: main.workoutMode,
+      strengthTrainingMode: main.strengthTrainingMode,
+      workoutPlanRotation: main.workoutPlanRotation,
+      workoutPlans: main.workoutPlans,
+      exerciseDefinitions: main.exerciseDefinitions,
+      upskillDefinitions: main.upskillDefinitions,
+      topicGoals: main.topicGoals,
+      deepWorkDefinitions: main.deepWorkDefinitions,
+      leadGenDefinitions: main.leadGenDefinitions,
+      mindProgrammingDefinitions: main.mindProgrammingDefinitions,
+      allMindProgrammingLogs: main.allMindProgrammingLogs,
+      mindProgrammingCategories: main.mindProgrammingCategories,
+      mindProgrammingMode: main.mindProgrammingMode,
+      mindProgrammingPlans: main.mindProgrammingPlans,
+      mindProgrammingPlanRotation: main.mindProgrammingPlanRotation,
+    };
+
+    const resourcesModule = {
+      resources: main.resources,
+      resourceFolders: main.resourceFolders,
+    };
+
+    const knowledge = {
+      canvasLayout: main.canvasLayout,
+      mindsetCards: main.mindsetCards,
+      pistons: main.pistons,
+      skillDomains: main.skillDomains,
+      coreSkills: main.coreSkills,
+      projects: main.projects,
+      companies: main.companies,
+      positions: main.positions,
+      purposeData: main.purposeData,
+      patterns: main.patterns,
+      metaRules: main.metaRules,
+      pillarEquations: main.pillarEquations,
+      skillAcquisitionPlans: main.skillAcquisitionPlans,
+      autoSuggestions: main.autoSuggestions,
+      pathNodes: main.pathNodes,
+      missedSlotReviews: main.missedSlotReviews,
+      topPriorities: main.topPriorities,
+      brainHacks: main.brainHacks,
+      spacedRepetitionData: main.spacedRepetitionData,
+      dailyReviewLogs: main.dailyReviewLogs,
+      abandonmentLogs: main.abandonmentLogs,
+      productizationPlans: main.productizationPlans,
+      offerizationPlans: main.offerizationPlans,
+    };
+
+    return { core, workouts, resources: resourcesModule, knowledge, ui };
   }
 
   async function pullFromGitHub(token: string, owner: string, repo: string, path: string, sha: string) {
@@ -3409,18 +3652,61 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     }
     toast({ title: "Downloading...", description: "Backup will be stored locally." });
     try {
+        const { dir } = getGitHubBaseDir(githubPath);
+        const manifestPath = dir ? `${dir}/manifest.json` : 'manifest.json';
+        const manifest = await getGitHubJson<{ version: number; modules: Record<string, { path: string }> }>(githubToken, githubOwner, githubRepo, manifestPath);
+
+        let useFullBackup = false;
+        if (manifest && manifest.modules) {
+            const core = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.core?.path);
+            const workouts = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.workouts?.path);
+            const resourcesMod = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.resources?.path);
+            const knowledge = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.knowledge?.path);
+            const ui = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.ui?.path);
+            const canvasFilesIndex = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules['canvas-files-index']?.path);
+
+            const hasCore = !!core;
+            const hasResources = !!resourcesMod;
+            if (!hasCore || !hasResources) {
+                useFullBackup = true;
+            } else {
+                const mergedMain = {
+                    ...(core || {}),
+                    ...(workouts || {}),
+                    ...(resourcesMod || {}),
+                    ...(knowledge || {}),
+                    ...(canvasFilesIndex ? { canvasFileIndex: canvasFilesIndex } : {}),
+                };
+
+                const merged = { main: mergedMain, ui: ui || {} };
+                const blob = new Blob([JSON.stringify(merged)], { type: 'application/json' });
+                await storeBackup('github_backup', blob);
+                setImportBackupConfirmationOpen(true);
+                toast({ title: "Download Ready", description: "Modular backup has been assembled locally." });
+                return;
+            }
+        }
+
         const response = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${githubPath}`, {
             headers: { 'Authorization': `token ${githubToken}` }
         });
         if (!response.ok) throw new Error('Failed to fetch file metadata from GitHub.');
         
         const data = await response.json();
-        const downloadUrl = data.download_url;
-        
-        const fileResponse = await fetch(downloadUrl);
-        if (!fileResponse.ok) throw new Error('Failed to download file content.');
+        let blob: Blob | null = null;
 
-        const blob = await fileResponse.blob();
+        if (data?.content) {
+            const content = atob(String(data.content).replace(/\n/g, ''));
+            blob = new Blob([content], { type: 'application/json' });
+        } else if (data?.download_url) {
+            const fileResponse = await fetch(data.download_url);
+            if (!fileResponse.ok) throw new Error('Failed to download file content.');
+            blob = await fileResponse.blob();
+        }
+
+        if (!blob) {
+            throw new Error('Failed to retrieve backup content from GitHub.');
+        }
         await storeBackup('github_backup', blob);
 
         setImportBackupConfirmationOpen(true);
@@ -3428,6 +3714,249 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     } catch (error) {
         toast({ title: 'Download Failed', description: error instanceof Error ? error.message : "Unknown error", variant: 'destructive' });
     }
+  };
+
+  const getCanvasFilesMetaByCanvasId = useCallback(() => {
+      const canvasFilesById = new Map<string, Record<string, any>>();
+
+      (resources || []).forEach(resource => {
+          (resource.points || []).forEach(point => {
+              if (point.type !== 'paint' || !point.drawing) return;
+              try {
+                  const parsed = JSON.parse(point.drawing);
+                  const canvasId = `${resource.id}-${point.id}`;
+
+                  if (parsed && parsed.files && typeof parsed.files === 'object' && Object.keys(parsed.files).length > 0) {
+                      canvasFilesById.set(canvasId, parsed.files);
+                      return;
+                  }
+
+                  // Fallback: derive file IDs from image elements if files metadata is missing.
+                  const fileIds = new Set<string>();
+                  const elements = Array.isArray(parsed?.elements) ? parsed.elements : [];
+                  elements.forEach((el: any) => {
+                      if (el?.type === 'image' && typeof el.fileId === 'string') {
+                          fileIds.add(el.fileId);
+                      }
+                  });
+
+                  if (fileIds.size > 0) {
+                      const derivedMeta: Record<string, any> = {};
+                      fileIds.forEach(fileId => {
+                          derivedMeta[fileId] = { mimeType: 'image/png' };
+                      });
+                      canvasFilesById.set(canvasId, derivedMeta);
+                  }
+              } catch (e) {
+                  console.error("Failed to parse canvas drawing JSON while collecting file metadata:", e);
+              }
+          });
+      });
+
+      return canvasFilesById;
+  }, [resources]);
+
+  const syncCanvasImagesToGitHub = async () => {
+      const username = currentUser?.username?.toLowerCase();
+      const { githubToken, githubOwner, githubRepo } = settings;
+
+      if (!username) {
+          toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
+          return;
+      }
+
+      if (!githubToken || !githubOwner || !githubRepo) {
+          toast({ title: 'GitHub settings not configured', variant: 'destructive' });
+          return;
+      }
+
+      const entries = await getAllExcalidrawFiles();
+      if (entries.length === 0) {
+          toast({ title: "No images found", description: "No Excalidraw images are stored locally." });
+          return;
+      }
+
+      const folderPath = `images_${username}`;
+      toast({ title: "Uploading images...", description: `Pushing ${entries.length} images to GitHub.` });
+
+      try {
+          let uploaded = 0;
+
+          for (const { key, record } of entries) {
+              const fileId = key.split(':').pop();
+              if (!fileId || !record?.blob) continue;
+
+              const mimeType = record.mimeType || record.blob.type || 'application/octet-stream';
+              const ext = mimeType.includes('png') ? 'png'
+                  : mimeType.includes('jpeg') ? 'jpg'
+                  : mimeType.includes('jpg') ? 'jpg'
+                  : mimeType.includes('webp') ? 'webp'
+                  : mimeType.includes('gif') ? 'gif'
+                  : 'bin';
+
+              const filename = `${fileId}.${ext}`;
+              const path = `${folderPath}/${filename}`;
+
+              const fileResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${path}`, {
+                  headers: { 'Authorization': `token ${githubToken}` }
+              });
+
+              let sha: string | undefined;
+              if (fileResponse.ok) {
+                  const fileData = await fileResponse.json();
+                  sha = fileData.sha;
+              } else if (fileResponse.status !== 404) {
+                  const errorData = await fileResponse.json();
+                  throw new Error(`Could not fetch image details from GitHub: ${errorData.message}`);
+              }
+
+              const buffer = await record.blob.arrayBuffer();
+              const base64Content = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+              const message = `LifeOS canvas image: ${filename}`;
+
+              const pushResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${path}`, {
+                  method: 'PUT',
+                  headers: {
+                      'Authorization': `token ${githubToken}`,
+                      'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                      message,
+                      content: base64Content,
+                      sha,
+                  }),
+              });
+
+              const result = await pushResponse.json();
+              if (!pushResponse.ok) {
+                  throw new Error(result.message || `Failed to upload ${filename}.`);
+              }
+
+              uploaded += 1;
+          }
+
+          toast({ title: "Images Uploaded", description: `${uploaded} images uploaded to GitHub.` });
+      } catch (error) {
+          console.error("GitHub image upload failed:", error);
+          toast({ title: "Upload Failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
+      }
+  };
+
+  const fetchCanvasImagesFromGitHub = async () => {
+      const username = currentUser?.username?.toLowerCase();
+      const { githubToken, githubOwner, githubRepo } = settings;
+
+      if (!username) {
+          toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
+          return;
+      }
+
+      if (!githubToken || !githubOwner || !githubRepo) {
+          toast({ title: 'GitHub settings not configured', variant: 'destructive' });
+          return;
+      }
+
+      const canvasFilesById = getCanvasFilesMetaByCanvasId();
+      if (canvasFilesById.size === 0) {
+          toast({ title: "No canvas metadata found", description: "No canvases with image metadata were found in your data." });
+          return;
+      }
+
+      const folderPath = `images_${username}`;
+      const { dir } = getGitHubBaseDir(settings.githubPath || 'backup.json');
+      const modulesBase = dir ? `${dir}/modules` : 'modules';
+      const canvasFilesBase = `${modulesBase}/canvas-files`;
+      toast({ title: "Fetching images...", description: "Downloading images from GitHub to this browser." });
+
+      try {
+          const listResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${folderPath}`, {
+              headers: { 'Authorization': `token ${githubToken}` }
+          });
+
+          if (!listResponse.ok) {
+              const errorData = await listResponse.json();
+              if (listResponse.status === 404) {
+                  throw new Error(`Folder "${folderPath}" not found in ${githubOwner}/${githubRepo}.`);
+              }
+              throw new Error(errorData.message || 'Could not list image folder on GitHub.');
+          }
+
+          const listData = await listResponse.json();
+          const fileMap = new Map<string, { name: string }>();
+          (listData || []).forEach((item: any) => {
+              if (item.type !== 'file' || !item.name) return;
+              const fileId = item.name.split('.').slice(0, -1).join('.') || item.name;
+              fileMap.set(fileId, { name: item.name });
+          });
+
+          let downloaded = 0;
+          let missing = 0;
+
+          const base64ToBlob = (base64: string, mimeType: string) => {
+              const cleaned = base64.replace(/\n/g, '');
+              const binary = atob(cleaned);
+              const bytes = new Uint8Array(binary.length);
+              for (let i = 0; i < binary.length; i++) {
+                  bytes[i] = binary.charCodeAt(i);
+              }
+              return new Blob([bytes], { type: mimeType });
+          };
+
+          for (const [canvasId, filesMetaFromLocal] of canvasFilesById.entries()) {
+              let filesMeta = filesMetaFromLocal;
+              try {
+                  const canvasMeta = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, `${canvasFilesBase}/${canvasId}.json`);
+                  if (canvasMeta?.files && typeof canvasMeta.files === 'object') {
+                      filesMeta = canvasMeta.files;
+                  }
+              } catch (e) {
+                  // fallback to local metadata
+              }
+
+              for (const fileId of Object.keys(filesMeta || {})) {
+                  const entry = fileMap.get(fileId);
+                  if (!entry?.name) {
+                      missing += 1;
+                      continue;
+                  }
+
+                  try {
+                      const filePath = `${folderPath}/${entry.name}`;
+                      const fileResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${filePath}`, {
+                          headers: { 'Authorization': `token ${githubToken}` }
+                      });
+                      if (!fileResponse.ok) {
+                          missing += 1;
+                          continue;
+                      }
+                      const fileData = await fileResponse.json();
+                      const mimeType = filesMeta[fileId]?.mimeType || 'application/octet-stream';
+                      if (!fileData?.content) {
+                          missing += 1;
+                          continue;
+                      }
+                      const blob = base64ToBlob(fileData.content, mimeType);
+                      const record: ExcalidrawFileRecord = { blob, mimeType };
+                      await storeExcalidrawFile(`${canvasId}:${fileId}`, record);
+                      downloaded += 1;
+                  } catch (e) {
+                      missing += 1;
+                  }
+              }
+          }
+
+          toast({
+              title: "Images Fetched",
+              description: `Downloaded ${downloaded} images. ${missing > 0 ? `${missing} missing.` : ''}`,
+          });
+      } catch (error) {
+          console.error("GitHub image fetch failed:", error);
+          toast({
+              title: "Fetch Failed",
+              description: error instanceof Error ? error.message : "Unknown error",
+              variant: "destructive",
+          });
+      }
   };
 
   const handleImportFromLocalBackup = async () => {
@@ -3545,6 +4074,18 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         }
       });
     });
+
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    allDefs.forEach(def => {
+      const isUpskill = upskillDefinitions.some(d => d.id === def.id);
+      const getNodeType = isUpskill ? getUpskillNodeType : getDeepWorkNodeType;
+      const nodeType = getNodeType(def);
+      const isActionable = nodeType === 'Action' || nodeType === 'Visualization' || nodeType === 'Standalone';
+      if (isActionable && (def.loggedDuration || 0) > 0) {
+        idSet.add(def.id);
+      }
+    });
+
     return idSet;
   }, [allDeepWorkLogs, allUpskillLogs, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType]);
 
@@ -3565,8 +4106,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     togglePinDrawing, updateDrawingData,
     clearAllLocalFiles,
     isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen,
-    syncWithGitHub,
-    downloadFromGitHub,
+      syncWithGitHub,
+      downloadFromGitHub,
+      syncCanvasImagesToGitHub,
+      fetchCanvasImagesFromGitHub,
     handleCreateTask,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
@@ -3594,7 +4137,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     mindProgrammingMode, setMindProgrammingMode,
     mindProgrammingPlans, setMindProgrammingPlans,
     mindProgrammingPlanRotation, setMindProgrammingPlanRotation,
-    resources, setResources, deleteResource,
+      resources, setResources, resourceFolders, setResourceFolders, deleteResource,
     pinnedFolderIds, setPinnedFolderIds,
     activeResourceTabIds, setActiveResourceTabIds,
     selectedResourceFolderId, setSelectedResourceFolderId,
@@ -3741,6 +4284,7 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
 
 
 

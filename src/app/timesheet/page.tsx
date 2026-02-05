@@ -69,6 +69,22 @@ const activityNameMap: Record<ActivityTypeType, string> = {
     pomodoro: 'Pomodoro',
 };
 
+const activityTypeIcons: Record<ActivityTypeType, React.ReactNode> = {
+    deepwork: <Briefcase className="h-4 w-4" />,
+    upskill: <BrainCircuit className="h-4 w-4" />,
+    workout: <Timer className="h-4 w-4" />,
+    mindset: <BrainCircuit className="h-4 w-4" />,
+    branding: <BarChartIcon className="h-4 w-4" />,
+    essentials: <CheckCircle className="h-4 w-4" />,
+    planning: <CalendarIcon className="h-4 w-4" />,
+    tracking: <Check className="h-4 w-4" />,
+    'lead-generation': <Coffee className="h-4 w-4" />,
+    interrupt: <XCircle className="h-4 w-4" />,
+    distraction: <XCircle className="h-4 w-4" />,
+    nutrition: <Coffee className="h-4 w-4" />,
+    pomodoro: <Timer className="h-4 w-4" />,
+};
+
 
 const activityColorMapping: Record<string, string> = {
     'Deep Work': 'hsl(var(--chart-4))',
@@ -234,6 +250,8 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
     const [viewMode, setViewMode] = useState<ViewMode>("day");
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
     const [modalData, setModalData] = useState<{ date: Date; activities: ProcessedActivity[], pieData: any[] } | null>(null);
+    const [modalTab, setModalTab] = useState<'timesheet' | 'habit-dashboard'>('timesheet');
+    const [dashboardMonth, setDashboardMonth] = useState(startOfMonth(new Date()));
 
     const handlePrev = () => {
         if (viewMode === 'day') {
@@ -253,6 +271,12 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
         } else if (viewMode === 'month') {
             setSelectedDate(prev => addMonths(prev, 1));
         }
+    };
+
+    const handleDashboardMonthChange = (direction: -1 | 1) => {
+        const newMonth = new Date(dashboardMonth);
+        newMonth.setMonth(newMonth.getMonth() + direction);
+        setDashboardMonth(startOfMonth(newMonth));
     };
 
     const timeData = useMemo(() => {
@@ -637,6 +661,298 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
         );
     };
 
+    const habitDashboard = useMemo(() => {
+        const daysInMonth = eachDayOfInterval({
+            start: startOfMonth(dashboardMonth),
+            end: endOfMonth(dashboardMonth),
+        });
+
+        const monthActivities = daysInMonth.flatMap(day => {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            const daySchedule = schedule[dateKey] || {};
+            const allSlots = Object.values(daySchedule) as Activity[][];
+            return allSlots.flat();
+        });
+
+        const getHabitKey = (activity: Activity) => {
+            const effectiveType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+            const name = activity.details.trim();
+            if (!name) return null;
+            return `${effectiveType}::${name}`;
+        };
+
+        const habitCounts = new Map<string, { count: number; type: ActivityTypeType; name: string }>();
+        monthActivities.forEach(activity => {
+            const effectiveType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+            const key = getHabitKey(activity);
+            if (!key) return;
+            const current = habitCounts.get(key);
+            if (current) {
+                current.count += 1;
+            } else {
+                habitCounts.set(key, { count: 1, type: effectiveType as ActivityTypeType, name: activity.details.trim() });
+            }
+        });
+
+        const monthTypeCounts = new Map<string, number>();
+        monthActivities.forEach(activity => {
+            const effectiveType = activity.type === 'pomodoro' && activity.linkedActivityType ? activity.linkedActivityType : activity.type;
+            const name = activityNameMap[effectiveType] || effectiveType;
+            monthTypeCounts.set(name, (monthTypeCounts.get(name) || 0) + 1);
+        });
+
+        const monthTypeData = Array.from(monthTypeCounts.entries())
+            .map(([name, value]) => ({ name, value }))
+            .sort((a, b) => b.value - a.value);
+
+        const habits = Array.from(habitCounts.entries())
+            .sort((a, b) => b[1].count - a[1].count)
+            .slice(0, 12)
+            .map(([, meta]) => ({ name: meta.name, type: meta.type }));
+
+        const dayCompletion = daysInMonth.map(day => {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            const daySchedule = schedule[dateKey] || {};
+            const allSlots = Object.values(daySchedule) as Activity[][];
+            const activities = allSlots.flat();
+            const habitSet = new Map<string, Activity[]>();
+            activities.forEach(activity => {
+                const key = getHabitKey(activity);
+                if (!key) return;
+                const bucket = habitSet.get(key) || [];
+                bucket.push(activity);
+                habitSet.set(key, bucket);
+            });
+
+            let total = 0;
+            let completed = 0;
+            habits.forEach(habit => {
+                const habitKey = `${habit.type}::${habit.name}`;
+                const acts = habitSet.get(habitKey);
+                if (!acts) return;
+                total += 1;
+                if (acts.some(act => {
+                    const effectiveType = act.type === 'pomodoro' && act.linkedActivityType ? act.linkedActivityType : act.type;
+                    return effectiveType === habit.type && act.completed;
+                })) completed += 1;
+            });
+
+            const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+            return { date: day, percent, completed, total };
+        });
+
+        const overallTotal = dayCompletion.reduce((sum, day) => sum + day.total, 0);
+        const overallCompleted = dayCompletion.reduce((sum, day) => sum + day.completed, 0);
+        const overallPercent = overallTotal === 0 ? 0 : Math.round((overallCompleted / overallTotal) * 100);
+
+        const maxBar = Math.max(1, ...dayCompletion.map(day => day.percent));
+
+        return (
+            <div className="grid gap-6 w-full">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div />
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" size="icon" onClick={() => handleDashboardMonthChange(-1)}>
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <div className="px-3 py-2 rounded-md border border-muted/50 bg-muted/30 text-sm font-semibold">
+                            {format(dashboardMonth, 'MMMM yyyy')}
+                        </div>
+                        <Button variant="outline" size="icon" onClick={() => handleDashboardMonthChange(1)}>
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="grid gap-4 xl:grid-cols-3 w-full">
+                    <div className="rounded-xl border border-muted/50 bg-card/60 p-4">
+                        <h3 className="font-semibold">Progress</h3>
+                        <div className="mt-4 flex items-center gap-4">
+                            <div className="h-24 w-24 rounded-full border-4 border-emerald-400/30 flex items-center justify-center text-xl font-bold text-emerald-300">
+                                {overallPercent}%
+                            </div>
+                            <div className="space-y-1 text-sm text-muted-foreground">
+                                <p>Total completed: <span className="text-foreground font-semibold">{overallCompleted}</span></p>
+                                <p>Total scheduled: <span className="text-foreground font-semibold">{overallTotal}</span></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-muted/50 bg-card/60 p-4">
+                        <h3 className="font-semibold">Top Habits</h3>
+                        <div className="mt-3 space-y-2 text-sm">
+                            {habits.length === 0 && (
+                                <p className="text-muted-foreground">No habits found this month.</p>
+                            )}
+                            {habits.map(habit => (
+                                <div key={habit.name} className="flex items-center gap-2">
+                                    <span className="text-muted-foreground">{activityTypeIcons[habit.type] || <CheckCircle className="h-4 w-4" />}</span>
+                                    <span className="truncate">{habit.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border border-muted/50 bg-card/60 p-4 overflow-hidden">
+                        <h3 className="font-semibold">Month Breakdown</h3>
+                        <p className="text-xs text-muted-foreground">By activity category</p>
+                        <div className="mt-2 h-40 flex items-center justify-center">
+                            <ChartContainer config={{}} className="h-full w-full">
+                                <ResponsiveContainer>
+                                    <RechartsPieChart>
+                                        <ChartTooltip content={<ChartTooltipContent />} />
+                                        <Pie data={monthTypeData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius="55%" outerRadius="80%" stroke="hsl(var(--background))" strokeWidth={2}>
+                                            {monthTypeData.map((entry) => (
+                                                <Cell key={`month-type-${entry.name}`} fill={activityColorMapping[entry.name] || '#8884d8'} />
+                                            ))}
+                                        </Pie>
+                                    </RechartsPieChart>
+                                </ResponsiveContainer>
+                            </ChartContainer>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="overflow-auto border border-muted/50 rounded-xl bg-card/50 w-full">
+                    <div className="min-w-full">
+                        <div
+                            className="grid gap-0 text-xs"
+                            style={{ gridTemplateColumns: `260px repeat(${daysInMonth.length}, minmax(16px, 1fr))` }}
+                        >
+                            <div className="h-8 px-2 flex items-center text-xs text-muted-foreground border-b border-muted/30">Day %</div>
+                            <div className="relative border-b border-muted/30" style={{ gridColumn: `2 / span ${daysInMonth.length}` }}>
+                                <div className="grid" style={{ gridTemplateColumns: `repeat(${daysInMonth.length}, minmax(0, 1fr))` }}>
+                                    {dayCompletion.map((day) => (
+                                        <div key={`bar-${day.date.toISOString()}`} className="p-2">
+                                            <div className="h-28 flex items-end">
+                                                <div
+                                                    className="w-full rounded-md border border-emerald-200/70 bg-emerald-400/20"
+                                                    style={{ height: `${(day.percent / maxBar) * 100}%` }}
+                                                    title={`${format(day.date, 'MMM d')}: ${day.percent}%`}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 80" preserveAspectRatio="none">
+                                    <path
+                                        d={(() => {
+                                            if (dayCompletion.length === 0) return "";
+                                            const points = dayCompletion.map((day, index) => {
+                                                const x = (index / Math.max(1, dayCompletion.length - 1)) * 100;
+                                                const y = 80 - (day.percent / maxBar) * 68 - 4;
+                                                return { x, y };
+                                            });
+                                            let d = `M ${points[0].x} ${points[0].y}`;
+                                            for (let i = 1; i < points.length; i++) {
+                                                const prev = points[i - 1];
+                                                const curr = points[i];
+                                                const cp1x = prev.x + (curr.x - prev.x) / 2;
+                                                const cp1y = prev.y;
+                                                const cp2x = prev.x + (curr.x - prev.x) / 2;
+                                                const cp2y = curr.y;
+                                                d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`;
+                                            }
+                                            return d;
+                                        })()}
+                                        fill="none"
+                                        stroke="rgba(226,232,240,0.9)"
+                                        strokeWidth="1.6"
+                                    />
+                                </svg>
+                            </div>
+                            <div className="h-8 px-2 flex items-center font-semibold text-muted-foreground border-b border-muted/30">Daily Habits</div>
+                            {daysInMonth.map((day) => (
+                                <div key={day.toISOString()} className="h-8 flex items-center justify-center font-semibold text-muted-foreground border-b border-muted/30">
+                                    {format(day, 'd')}
+                                </div>
+                            ))}
+                            {habits.map((habit) => (
+                                <React.Fragment key={habit.name}>
+                                    <div className="h-8 px-2 border-b border-muted/20 text-sm truncate flex items-center" title={habit.name}>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className="text-muted-foreground">{activityTypeIcons[habit.type] || <CheckCircle className="h-4 w-4" />}</span>
+                                            <span className="truncate">{habit.name}</span>
+                                        </div>
+                                    </div>
+                                    {daysInMonth.map((day) => {
+                                        const dateKey = format(day, 'yyyy-MM-dd');
+                                        const daySchedule = schedule[dateKey] || {};
+                                        const allSlots = Object.values(daySchedule) as Activity[][];
+                                        const activities = allSlots.flat();
+                                        const habitKey = `${habit.type}::${habit.name}`;
+                                        const matches = activities.filter(act => getHabitKey(act) === habitKey);
+                                        const completed = matches.some(act => act.completed);
+                                        const hasHabit = matches.length > 0;
+                                        return (
+                                            <div key={`${habit.name}-${dateKey}`} className="h-8 flex items-center justify-center border-b border-muted/20">
+                                                <div className={cn(
+                                                    "h-4 w-4 mx-auto rounded-sm border border-muted-foreground/30",
+                                                    hasHabit && !completed && "bg-muted/40",
+                                                    completed && "bg-emerald-400/80 border-emerald-400"
+                                                )} />
+                                            </div>
+                                        );
+                                    })}
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
+    }, [dashboardMonth, schedule]);
+
+    const timesheetBody = (
+        <>
+            <div className="flex flex-wrap items-center gap-4 flex-shrink-0">
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="icon" onClick={handlePrev}><ChevronLeft className="h-4 w-4" /></Button>
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant={"outline"} className="w-auto sm:w-[240px] justify-start text-left font-normal">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {format(selectedDate, 'PPP')}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={selectedDate} onSelect={(d) => d && setSelectedDate(d)} initialFocus />
+                        </PopoverContent>
+                    </Popover>
+                    <Button variant="outline" size="icon" onClick={handleNext}><ChevronRight className="h-4 w-4" /></Button>
+                </div>
+                <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)} className="w-auto">
+                    <TabsList>
+                        <TabsTrigger value="day">Day</TabsTrigger>
+                        <TabsTrigger value="week">Week</TabsTrigger>
+                        <TabsTrigger value="month">Month</TabsTrigger>
+                    </TabsList>
+                </Tabs>
+                <div className="flex items-center gap-2">
+                     <Filter className="h-4 w-4 text-muted-foreground"/>
+                     <Select value={activityFilter} onValueChange={(v) => setActivityFilter(v as ActivityFilter)}>
+                        <SelectTrigger className="w-auto sm:w-[200px]">
+                            <SelectValue placeholder="Filter activities..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Activities</SelectItem>
+                            <SelectItem value="deepwork">Deep Work Only</SelectItem>
+                            <SelectItem value="upskill">Upskill Only</SelectItem>
+                            <SelectItem value="deepwork_upskill">Deep Work + Upskill</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+            <div className={cn(isModal && "flex-grow min-h-0")}>
+                <ScrollArea className={cn(isModal && "h-full")}>
+                    {viewMode === 'day' && renderDayView()}
+                    {viewMode === 'week' && renderWeekView()}
+                    {viewMode === 'month' && renderMonthView()}
+                </ScrollArea>
+            </div>
+        </>
+    );
+
     return (
         <div className={cn("container mx-auto", isModal ? "p-0 h-full flex flex-col bg-transparent" : "p-4 sm:p-6 lg:p-8")}>
             <Card className={cn(isModal && "border-0 shadow-none flex-grow flex flex-col min-h-0 bg-transparent")}>
@@ -647,51 +963,24 @@ export function TimesheetPageContent({ isModal = false }: TimesheetPageContentPr
                     </CardHeader>
                 )}
                 <CardContent className={cn("space-y-6", isModal ? "p-4 flex-grow min-h-0 flex flex-col" : "")}>
-                    <div className="flex flex-wrap items-center gap-4 flex-shrink-0">
-                        <div className="flex items-center gap-2">
-                            <Button variant="outline" size="icon" onClick={handlePrev}><ChevronLeft className="h-4 w-4" /></Button>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant={"outline"} className="w-auto sm:w-[240px] justify-start text-left font-normal">
-                                        <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {format(selectedDate, 'PPP')}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0">
-                                    <Calendar mode="single" selected={selectedDate} onSelect={(d) => d && setSelectedDate(d)} initialFocus />
-                                </PopoverContent>
-                            </Popover>
-                            <Button variant="outline" size="icon" onClick={handleNext}><ChevronRight className="h-4 w-4" /></Button>
-                        </div>
-                        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)} className="w-auto">
-                            <TabsList>
-                                <TabsTrigger value="day">Day</TabsTrigger>
-                                <TabsTrigger value="week">Week</TabsTrigger>
-                                <TabsTrigger value="month">Month</TabsTrigger>
+                    {isModal ? (
+                        <Tabs value={modalTab} onValueChange={(v) => setModalTab(v as 'timesheet' | 'habit-dashboard')} className="flex flex-col flex-grow min-h-0">
+                            <TabsList className="self-start">
+                                <TabsTrigger value="timesheet">Timesheet</TabsTrigger>
+                                <TabsTrigger value="habit-dashboard">Habit Dashboard</TabsTrigger>
                             </TabsList>
+                            <TabsContent value="timesheet" className="flex flex-col flex-grow min-h-0">
+                                {timesheetBody}
+                            </TabsContent>
+                            <TabsContent value="habit-dashboard" className="flex-grow min-h-0 w-full">
+                                <ScrollArea className="h-full w-full">
+                                    {habitDashboard}
+                                </ScrollArea>
+                            </TabsContent>
                         </Tabs>
-                        <div className="flex items-center gap-2">
-                             <Filter className="h-4 w-4 text-muted-foreground"/>
-                             <Select value={activityFilter} onValueChange={(v) => setActivityFilter(v as ActivityFilter)}>
-                                <SelectTrigger className="w-auto sm:w-[200px]">
-                                    <SelectValue placeholder="Filter activities..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Activities</SelectItem>
-                                    <SelectItem value="deepwork">Deep Work Only</SelectItem>
-                                    <SelectItem value="upskill">Upskill Only</SelectItem>
-                                    <SelectItem value="deepwork_upskill">Deep Work + Upskill</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-                    <div className={cn(isModal && "flex-grow min-h-0")}>
-                        <ScrollArea className={cn(isModal && "h-full")}>
-                            {viewMode === 'day' && renderDayView()}
-                            {viewMode === 'week' && renderWeekView()}
-                            {viewMode === 'month' && renderMonthView()}
-                        </ScrollArea>
-                    </div>
+                    ) : (
+                        timesheetBody
+                    )}
                 </CardContent>
             </Card>
             

@@ -13,6 +13,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import type { Resource, ResourcePoint } from '@/types/workout';
 import { useDraggable } from '@dnd-kit/core';
 import dynamic from 'next/dynamic';
+import { loadExcalidrawFiles, saveExcalidrawFiles, type ExcalidrawFilesMetaMap } from '@/lib/excalidrawFileStore';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -94,6 +95,7 @@ const ExcalidrawWrapper = ({
   onPointerDown,
   onKeyDown,
   onLinkOpen,
+  files,
 }: {
   activeCanvas: { id: string; data?: string };
   theme: string;
@@ -105,6 +107,7 @@ const ExcalidrawWrapper = ({
   ) => void;
   onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   onLinkOpen: OnLinkOpen;
+  files: Record<string, any>;
 }) => {
   // Robustly parse data and provide a safe fallback on every render.
   const initialData = useMemo(() => {
@@ -113,15 +116,15 @@ const ExcalidrawWrapper = ({
         const parsedData = JSON.parse(activeCanvas.data);
         // Ensure the parsed data has a valid elements array.
         if (Array.isArray(parsedData.elements)) {
-          return { elements: parsedData.elements };
+          return { elements: parsedData.elements, appState: parsedData.appState, files };
         }
       }
     } catch (e) {
       console.error("Failed to parse canvas data, defaulting to empty.", e);
     }
     // Fallback to a safe default if data is missing, malformed, or doesn't have the elements array.
-    return { elements: [] };
-  }, [activeCanvas.id, activeCanvas.data]);
+    return { elements: [], files };
+  }, [activeCanvas.id, activeCanvas.data, files]);
 
   return (
     <div style={{ height: "100%", width: "100%" }}>
@@ -164,6 +167,8 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const isUserChange = useRef(false);
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [loadedFiles, setLoadedFiles] = useState<Record<string, any>>({});
+  const [loadedFilesCanvasId, setLoadedFilesCanvasId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -207,14 +212,67 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     isUserChange.current = false;
     setIsDirty(false);
   }, [drawingCanvasState?.activeCanvasId]);
+
+  useEffect(() => {
+    const loadFiles = async () => {
+      if (!activeCanvas?.id) {
+        setLoadedFiles({});
+        setLoadedFilesCanvasId(null);
+        return;
+      }
+
+      let filesMeta: ExcalidrawFilesMetaMap | undefined;
+      if (activeCanvas.data) {
+        try {
+          const parsed = JSON.parse(activeCanvas.data);
+          filesMeta = parsed.files;
+        } catch (e) {
+          console.error("Failed to parse canvas file metadata:", e);
+        }
+      }
+
+      if (!filesMeta || Object.keys(filesMeta).length === 0) {
+        setLoadedFiles({});
+        setLoadedFilesCanvasId(activeCanvas.id);
+        return;
+      }
+
+      try {
+        const files = await loadExcalidrawFiles(activeCanvas.id, filesMeta);
+        setLoadedFiles(files);
+        setLoadedFilesCanvasId(activeCanvas.id);
+      } catch (e) {
+        console.error("Failed to load Excalidraw files from IndexedDB:", e);
+        setLoadedFiles({});
+        setLoadedFilesCanvasId(activeCanvas.id);
+      }
+    };
+
+    loadFiles();
+  }, [activeCanvas?.id, activeCanvas?.data]);
+
+  useEffect(() => {
+    if (!excalidrawAPIRef.current) return;
+    if (!activeCanvas?.id || loadedFilesCanvasId !== activeCanvas.id) return;
+    if (!loadedFiles || Object.keys(loadedFiles).length === 0) return;
+
+    const api = excalidrawAPIRef.current;
+    if (typeof api.addFiles === 'function') {
+      api.addFiles(Object.values(loadedFiles));
+    } else if (typeof api.updateScene === 'function') {
+      api.updateScene({ files: loadedFiles });
+    }
+  }, [loadedFiles, loadedFilesCanvasId, activeCanvas?.id]);
   
-  const handleSaveClick = useCallback(() => {
+  const handleSaveClick = useCallback(async () => {
     if (!excalidrawAPIRef.current || !drawingCanvasState?.activeCanvasId) {
         return;
     }
   
     const elements = excalidrawAPIRef.current.getSceneElements();
     const appState = excalidrawAPIRef.current.getAppState();
+    const files = typeof excalidrawAPIRef.current.getFiles === 'function' ? excalidrawAPIRef.current.getFiles() : {};
+    const filesMeta = await saveExcalidrawFiles(drawingCanvasState.activeCanvasId, files);
     const drawingData = JSON.stringify({
         type: "excalidraw",
         version: 2,
@@ -223,7 +281,8 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         appState: {
             viewBackgroundColor: appState.viewBackgroundColor,
             gridSize: appState.gridSize,
-        }
+        },
+        files: filesMeta,
     });
   
     updateDrawingData(drawingCanvasState.activeCanvasId, drawingData, () => {
@@ -248,13 +307,13 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
     if ((event.metaKey || event.ctrlKey) && event.key === 's') {
         event.preventDefault();
-        handleSaveClick();
+            void handleSaveClick();
     }
   }, [handleSaveClick]);
 
   const handleTabClick = (canvasId: string) => {
     if (isDirty) {
-      handleSaveClick();
+      void handleSaveClick();
     }
     setDrawingCanvasState(prev => prev ? { ...prev, activeCanvasId: canvasId } : null);
   };
@@ -262,7 +321,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const handleCloseTab = (e: React.MouseEvent, canvasId: string) => {
     e.stopPropagation();
     if (isDirty) {
-      handleSaveClick();
+      void handleSaveClick();
     }
     setDrawingCanvasState(prev => {
         if (!prev) return null;
@@ -366,7 +425,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     }
     api.updateScene({ elements: [...existingElements, newElement] });
     api.history.clear(); // To prevent undoing the add
-    handleSaveClick(); // Save immediately after adding
+    void handleSaveClick(); // Save immediately after adding
     setIsLinkingSearchOpen(false);
   };
   
@@ -426,6 +485,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       onPointerDown={handlePointerDown}
                       onKeyDown={handleKeyDown}
                       onLinkOpen={onLinkOpen}
+                      files={loadedFilesCanvasId === activeCanvas.id ? loadedFiles : {}}
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">Select a canvas to start drawing.</div>

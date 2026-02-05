@@ -59,7 +59,7 @@ const SLOT_NAMES: SlotName[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'E
 
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
-  const { currentUser, theme, setTheme, settings, setSettings, habitCards, schedule, setSchedule, recalculateAndFixTaskTypes, clearAllLocalFiles } = useAuth();
+  const { currentUser, theme, setTheme, settings, setSettings, habitCards, schedule, setSchedule, recalculateAndFixTaskTypes, clearAllLocalFiles, syncCanvasImagesToGitHub, fetchCanvasImagesFromGitHub } = useAuth();
   const { toast } = useToast();
 
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
@@ -447,7 +447,11 @@ ${JSON.stringify(finalTemplate, null, 2)}
                             <Label htmlFor="github-path">File Path in Repo</Label>
                             <Input id="github-path" placeholder="e.g., backup.json" value={localSettings.githubPath || ''} onChange={(e) => handleLocalSettingChange('githubPath', e.target.value)} />
                           </div>
-                          <Button onClick={handleGithubSettingsSave}>Save GitHub Settings</Button>
+                          <div className="flex flex-wrap gap-2">
+                            <Button onClick={handleGithubSettingsSave}>Save GitHub Settings</Button>
+                            <Button variant="secondary" onClick={syncCanvasImagesToGitHub}>Upload Canvas Images</Button>
+                            <Button variant="outline" onClick={fetchCanvasImagesFromGitHub}>Fetch Canvas Images</Button>
+                          </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>

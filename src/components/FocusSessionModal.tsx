@@ -19,6 +19,7 @@ import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, 
 import type { Activity, HabitEquation, Resource, ActivityType, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, WorkoutExercise } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface FocusSessionModalProps {
   isOpen: boolean;
@@ -200,14 +201,15 @@ export function FocusSessionModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="lg:max-w-3xl">
+      <DialogContent className="lg:max-w-3xl max-h-[85dvh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Start Focus Session</DialogTitle>
           <DialogDescription>
             Configure your Pomodoro-style focus session for '{activity.details}'.
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4 pt-4">
+        <ScrollArea className="flex-grow min-h-0">
+          <div className="space-y-4 pt-4 pr-2">
             <div className="flex items-center justify-center space-x-4">
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => handleDurationChange(-5)}><Minus /></Button>
                 <div className="text-6xl font-bold w-24 text-center">{duration}</div>
@@ -311,7 +313,8 @@ export function FocusSessionModal({
                 <Checkbox id="skip-breaks-modal" checked={skipBreaks} onCheckedChange={(checked) => setSkipBreaks(!!checked)} />
                 <Label htmlFor="skip-breaks-modal">Skip breaks</Label>
             </div>
-        </div>
+          </div>
+        </ScrollArea>
         <DialogFooter className="grid grid-cols-3 gap-2">
             <Button variant="outline" className="w-full" onClick={handleLogDurationClick}>
                 <Save className="mr-2 h-4 w-4" /> Log & Complete

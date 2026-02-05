@@ -775,6 +775,7 @@ export interface UserSettings {
   githubRepo?: string;
   githubPath?: string;
   lastSync?: { sha: string, timestamp: number };
+  githubModuleHashes?: Record<string, string>;
   pinnedCanvasIds?: string[];
 }
 

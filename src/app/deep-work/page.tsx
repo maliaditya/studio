@@ -1554,7 +1554,7 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
   }, [deepWorkDefinitions, upskillDefinitions]);
   
   const wrapperClass = isModal 
-    ? "p-4"
+    ? "p-4 h-full overflow-auto"
     : "container mx-auto p-4 sm:p-6 lg:p-8";
 
   const mainPanelHeader = isModal 

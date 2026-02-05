@@ -29,6 +29,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { MindMapViewer } from '@/components/MindMapViewer';
 import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
@@ -1038,16 +1039,18 @@ function SkillPageContent() {
 
   return (
     <DndContext onDragEnd={handleDragEnd}>
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-        <aside className="lg:col-span-1 space-y-6">
-          <Card>
+    <div className="container mx-auto p-4 sm:p-6 lg:p-8 h-[calc(100vh-4rem)] min-h-0 overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start h-full min-h-0 overflow-hidden">
+        <aside className="lg:col-span-1 space-y-6 min-h-0 h-full">
+          <Card className="h-full flex flex-col min-h-0 overflow-hidden">
             <CardHeader>
               <CardTitle>Skill & Experience Library</CardTitle>
               <CardDescription>Define domains, skills, projects, and work history.</CardDescription>
             </CardHeader>
-            <CardContent>
-              <Accordion type="multiple" className="w-full" value={expandedItems} onValueChange={handleExpansionChange}>
+            <CardContent className="flex-1 min-h-0 p-0 overflow-hidden">
+              <ScrollArea className="h-full w-full">
+                <div className="p-6">
+                  <Accordion type="multiple" className="w-full" value={expandedItems} onValueChange={handleExpansionChange}>
                 <AccordionItem value="skills-domains">
                   <AccordionTrigger>Skills & Projects</AccordionTrigger>
                   <AccordionContent>
@@ -1184,18 +1187,22 @@ function SkillPageContent() {
                         </div>
                     </AccordionContent>
                 </AccordionItem>
-              </Accordion>
+                  </Accordion>
+                </div>
+              </ScrollArea>
             </CardContent>
           </Card>
         </aside>
         
-        <main className="lg:col-span-2">
-          <Card>
+        <main className="lg:col-span-2 min-h-0 h-full">
+          <Card className="h-full flex flex-col min-h-0 overflow-hidden">
             <CardHeader>
               <CardTitle>{selectedCoreSkill ? selectedCoreSkill.name : selectedProject ? selectedProject.name : selectedCompanyId ? companies.find(c => c.id === selectedCompanyId)?.name : 'Details'}</CardTitle>
               <CardDescription>{selectedCoreSkill ? `Viewing skill areas for "${selectedCoreSkill.name}"` : selectedProject ? `Viewing linked tasks for "${selectedProject.name}"` : selectedCompanyId ? `Viewing positions for "${companies.find(c => c.id === selectedCompanyId)?.name}"` : 'Select an item from the library.'}</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 min-h-0 p-0 overflow-hidden">
+              <ScrollArea className="h-full w-full">
+                <div className="p-6">
               {selectedProject ? (
                   <div className="space-y-4">
                       {Array.from(linkedTasksByCoreSkill.entries()).map(([coreSkillName, data]) => (
@@ -1456,6 +1463,8 @@ function SkillPageContent() {
               ) : (
                 <div className="text-center py-10 text-muted-foreground">Select an item to see its breakdown.</div>
               )}
+                </div>
+              </ScrollArea>
             </CardContent>
           </Card>
         </main>

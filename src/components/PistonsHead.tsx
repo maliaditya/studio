@@ -210,8 +210,8 @@ const QuickAccessView = () => {
             <ScrollArea className="h-80">
                 <ul className="space-y-2 pr-2">
                     {quickAccessCards.map(card => (
-                        <li key={card.id} className="p-2 rounded-md border bg-muted/30 hover:bg-muted/50 transition-colors group">
-                           <div className="flex items-center justify-between">
+                        <li key={card.id} className="p-2 rounded-md border bg-muted/30 hover:bg-muted/50 transition-colors group overflow-hidden">
+                           <div className="flex items-center justify-between min-w-0 gap-2">
                                 {editingCardId === card.id ? (
                                     <Input
                                         value={editingName}
@@ -222,16 +222,17 @@ const QuickAccessView = () => {
                                         className="h-8 text-sm"
                                     />
                                 ) : (
-                                    <button className="text-sm font-medium w-full text-left truncate" onClick={(e) => openGeneralPopup(card.id, e)}>
+                                    <button
+                                        className="text-sm font-medium text-left flex-1 min-w-0 max-w-[260px] overflow-hidden text-ellipsis whitespace-nowrap"
+                                        title={card.name}
+                                        onClick={(e) => openGeneralPopup(card.id, e)}
+                                    >
                                         {card.name}
                                     </button>
                                 )}
-                                <div className="flex items-center">
+                                <div className="flex items-center flex-shrink-0">
                                     <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleFavorite(card.id)}>
                                         <Star className={cn("h-4 w-4", card.isFavorite ? "text-yellow-400 fill-current" : "text-muted-foreground")} />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100" onClick={() => setEditingCardId(card.id)}>
-                                        <Edit className="h-4 w-4" />
                                     </Button>
                                 </div>
                            </div>

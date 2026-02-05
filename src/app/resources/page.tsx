@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks, Zap, Search, View, File as FileIcon } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks, Zap, Search, View, File as FileIcon, Paintbrush } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint, PopupState } from '@/types/workout';
@@ -608,6 +608,8 @@ function ResourcesPageContent() {
   
   const [newlyCreatedFolderId, setNewlyCreatedFolderId] = useState<string | null>(null);
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+  const defaultCollapseAppliedRef = useRef(false);
+  const collapseStateSourceRef = useRef<'saved' | 'default' | null>(null);
   
   const [editingResource, setEditingResource] = useState<Resource | null>(null);
   
@@ -825,16 +827,22 @@ function ResourcesPageContent() {
     if (savedCollapsed) {
         try {
             setCollapsedFolders(new Set(JSON.parse(savedCollapsed)));
+            collapseStateSourceRef.current = 'saved';
         } catch (e) {
             console.error("Failed to parse collapsed folders state from localStorage", e);
-             // Default to not collapsing any if parsing fails
-             setCollapsedFolders(new Set());
+            collapseStateSourceRef.current = 'default';
         }
     } else {
-        // If nothing is saved, default to not collapsing any folders
-        setCollapsedFolders(new Set());
+        collapseStateSourceRef.current = 'default';
     }
   }, []);
+
+  useEffect(() => {
+    if (collapseStateSourceRef.current !== 'default' || defaultCollapseAppliedRef.current) return;
+    if (!resourceFolders || resourceFolders.length === 0) return;
+    setCollapsedFolders(new Set(resourceFolders.map(folder => folder.id)));
+    defaultCollapseAppliedRef.current = true;
+  }, [resourceFolders]);
 
   useEffect(() => {
     // Save collapsed state to localStorage
@@ -1129,34 +1137,44 @@ function ResourcesPageContent() {
 }, [resources, selectedResourceFolderId, searchTerm]);
 
   return (
-    <div className="grid h-full grid-cols-1 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-4 gap-4 p-4">
+    <div className="h-[calc(100vh-4rem)] overflow-hidden">
+    <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-4 gap-4 p-4">
       <input type="file" ref={pdfUploadInputRef} onChange={handlePdfUpload} accept=".pdf" className="hidden" />
       <DndContext
         sensors={sensors}
         onDragStart={(e) => setActiveId(e.active.id.toString())}
         onDragEnd={handleDragEnd}
       >
-        <div className="md:col-span-1 h-full">
-            <Card className="h-full flex flex-col">
+        <div className="md:col-span-1 h-full min-h-0">
+            <Card className="h-full min-h-0 flex flex-col">
                 <CardHeader>
                     <div className="flex justify-between items-center">
                         <CardTitle>Folders</CardTitle>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
-                                    <PlusCircle className="h-4 w-4" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-60">
-                                <form onSubmit={(e) => { e.preventDefault(); handleAddFolder(); }} className="flex gap-2">
-                                <Input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="New folder name..." />
-                                <Button type="submit">Add</Button>
-                                </form>
-                            </PopoverContent>
-                        </Popover>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setCollapsedFolders(new Set(resourceFolders.map(folder => folder.id)))}
+                            >
+                                Collapse All
+                            </Button>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <PlusCircle className="h-4 w-4" />
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-60">
+                                    <form onSubmit={(e) => { e.preventDefault(); handleAddFolder(); }} className="flex gap-2">
+                                    <Input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="New folder name..." />
+                                    <Button type="submit">Add</Button>
+                                    </form>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
                     </div>
                 </CardHeader>
-                <CardContent className="flex-grow p-2">
+                <CardContent className="flex-grow min-h-0 p-2 overflow-hidden">
                     <ScrollArea className="h-full">
                         <FolderTreeView
                             folders={rootFolders}
@@ -1181,8 +1199,8 @@ function ResourcesPageContent() {
                 </CardContent>
             </Card>
         </div>
-        <div className="h-full md:col-span-3 lg:col-span-4 xl:col-span-3">
-            <Card className="h-full flex flex-col">
+        <div className="h-full min-h-0 md:col-span-3 lg:col-span-4 xl:col-span-3">
+            <Card className="h-full min-h-0 flex flex-col">
                 <CardHeader>
                     <div className="flex flex-col sm:flex-row gap-2 sm:justify-between sm:items-center">
                          <div className="relative flex-grow">
@@ -1226,14 +1244,14 @@ function ResourcesPageContent() {
                         </div>
                     )}
                 </CardHeader>
-                <CardContent className="p-4 flex-grow">
+                <CardContent className="p-4 flex-grow min-h-0 overflow-hidden">
                     <h2 className="text-2xl font-bold mb-4">
                         {selectedResourceFolderId && !searchTerm && resourceFolders?.find(f => f.id === selectedResourceFolderId)?.name
                         ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
                         : searchTerm ? `Search results for "${searchTerm}"` : 'Select a folder'}
                     </h2>
                     
-                    <ScrollArea className="h-[calc(100vh-20rem)] pr-4">
+                    <ScrollArea className="h-full pr-4">
                         {filteredResources.length > 0 ? (
                             <SortableContext items={filteredResources.map(r => r.id)}>
                             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -1243,6 +1261,21 @@ function ResourcesPageContent() {
                                         <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => setDeleteConfirmation({item: res})} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)} />
                                     ) : res.type === 'mechanism' ? (
                                         <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => setDeleteConfirmation({item: res})} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)} />
+                                    ) : res.type === 'card' ? (
+                                        <ResourceCardComponent
+                                            resource={res}
+                                            onUpdate={handleUpdateResource}
+                                            onDelete={() => setDeleteConfirmation({ item: res })}
+                                            onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)}
+                                            onOpenMarkdownModal={handleOpenMarkdownModal}
+                                            playingAudio={playingAudio}
+                                            setPlayingAudio={setPlayingAudio}
+                                            onLinkClick={handleLinkClick}
+                                            linkingFromId={linkingFromId}
+                                            onEditLinkText={handleEditLinkText}
+                                            onConvertToCard={onConvertToCard}
+                                            onOpenPdfViewer={openPdfViewer}
+                                        />
                                     ) : (
                                         <ResourceCard
                                             resource={res}
@@ -1443,6 +1476,7 @@ function ResourcesPageContent() {
             </DialogContent>
         </Dialog>
 
+    </div>
     </div>
   );
 }

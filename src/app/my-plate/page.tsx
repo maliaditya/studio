@@ -668,7 +668,7 @@ function MyPlatePageContent() {
                 </DialogContent>
             </Dialog>
             <Dialog open={isTimesheetModalOpen} onOpenChange={setIsTimesheetModalOpen}>
-                <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+                <DialogContent className="max-w-[98vw] w-[98vw] h-[90vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
                         <DialogTitle>Timesheet</DialogTitle>
                     </DialogHeader>

@@ -226,7 +226,7 @@ export function TodaysScheduleCard({
   onOpenHabitPopup,
   currentSlot,
 }: TodaysScheduleCardProps) {
-  const { toast } = useAuth();
+  const { toast } = useToast();
   const { 
     currentUser,
     settings,

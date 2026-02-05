@@ -223,6 +223,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
             onWeekChange(newWeek);
         }
     };
+
     
     const weekDates = React.useMemo(() => {
         return Array.from({ length: 7 }).map((_, i) => addDays(currentWeek, i));
@@ -373,6 +374,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
         </div>
       </DragDropContext>
     );
+
 
     if (isModal) {
         return (
