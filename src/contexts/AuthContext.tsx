@@ -96,6 +96,7 @@ interface AuthContextType {
   setDrawingCanvasState: React.Dispatch<React.SetStateAction<DrawingCanvasPopupState | null>>;
   openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => void;
   openDrawingCanvasFromHeader: () => void;
+  openCanvasResourceCard: () => void;
   handleDrawingCanvasPopupDragEnd: (event: DragEndEvent) => void;
   togglePinDrawing: (canvasId: string) => void;
   updateDrawingData: (canvasId: string, data: string, onSaveComplete: () => void) => void;
@@ -866,6 +867,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         initialDrawing: scratchpadPoint.drawing,
     });
   }, [resources, resourceFolders, setResources, setResourceFolders, openDrawingCanvas]);
+
+  const openCanvasResourceCard = useCallback(() => {
+    let updatedFolders = [...resourceFolders];
+    let updatedResources = [...resources];
+    let shouldUpdate = false;
+
+    let scratchpadFolder = updatedFolders.find(f => f.name === 'Scratchpad' && !f.parentId);
+    if (!scratchpadFolder) {
+      scratchpadFolder = {
+        id: `folder_scratchpad_${Date.now()}`,
+        name: 'Scratchpad',
+        parentId: null,
+        icon: 'Paintbrush'
+      };
+      updatedFolders.push(scratchpadFolder);
+      shouldUpdate = true;
+    }
+
+    let canvasResource = updatedResources.find(r => r.type === 'card' && r.name === 'Canvas');
+    if (!canvasResource) {
+      canvasResource = {
+        id: `res_canvas_${Date.now()}`,
+        name: 'Canvas',
+        folderId: scratchpadFolder.id,
+        type: 'card',
+        createdAt: new Date().toISOString(),
+        points: [
+          { id: `point_canvas_${Date.now()}`, text: 'Canvas', type: 'paint' }
+        ],
+      };
+      updatedResources.push(canvasResource);
+      shouldUpdate = true;
+    }
+
+    if (shouldUpdate) {
+      setResourceFolders(updatedFolders);
+      setResources(updatedResources);
+    }
+
+    setGeneralPopups(prev => {
+      const newPopups = new Map(prev);
+      const hasMarkdown = (canvasResource?.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+      const popupWidth = hasMarkdown ? 1280 : 768;
+      const x = (window.innerWidth - popupWidth) / 2;
+      const y = (window.innerHeight - 600) / 2;
+
+      newPopups.set(canvasResource!.id, {
+        resourceId: canvasResource!.id,
+        level: 0,
+        x,
+        y,
+        parentId: undefined,
+        width: popupWidth,
+        z: 80,
+      });
+      return newPopups;
+    });
+  }, [resources, resourceFolders, setResources, setResourceFolders, setGeneralPopups]);
 
   const updateDrawingData = useCallback((canvasId: string, data: string, onSaveComplete: () => void) => {
     setDrawingCanvasState(prev => {
@@ -4783,7 +4842,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     globalVolume, setGlobalVolume,
     playbackRequest, setPlaybackRequest,
     pdfViewerState, setPdfViewerState, openPdfViewer, handlePdfViewerPopupDragEnd,
-    drawingCanvasState, setDrawingCanvasState, openDrawingCanvas, openDrawingCanvasFromHeader, handleDrawingCanvasPopupDragEnd,
+    drawingCanvasState, setDrawingCanvasState, openDrawingCanvas, openDrawingCanvasFromHeader, openCanvasResourceCard, handleDrawingCanvasPopupDragEnd,
     togglePinDrawing, updateDrawingData,
     clearAllLocalFiles,
     isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen,

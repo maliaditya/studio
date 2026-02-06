@@ -3,7 +3,7 @@
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from './ui/button';
-import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush } from 'lucide-react';
+import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ExcalidrawElement, NonDeleted, AppState, PointerDownState, OnLinkOpen } from "@excalidraw/excalidraw";
 import { useAuth } from '@/contexts/AuthContext';
@@ -150,6 +150,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     updateDrawingData, 
     togglePinDrawing, 
     openDrawingCanvas: authOpenDrawingCanvas, 
+    openCanvasResourceCard,
     settings,
     resources,
     setFloatingVideoUrl,
@@ -467,6 +468,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button variant="ghost" size="icon" onClick={openCanvasResourceCard}><Plus className="h-4 w-4"/></Button>
                     <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-4 w-4"/></Button>
                     <Button variant="ghost" size="icon" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-4 w-4"/></Button>
                     <Button variant="ghost" size="icon" onClick={handleSaveClick}>

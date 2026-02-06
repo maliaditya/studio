@@ -4,7 +4,7 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy, ChevronsDown, ChevronsUp, Smartphone } from 'lucide-react';
+import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy, ChevronsDown, ChevronsUp, Smartphone, Plus } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -151,6 +151,7 @@ function DrawingCanvasPageContent() {
         updateDrawingData,
         togglePinDrawing,
         openDrawingCanvas,
+        openCanvasResourceCard,
         settings,
         setSettings,
         resources,
@@ -538,6 +539,7 @@ function DrawingCanvasPageContent() {
                                 <LayoutDashboard className="h-4 w-4" />
                             </Link>
                         </Button>
+                        <Button variant="ghost" size="icon" onClick={openCanvasResourceCard}><Plus className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" onClick={handleCopyLink}><Copy className="h-4 w-4"/></Button>
