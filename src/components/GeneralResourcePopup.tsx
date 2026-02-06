@@ -201,7 +201,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         left: popupState.x,
         width: `${popupState.width || 420}px`,
         willChange: 'transform',
-        zIndex: 65 + (popupState.level || 0),
+        zIndex: popupState.z ?? (65 + (popupState.level || 0)),
     };
 
     if (transform) {

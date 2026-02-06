@@ -920,7 +920,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         y,
         parentId: undefined,
         width: popupWidth,
-        z: 80,
+        z: 140,
       });
       return newPopups;
     });
