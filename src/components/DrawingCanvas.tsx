@@ -437,30 +437,30 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
       <div style={style}>
           <Card className="w-full h-full bg-background text-foreground p-0 flex flex-col shadow-2xl border-2 border-primary/50">
               <CardHeader 
-                  className="p-2 pl-3 flex flex-row items-center justify-between border-b gap-4"
+                  className="p-1 pl-2 flex flex-row items-center justify-between border-b gap-2"
               >
                   <div 
-                    className="flex items-center gap-2 flex-shrink-0"
+                    className="flex items-center gap-1.5 flex-shrink-0"
                   >
-                       <GripVertical className="h-5 w-5 text-muted-foreground/50"/>
+                       <GripVertical className="h-3 w-3 text-muted-foreground/50"/>
                   </div>
                   <div className="flex-grow min-w-0 overflow-x-auto">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                           {(drawingCanvasState.openCanvases || []).map(canvas => (
                               <Button
                                   key={canvas.id}
                                   variant={drawingCanvasState.activeCanvasId === canvas.id ? "secondary" : "ghost"}
                                   size="sm"
-                                  className="h-8 pl-2 pr-1 flex items-center gap-1 flex-shrink-0"
+                                  className="h-5 pl-1 pr-1 flex items-center gap-1 flex-shrink-0 text-[10px]"
                                   onClick={() => handleTabClick(canvas.id)}
                               >
-                                  <span className="truncate max-w-[120px]">{canvas.name}</span>
-                                  <button onClick={(e) => handleTogglePin(e, canvas.id)} className="p-1 rounded hover:bg-muted">
-                                      <Pin className={cn("h-3 w-3", (settings.pinnedCanvasIds || []).includes(canvas.id) ? "text-primary fill-current" : "text-muted-foreground")}/>
+                                  <span className="truncate max-w-[88px]">{canvas.name}</span>
+                                  <button onClick={(e) => handleTogglePin(e, canvas.id)} className="p-0.5 rounded hover:bg-muted">
+                                      <Pin className={cn("h-2 w-2", (settings.pinnedCanvasIds || []).includes(canvas.id) ? "text-primary fill-current" : "text-muted-foreground")}/>
                                   </button>
                                   {!(settings.pinnedCanvasIds || []).includes(canvas.id) && (
-                                      <button onClick={(e) => handleCloseTab(e, canvas.id)} className="p-1 rounded hover:bg-destructive/20">
-                                          <X className="h-3 w-3 text-destructive"/>
+                                      <button onClick={(e) => handleCloseTab(e, canvas.id)} className="p-0.5 rounded hover:bg-destructive/20">
+                                          <X className="h-2 w-2 text-destructive"/>
                                       </button>
                                   )}
                               </Button>
@@ -468,13 +468,13 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button variant="ghost" size="icon" onClick={openCanvasResourceCard}><Plus className="h-4 w-4"/></Button>
-                    <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-4 w-4"/></Button>
-                    <Button variant="ghost" size="icon" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-4 w-4"/></Button>
-                    <Button variant="ghost" size="icon" onClick={handleSaveClick}>
-                        <Save className={cn("h-4 w-4", isDirty ? "text-red-500" : "text-green-500")} />
+                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={openCanvasResourceCard}><Plus className="h-2.5 w-2.5"/></Button>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-2.5 w-2.5"/></Button>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-2.5 w-2.5"/></Button>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleSaveClick}>
+                        <Save className={cn("h-2.5 w-2.5", isDirty ? "text-red-500" : "text-green-500")} />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={onClose}><X className="h-4 w-4"/></Button>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onClose}><X className="h-2.5 w-2.5"/></Button>
                   </div>
               </CardHeader>
               <CardContent className="p-0 flex-grow relative">
