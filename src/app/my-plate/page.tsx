@@ -616,7 +616,7 @@ function MyPlatePageContent() {
                                             onEditDietClick={() => setIsDietPlanModalOpen(true)}
                                             onOpenChartModal={() => setIsWeightChartModalOpen(true)}
                                         />
-                                        <BotheringsCard />
+                                        {!isAgendaDocked && <BotheringsCard />}
                                     </>
                                 )}
                             </div>

@@ -29,7 +29,7 @@ export function BotheringsCard() {
   };
 
   return (
-    <Card className="bg-card/50">
+    <Card className="bg-card/50 h-[420px]">
       <CardHeader className="flex flex-row items-start justify-between">
         <div>
           <CardTitle className="flex items-center gap-2 text-primary">
@@ -39,7 +39,7 @@ export function BotheringsCard() {
           <CardDescription>Active botherings with linked tasks.</CardDescription>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="h-[320px] overflow-hidden">
         {activeBotherings.length === 0 ? (
           <div className="text-center text-sm text-muted-foreground py-4">
             No active botherings.
