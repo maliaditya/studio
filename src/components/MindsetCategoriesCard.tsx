@@ -1450,7 +1450,21 @@ export function MindsetCategoriesCard() {
                                                                         slot: task.slotName || botheringTaskSlot,
                                                                         taskIds: [],
                                                                     };
-                                                                    toggleRoutine(routineActivity, recurrence === 'none' ? null : { type: recurrence }, baseDate);
+                                                                    if (recurrence === 'none') {
+                                                                        toggleRoutine(routineActivity, null, baseDate);
+                                                                        return;
+                                                                    }
+                                                                    if (recurrence === 'custom') {
+                                                                        const interval = Math.max(1, task.repeatInterval || 1);
+                                                                        const unit = task.repeatUnit || 'week';
+                                                                        const days =
+                                                                            unit === 'day' ? interval :
+                                                                            unit === 'week' ? interval * 7 :
+                                                                            interval * 30;
+                                                                        toggleRoutine(routineActivity, { type: 'custom', days }, baseDate);
+                                                                        return;
+                                                                    }
+                                                                    toggleRoutine(routineActivity, { type: recurrence }, baseDate);
                                                                 }}
                                                             >
                                                                 <SelectTrigger className="h-7 w-[120px]">
@@ -1477,6 +1491,23 @@ export function MindsetCategoriesCard() {
                                                                             ...point,
                                                                             tasks: (point.tasks || []).map(t => t.id === task.id ? { ...t, repeatInterval: nextInterval } : t),
                                                                         }));
+                                                                        const activityId = task.activityId || task.id;
+                                                                        const activity = activityId ? scheduleActivityMap.get(activityId)?.activity : null;
+                                                                        const baseDate = task.startDate || task.dateKey || format(new Date(), 'yyyy-MM-dd');
+                                                                        const unit = task.repeatUnit || 'week';
+                                                                        const days =
+                                                                            unit === 'day' ? nextInterval :
+                                                                            unit === 'week' ? nextInterval * 7 :
+                                                                            nextInterval * 30;
+                                                                        const routineActivity: Activity = activity || {
+                                                                            id: activityId || `routine_${Date.now()}`,
+                                                                            type: task.type,
+                                                                            details: task.details,
+                                                                            completed: false,
+                                                                            slot: task.slotName || botheringTaskSlot,
+                                                                            taskIds: [],
+                                                                        };
+                                                                        toggleRoutine(routineActivity, { type: 'custom', days }, baseDate);
                                                                     }}
                                                                     className="h-7 w-[64px]"
                                                                 />
@@ -1488,6 +1519,23 @@ export function MindsetCategoriesCard() {
                                                                             ...point,
                                                                             tasks: (point.tasks || []).map(t => t.id === task.id ? { ...t, repeatUnit: nextUnit } : t),
                                                                         }));
+                                                                        const activityId = task.activityId || task.id;
+                                                                        const activity = activityId ? scheduleActivityMap.get(activityId)?.activity : null;
+                                                                        const baseDate = task.startDate || task.dateKey || format(new Date(), 'yyyy-MM-dd');
+                                                                        const interval = Math.max(1, task.repeatInterval || 1);
+                                                                        const days =
+                                                                            nextUnit === 'day' ? interval :
+                                                                            nextUnit === 'week' ? interval * 7 :
+                                                                            interval * 30;
+                                                                        const routineActivity: Activity = activity || {
+                                                                            id: activityId || `routine_${Date.now()}`,
+                                                                            type: task.type,
+                                                                            details: task.details,
+                                                                            completed: false,
+                                                                            slot: task.slotName || botheringTaskSlot,
+                                                                            taskIds: [],
+                                                                        };
+                                                                        toggleRoutine(routineActivity, { type: 'custom', days }, baseDate);
                                                                     }}
                                                                 >
                                                                     <SelectTrigger className="h-7 w-[120px]">
