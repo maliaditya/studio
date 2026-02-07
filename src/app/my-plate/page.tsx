@@ -16,7 +16,7 @@ import { TimeSlots } from '@/components/TimeSlots';
 import { ProductivitySnapshot, TimeAllocationChart } from '@/components/ProductivitySnapshot';
 import { DashboardStats } from '@/components/DashboardStats';
 import { WeightGoalCard } from '@/components/WeightGoalCard';
-import { VisionCard } from '@/components/VisionCard';
+import { BotheringsCard } from '@/components/BotheringsCard';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -616,7 +616,7 @@ function MyPlatePageContent() {
                                             onEditDietClick={() => setIsDietPlanModalOpen(true)}
                                             onOpenChartModal={() => setIsWeightChartModalOpen(true)}
                                         />
-                                        <VisionCard />
+                                        <BotheringsCard />
                                     </>
                                 )}
                             </div>

@@ -12,22 +12,43 @@ import type { CoreSkill } from '@/types/workout';
 import Link from 'next/link';
 
 export function VisionCard() {
-    const { skillAcquisitionPlans, coreSkills } = useAuth();
+    const { skillAcquisitionPlans, coreSkills, deepWorkDefinitions, upskillDefinitions } = useAuth();
     
     const specializations = useMemo(() => {
         return coreSkills.filter(skill => skill.type === 'Specialization');
     }, [coreSkills]);
 
     const renderVisionContent = () => {
+        const allDefinitions = [...deepWorkDefinitions, ...upskillDefinitions];
+        const defById = new Map(allDefinitions.map(def => [def.id, def]));
+
+        const calculateEstimatedMinutes = (definitionId: string, visited = new Set<string>()): number => {
+            const def = defById.get(definitionId);
+            if (!def || visited.has(definitionId)) return 0;
+            visited.add(definitionId);
+            const children = [...(def.linkedDeepWorkIds || []), ...(def.linkedUpskillIds || [])];
+            if (children.length === 0) {
+                return def.estimatedDuration || 0;
+            }
+            return children.reduce((sum, childId) => sum + calculateEstimatedMinutes(childId, visited), 0);
+        };
+
         const plannedSpecs = (skillAcquisitionPlans || [])
             .map(plan => {
                 const spec = specializations.find(s => s.id === plan.specializationId);
                 if (!spec) return null;
 
+                const microSkillNames = new Set(
+                    spec.skillAreas.flatMap(area => area.microSkills.map(ms => ms.name))
+                );
+                const relatedDefs = allDefinitions.filter(def => microSkillNames.has(def.category));
+                const totalMinutes = relatedDefs.reduce((sum, def) => sum + calculateEstimatedMinutes(def.id), 0);
+                const computedHours = totalMinutes > 0 ? Math.round((totalMinutes / 60) * 10) / 10 : null;
+
                 const daysRemaining = plan.targetDate ? differenceInDays(parseISO(plan.targetDate), new Date()) : null;
                 const isOverdue = daysRemaining !== null && daysRemaining < 0;
 
-                return { ...plan, specName: spec.name, daysRemaining, isOverdue };
+                return { ...plan, specName: spec.name, daysRemaining, isOverdue, computedHours };
             })
             .filter((p): p is NonNullable<typeof p> => !!p)
             .sort((a, b) => new Date(a.targetDate).getTime() - new Date(b.targetDate).getTime());
@@ -63,7 +84,7 @@ export function VisionCard() {
                                     <div className="grid grid-cols-2 gap-x-4">
                                         <div>
                                             <p className="text-muted-foreground">Est. Hours</p>
-                                            <p className="font-bold">{plan.requiredHours || 'N/A'}</p>
+                                            <p className="font-bold">{plan.requiredHours != null ? plan.requiredHours : (plan.computedHours != null ? plan.computedHours : 'N/A')}</p>
                                         </div>
                                         <div>
                                             <p className="text-muted-foreground">Est. Cost</p>
