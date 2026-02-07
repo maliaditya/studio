@@ -3,7 +3,7 @@
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from './ui/button';
-import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush, Plus } from 'lucide-react';
+import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush, Plus, Library, ArrowUpRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ExcalidrawElement, NonDeleted, AppState, PointerDownState, OnLinkOpen } from "@excalidraw/excalidraw";
 import { useAuth } from '@/contexts/AuthContext';
@@ -87,6 +87,241 @@ export const SearchPopup = React.memo(({ open, setOpen, onSelect, title }: { ope
 });
 SearchPopup.displayName = 'SearchPopup';
 
+const CanvasPreviewPopup = ({
+  title,
+  drawingData,
+  initialRect,
+  onClose,
+  onOpenInTab,
+  storageKey,
+}: {
+  title: string;
+  drawingData?: string | null;
+  initialRect: { x: number; y: number; width: number; height: number };
+  onClose: () => void;
+  onOpenInTab: () => void;
+  storageKey: string;
+}) => {
+  const excalidrawAPIRef = useRef<any>(null);
+  const [position, setPosition] = useState({ x: initialRect.x, y: initialRect.y });
+  const [size, setSize] = useState({ width: initialRect.width, height: initialRect.height });
+  const [isLoaded, setIsLoaded] = useState(false);
+  const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { x?: number; y?: number; width?: number; height?: number; zoom?: number };
+      if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+        setPosition({ x: parsed.x, y: parsed.y });
+      }
+      if (typeof parsed.width === 'number' && typeof parsed.height === 'number') {
+        setSize({ width: parsed.width, height: parsed.height });
+      }
+    } catch {
+      // ignore
+    }
+    setIsLoaded(true);
+  }, [storageKey]);
+
+  const initialData = useMemo(() => {
+    if (!drawingData) return { elements: [] as any[] };
+    try {
+      const parsed = JSON.parse(drawingData);
+      if (Array.isArray(parsed.elements)) {
+        return { elements: parsed.elements, appState: parsed.appState };
+      }
+    } catch (e) {
+      console.error('Failed to parse preview canvas data:', e);
+    }
+    return { elements: [] as any[] };
+  }, [drawingData]);
+
+  useEffect(() => {
+    const api = excalidrawAPIRef.current;
+    if (!api) return;
+    const t = setTimeout(() => {
+      if (api?.scrollToContent) {
+        api.scrollToContent(api.getSceneElements(), { fitToContent: true });
+        const raw = localStorage.getItem(storageKey);
+        const parsed = raw ? (JSON.parse(raw) as { zoom?: number }) : null;
+        const zoom = typeof parsed?.zoom === 'number' ? parsed!.zoom : 0.3;
+        if (api.updateScene) {
+          api.updateScene({ appState: { zoom: { value: zoom } } });
+        }
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [drawingData, storageKey]);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!dragState.current) return;
+      const dx = event.clientX - dragState.current.startX;
+      const dy = event.clientY - dragState.current.startY;
+      setPosition({
+        x: dragState.current.originX + dx,
+        y: dragState.current.originY + dy,
+      });
+    };
+    const handlePointerUp = () => {
+      dragState.current = null;
+    };
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(() => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      setSize({ width: rect.width, height: rect.height });
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const api = excalidrawAPIRef.current;
+    const zoom = api?.getAppState?.()?.zoom?.value;
+    try {
+      if (!isLoaded) return;
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          x: position.x,
+          y: position.y,
+          width: size.width,
+          height: size.height,
+          zoom: typeof zoom === 'number' ? zoom : undefined,
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }, [position, size, storageKey, isLoaded]);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        top: position.y,
+        left: position.x,
+        width: size.width,
+        height: size.height,
+        minWidth: 320,
+        minHeight: 240,
+      }}
+      className="fixed z-[160] rounded-2xl border border-white/10 bg-background/90 backdrop-blur-md shadow-2xl overflow-hidden resize both canvas-preview"
+    >
+      <div
+        className="absolute top-2 left-2 z-20 flex items-center gap-1 rounded-full bg-background/60 border border-white/10 px-2 py-1 cursor-grab active:cursor-grabbing"
+        onPointerDown={(event) => {
+          dragState.current = {
+            startX: event.clientX,
+            startY: event.clientY,
+            originX: position.x,
+            originY: position.y,
+          };
+        }}
+      >
+        <GripVertical className="h-3 w-3 text-muted-foreground/70" />
+        <span className="text-[10px] text-muted-foreground/70">Drag</span>
+      </div>
+      <div className="absolute top-2 right-2 z-20 flex items-center gap-1 rounded-full bg-background/60 border border-white/10 px-1 py-0.5">
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpenInTab} title="Open in New Tab">
+          <ArrowUpRight className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} title="Close">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className="h-full w-full">
+        <Excalidraw
+          initialData={initialData}
+          excalidrawAPI={(api) => (excalidrawAPIRef.current = api)}
+          theme="dark"
+          viewModeEnabled={true}
+          zenModeEnabled={true}
+          gridModeEnabled={false}
+          UIOptions={{
+            canvasActions: {
+              export: false,
+              loadScene: false,
+              saveToActiveFile: false,
+              toggleTheme: false,
+              clearCanvas: false,
+              changeViewBackgroundColor: false,
+            },
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
+const ResourceSearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource) => void }) => {
+  const { resources } = useAuth();
+
+  const searchResults = useMemo(() => {
+      return resources.filter(resource => resource.type === 'card' || resource.type === 'habit' || resource.type === 'mechanism');
+  }, [resources]);
+
+  return (
+    <Command shouldFilter={true}>
+        <CommandInput placeholder="Search resources..." />
+        <CommandList>
+            <CommandEmpty>No resources found.</CommandEmpty>
+            <CommandGroup>
+                {searchResults.map((resource) => (
+                    <CommandItem
+                        key={resource.id}
+                        value={resource.name || 'Untitled'}
+                        onSelect={() => onSelect(resource)}
+                        className="flex justify-between items-center cursor-pointer"
+                    >
+                        <span>{resource.name || 'Untitled'}</span>
+                        <span className="text-xs text-muted-foreground">{resource.type}</span>
+                    </CommandItem>
+                ))}
+            </CommandGroup>
+        </CommandList>
+    </Command>
+  );
+});
+ResourceSearchContent.displayName = 'ResourceSearchContent';
+
+const ResourceSearchPopup = React.memo(({ open, setOpen, onSelect, title }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource) => void, title: string }) => {
+  const style: React.CSSProperties = {
+      position: 'fixed',
+      top: '50%',
+      left: '50%',
+      transform: 'translate(-50%, -50%)',
+      zIndex: 130,
+  };
+
+  if (!open) return null;
+
+  return (
+      <div style={style}>
+           <Card className="w-[512px] shadow-2xl border-2 bg-popover">
+              <CardHeader className="p-3 border-b">
+                  <CardTitle className="text-base">{title}</CardTitle>
+              </CardHeader>
+              <ResourceSearchContent onSelect={onSelect} />
+          </Card>
+      </div>
+  );
+});
+ResourceSearchPopup.displayName = 'ResourceSearchPopup';
+
 const ExcalidrawWrapper = ({
   activeCanvas,
   theme,
@@ -151,6 +386,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     togglePinDrawing, 
     openDrawingCanvas: authOpenDrawingCanvas, 
     openCanvasResourceCard,
+    openGeneralPopup,
     settings,
     resources,
     setFloatingVideoUrl,
@@ -160,6 +396,8 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [isMounted, setIsMounted] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isLinkingSearchOpen, setIsLinkingSearchOpen] = useState(false);
+  const [isLinkingResourceOpen, setIsLinkingResourceOpen] = useState(false);
+  const [canvasPreview, setCanvasPreview] = useState<{ title: string; drawing: string | null; x: number; y: number; width: number; height: number; resourceId: string; pointId: string } | null>(null);
   
   const excalidrawAPIRef = useRef<any>(null);
   const { toast } = useToast();
@@ -185,12 +423,13 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     }
   }, [isOpen]);
   
+  const sizeMode = drawingCanvasState?.size ?? 'normal';
   const style: React.CSSProperties = {
     position: 'fixed',
     top: `${position.y}px`,
     left: `${position.x}px`,
-    width: '95vw',
-    height: '95vh',
+    width: sizeMode === 'compact' ? '75vw' : '95vw',
+    height: sizeMode === 'compact' ? '75vh' : '95vh',
     transform: 'translate(-50%, -50%)',
     willChange: 'transform',
     zIndex: 110,
@@ -361,27 +600,37 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         const point = resource?.points?.find(p => p.id === pointId);
         
         if (resource && point) {
-             const canvasId = `${resource.id}-${point.id}`;
-            const isAlreadyOpen = drawingCanvasState?.openCanvases?.some(c => c.id === canvasId);
-            
-            if (isAlreadyOpen) {
-                handleTabClick(canvasId);
-            } else {
-                 authOpenDrawingCanvas({
-                    resourceId: resource.id,
-                    pointId: point.id,
-                    name: point.text || 'Linked Canvas',
-                    initialDrawing: point.drawing,
-                });
-            }
+            const width = Math.max(360, Math.min(window.innerWidth * 0.6, 720));
+            const height = Math.max(260, Math.min(window.innerHeight * 0.55, 520));
+            const x = (window.innerWidth - width) / 2 + 20;
+            const y = (window.innerHeight - height) / 2 + 20;
+            setCanvasPreview({
+              title: point.text || 'Linked Canvas',
+              drawing: typeof point.drawing === 'string' ? point.drawing : null,
+              x,
+              y,
+              width,
+              height,
+              resourceId: resource.id,
+              pointId: point.id,
+            });
         } else {
             console.error("Linked canvas not found:", resourceId, pointId);
             toast({ title: 'Error', description: 'Could not find the linked canvas.', variant: 'destructive'});
         }
+    } else if (link?.startsWith('resource://')) {
+        const resourceId = link.replace('resource://', '');
+        const resource = resources.find(r => r.id === resourceId);
+        if (resource) {
+          openGeneralPopup(resourceId, null);
+        } else {
+          console.error("Linked resource not found:", resourceId);
+          toast({ title: 'Error', description: 'Could not find the linked resource.', variant: 'destructive'});
+        }
     } else if (link) {
         setFloatingVideoUrl(link);
     }
-  }, [authOpenDrawingCanvas, resources, toast, drawingCanvasState, handleTabClick, setFloatingVideoUrl]);
+  }, [authOpenDrawingCanvas, resources, toast, drawingCanvasState, handleTabClick, setFloatingVideoUrl, openGeneralPopup]);
   
   const handleLinkingSearchSelect = (resource: Resource, point: ResourcePoint) => {
     const api = excalidrawAPIRef.current;
@@ -429,6 +678,53 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     void handleSaveClick(); // Save immediately after adding
     setIsLinkingSearchOpen(false);
   };
+
+  const handleLinkingResourceSelect = (resource: Resource) => {
+    const api = excalidrawAPIRef.current;
+    if (!api) return;
+    
+    const { scrollX, scrollY, width, height } = api.getAppState();
+    const existingElements = api.getSceneElements();
+
+    const newElement: NonDeleted<ExcalidrawElement> = {
+        id: randomId(),
+        type: 'text',
+        x: scrollX + width / 2,
+        y: scrollY + height / 2,
+        width: 220,
+        height: 24,
+        angle: 0,
+        strokeColor: '#1e1e1e',
+        backgroundColor: 'transparent',
+        fillStyle: 'hachure',
+        strokeWidth: 1,
+        strokeStyle: 'solid',
+        roughness: 1,
+        opacity: 100,
+        groupIds: [],
+        frameId: null,
+        roundness: null,
+        seed: Math.floor(Math.random() * 1e9),
+        version: 1,
+        versionNonce: Math.floor(Math.random() * 1e9),
+        isDeleted: false,
+        boundElements: null,
+        updated: Date.now(),
+        link: `resource://${resource.id}`,
+        text: resource.name || "Linked Resource",
+        fontSize: 20,
+        fontFamily: 1,
+        textAlign: 'center',
+        verticalAlign: 'middle',
+        baseline: 8,
+        lineHeight: 1.2 as any,
+        locked: false,
+    }
+    api.updateScene({ elements: [...existingElements, newElement] });
+    api.history.clear();
+    void handleSaveClick();
+    setIsLinkingResourceOpen(false);
+  };
   
   if (!isOpen || !drawingCanvasState) return null;
 
@@ -471,6 +767,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={openCanvasResourceCard}><Plus className="h-2.5 w-2.5"/></Button>
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-2.5 w-2.5"/></Button>
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-2.5 w-2.5"/></Button>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsLinkingResourceOpen(prev => !prev)}><Library className="h-2.5 w-2.5"/></Button>
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleSaveClick}>
                         <Save className={cn("h-2.5 w-2.5", isDirty ? "text-red-500" : "text-green-500")} />
                     </Button>
@@ -497,6 +794,25 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
       </div>
       <SearchPopup open={isSearchOpen} setOpen={setIsSearchOpen} onSelect={handleSearchSelect} title="Search & Open Canvas" />
       <SearchPopup open={isLinkingSearchOpen} setOpen={setIsLinkingSearchOpen} onSelect={handleLinkingSearchSelect} title="Link to a Canvas" />
+      <ResourceSearchPopup open={isLinkingResourceOpen} setOpen={setIsLinkingResourceOpen} onSelect={handleLinkingResourceSelect} title="Link a Resource Card" />
+      {canvasPreview && (
+        <CanvasPreviewPopup
+          title={canvasPreview.title}
+          drawingData={canvasPreview.drawing}
+          initialRect={{ x: canvasPreview.x, y: canvasPreview.y, width: canvasPreview.width, height: canvasPreview.height }}
+          onClose={() => setCanvasPreview(null)}
+          onOpenInTab={() => {
+            authOpenDrawingCanvas({
+              resourceId: canvasPreview.resourceId,
+              pointId: canvasPreview.pointId,
+              name: canvasPreview.title,
+              initialDrawing: canvasPreview.drawing ?? undefined,
+              size: 'normal',
+            });
+          }}
+          storageKey={`canvasPreview:${canvasPreview.resourceId}-${canvasPreview.pointId}`}
+        />
+      )}
     </>
   );
 }

@@ -225,3 +225,17 @@
 .editable-sentence span {
   display: inline;
 }
+
+/* Hide Excalidraw chrome inside compact canvas preview */
+.canvas-preview .excalidraw .App-menu,
+.canvas-preview .excalidraw .App-menu__left,
+.canvas-preview .excalidraw .App-menu__right,
+.canvas-preview .excalidraw .App-bottom-bar,
+.canvas-preview .excalidraw .layer-ui__wrapper,
+.canvas-preview .excalidraw .FixedSideContainer,
+.canvas-preview .excalidraw .footer,
+.canvas-preview .excalidraw .App-toolbar,
+.canvas-preview .excalidraw .help-icon,
+.canvas-preview .excalidraw .App-menu__theme-toggle {
+  display: none !important;
+}

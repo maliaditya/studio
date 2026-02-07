@@ -847,6 +847,7 @@ export interface DrawingCanvasPopupState {
   activeCanvasId: string | null;
   openCanvases: DrawingCanvasData[];
   position: { x: number, y: number };
+  size?: 'normal' | 'compact';
 }
 
 export interface DailyLearningLog {

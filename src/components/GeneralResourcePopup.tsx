@@ -4,11 +4,12 @@
 import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff, ChevronRight, Link as LinkIcon, Workflow, GitMerge, Paintbrush, Youtube } from 'lucide-react';
+import { Zap, X, GripVertical, Library, MessageSquare, Code, ArrowRight, ArrowUpRight, Upload, Play, Pause, Unlink, Edit3, PlusCircle, PopoverClose, Trash2, Blocks, Loader2, Brain, View, Pin, PinOff, ChevronRight, Link as LinkIcon, Workflow, GitMerge, Paintbrush, Youtube } from 'lucide-react';
 import type { Resource, ResourcePoint, PopupState } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
 import { useDraggable } from '@dnd-kit/core';
+import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from './ui/input';
@@ -156,6 +157,193 @@ const PointTree = ({ points, onUpdate, onDelete, onOpenNestedPopup, openContentV
   );
 };
 
+const Excalidraw = dynamic(
+  async () => (await import('@excalidraw/excalidraw')).Excalidraw,
+  {
+    ssr: false,
+    loading: () => <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">Loading canvas...</div>,
+  }
+);
+
+const CanvasPreviewPopup = ({
+  title,
+  drawingData,
+  onClose,
+  initialRect,
+  onOpenInCanvas,
+  storageKey,
+}: {
+  title: string;
+  drawingData?: string | null;
+  onClose: () => void;
+  initialRect: { x: number; y: number; width: number; height: number };
+  onOpenInCanvas: () => void;
+  storageKey: string;
+}) => {
+  const [position, setPosition] = useState({ x: initialRect.x, y: initialRect.y });
+  const [size, setSize] = useState({ width: initialRect.width, height: initialRect.height });
+  const [isLoaded, setIsLoaded] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
+  const excalidrawAPIRef = useRef<any>(null);
+  const initialData = useMemo(() => {
+    if (!drawingData) return { elements: [] as any[] };
+    try {
+      const parsed = JSON.parse(drawingData);
+      if (Array.isArray(parsed.elements)) {
+        return { elements: parsed.elements, appState: parsed.appState };
+      }
+    } catch (e) {
+      console.error('Failed to parse preview canvas data:', e);
+    }
+    return { elements: [] as any[] };
+  }, [drawingData]);
+
+  useEffect(() => {
+    const api = excalidrawAPIRef.current;
+    if (!api) return;
+    const t = setTimeout(() => {
+      if (api?.scrollToContent) {
+        api.scrollToContent(api.getSceneElements(), { fitToContent: true });
+        const raw = localStorage.getItem(storageKey);
+        const parsed = raw ? (JSON.parse(raw) as { zoom?: number }) : null;
+        const zoom = typeof parsed?.zoom === 'number' ? parsed!.zoom : 0.3;
+        if (api.updateScene) {
+          api.updateScene({ appState: { zoom: { value: zoom } } });
+        }
+      }
+    }, 0);
+    return () => clearTimeout(t);
+  }, [drawingData, storageKey]);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!dragState.current) return;
+      const dx = event.clientX - dragState.current.startX;
+      const dy = event.clientY - dragState.current.startY;
+      setPosition({
+        x: dragState.current.originX + dx,
+        y: dragState.current.originY + dy,
+      });
+    };
+    const handlePointerUp = () => {
+      dragState.current = null;
+    };
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(() => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      setSize({ width: rect.width, height: rect.height });
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as { x?: number; y?: number; width?: number; height?: number; zoom?: number };
+      if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+        setPosition({ x: parsed.x, y: parsed.y });
+      }
+      if (typeof parsed.width === 'number' && typeof parsed.height === 'number') {
+        setSize({ width: parsed.width, height: parsed.height });
+      }
+    } catch {
+      // ignore
+    }
+    setIsLoaded(true);
+  }, [storageKey]);
+
+  useEffect(() => {
+    const api = excalidrawAPIRef.current;
+    const zoom = api?.getAppState?.()?.zoom?.value;
+    try {
+      if (!isLoaded) return;
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({
+          x: position.x,
+          y: position.y,
+          width: size.width,
+          height: size.height,
+          zoom: typeof zoom === 'number' ? zoom : undefined,
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }, [position, size, storageKey, isLoaded]);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        top: position.y,
+        left: position.x,
+        width: size.width,
+        height: size.height,
+        minWidth: 320,
+        minHeight: 240,
+      }}
+      className="fixed z-[160] rounded-2xl border border-white/10 bg-background/90 backdrop-blur-md shadow-2xl overflow-hidden resize both canvas-preview"
+    >
+      <div
+        className="absolute top-2 left-2 z-20 flex items-center gap-1 rounded-full bg-background/60 border border-white/10 px-2 py-1 cursor-grab active:cursor-grabbing"
+        onPointerDown={(event) => {
+          dragState.current = {
+            startX: event.clientX,
+            startY: event.clientY,
+            originX: position.x,
+            originY: position.y,
+          };
+        }}
+      >
+        <GripVertical className="h-3 w-3 text-muted-foreground/70" />
+        <span className="text-[10px] text-muted-foreground/70">Drag</span>
+      </div>
+      <div className="absolute top-2 right-2 z-20 flex items-center gap-1 rounded-full bg-background/60 border border-white/10 px-1 py-0.5">
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpenInCanvas} title="Open in Canvas">
+          <ArrowUpRight className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} title="Close">
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+      <div className="h-full w-full">
+        <Excalidraw
+          initialData={initialData}
+          excalidrawAPI={(api) => (excalidrawAPIRef.current = api)}
+          theme="dark"
+          viewModeEnabled={true}
+          zenModeEnabled={true}
+          gridModeEnabled={false}
+          UIOptions={{
+            canvasActions: {
+              export: false,
+              loadScene: false,
+              saveToActiveFile: false,
+              toggleTheme: false,
+              clearCanvas: false,
+              changeViewBackgroundColor: false,
+            },
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
 
 export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
     const { 
@@ -177,7 +365,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const router = useRouter();
     const [editingTitle, setEditingTitle] = useState(false);
     const audioInputRef = useRef<HTMLInputElement>(null);
+    const cardRef = useRef<HTMLDivElement>(null);
     const [playingAudio, setPlayingAudio] = useState(false);
+    const [canvasPreview, setCanvasPreview] = useState<{ title: string; drawing: string | null; x: number; y: number; width: number; height: number; resourceId: string; pointId: string } | null>(null);
     
     const audioRef = useRef<HTMLAudioElement>(null);
     const playerRef = useRef<ReactPlayer>(null);
@@ -466,13 +656,40 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const pointTree = useMemo(() => buildPointTree(resource.points || []), [resource.points]);
     
     const openDrawingCanvas = useCallback((point: ResourcePoint) => {
-        authOpenDrawingCanvas({
-            resourceId: resource.id,
-            pointId: point.id,
-            name: point.text,
-            initialDrawing: point.drawing,
+        let title = point.text || 'Canvas';
+        let drawing = point.drawing;
+        let resourceId = resource.id;
+        let pointId = point.id;
+
+        if (typeof drawing === 'string' && drawing.startsWith('canvas://')) {
+            const [resId, linkedPointId] = drawing.replace('canvas://', '').split('/');
+            const linkedResource = resources.find(r => r.id === resId);
+            const linkedPoint = linkedResource?.points?.find(p => p.id === linkedPointId);
+            if (linkedPoint) {
+                title = linkedPoint.text || title;
+                drawing = linkedPoint.drawing;
+                resourceId = resId;
+                pointId = linkedPointId;
+            }
+        }
+
+        const rect = cardRef.current?.getBoundingClientRect();
+        const width = rect?.width ?? 520;
+        const height = rect?.height ?? 380;
+        const x = (rect?.x ?? (window.innerWidth - width) / 2) + 20;
+        const y = (rect?.y ?? (window.innerHeight - height) / 2) + 20;
+
+        setCanvasPreview({
+            title,
+            drawing: typeof drawing === 'string' ? drawing : null,
+            x,
+            y,
+            width,
+            height,
+            resourceId,
+            pointId,
         });
-    }, [resource.id, authOpenDrawingCanvas]);
+    }, [resources]);
     
     const handleLinkCanvas = (selectedResource: Resource, selectedPoint: ResourcePoint) => {
         const newPoint: ResourcePoint = {
@@ -487,6 +704,16 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     };
 
     const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
+
+    const canvasPreviewRect = useMemo(() => {
+        if (!canvasPreview) return null;
+        return {
+            x: canvasPreview.x,
+            y: canvasPreview.y,
+            width: canvasPreview.width,
+            height: canvasPreview.height,
+        };
+    }, [canvasPreview]);
     
     const renderContent = () => {
         switch (resource.type) {
@@ -537,10 +764,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
             <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
                 <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
                 <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
-                <Card className="shadow-2xl border-2 border-primary/30 bg-card flex flex-col max-h-[80vh] relative group">
-                    <div className="absolute top-2 right-2 z-20 flex items-center">
+                <Card ref={cardRef} className="shadow-2xl border border-primary/20 bg-gradient-to-b from-card/95 via-card/90 to-card/80 flex flex-col max-h-[80vh] relative group rounded-2xl overflow-hidden">
+                    <div className="absolute top-3 right-3 z-20 flex items-center bg-background/60 backdrop-blur-md border border-white/10 rounded-full px-1 py-0.5 shadow-lg">
                         <TooltipProvider delayDuration={200}>
-                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsMindMapModalOpen(true)}><GitMerge className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>View Mind Map</p></TooltipContent></Tooltip>
                             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleToggleFavorite}>
                                 {resource.isFavorite ? <PinOff className="h-4 w-4 text-yellow-400" /> : <Pin className="h-4 w-4" />}
                             </Button></TooltipTrigger><TooltipContent><p>{resource.isFavorite ? 'Un-favorite' : 'Favorite'}</p></TooltipContent></Tooltip>
@@ -569,7 +795,6 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('link')}><LinkIcon className="h-4 w-4 text-purple-500" /></Button></TooltipTrigger><TooltipContent><p>Add Link</p></TooltipContent></Tooltip>
                             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleAddPoint('paint')}><Paintbrush className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent><p>Add Paint Canvas</p></TooltipContent></Tooltip>
                             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsLinkingCanvasOpen(true)}><LinkIcon className="h-4 w-4 text-red-500" /></Button></TooltipTrigger><TooltipContent><p>Link Canvas</p></TooltipContent></Tooltip>
-                            <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => createResourceWithHierarchyAuth(resource, undefined, 'brain_hack')}><Brain className="h-4 w-4 text-pink-500" /></Button></TooltipTrigger><TooltipContent><p>Create Brain Hack</p></TooltipContent></Tooltip>
                         </TooltipProvider>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={handleClose}>
                             <X className="h-4 w-4" />
@@ -577,16 +802,18 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                     </div>
 
 	                    <CardHeader 
-	                        className="p-3 pt-8 relative flex-shrink-0"
+	                        className="p-4 pt-10 relative flex-shrink-0"
 	                    >
 	                        <div
-	                            className="absolute top-0 left-0 right-0 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing"
+	                            className="absolute top-0 left-0 right-0 h-9 flex items-center justify-center cursor-grab active:cursor-grabbing"
 	                            {...listeners}
 	                        >
 	                            <GripVertical className="h-5 w-5 text-muted-foreground/30" />
 	                        </div>
-	                        <div className="flex items-center gap-2">
-	                          {getIcon()}
+	                        <div className="flex items-center gap-3">
+                              <div className="h-9 w-9 rounded-xl bg-muted/40 border border-white/10 flex items-center justify-center">
+	                            {getIcon()}
+                              </div>
 	                            {editingTitle ? (
 	                                 <Input 
 	                                    value={resource.name || ''}
@@ -608,19 +835,19 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
 	                            </div>
 	                          )}
 	                        {folderPath && (
-	                            <CardDescription className="text-xs pt-1 truncate" title={folderPath}>
-	                              <span className="flex items-center gap-1">
+	                            <CardDescription className="text-xs pt-2" title={folderPath}>
+	                              <span className="flex items-center gap-1 flex-wrap">
 	                                {folderPath.split(' / ').map((part, index, arr) => (
 	                                    <React.Fragment key={index}>
-	                                        <span>{part}</span>
-	                                        {index < arr.length - 1 && <ChevronRight className="h-3 w-3" />}
+	                                        <span className="px-2 py-0.5 rounded-full bg-muted/40 border border-white/10">{part}</span>
+	                                        {index < arr.length - 1 && <ChevronRight className="h-3 w-3 text-muted-foreground/60" />}
 	                                    </React.Fragment>
 	                                ))}
 	                              </span>
 	                            </CardDescription>
 	                        )}
                          {(audioSrc || youtubeEmbedUrl) && (
-                            <div className="w-full space-y-2 pt-2">
+                            <div className="w-full space-y-2 pt-3">
                                 <div className="flex items-center gap-2">
                                      <Button variant="ghost" size="icon" className="h-7 w-7" onPointerDown={togglePlayAudio}>
                                         {playingAudio ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
@@ -650,11 +877,11 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         )}
                     </CardHeader>
                     <div className="flex-grow min-h-0 overflow-y-auto">
-                        <CardContent className="p-3 pt-0">
+                        <CardContent className="p-4 pt-0">
                            {renderContent()}
                         </CardContent>
                     </div>
-                     <CardFooter className="p-3 border-t">
+                     <CardFooter className="p-3 border-t border-white/10 bg-muted/30">
                          <div className="flex gap-2 w-full">
                             {(audioSrc || youtubeEmbedUrl) && (
                               <div className="flex gap-2 w-full">
@@ -676,6 +903,24 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                     </DialogContent>
                 </Dialog>
             </div>
+            {canvasPreview && canvasPreviewRect && (
+                <CanvasPreviewPopup
+                    title={canvasPreview.title}
+                    drawingData={canvasPreview.drawing}
+                    onClose={() => setCanvasPreview(null)}
+                    initialRect={canvasPreviewRect}
+                    onOpenInCanvas={() => {
+                      authOpenDrawingCanvas({
+                        resourceId: canvasPreview.resourceId,
+                        pointId: canvasPreview.pointId,
+                        name: canvasPreview.title,
+                        initialDrawing: canvasPreview.drawing ?? undefined,
+                        size: 'normal',
+                      });
+                    }}
+                    storageKey={`canvasPreview:${canvasPreview.resourceId}-${canvasPreview.pointId}`}
+                />
+            )}
             <SearchPopup open={isLinkingCanvasOpen} setOpen={setIsLinkingCanvasOpen} onSelect={handleLinkCanvas} title="Link an Existing Canvas" />
         </>
     );

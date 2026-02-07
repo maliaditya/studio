@@ -94,7 +94,7 @@ interface AuthContextType {
   handlePdfViewerPopupDragEnd: (event: DragEndEvent) => void;
   drawingCanvasState: DrawingCanvasPopupState | null;
   setDrawingCanvasState: React.Dispatch<React.SetStateAction<DrawingCanvasPopupState | null>>;
-  openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => void;
+  openDrawingCanvas: (state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'> & { size?: 'normal' | 'compact' }) => void;
   openDrawingCanvasFromHeader: () => void;
   openCanvasResourceCard: () => void;
   handleDrawingCanvasPopupDragEnd: (event: DragEndEvent) => void;
@@ -757,7 +757,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: 'Task Completed!', description: `Logged ${duration} minutes.` });
   }, [updateActivity, toast, allUpskillLogs, allDeepWorkLogs, setUpskillDefinitions, setDeepWorkDefinitions, upskillDefinitions, deepWorkDefinitions]);
   
-  const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'>) => {
+  const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'> & { size?: 'normal' | 'compact' }) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
     setDrawingCanvasState(prev => {
         if (!prev || !prev.isOpen) {
@@ -791,6 +791,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 position: { x: window.innerWidth / 2, y: window.innerHeight / 2 },
                 openCanvases,
                 activeCanvasId: canvasId,
+                size: state.size ?? prev?.size ?? 'normal',
             };
         }
 
@@ -813,6 +814,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             isOpen: true,
             openCanvases: newOpenCanvases,
             activeCanvasId: canvasId,
+            size: state.size ?? prev.size ?? 'normal',
         };
     });
   }, [settings.pinnedCanvasIds, resources]);
