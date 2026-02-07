@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfDay, isAfter, getDay } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfDay, isAfter, getDay, differenceInMonths, differenceInDays } from 'date-fns';
 import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide, Check, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -857,6 +857,20 @@ export function TimesheetPageContent({
             if (isAfter(startOfDay(start), startOfDay(date))) return false;
             if (task.recurrence === 'daily') return true;
             if (task.recurrence === 'weekly') return getDay(start) === getDay(date);
+            if (task.recurrence === 'custom') {
+                const interval = Math.max(1, task.repeatInterval || 1);
+                if (task.repeatUnit === 'month') {
+                    if (start.getDate() !== date.getDate()) return false;
+                    const diffMonths = differenceInMonths(date, start);
+                    return diffMonths >= 0 && diffMonths % interval === 0;
+                }
+                if (task.repeatUnit === 'week') {
+                    const diffDays = differenceInDays(date, start);
+                    return diffDays >= 0 && diffDays % (interval * 7) === 0;
+                }
+                const diffDays = differenceInDays(date, start);
+                return diffDays >= 0 && diffDays % interval === 0;
+            }
             return startKey === dateKey;
         };
         const isTaskCompletedOnDate = (task: MindsetPoint['tasks'][number], dateKey: string, activityMap: Map<string, Activity>) => {

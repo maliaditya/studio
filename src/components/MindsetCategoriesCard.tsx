@@ -18,7 +18,7 @@ import { Label } from './ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { format, isSameDay, isBefore, subDays, startOfDay, differenceInDays, parseISO, eachDayOfInterval, isAfter, getDay } from 'date-fns';
+import { format, isSameDay, isBefore, subDays, startOfDay, differenceInDays, parseISO, eachDayOfInterval, isAfter, getDay, differenceInMonths } from 'date-fns';
 import { LinkTechniqueModal } from './LinkTechniqueModal';
 import { ChartContainer } from './ui/chart';
 import { LineChart as RechartsLineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer } from 'recharts';
@@ -501,8 +501,22 @@ export function MindsetCategoriesCard() {
         if (isAfter(startOfDay(start), startOfDay(date))) return false;
         if (task.recurrence === 'daily') return true;
         if (task.recurrence === 'weekly') return getDay(start) === getDay(date);
-        return startKey === dateKey;
-    };
+            if (task.recurrence === 'custom') {
+                const interval = Math.max(1, task.repeatInterval || 1);
+                if (task.repeatUnit === 'month') {
+                    if (start.getDate() !== date.getDate()) return false;
+                    const diffMonths = differenceInMonths(date, start);
+                    return diffMonths >= 0 && diffMonths % interval === 0;
+                }
+                if (task.repeatUnit === 'week') {
+                    const diffDays = differenceInDays(date, start);
+                    return diffDays >= 0 && diffDays % (interval * 7) === 0;
+                }
+                const diffDays = differenceInDays(date, start);
+                return diffDays >= 0 && diffDays % interval === 0;
+            }
+            return startKey === dateKey;
+        };
     const isTaskCompletedOnDate = (task: MindsetPoint['tasks'][number], dateKey: string) => {
         if (task.recurrence && task.recurrence !== 'none') {
             return !!task.completionHistory?.[dateKey];
@@ -1004,9 +1018,13 @@ export function MindsetCategoriesCard() {
                                                                             <span className={cn(point.completed && "line-through text-muted-foreground")}>{point.text}</span>
                                                                         </div>
                                                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                                                            {getDaysLeftLabel(point.endDate) && (
+                                                                            {getDaysLeftLabel(point.endDate) ? (
                                                                                 <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
                                                                                     {getDaysLeftLabel(point.endDate)}
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="px-2 py-0.5 rounded-full border border-muted-foreground/30 text-muted-foreground bg-muted/10">
+                                                                                    No end date
                                                                                 </span>
                                                                             )}
                                                                             {stats.total > 0 && (
@@ -1061,9 +1079,13 @@ export function MindsetCategoriesCard() {
                                                                             <span className={cn(point.completed && "line-through text-muted-foreground")}>{point.text}</span>
                                                                         </div>
                                                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                                                            {getDaysLeftLabel(point.endDate) && (
+                                                                            {getDaysLeftLabel(point.endDate) ? (
                                                                                 <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
                                                                                     {getDaysLeftLabel(point.endDate)}
+                                                                                </span>
+                                                                            ) : (
+                                                                                <span className="px-2 py-0.5 rounded-full border border-muted-foreground/30 text-muted-foreground bg-muted/10">
+                                                                                    No end date
                                                                                 </span>
                                                                             )}
                                                                             {stats.total > 0 && (
@@ -1118,9 +1140,13 @@ export function MindsetCategoriesCard() {
                                             <span className={cn(point.completed && "line-through text-muted-foreground")}>{point.text}</span>
                                         </div>
                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                            {getDaysLeftLabel(point.endDate) && (
+                                            {getDaysLeftLabel(point.endDate) ? (
                                                 <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
                                                     {getDaysLeftLabel(point.endDate)}
+                                                </span>
+                                            ) : (
+                                                <span className="px-2 py-0.5 rounded-full border border-muted-foreground/30 text-muted-foreground bg-muted/10">
+                                                    No end date
                                                 </span>
                                             )}
                                             {stats.total > 0 && (
@@ -1264,9 +1290,16 @@ export function MindsetCategoriesCard() {
                                             />
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            {(!activeBotheringPoint.endDate || activeBotheringPoint.endDate.trim() === "") && (
+                                                <span className="text-xs text-muted-foreground">No end date</span>
+                                            )}
                                             <Button
                                                 variant={activeBotheringPoint.completed ? "secondary" : "default"}
-                                                disabled={!activeBotheringPoint.completed && (activeBotheringPoint.tasks?.some(t => !t.completed) ?? false)}
+                                                disabled={
+                                                    !activeBotheringPoint.completed &&
+                                                    !!activeBotheringPoint.endDate &&
+                                                    (activeBotheringPoint.tasks?.some(t => !t.completed) ?? false)
+                                                }
                                                 onClick={() => updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({ ...point, completed: !point.completed }))}
                                             >
                                                 {activeBotheringPoint.completed ? 'Mark Active' : 'Mark Complete'}
@@ -1274,7 +1307,7 @@ export function MindsetCategoriesCard() {
                                             {activeBotheringPoint.completed && (
                                                 <span className="text-xs text-emerald-400">Completed</span>
                                             )}
-                                            {!activeBotheringPoint.completed && (activeBotheringPoint.tasks?.some(t => !t.completed) ?? false) && (
+                                            {!activeBotheringPoint.completed && !!activeBotheringPoint.endDate && (activeBotheringPoint.tasks?.some(t => !t.completed) ?? false) && (
                                                 <span className="text-xs text-muted-foreground">Complete all tasks to finish</span>
                                             )}
                                         </div>
@@ -1394,7 +1427,7 @@ export function MindsetCategoriesCard() {
                                                             <Select
                                                                 value={task.recurrence || 'none'}
                                                                 onValueChange={(value) => {
-                                                                    const recurrence = value as 'none' | 'daily' | 'weekly';
+                                                                    const recurrence = value as 'none' | 'daily' | 'weekly' | 'custom';
                                                                     const baseDate = task.startDate || task.dateKey || format(new Date(), 'yyyy-MM-dd');
                                                                     updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
                                                                         ...point,
@@ -1403,6 +1436,8 @@ export function MindsetCategoriesCard() {
                                                                             recurrence,
                                                                             startDate: t.startDate || baseDate,
                                                                             completionHistory: recurrence === 'none' ? undefined : (t.completionHistory || {}),
+                                                                            repeatInterval: recurrence === 'custom' ? (t.repeatInterval || 1) : t.repeatInterval,
+                                                                            repeatUnit: recurrence === 'custom' ? (t.repeatUnit || 'week') : t.repeatUnit,
                                                                         } : t),
                                                                     }));
                                                                     const activityId = task.activityId || task.id;
@@ -1425,9 +1460,47 @@ export function MindsetCategoriesCard() {
                                                                     <SelectItem value="none">None</SelectItem>
                                                                     <SelectItem value="daily">Daily</SelectItem>
                                                                     <SelectItem value="weekly">Weekly</SelectItem>
+                                                                    <SelectItem value="custom">Custom</SelectItem>
                                                                 </SelectContent>
                                                             </Select>
                                                         </div>
+                                                        {task.recurrence === 'custom' && (
+                                                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                                                                <span>Every</span>
+                                                                <Input
+                                                                    type="number"
+                                                                    min={1}
+                                                                    value={task.repeatInterval || 1}
+                                                                    onChange={(e) => {
+                                                                        const nextInterval = Math.max(1, parseInt(e.target.value, 10) || 1);
+                                                                        updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                                                            ...point,
+                                                                            tasks: (point.tasks || []).map(t => t.id === task.id ? { ...t, repeatInterval: nextInterval } : t),
+                                                                        }));
+                                                                    }}
+                                                                    className="h-7 w-[64px]"
+                                                                />
+                                                                <Select
+                                                                    value={task.repeatUnit || 'week'}
+                                                                    onValueChange={(value) => {
+                                                                        const nextUnit = value as 'day' | 'week' | 'month';
+                                                                        updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                                                            ...point,
+                                                                            tasks: (point.tasks || []).map(t => t.id === task.id ? { ...t, repeatUnit: nextUnit } : t),
+                                                                        }));
+                                                                    }}
+                                                                >
+                                                                    <SelectTrigger className="h-7 w-[120px]">
+                                                                        <SelectValue />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent className="z-[200]">
+                                                                        <SelectItem value="day">Days</SelectItem>
+                                                                        <SelectItem value="week">Weeks</SelectItem>
+                                                                        <SelectItem value="month">Months</SelectItem>
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+                                                        )}
                                                         {(() => {
                                                             const counts = getRecurringTaskCounts(task);
                                                             if (!counts) return null;

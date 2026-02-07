@@ -700,7 +700,9 @@ export interface MindsetPoint {
     activityId?: string;
     dateKey?: string;
     slotName?: SlotName;
-    recurrence?: 'none' | 'daily' | 'weekly';
+    recurrence?: 'none' | 'daily' | 'weekly' | 'custom';
+    repeatInterval?: number;
+    repeatUnit?: 'day' | 'week' | 'month';
     startDate?: string;
     completionHistory?: Record<string, boolean>;
   }[];
