@@ -303,6 +303,7 @@ export function TimesheetPageContent({
     const [collapsedHabitGroups, setCollapsedHabitGroups] = useState<Record<string, boolean>>({});
     const [collapsedSpecializations, setCollapsedSpecializations] = useState<Record<string, boolean>>({});
     const [habitDashboardTab, setHabitDashboardTab] = useState<'daily' | 'botherings'>('botherings');
+    const [collapsedBotherings, setCollapsedBotherings] = useState<Record<string, boolean>>({});
     const dashboardOuterRef = useRef<HTMLDivElement>(null);
     const dashboardInnerRef = useRef<HTMLDivElement>(null);
     const [dashboardScale, setDashboardScale] = useState(1);
@@ -1332,48 +1333,116 @@ export function TimesheetPageContent({
                                     )}
                                     {botherings.map((bothering) => {
                                         const totalMinutes = botheringTotals.find(b => b.id === bothering.id)?.totalMinutes || 0;
+                                        const isCollapsed = collapsedBotherings[bothering.id] ?? true;
                                         return (
                                             <React.Fragment key={bothering.id}>
                                                 <div className="h-8 px-2 border-b border-muted/20 text-sm truncate flex items-center" title={bothering.text}>
-                                                    <div className="flex items-center gap-2 min-w-0">
+                                                    <button
+                                                        className="flex items-center gap-2 min-w-0"
+                                                        onClick={() => setCollapsedBotherings(prev => ({ ...prev, [bothering.id]: !isCollapsed }))}
+                                                    >
                                                         <span className="text-emerald-400"><CheckCircle className="h-4 w-4" /></span>
                                                         <span className="truncate">{bothering.text}</span>
-                                                    </div>
+                                                    </button>
                                                 </div>
-                                                {daysInMonth.map((day, index) => {
-                                                    const dateKey = format(day, 'yyyy-MM-dd');
-                                                    const activityMap = dayActivityMaps.get(dateKey) || new Map();
-                                                    const dueTasks = bothering.tasks.filter(task => isTaskDueOnDate(task, dateKey));
-                                                    const completedCount = dueTasks.filter(task => isTaskCompletedOnDate(task, dateKey, activityMap)).length;
-                                                    const hasTasks = dueTasks.length > 0;
-                                                    const isEndDate = bothering.endDate && bothering.endDate === dateKey;
-                                                    return (
-                                                        <div key={`${bothering.id}-${dateKey}`} className={cn("h-8 flex items-center justify-center border-b border-muted/20", isAltWeek(index) && "bg-muted/20", isEndDate && "bg-amber-400/20 border-amber-400/40")}>
-                                                            <div className={cn(
-                                                                "h-4 w-4 mx-auto rounded-sm border border-muted-foreground/30",
-                                                                hasTasks && completedCount === 0 && "bg-muted/40",
-                                                                completedCount > 0 && "bg-emerald-400/80 border-emerald-400"
-                                                            )} />
-                                                        </div>
-                                                    );
-                                                })}
-                                                <div className="h-8 px-2 border-b border-muted/20 flex items-center">
-                                                    {(() => {
-                                                        const hours = totalMinutes / 60;
-                                                        const accent = totalMinutes > 0 ? "text-amber-300" : "text-muted-foreground";
-                                                        return (
-                                                            <div className="w-full flex items-center gap-2">
-                                                                <div className="h-2 flex-1 rounded-full bg-muted/40 overflow-hidden">
-                                                                    <div
-                                                                        className={cn("h-full", totalMinutes > 0 ? "bg-amber-400/80" : "bg-muted/30")}
-                                                                        style={{ width: `${Math.min(100, (totalMinutes / maxBotheringMinutes) * 100)}%` }}
-                                                                    />
+                                                {isCollapsed ? (
+                                                    <>
+                                                        {daysInMonth.map((day, index) => {
+                                                            const dateKey = format(day, 'yyyy-MM-dd');
+                                                            const activityMap = dayActivityMaps.get(dateKey) || new Map();
+                                                            const dueTasks = bothering.tasks.filter(task => isTaskDueOnDate(task, dateKey));
+                                                            const completedCount = dueTasks.filter(task => isTaskCompletedOnDate(task, dateKey, activityMap)).length;
+                                                            const hasTasks = dueTasks.length > 0;
+                                                            const isEndDate = bothering.endDate && bothering.endDate === dateKey;
+                                                            return (
+                                                                <div key={`${bothering.id}-${dateKey}`} className={cn("h-8 flex items-center justify-center border-b border-muted/20", isAltWeek(index) && "bg-muted/20", isEndDate && "bg-amber-400/20 border-amber-400/40")}>
+                                                                    <div className={cn(
+                                                                        "h-4 w-4 mx-auto rounded-sm border border-muted-foreground/30",
+                                                                        hasTasks && completedCount === 0 && "bg-muted/40",
+                                                                        completedCount > 0 && "bg-emerald-400/80 border-emerald-400"
+                                                                    )} />
                                                                 </div>
-                                                                <span className={cn("text-[10px] tabular-nums min-w-[32px] text-right", accent)}>{hours.toFixed(1)}</span>
+                                                            );
+                                                        })}
+                                                        <div className="h-8 px-2 border-b border-muted/20 flex items-center">
+                                                            {(() => {
+                                                                const hours = totalMinutes / 60;
+                                                                const accent = totalMinutes > 0 ? "text-amber-300" : "text-muted-foreground";
+                                                                return (
+                                                                    <div className="w-full flex items-center gap-2">
+                                                                        <div className="h-2 flex-1 rounded-full bg-muted/40 overflow-hidden">
+                                                                            <div
+                                                                                className={cn("h-full", totalMinutes > 0 ? "bg-amber-400/80" : "bg-muted/30")}
+                                                                                style={{ width: `${Math.min(100, (totalMinutes / maxBotheringMinutes) * 100)}%` }}
+                                                                            />
+                                                                        </div>
+                                                                        <span className={cn("text-[10px] tabular-nums min-w-[32px] text-right", accent)}>{hours.toFixed(1)}</span>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        {daysInMonth.map((day, index) => (
+                                                            <div key={`${bothering.id}-blank-${day.toISOString()}`} className={cn("h-8 border-b border-muted/20", isAltWeek(index) && "bg-muted/20")} />
+                                                        ))}
+                                                        <div className="h-8 border-b border-muted/20" />
+                                                    </>
+                                                )}
+                                                {!isCollapsed && bothering.tasks.map((task) => (
+                                                    <React.Fragment key={`${bothering.id}-${task.id}`}>
+                                                        <div className="h-8 px-4 border-b border-muted/20 text-[11px] truncate flex items-center text-muted-foreground" title={task.details}>
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                                                                <span className="truncate">{task.details}</span>
                                                             </div>
-                                                        );
-                                                    })()}
-                                                </div>
+                                                        </div>
+                                                        {daysInMonth.map((day, index) => {
+                                                            const dateKey = format(day, 'yyyy-MM-dd');
+                                                            const activityMap = dayActivityMaps.get(dateKey) || new Map();
+                                                            const isDue = isTaskDueOnDate(task, dateKey);
+                                                            const isDone = isDue && isTaskCompletedOnDate(task, dateKey, activityMap);
+                                                            return (
+                                                                <div key={`${bothering.id}-${task.id}-${dateKey}`} className={cn("h-8 flex items-center justify-center border-b border-muted/20", isAltWeek(index) && "bg-muted/20")}>
+                                                                    <div className={cn(
+                                                                        "h-4 w-4 mx-auto rounded-sm border border-muted-foreground/30",
+                                                                        isDue && !isDone && "bg-muted/40",
+                                                                        isDone && "bg-emerald-400/80 border-emerald-400"
+                                                                    )} />
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        <div className="h-8 px-2 border-b border-muted/20 flex items-center">
+                                                            {(() => {
+                                                                let taskMinutes = 0;
+                                                                daysInMonth.forEach(day => {
+                                                                    const dateKey = format(day, 'yyyy-MM-dd');
+                                                                    const activityMap = dayActivityMaps.get(dateKey) || new Map();
+                                                                    if (!isTaskDueOnDate(task, dateKey)) return;
+                                                                    if (!isTaskCompletedOnDate(task, dateKey, activityMap)) return;
+                                                                    const act = activityMap.get(task.activityId || task.id);
+                                                                    if (act) {
+                                                                        taskMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
+                                                                    }
+                                                                });
+                                                                const hours = taskMinutes / 60;
+                                                                const accent = taskMinutes > 0 ? "text-amber-300" : "text-muted-foreground";
+                                                                return (
+                                                                    <div className="w-full flex items-center gap-2">
+                                                                        <div className="h-2 flex-1 rounded-full bg-muted/40 overflow-hidden">
+                                                                            <div
+                                                                                className={cn("h-full", taskMinutes > 0 ? "bg-amber-400/80" : "bg-muted/30")}
+                                                                                style={{ width: `${Math.min(100, (taskMinutes / maxBotheringMinutes) * 100)}%` }}
+                                                                            />
+                                                                        </div>
+                                                                        <span className={cn("text-[10px] tabular-nums min-w-[32px] text-right", accent)}>{hours.toFixed(1)}</span>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    </React.Fragment>
+                                                ))}
                                             </React.Fragment>
                                         );
                                     })}
@@ -1406,7 +1475,7 @@ export function TimesheetPageContent({
                 </div>
             </div>
         );
-    }, [effectiveDashboardMonth, schedule, collapsedHabitGroups, collapsedSpecializations, upskillDefinitions, deepWorkDefinitions, microSkillMap, mindsetCards, habitDashboardTab, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs]);
+    }, [effectiveDashboardMonth, schedule, collapsedHabitGroups, collapsedSpecializations, collapsedBotherings, upskillDefinitions, deepWorkDefinitions, microSkillMap, mindsetCards, habitDashboardTab, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs]);
 
     const timesheetBody = (
         <>
