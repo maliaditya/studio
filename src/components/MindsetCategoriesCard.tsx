@@ -18,7 +18,7 @@ import { Label } from './ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { format, isSameDay, isBefore, subDays, startOfDay } from 'date-fns';
+import { format, isSameDay, isBefore, subDays, startOfDay, differenceInDays, parseISO } from 'date-fns';
 import { LinkTechniqueModal } from './LinkTechniqueModal';
 import { ChartContainer } from './ui/chart';
 import { LineChart as RechartsLineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer } from 'recharts';
@@ -210,7 +210,10 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
     onOpenChange: (isOpen: boolean) => void;
     allLinkedResistances: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[];
 }) => {
-    const [position, setPosition] = useState({ x: window.innerWidth / 2 - 420, y: window.innerHeight / 2 - 260 });
+    const [position, setPosition] = useState(() => ({
+        x: typeof window !== 'undefined' ? window.innerWidth / 2 - 420 : 0,
+        y: typeof window !== 'undefined' ? window.innerHeight / 2 - 260 : 0,
+    }));
     const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
     const [filter, setFilter] = useState<'all' | 'today' | 'lastX'>('lastX');
     const [lastXDays, setLastXDays] = useState(5);
@@ -413,7 +416,10 @@ export function MindsetCategoriesCard() {
     const [botheringTaskSlot, setBotheringTaskSlot] = useState<SlotName>('Evening');
     const [newBotheringText, setNewBotheringText] = useState('');
     const [botheringType, setBotheringType] = useState<'mismatch' | 'constraint'>('mismatch');
-    const [position, setPosition] = useState({ x: window.innerWidth / 2 - 360, y: window.innerHeight / 2 - 260 });
+    const [position, setPosition] = useState(() => ({
+        x: typeof window !== 'undefined' ? window.innerWidth / 2 - 360 : 0,
+        y: typeof window !== 'undefined' ? window.innerHeight / 2 - 260 : 0,
+    }));
     const dragState = React.useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
 
     useEffect(() => {
@@ -468,6 +474,16 @@ export function MindsetCategoriesCard() {
         const total = point?.tasks?.length || 0;
         const completed = point?.tasks?.filter(t => t.completed).length || 0;
         return { total, completed, remaining: Math.max(0, total - completed) };
+    };
+    const getDaysLeftLabel = (endDate?: string) => {
+        if (!endDate) return null;
+        const target = parseISO(endDate);
+        if (Number.isNaN(target.getTime())) return null;
+        const today = startOfDay(new Date());
+        const diff = differenceInDays(target, today);
+        if (diff < 0) return `Overdue ${Math.abs(diff)}d`;
+        if (diff === 0) return "Due today";
+        return `${diff}d left`;
     };
 
     useEffect(() => {
@@ -923,9 +939,9 @@ export function MindsetCategoriesCard() {
                                                                             <span className={cn(point.completed && "line-through text-muted-foreground")}>{point.text}</span>
                                                                         </div>
                                                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                                                            {point.endDate && (
+                                                                            {getDaysLeftLabel(point.endDate) && (
                                                                                 <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
-                                                                                    {point.endDate}
+                                                                                    {getDaysLeftLabel(point.endDate)}
                                                                                 </span>
                                                                             )}
                                                                             {stats.total > 0 && (
@@ -980,9 +996,9 @@ export function MindsetCategoriesCard() {
                                                                             <span className={cn(point.completed && "line-through text-muted-foreground")}>{point.text}</span>
                                                                         </div>
                                                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                                                            {point.endDate && (
+                                                                            {getDaysLeftLabel(point.endDate) && (
                                                                                 <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
-                                                                                    {point.endDate}
+                                                                                    {getDaysLeftLabel(point.endDate)}
                                                                                 </span>
                                                                             )}
                                                                             {stats.total > 0 && (

@@ -28,7 +28,10 @@ export function StopperProgressModal({ popupState, onOpenChange }: StopperProgre
     }
 
     const { isOpen, stopper, habitName } = popupState;
-    const [position, setPosition] = useState({ x: window.innerWidth / 2 - 300, y: window.innerHeight / 2 - 240 });
+    const [position, setPosition] = useState(() => ({
+        x: typeof window !== 'undefined' ? window.innerWidth / 2 - 300 : 0,
+        y: typeof window !== 'undefined' ? window.innerHeight / 2 - 240 : 0,
+    }));
     const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
 
     useEffect(() => {
