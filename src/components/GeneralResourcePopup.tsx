@@ -195,13 +195,14 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         id: `general-popup-${popupState.resourceId}`,
     });
 
+    const baseZ = (drawingCanvasState?.isOpen ? 150 : 65) + (popupState.level || 0);
     const style: React.CSSProperties = {
         position: 'fixed',
         top: popupState.y,
         left: popupState.x,
         width: `${popupState.width || 420}px`,
         willChange: 'transform',
-        zIndex: popupState.z ?? (65 + (popupState.level || 0)),
+        zIndex: Math.max(popupState.z ?? 0, baseZ),
     };
 
     if (transform) {
