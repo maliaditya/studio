@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -46,7 +46,7 @@ export function TodaysWorkoutModal({
   removeExerciseFromWorkout,
   swapWorkoutExercise,
 }: TodaysWorkoutModalProps) {
-  const { allWorkoutLogs, setAllWorkoutLogs, exerciseDefinitions, workoutMode, workoutPlans, swapWorkoutForDay, workoutPlanRotation, settings } = useAuth();
+  const { allWorkoutLogs, setAllWorkoutLogs, exerciseDefinitions, workoutMode, workoutPlans, swapWorkoutForDay, workoutPlanRotation, settings, updateActivity } = useAuth();
   const { toast } = useToast();
 
   const currentWorkoutLog = useMemo(() => {
@@ -72,6 +72,14 @@ export function TodaysWorkoutModal({
   }, [isOpen, dateForWorkout, currentWorkoutLog, workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs]);
 
   const exercisesInLog = currentWorkoutLog?.exercises || todaysExercises;
+
+  useEffect(() => {
+    if (!isOpen || !activityToLog) return;
+    if (!Array.isArray(muscleGroupsForDay) || muscleGroupsForDay.length === 0) return;
+    const workoutName = muscleGroupsForDay.join(' & ');
+    if (activityToLog.details === workoutName) return;
+    updateActivity({ ...activityToLog, details: workoutName });
+  }, [isOpen, activityToLog, muscleGroupsForDay, updateActivity]);
 
   const pendingExercises = useMemo(() => 
     exercisesInLog.filter(ex => ex.loggedSets.length < ex.targetSets), 
@@ -103,6 +111,10 @@ export function TodaysWorkoutModal({
 
   const handleSwapWorkout = (newCategories: ExerciseCategory[]) => {
     swapWorkoutForDay(dateForWorkout, newCategories);
+    if (activityToLog) {
+      const workoutName = newCategories.join(' & ');
+      updateActivity({ ...activityToLog, details: workoutName });
+    }
   };
 
   const workoutOptions = useMemo(() => {

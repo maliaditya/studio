@@ -690,8 +690,20 @@ export interface MindsetPoint {
   completed?: boolean;
   resolution?: string;
   endDate?: string;
+  mismatchType?: 'mental-model' | 'cognitive-load' | 'threat-prediction' | 'action-sequencing';
   linkedHabitIds?: string[];
-  tasks?: { id: string; type: ActivityType; details: string; completed?: boolean; activityId?: string; dateKey?: string; slotName?: SlotName }[];
+  tasks?: {
+    id: string;
+    type: ActivityType;
+    details: string;
+    completed?: boolean;
+    activityId?: string;
+    dateKey?: string;
+    slotName?: SlotName;
+    recurrence?: 'none' | 'daily' | 'weekly';
+    startDate?: string;
+    completionHistory?: Record<string, boolean>;
+  }[];
 }
 
 export interface MindsetTechniquePopupState {

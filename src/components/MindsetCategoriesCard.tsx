@@ -18,7 +18,7 @@ import { Label } from './ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { format, isSameDay, isBefore, subDays, startOfDay, differenceInDays, parseISO } from 'date-fns';
+import { format, isSameDay, isBefore, subDays, startOfDay, differenceInDays, parseISO, eachDayOfInterval, isAfter, getDay } from 'date-fns';
 import { LinkTechniqueModal } from './LinkTechniqueModal';
 import { ChartContainer } from './ui/chart';
 import { LineChart as RechartsLineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer } from 'recharts';
@@ -400,6 +400,7 @@ export function MindsetCategoriesCard() {
         setMindsetCards,
         schedule,
         setSchedule,
+        toggleRoutine,
     } = useAuth();
     
     const [hotResistances, setHotResistances] = useState<Set<string>>(new Set());
@@ -411,11 +412,12 @@ export function MindsetCategoriesCard() {
     const [selectedHabitId, setSelectedHabitId] = useState<string>('');
     const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
     const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-    const [botheringPopup, setBotheringPopup] = useState<{ type: 'mismatch' | 'constraint'; pointId: string } | null>(null);
+    const [botheringPopup, setBotheringPopup] = useState<{ type: 'mismatch' | 'constraint' | 'external'; pointId: string } | null>(null);
     const [selectedBotheringHabitId, setSelectedBotheringHabitId] = useState('');
     const [botheringTaskSlot, setBotheringTaskSlot] = useState<SlotName>('Evening');
     const [newBotheringText, setNewBotheringText] = useState('');
-    const [botheringType, setBotheringType] = useState<'mismatch' | 'constraint'>('mismatch');
+    const [newMismatchType, setNewMismatchType] = useState<MindsetPoint['mismatchType']>('mental-model');
+    const [botheringType, setBotheringType] = useState<'mismatch' | 'constraint' | 'external'>('mismatch');
     const [position, setPosition] = useState(() => ({
         x: typeof window !== 'undefined' ? window.innerWidth / 2 - 360 : 0,
         y: typeof window !== 'undefined' ? window.innerHeight / 2 - 260 : 0,
@@ -436,13 +438,18 @@ export function MindsetCategoriesCard() {
         }
     }, [isAddPopoverOpen, selectedHabitId, habitCards]);
 
-    const getOrCreateBotheringCard = useCallback((type: 'mismatch' | 'constraint') => {
+    const getOrCreateBotheringCard = useCallback((type: 'mismatch' | 'constraint' | 'external') => {
         const id = `mindset_botherings_${type}`;
         const existing = mindsetCards.find(c => c.id === id);
         if (existing) return existing;
+        const titleMap: Record<'mismatch' | 'constraint' | 'external', string> = {
+            mismatch: 'Mismatch Botherings',
+            constraint: 'Constraint Botherings',
+            external: 'External Botherings',
+        };
         const newCard: MindsetCard = {
             id,
-            title: type === 'mismatch' ? 'Mismatch Botherings' : 'Constraint Botherings',
+            title: titleMap[type],
             icon: 'Brain',
             points: [],
         };
@@ -453,20 +460,30 @@ export function MindsetCategoriesCard() {
     const addBothering = () => {
         if (!newBotheringText.trim()) return;
         const card = getOrCreateBotheringCard(botheringType);
-        const newPoint: MindsetPoint = { id: `bother_${Date.now()}`, text: newBotheringText.trim() };
+        const newPoint: MindsetPoint = {
+            id: `bother_${Date.now()}`,
+            text: newBotheringText.trim(),
+            ...(botheringType === 'mismatch' ? { mismatchType: newMismatchType } : {}),
+        };
         setMindsetCards(prev => prev.map(c => c.id === card.id ? { ...c, points: [...c.points, newPoint] } : c));
         setNewBotheringText('');
     };
 
-    const deleteBothering = (type: 'mismatch' | 'constraint', pointId: string) => {
+    const deleteBothering = (type: 'mismatch' | 'constraint' | 'external', pointId: string) => {
         const cardId = `mindset_botherings_${type}`;
         setMindsetCards(prev => prev.map(c => c.id === cardId ? { ...c, points: c.points.filter(p => p.id !== pointId) } : c));
     };
 
     const mismatchCard = mindsetCards.find(c => c.id === 'mindset_botherings_mismatch');
     const constraintCard = mindsetCards.find(c => c.id === 'mindset_botherings_constraint');
+    const externalCard = mindsetCards.find(c => c.id === 'mindset_botherings_external');
 
-    const activeBotheringCard = botheringPopup?.type === 'mismatch' ? mismatchCard : constraintCard;
+    const activeBotheringCard =
+        botheringPopup?.type === 'mismatch'
+            ? mismatchCard
+            : botheringPopup?.type === 'constraint'
+                ? constraintCard
+                : externalCard;
     const activeBotheringPoint = activeBotheringCard?.points.find(p => p.id === botheringPopup?.pointId);
     const isBotheringActive = (point?: MindsetPoint) =>
         !!point && (point.tasks?.length || 0) > 0 && !point.completed;
@@ -474,6 +491,42 @@ export function MindsetCategoriesCard() {
         const total = point?.tasks?.length || 0;
         const completed = point?.tasks?.filter(t => t.completed).length || 0;
         return { total, completed, remaining: Math.max(0, total - completed) };
+    };
+    const isTaskDueOnDate = (task: MindsetPoint['tasks'][number], dateKey: string) => {
+        const startKey = task.startDate || task.dateKey;
+        if (!startKey) return false;
+        const start = parseISO(startKey);
+        const date = parseISO(dateKey);
+        if (Number.isNaN(start.getTime()) || Number.isNaN(date.getTime())) return false;
+        if (isAfter(startOfDay(start), startOfDay(date))) return false;
+        if (task.recurrence === 'daily') return true;
+        if (task.recurrence === 'weekly') return getDay(start) === getDay(date);
+        return startKey === dateKey;
+    };
+    const isTaskCompletedOnDate = (task: MindsetPoint['tasks'][number], dateKey: string) => {
+        if (task.recurrence && task.recurrence !== 'none') {
+            return !!task.completionHistory?.[dateKey];
+        }
+        if (task.dateKey && task.dateKey !== dateKey) return false;
+        return !!task.completed;
+    };
+    const getRecurringTaskCounts = (task: MindsetPoint['tasks'][number]) => {
+        if (!task.recurrence || task.recurrence === 'none') return null;
+        const startKey = task.startDate || task.dateKey;
+        if (!startKey) return { completed: 0, missed: 0 };
+        const start = parseISO(startKey);
+        const today = startOfDay(new Date());
+        if (Number.isNaN(start.getTime())) return { completed: 0, missed: 0 };
+        const days = eachDayOfInterval({ start: startOfDay(start), end: today });
+        let completed = 0;
+        let missed = 0;
+        days.forEach(day => {
+            const key = format(day, 'yyyy-MM-dd');
+            if (!isTaskDueOnDate(task, key)) return;
+            if (task.completionHistory?.[key]) completed += 1;
+            else if (key !== format(today, 'yyyy-MM-dd')) missed += 1;
+        });
+        return { completed, missed };
     };
     const getDaysLeftLabel = (endDate?: string) => {
         if (!endDate) return null;
@@ -491,7 +544,7 @@ export function MindsetCategoriesCard() {
         setSelectedBotheringHabitId('');
     }, [botheringPopup]);
 
-    const updateBotheringPoint = useCallback((type: 'mismatch' | 'constraint', pointId: string, updater: (point: MindsetPoint) => MindsetPoint) => {
+    const updateBotheringPoint = useCallback((type: 'mismatch' | 'constraint' | 'external', pointId: string, updater: (point: MindsetPoint) => MindsetPoint) => {
         const cardId = `mindset_botherings_${type}`;
         setMindsetCards(prev => prev.map(c => c.id === cardId ? { ...c, points: c.points.map(p => p.id === pointId ? updater(p) : p) } : c));
     }, [setMindsetCards]);
@@ -547,6 +600,9 @@ export function MindsetCategoriesCard() {
                             if (!activityId) return task;
                             const match = scheduleActivityMap.get(activityId);
                             if (!match) {
+                                if (task.recurrence && task.recurrence !== 'none') {
+                                    return task;
+                                }
                                 tasksChanged = true;
                                 return null;
                             }
@@ -568,6 +624,14 @@ export function MindsetCategoriesCard() {
                                     dateKey,
                                     slotName,
                                 };
+                            }
+                            if (task.recurrence && task.recurrence !== 'none') {
+                                const history = { ...(task.completionHistory || {}) };
+                                history[dateKey] = activity.completed;
+                                if (!task.completionHistory || task.completionHistory[dateKey] !== activity.completed) {
+                                    tasksChanged = true;
+                                    return { ...task, completionHistory: history };
+                                }
                             }
                             return task;
                         })
@@ -901,11 +965,12 @@ export function MindsetCategoriesCard() {
                                 </div>
                                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
                                     <div className="text-sm font-semibold mb-3">Botherings</div>
-                                    <Tabs value={botheringType} onValueChange={(v) => setBotheringType(v as any)}>
-                                        <TabsList className="grid grid-cols-2 w-full mb-3">
-                                            <TabsTrigger value="mismatch">Mismatch</TabsTrigger>
-                                            <TabsTrigger value="constraint">Constraint</TabsTrigger>
-                                        </TabsList>
+    <Tabs value={botheringType} onValueChange={(v) => setBotheringType(v as any)}>
+        <TabsList className="grid grid-cols-3 w-full mb-3">
+            <TabsTrigger value="mismatch">Mismatch</TabsTrigger>
+            <TabsTrigger value="constraint">Constraint</TabsTrigger>
+            <TabsTrigger value="external">External</TabsTrigger>
+        </TabsList>
                                         <TabsContent value="mismatch" className="space-y-3">
                                             <div className="text-xs text-muted-foreground">
                                                 Expectation vs Reality. Cognitive. Debuggable by understanding.
@@ -963,16 +1028,16 @@ export function MindsetCategoriesCard() {
                                                 </ul>
                                             </ScrollArea>
                                         </TabsContent>
-                                        <TabsContent value="constraint" className="space-y-3">
-                                            <div className="text-xs text-muted-foreground">
-                                                Capacity &gt; Allowed space. Energy &gt; Channel. Growth &gt; Container. Produces ghutan and baichaini.
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <Input value={newBotheringText} onChange={(e) => setNewBotheringText(e.target.value)} placeholder="Describe the constraint..." />
-                                                <Button onClick={addBothering}>Add</Button>
-                                            </div>
-                                            <ScrollArea className="h-[420px] pr-2">
-                                                <ul className="space-y-2">
+        <TabsContent value="constraint" className="space-y-3">
+            <div className="text-xs text-muted-foreground">
+                Capacity &gt; Allowed space. Energy &gt; Channel. Growth &gt; Container. Produces ghutan and baichaini.
+            </div>
+            <div className="flex gap-2">
+                <Input value={newBotheringText} onChange={(e) => setNewBotheringText(e.target.value)} placeholder="Describe the constraint..." />
+                <Button onClick={addBothering}>Add</Button>
+            </div>
+            <ScrollArea className="h-[420px] pr-2">
+                <ul className="space-y-2">
                                                     {(constraintCard?.points || [])
                                                         .slice()
                                                         .sort((a, b) => {
@@ -1017,10 +1082,67 @@ export function MindsetCategoriesCard() {
                                                                 </li>
                                                             );
                                                         })}
-                                                </ul>
-                                            </ScrollArea>
-                                        </TabsContent>
-                                    </Tabs>
+                </ul>
+            </ScrollArea>
+        </TabsContent>
+        <TabsContent value="external" className="space-y-3">
+            <div className="text-xs text-muted-foreground">
+                External friction: people, environment, systems, or context outside you.
+            </div>
+            <div className="flex gap-2">
+                <Input value={newBotheringText} onChange={(e) => setNewBotheringText(e.target.value)} placeholder="Describe the external bothering..." />
+                <Button onClick={addBothering}>Add</Button>
+            </div>
+            <ScrollArea className="h-[420px] pr-2">
+                <ul className="space-y-2">
+                    {(externalCard?.points || [])
+                        .slice()
+                        .sort((a, b) => {
+                            const aActive = isBotheringActive(a);
+                            const bActive = isBotheringActive(b);
+                            if (aActive !== bActive) return aActive ? -1 : 1;
+                            if (!!a.completed !== !!b.completed) return a.completed ? 1 : -1;
+                            return 0;
+                        })
+                        .map(point => {
+                            const stats = getTaskStats(point);
+                            return (
+                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isBotheringActive(point) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-white/5")}>
+                                    <button
+                                        type="button"
+                                        className="flex-1 min-w-0 text-left"
+                                        onClick={() => setBotheringPopup({ type: 'external', pointId: point.id })}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {point.completed ? <Check className="h-4 w-4 text-emerald-400" /> : null}
+                                            <span className={cn(point.completed && "line-through text-muted-foreground")}>{point.text}</span>
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                            {getDaysLeftLabel(point.endDate) && (
+                                                <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
+                                                    {getDaysLeftLabel(point.endDate)}
+                                                </span>
+                                            )}
+                                            {stats.total > 0 && (
+                                                <span className="text-muted-foreground">
+                                                    {stats.completed}/{stats.total}
+                                                </span>
+                                            )}
+                                            {isBotheringActive(point) && (
+                                                <span className="h-2 w-2 rounded-full bg-emerald-400/80" />
+                                            )}
+                                        </div>
+                                    </button>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteBothering('external', point.id)}>
+                                        <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                </li>
+                            );
+                        })}
+                </ul>
+            </ScrollArea>
+        </TabsContent>
+    </Tabs>
                                 </div>
                             </div>
                         </div>
@@ -1047,9 +1169,27 @@ export function MindsetCategoriesCard() {
                             <div className="p-4 border-b border-white/10 flex items-start justify-between">
                                 <div className="space-y-1">
                                     <div className="text-base font-semibold">
-                                        {botheringPopup.type === 'mismatch' ? 'Mismatch Bothering' : 'Constraint Bothering'}
+                                        {botheringPopup.type === 'mismatch' ? 'Mismatch Bothering' : botheringPopup.type === 'constraint' ? 'Constraint Bothering' : 'External Bothering'}
                                     </div>
                                     <div className="text-sm text-muted-foreground">{activeBotheringPoint.text}</div>
+                                    {botheringPopup.type === 'mismatch' && (
+                                        <div className="pt-2">
+                                            <Select
+                                                value={activeBotheringPoint.mismatchType ?? 'mental-model'}
+                                                onValueChange={(v) => updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({ ...point, mismatchType: v as MindsetPoint['mismatchType'] }))}
+                                            >
+                                                <SelectTrigger className="h-8 w-[240px]">
+                                                    <SelectValue placeholder="Mismatch type" />
+                                                </SelectTrigger>
+                                                <SelectContent className="z-[200]">
+                                                    <SelectItem value="mental-model">Mental model mismatch</SelectItem>
+                                                    <SelectItem value="cognitive-load">Cognitive load mismatch</SelectItem>
+                                                    <SelectItem value="threat-prediction">Threat prediction mismatch</SelectItem>
+                                                    <SelectItem value="action-sequencing">Action sequencing mismatch</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    )}
                                 </div>
                                 <Button variant="ghost" size="icon" onClick={() => setBotheringPopup(null)}>
                                     <X className="h-4 w-4" />
@@ -1189,13 +1329,24 @@ export function MindsetCategoriesCard() {
                                                     ...point,
                                                     tasks: [
                                                         ...(point.tasks || []),
-                                                        { id: activityId, activityId, type, details: label, completed: false, dateKey, slotName: botheringTaskSlot },
+                                                        {
+                                                            id: activityId,
+                                                            activityId,
+                                                            type,
+                                                            details: label,
+                                                            completed: false,
+                                                            dateKey,
+                                                            slotName: botheringTaskSlot,
+                                                            recurrence: 'none',
+                                                            startDate: dateKey,
+                                                            completionHistory: undefined,
+                                                        },
                                                     ],
                                                 }));
                                             }}
                                         />
                                         </DropdownMenu>
-                                    <ScrollArea className="h-[260px] pr-2">
+                                    <ScrollArea className="h-[420px] pr-2">
                                         <ul className="space-y-2">
                                             {(activeBotheringPoint.tasks || []).map((task) => (
                                                 <li key={task.id} className="flex items-start gap-2 text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
@@ -1204,9 +1355,13 @@ export function MindsetCategoriesCard() {
                                                         className={cn("h-6 w-6 rounded border border-white/10 flex items-center justify-center", task.completed && "bg-emerald-500/20 border-emerald-500/40")}
                                                         onClick={() => {
                                                             const nextCompleted = !task.completed;
+                                                            const todayKey = format(new Date(), 'yyyy-MM-dd');
+                                                            const nextHistory = task.recurrence && task.recurrence !== 'none'
+                                                                ? { ...(task.completionHistory || {}), [todayKey]: nextCompleted }
+                                                                : task.completionHistory;
                                                             updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
                                                                 ...point,
-                                                                tasks: (point.tasks || []).map(t => t.id === task.id ? { ...t, completed: nextCompleted } : t),
+                                                                tasks: (point.tasks || []).map(t => t.id === task.id ? { ...t, completed: nextCompleted, completionHistory: nextHistory } : t),
                                                             }));
                                                             const activityId = task.activityId || task.id;
                                                             if (activityId) {
@@ -1234,6 +1389,54 @@ export function MindsetCategoriesCard() {
                                                         <div className="text-xs text-muted-foreground capitalize">
                                                             {task.type.replace('-', ' ')} {task.slotName ? `• ${task.slotName}` : ''}
                                                         </div>
+                                                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                                                            <span>Repeat</span>
+                                                            <Select
+                                                                value={task.recurrence || 'none'}
+                                                                onValueChange={(value) => {
+                                                                    const recurrence = value as 'none' | 'daily' | 'weekly';
+                                                                    const baseDate = task.startDate || task.dateKey || format(new Date(), 'yyyy-MM-dd');
+                                                                    updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                                                        ...point,
+                                                                        tasks: (point.tasks || []).map(t => t.id === task.id ? {
+                                                                            ...t,
+                                                                            recurrence,
+                                                                            startDate: t.startDate || baseDate,
+                                                                            completionHistory: recurrence === 'none' ? undefined : (t.completionHistory || {}),
+                                                                        } : t),
+                                                                    }));
+                                                                    const activityId = task.activityId || task.id;
+                                                                    const activity = activityId ? scheduleActivityMap.get(activityId)?.activity : null;
+                                                                    const routineActivity: Activity = activity || {
+                                                                        id: activityId || `routine_${Date.now()}`,
+                                                                        type: task.type,
+                                                                        details: task.details,
+                                                                        completed: false,
+                                                                        slot: task.slotName || botheringTaskSlot,
+                                                                        taskIds: [],
+                                                                    };
+                                                                    toggleRoutine(routineActivity, recurrence === 'none' ? null : { type: recurrence }, baseDate);
+                                                                }}
+                                                            >
+                                                                <SelectTrigger className="h-7 w-[120px]">
+                                                                    <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent className="z-[200]">
+                                                                    <SelectItem value="none">None</SelectItem>
+                                                                    <SelectItem value="daily">Daily</SelectItem>
+                                                                    <SelectItem value="weekly">Weekly</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                        {(() => {
+                                                            const counts = getRecurringTaskCounts(task);
+                                                            if (!counts) return null;
+                                                            return (
+                                                                <div className="text-[11px] text-muted-foreground">
+                                                                    {counts.completed} done • {counts.missed} missed
+                                                                </div>
+                                                            );
+                                                        })()}
                                                     </div>
                                                     <Button
                                                         variant="ghost"

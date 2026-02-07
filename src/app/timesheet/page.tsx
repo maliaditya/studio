@@ -9,12 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfDay, isAfter, getDay } from 'date-fns';
 import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide, Check, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
-import type { Activity, PauseEvent, ActivityType as ActivityTypeType } from '@/types/workout';
+import type { Activity, PauseEvent, ActivityType as ActivityTypeType, MindsetPoint } from '@/types/workout';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
@@ -837,7 +837,7 @@ export function TimesheetPageContent({
             dayActivityMaps.set(dateKey, activityMap);
         });
 
-        const botherings = ['mindset_botherings_mismatch', 'mindset_botherings_constraint']
+        const botherings = ['mindset_botherings_mismatch', 'mindset_botherings_constraint', 'mindset_botherings_external']
             .map(id => mindsetCards.find(c => c.id === id))
             .flatMap(card => card?.points || [])
             .filter(point => (point.tasks?.length || 0) > 0 && !point.completed)
@@ -847,6 +847,27 @@ export function TimesheetPageContent({
                 endDate: point.endDate,
                 tasks: point.tasks || [],
             }));
+
+        const isTaskDueOnDate = (task: MindsetPoint['tasks'][number], dateKey: string) => {
+            const startKey = task.startDate || task.dateKey;
+            if (!startKey) return false;
+            const start = parseISO(startKey);
+            const date = parseISO(dateKey);
+            if (Number.isNaN(start.getTime()) || Number.isNaN(date.getTime())) return false;
+            if (isAfter(startOfDay(start), startOfDay(date))) return false;
+            if (task.recurrence === 'daily') return true;
+            if (task.recurrence === 'weekly') return getDay(start) === getDay(date);
+            return startKey === dateKey;
+        };
+        const isTaskCompletedOnDate = (task: MindsetPoint['tasks'][number], dateKey: string, activityMap: Map<string, Activity>) => {
+            if (task.recurrence && task.recurrence !== 'none') {
+                return !!task.completionHistory?.[dateKey];
+            }
+            const activity = activityMap.get(task.activityId || task.id);
+            if (activity) return !!activity.completed;
+            if (task.dateKey && task.dateKey !== dateKey) return false;
+            return !!task.completed;
+        };
 
         const dayCompletion = daysInMonth.map(day => {
             const dateKey = format(day, 'yyyy-MM-dd');
@@ -886,10 +907,9 @@ export function TimesheetPageContent({
             let completed = 0;
             botherings.forEach(b => {
                 b.tasks.forEach(task => {
-                    const act = activityMap.get(task.activityId || task.id);
-                    if (!act) return;
+                    if (!isTaskDueOnDate(task, dateKey)) return;
                     total += 1;
-                    if (act.completed) completed += 1;
+                    if (isTaskCompletedOnDate(task, dateKey, activityMap)) completed += 1;
                 });
             });
             const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
@@ -940,9 +960,12 @@ export function TimesheetPageContent({
                 const dateKey = format(day, 'yyyy-MM-dd');
                 const activityMap = dayActivityMaps.get(dateKey) || new Map();
                 b.tasks.forEach(task => {
+                    if (!isTaskDueOnDate(task, dateKey)) return;
+                    if (!isTaskCompletedOnDate(task, dateKey, activityMap)) return;
                     const act = activityMap.get(task.activityId || task.id);
-                    if (!act || !act.completed) return;
-                    totalMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
+                    if (act) {
+                        totalMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
+                    }
                 });
             });
             return { id: b.id, totalMinutes };
@@ -955,9 +978,12 @@ export function TimesheetPageContent({
             let totalMinutes = 0;
             botherings.forEach(b => {
                 b.tasks.forEach(task => {
+                    if (!isTaskDueOnDate(task, dateKey)) return;
+                    if (!isTaskCompletedOnDate(task, dateKey, activityMap)) return;
                     const act = activityMap.get(task.activityId || task.id);
-                    if (!act || !act.completed) return;
-                    totalMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
+                    if (act) {
+                        totalMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
+                    }
                 });
             });
             return { date: day, totalMinutes };
@@ -1303,18 +1329,16 @@ export function TimesheetPageContent({
                                                 {daysInMonth.map((day, index) => {
                                                     const dateKey = format(day, 'yyyy-MM-dd');
                                                     const activityMap = dayActivityMaps.get(dateKey) || new Map();
-                                                    const dayTasks = bothering.tasks
-                                                        .map(task => activityMap.get(task.activityId || task.id))
-                                                        .filter(Boolean) as Activity[];
-                                                    const completedTasks = dayTasks.filter(t => t.completed);
-                                                    const hasTasks = dayTasks.length > 0;
+                                                    const dueTasks = bothering.tasks.filter(task => isTaskDueOnDate(task, dateKey));
+                                                    const completedCount = dueTasks.filter(task => isTaskCompletedOnDate(task, dateKey, activityMap)).length;
+                                                    const hasTasks = dueTasks.length > 0;
                                                     const isEndDate = bothering.endDate && bothering.endDate === dateKey;
                                                     return (
                                                         <div key={`${bothering.id}-${dateKey}`} className={cn("h-8 flex items-center justify-center border-b border-muted/20", isAltWeek(index) && "bg-muted/20", isEndDate && "bg-amber-400/20 border-amber-400/40")}>
                                                             <div className={cn(
                                                                 "h-4 w-4 mx-auto rounded-sm border border-muted-foreground/30",
-                                                                hasTasks && completedTasks.length === 0 && "bg-muted/40",
-                                                                completedTasks.length > 0 && "bg-emerald-400/80 border-emerald-400"
+                                                                hasTasks && completedCount === 0 && "bg-muted/40",
+                                                                completedCount > 0 && "bg-emerald-400/80 border-emerald-400"
                                                             )} />
                                                         </div>
                                                     );
