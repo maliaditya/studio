@@ -292,6 +292,7 @@ export function TimesheetPageContent({
         upskillDefinitions,
         deepWorkDefinitions,
         microSkillMap,
+        mindsetCards,
     } = useAuth();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>("day");
@@ -301,6 +302,7 @@ export function TimesheetPageContent({
     const [localDashboardMonth, setLocalDashboardMonth] = useState(startOfMonth(new Date()));
     const [collapsedHabitGroups, setCollapsedHabitGroups] = useState<Record<string, boolean>>({});
     const [collapsedSpecializations, setCollapsedSpecializations] = useState<Record<string, boolean>>({});
+    const [habitDashboardTab, setHabitDashboardTab] = useState<'daily' | 'botherings'>('botherings');
     const dashboardOuterRef = useRef<HTMLDivElement>(null);
     const dashboardInnerRef = useRef<HTMLDivElement>(null);
     const [dashboardScale, setDashboardScale] = useState(1);
@@ -823,6 +825,29 @@ export function TimesheetPageContent({
             return aName.localeCompare(bName);
         });
 
+        const dayActivityMaps = new Map<string, Map<string, Activity>>();
+        daysInMonth.forEach(day => {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            const daySchedule = schedule[dateKey] || {};
+            const allSlots = Object.values(daySchedule) as Activity[][];
+            const activityMap = new Map<string, Activity>();
+            allSlots.flat().forEach(act => {
+                if (act?.id) activityMap.set(act.id, act);
+            });
+            dayActivityMaps.set(dateKey, activityMap);
+        });
+
+        const botherings = ['mindset_botherings_mismatch', 'mindset_botherings_constraint']
+            .map(id => mindsetCards.find(c => c.id === id))
+            .flatMap(card => card?.points || [])
+            .filter(point => (point.tasks?.length || 0) > 0 && !point.completed)
+            .map(point => ({
+                id: point.id,
+                text: point.text,
+                endDate: point.endDate,
+                tasks: point.tasks || [],
+            }));
+
         const dayCompletion = daysInMonth.map(day => {
             const dateKey = format(day, 'yyyy-MM-dd');
             const daySchedule = schedule[dateKey] || {};
@@ -854,11 +879,30 @@ export function TimesheetPageContent({
             return { date: day, percent, completed, total };
         });
 
-        const overallTotal = dayCompletion.reduce((sum, day) => sum + day.total, 0);
-        const overallCompleted = dayCompletion.reduce((sum, day) => sum + day.completed, 0);
+        const dayBotheringCompletion = daysInMonth.map(day => {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            const activityMap = dayActivityMaps.get(dateKey) || new Map();
+            let total = 0;
+            let completed = 0;
+            botherings.forEach(b => {
+                b.tasks.forEach(task => {
+                    const act = activityMap.get(task.activityId || task.id);
+                    if (!act) return;
+                    total += 1;
+                    if (act.completed) completed += 1;
+                });
+            });
+            const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
+            return { date: day, percent, completed, total };
+        });
+
+        const overallTotal = (habitDashboardTab === 'botherings' ? dayBotheringCompletion : dayCompletion)
+            .reduce((sum, day) => sum + day.total, 0);
+        const overallCompleted = (habitDashboardTab === 'botherings' ? dayBotheringCompletion : dayCompletion)
+            .reduce((sum, day) => sum + day.completed, 0);
         const overallPercent = overallTotal === 0 ? 0 : Math.round((overallCompleted / overallTotal) * 100);
 
-        const maxBar = Math.max(1, ...dayCompletion.map(day => day.percent));
+        const maxBar = Math.max(1, ...(habitDashboardTab === 'botherings' ? dayBotheringCompletion : dayCompletion).map(day => day.percent));
         const isAltWeek = (index: number) => Math.floor(index / 7) % 2 === 1;
 
         const habitTotals = habits.map(habit => {
@@ -890,6 +934,36 @@ export function TimesheetPageContent({
         });
         const maxDayMinutes = Math.max(1, ...dayTotals.map(d => d.totalMinutes));
 
+        const botheringTotals = botherings.map(b => {
+            let totalMinutes = 0;
+            daysInMonth.forEach(day => {
+                const dateKey = format(day, 'yyyy-MM-dd');
+                const activityMap = dayActivityMaps.get(dateKey) || new Map();
+                b.tasks.forEach(task => {
+                    const act = activityMap.get(task.activityId || task.id);
+                    if (!act || !act.completed) return;
+                    totalMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
+                });
+            });
+            return { id: b.id, totalMinutes };
+        });
+        const maxBotheringMinutes = Math.max(1, ...botheringTotals.map(b => b.totalMinutes));
+
+        const botheringsDayTotals = daysInMonth.map(day => {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            const activityMap = dayActivityMaps.get(dateKey) || new Map();
+            let totalMinutes = 0;
+            botherings.forEach(b => {
+                b.tasks.forEach(task => {
+                    const act = activityMap.get(task.activityId || task.id);
+                    if (!act || !act.completed) return;
+                    totalMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
+                });
+            });
+            return { date: day, totalMinutes };
+        });
+        const maxBotheringsDayMinutes = Math.max(1, ...botheringsDayTotals.map(d => d.totalMinutes));
+
         const groupTotals = orderedTypes.map(type => {
             const groupHabits = habitsByType[type] || [];
             const totalMinutes = groupHabits.reduce((sum, habit) => {
@@ -910,6 +984,12 @@ export function TimesheetPageContent({
                             month={effectiveDashboardMonth}
                             onChange={handleDashboardMonthChange}
                         />
+                        <Tabs value={habitDashboardTab} onValueChange={(v) => setHabitDashboardTab(v as 'daily' | 'botherings')}>
+                            <TabsList>
+                                <TabsTrigger value="daily">Daily Habits</TabsTrigger>
+                                <TabsTrigger value="botherings">Botherings</TabsTrigger>
+                            </TabsList>
+                        </Tabs>
                     </div>
                 )}
 
@@ -932,7 +1012,7 @@ export function TimesheetPageContent({
                             </div>
                             <div className="relative border-b border-muted/30 h-40" style={{ gridColumn: `2 / span ${daysInMonth.length}` }}>
                                 <div className="grid h-full items-end pt-4" style={{ gridTemplateColumns: `repeat(${daysInMonth.length}, minmax(0, 1fr))` }}>
-                                    {dayCompletion.map((day, index) => (
+                                    {(habitDashboardTab === 'botherings' ? dayBotheringCompletion : dayCompletion).map((day, index) => (
                                         <div key={`bar-${day.date.toISOString()}`} className={cn("p-2", isAltWeek(index) && "bg-muted/20")}>
                                             <div className="h-20 flex items-end">
                                                 <div
@@ -947,9 +1027,10 @@ export function TimesheetPageContent({
                                 <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 80" preserveAspectRatio="none">
                                     <path
                                         d={(() => {
-                                            if (dayCompletion.length === 0) return "";
-                                            const points = dayCompletion.map((day, index) => {
-                                                const x = (index / Math.max(1, dayCompletion.length - 1)) * 100;
+                                            const source = habitDashboardTab === 'botherings' ? dayBotheringCompletion : dayCompletion;
+                                            if (source.length === 0) return "";
+                                            const points = source.map((day, index) => {
+                                                const x = (index / Math.max(1, source.length - 1)) * 100;
                                                 const y = 80 - (day.percent / maxBar) * 68 - 4;
                                                 return { x, y };
                                             });
@@ -991,15 +1072,24 @@ export function TimesheetPageContent({
                             </div>
                             <div className="h-8 px-2 flex items-center gap-2 font-semibold text-muted-foreground border-b border-muted/30">
                                 <CheckCircle className="h-4 w-4 text-emerald-400" />
-                                Daily Habits
+                                {habitDashboardTab === 'daily' ? 'Daily Habits' : 'Botherings'}
                             </div>
-                            {daysInMonth.map((day, index) => (
-                                <div key={day.toISOString()} className={cn("h-8 flex items-center justify-center font-semibold text-muted-foreground border-b border-muted/30", isAltWeek(index) && "bg-muted/20")}>
-                                    {format(day, 'd')}
-                                </div>
-                            ))}
+                            {daysInMonth.map((day, index) => {
+                                const dateKey = format(day, 'yyyy-MM-dd');
+                                const hasEndDate = habitDashboardTab === 'botherings' && botherings.some(b => b.endDate === dateKey);
+                                return (
+                                    <div key={day.toISOString()} className={cn(
+                                        "h-8 flex items-center justify-center font-semibold text-muted-foreground border-b border-muted/30",
+                                        isAltWeek(index) && "bg-muted/20",
+                                        hasEndDate && "bg-amber-400/20 text-amber-200"
+                                    )}>
+                                        {format(day, 'd')}
+                                    </div>
+                                );
+                            })}
                             <div className="h-8 px-2 flex items-center justify-end font-semibold text-muted-foreground border-b border-muted/30">Total hrs</div>
-                            {orderedTypes.map(type => (
+                            {habitDashboardTab === 'daily' ? (
+                            orderedTypes.map(type => (
                                 <React.Fragment key={`group-${type}`}>
                                     {collapsedHabitGroups[type] ? (
                                         <>
@@ -1192,18 +1282,76 @@ export function TimesheetPageContent({
                                         </>
                                     )}
                                 </React.Fragment>
-                            ))}
+                            ))
+                            ) : (
+                                <>
+                                    {botherings.length === 0 && (
+                                        <div className="text-center text-muted-foreground py-12 col-span-full">
+                                            No active botherings with tasks.
+                                        </div>
+                                    )}
+                                    {botherings.map((bothering) => {
+                                        const totalMinutes = botheringTotals.find(b => b.id === bothering.id)?.totalMinutes || 0;
+                                        return (
+                                            <React.Fragment key={bothering.id}>
+                                                <div className="h-8 px-2 border-b border-muted/20 text-sm truncate flex items-center" title={bothering.text}>
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <span className="text-emerald-400"><CheckCircle className="h-4 w-4" /></span>
+                                                        <span className="truncate">{bothering.text}</span>
+                                                    </div>
+                                                </div>
+                                                {daysInMonth.map((day, index) => {
+                                                    const dateKey = format(day, 'yyyy-MM-dd');
+                                                    const activityMap = dayActivityMaps.get(dateKey) || new Map();
+                                                    const dayTasks = bothering.tasks
+                                                        .map(task => activityMap.get(task.activityId || task.id))
+                                                        .filter(Boolean) as Activity[];
+                                                    const completedTasks = dayTasks.filter(t => t.completed);
+                                                    const hasTasks = dayTasks.length > 0;
+                                                    const isEndDate = bothering.endDate && bothering.endDate === dateKey;
+                                                    return (
+                                                        <div key={`${bothering.id}-${dateKey}`} className={cn("h-8 flex items-center justify-center border-b border-muted/20", isAltWeek(index) && "bg-muted/20", isEndDate && "bg-amber-400/20 border-amber-400/40")}>
+                                                            <div className={cn(
+                                                                "h-4 w-4 mx-auto rounded-sm border border-muted-foreground/30",
+                                                                hasTasks && completedTasks.length === 0 && "bg-muted/40",
+                                                                completedTasks.length > 0 && "bg-emerald-400/80 border-emerald-400"
+                                                            )} />
+                                                        </div>
+                                                    );
+                                                })}
+                                                <div className="h-8 px-2 border-b border-muted/20 flex items-center">
+                                                    {(() => {
+                                                        const hours = totalMinutes / 60;
+                                                        const accent = totalMinutes > 0 ? "text-amber-300" : "text-muted-foreground";
+                                                        return (
+                                                            <div className="w-full flex items-center gap-2">
+                                                                <div className="h-2 flex-1 rounded-full bg-muted/40 overflow-hidden">
+                                                                    <div
+                                                                        className={cn("h-full", totalMinutes > 0 ? "bg-amber-400/80" : "bg-muted/30")}
+                                                                        style={{ width: `${Math.min(100, (totalMinutes / maxBotheringMinutes) * 100)}%` }}
+                                                                    />
+                                                                </div>
+                                                                <span className={cn("text-[10px] tabular-nums min-w-[32px] text-right", accent)}>{hours.toFixed(1)}</span>
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </>
+                            )}
                             <div className="h-8 px-2 flex items-center font-semibold text-muted-foreground border-b border-muted/30">
                                 Hours
                             </div>
-                            {dayTotals.map((day, index) => {
+                            {(habitDashboardTab === 'botherings' ? botheringsDayTotals : dayTotals).map((day, index) => {
                                 const hours = day.totalMinutes / 60;
                                 return (
                                     <div key={`day-total-${day.date.toISOString()}`} className={cn("h-20 flex flex-col items-center justify-start gap-1 border-b border-muted/30", isAltWeek(index) && "bg-muted/20")}>
                                         <div className="relative h-16 w-5">
                                             <div
                                                 className="absolute left-0 top-0 w-full rounded-sm bg-indigo-400/80"
-                                                style={{ height: `${(day.totalMinutes / maxDayMinutes) * 100}%` }}
+                                                style={{ height: `${(day.totalMinutes / (habitDashboardTab === 'botherings' ? maxBotheringsDayMinutes : maxDayMinutes)) * 100}%` }}
                                             />
                                         </div>
                                         <span className={cn("text-[10px] tabular-nums", hours > 0 ? "text-indigo-300" : "text-muted-foreground")}>{hours > 0 ? hours.toFixed(1) : "0.0"}</span>
@@ -1220,7 +1368,7 @@ export function TimesheetPageContent({
                 </div>
             </div>
         );
-    }, [effectiveDashboardMonth, schedule, collapsedHabitGroups, collapsedSpecializations, upskillDefinitions, deepWorkDefinitions, microSkillMap]);
+    }, [effectiveDashboardMonth, schedule, collapsedHabitGroups, collapsedSpecializations, upskillDefinitions, deepWorkDefinitions, microSkillMap, mindsetCards, habitDashboardTab, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs]);
 
     const timesheetBody = (
         <>

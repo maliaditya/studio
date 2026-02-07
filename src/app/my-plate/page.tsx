@@ -202,6 +202,7 @@ function MyPlatePageContent() {
                 setSelectedDomainId(coreSkill.domainId);
                 setSelectedSkillId(coreSkill.id);
             }
+            setFocusActivity(activity);
             setIsDeepWorkModalOpen(true);
             return true;
         }
@@ -212,12 +213,13 @@ function MyPlatePageContent() {
             setSelectedSkillId(coreSkill.id);
             setSelectedUpskillTask(null);
             setSelectedDeepWorkTask(null);
+            setFocusActivity(activity);
             setIsDeepWorkModalOpen(true);
             return true;
         }
         
         return false;
-    }, [coreSkills, findRootTask, findSpecializationForTask, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, setIsDeepWorkModalOpen, setIsTodaysWorkoutModalOpen, setWorkoutActivityToLog]);
+    }, [coreSkills, findRootTask, findSpecializationForTask, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, setFocusActivity, setIsDeepWorkModalOpen, setIsTodaysWorkoutModalOpen, setWorkoutActivityToLog]);
 
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;

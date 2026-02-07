@@ -1,30 +1,30 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, History, LineChart, Workflow, ChevronLeft, Calendar as CalendarIcon } from 'lucide-react';
+import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, History, LineChart, Workflow, ChevronLeft, Calendar as CalendarIcon, X, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, AlertCircle, Wind, Timer, Check } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { BrainHack, Stopper } from '@/types/workout';
+import { BrainHack, Stopper, MindsetCard, MindsetPoint, Activity, SlotName } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Label } from './ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { format, isSameDay, isBefore, subDays, startOfDay } from 'date-fns';
 import { LinkTechniqueModal } from './LinkTechniqueModal';
 import { ChartContainer } from './ui/chart';
 import { LineChart as RechartsLineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer } from 'recharts';
-import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 
 
 const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
@@ -140,13 +140,88 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
 });
 EditableBrainHack.displayName = 'EditableBrainHack';
 
+const activityIcons: Record<ActivityType, React.ReactNode> = {
+    workout: <Dumbbell className="h-4 w-4" />,
+    upskill: <BookOpenCheck className="h-4 w-4" />,
+    deepwork: <Briefcase className="h-4 w-4" />,
+    planning: <ClipboardList className="h-4 w-4" />,
+    tracking: <ClipboardCheck className="h-4 w-4" />,
+    branding: <Share2 className="h-4 w-4" />,
+    'lead-generation': <Magnet className="h-4 w-4" />,
+    essentials: <CheckSquare className="h-4 w-4" />,
+    nutrition: <Utensils className="h-4 w-4" />,
+    interrupt: <AlertCircle className="h-4 w-4 text-red-500" />,
+    distraction: <Wind className="h-4 w-4 text-yellow-500" />,
+    mindset: <Brain className="h-4 w-4" />,
+    pomodoro: <Timer className="h-4 w-4" />,
+};
+
+const BotheringAddActivityMenu = ({
+    onAddActivity,
+}: {
+    onAddActivity: (type: ActivityType, details: string) => void;
+}) => {
+    const { coreSkills } = useAuth();
+    const specializations = coreSkills.filter(s => s.type === 'Specialization');
+
+    return (
+        <DropdownMenuContent className="w-56 p-2 z-[220]">
+            <p className="font-medium text-sm p-2">Select Activity</p>
+            {Object.entries(activityIcons).map(([type, icon]) => {
+                const activityType = type as ActivityType;
+                if (activityType === 'upskill' || activityType === 'deepwork') {
+                    return (
+                        <DropdownMenuSub key={type}>
+                            <DropdownMenuSubTrigger className="w-full justify-start">
+                                {icon}
+                                <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                                <DropdownMenuSubContent className="z-[220]">
+                                    <ScrollArea className="h-48">
+                                        {specializations.length > 0 ? (
+                                            specializations.map(spec => (
+                                                <DropdownMenuItem key={spec.id} onClick={() => onAddActivity(activityType, spec.name)}>
+                                                    {spec.name}
+                                                </DropdownMenuItem>
+                                            ))
+                                        ) : (
+                                            <DropdownMenuItem disabled>No specializations defined</DropdownMenuItem>
+                                        )}
+                                    </ScrollArea>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                        </DropdownMenuSub>
+                    );
+                }
+                return (
+                    <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, '')}>
+                        {icon}
+                        <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
+                    </DropdownMenuItem>
+                );
+            })}
+        </DropdownMenuContent>
+    );
+};
+
 const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances }: { 
     isOpen: boolean; 
     onOpenChange: (isOpen: boolean) => void;
     allLinkedResistances: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[];
 }) => {
+    const [position, setPosition] = useState({ x: window.innerWidth / 2 - 420, y: window.innerHeight / 2 - 260 });
+    const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
     const [filter, setFilter] = useState<'all' | 'today' | 'lastX'>('lastX');
     const [lastXDays, setLastXDays] = useState(5);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        setPosition({
+            x: window.innerWidth / 2 - 420,
+            y: window.innerHeight / 2 - 260,
+        });
+    }, [isOpen]);
     
     const chartData = React.useMemo(() => {
         const log = Array.from({ length: 24 }, (_, i) => {
@@ -220,47 +295,89 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
         return null;
     };
 
+    if (!isOpen) return null;
+
     return (
-        <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-4xl max-h-[80vh] flex flex-col">
-                <DialogHeader>
-                    <DialogTitle>Hourly Resistance Log</DialogTitle>
-                    <DialogDescription>
-                        A historical log of all your urges and resistances, grouped by the hour of the day they were recorded.
-                    </DialogDescription>
-                </DialogHeader>
-                 <div className="flex flex-wrap items-center gap-2">
-                    <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>All Time</Button>
-                    <Button variant={filter === 'today' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('today')}>Today</Button>
-                    <div className="flex items-center gap-2">
-                      <Button variant={filter === 'lastX' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('lastX')}>Last</Button>
-                      <Input 
-                        type="number" 
-                        value={lastXDays}
-                        onChange={(e) => setLastXDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                        className="w-16 h-8 text-sm"
-                        onFocus={() => setFilter('lastX')}
-                      />
-                      <span className="text-sm">Days</span>
+        <div className="fixed inset-0 z-[160] pointer-events-none">
+            <div className="pointer-events-auto">
+                <div
+                    className="fixed w-[840px] max-w-[95vw]"
+                    style={{ top: position.y, left: position.x }}
+                >
+                    <div className="shadow-2xl border border-white/10 bg-[#151517]/95 backdrop-blur rounded-2xl overflow-hidden">
+                        <div
+                            className="p-4 border-b border-white/10 flex items-start justify-between cursor-grab select-none"
+                            onPointerDown={(event) => {
+                                dragState.current = {
+                                    startX: event.clientX,
+                                    startY: event.clientY,
+                                    originX: position.x,
+                                    originY: position.y,
+                                };
+                                const handlePointerMove = (e: PointerEvent) => {
+                                    if (!dragState.current) return;
+                                    const dx = e.clientX - dragState.current.startX;
+                                    const dy = e.clientY - dragState.current.startY;
+                                    setPosition({
+                                        x: dragState.current.originX + dx,
+                                        y: dragState.current.originY + dy,
+                                    });
+                                };
+                                const handlePointerUp = () => {
+                                    dragState.current = null;
+                                    window.removeEventListener('pointermove', handlePointerMove);
+                                    window.removeEventListener('pointerup', handlePointerUp);
+                                };
+                                window.addEventListener('pointermove', handlePointerMove);
+                                window.addEventListener('pointerup', handlePointerUp);
+                            }}
+                        >
+                            <div>
+                                <div className="text-base font-semibold">Hourly Resistance Log</div>
+                                <div className="text-sm text-muted-foreground">
+                                    A historical log of urges and resistances grouped by hour.
+                                </div>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button variant={filter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('all')}>All Time</Button>
+                                <Button variant={filter === 'today' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('today')}>Today</Button>
+                                <div className="flex items-center gap-2">
+                                  <Button variant={filter === 'lastX' ? 'default' : 'outline'} size="sm" onClick={() => setFilter('lastX')}>Last</Button>
+                                  <Input 
+                                    type="number" 
+                                    value={lastXDays}
+                                    onChange={(e) => setLastXDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                    className="w-16 h-8 text-sm"
+                                    onFocus={() => setFilter('lastX')}
+                                  />
+                                  <span className="text-sm">Days</span>
+                                </div>
+                            </div>
+                            <div className="w-full h-[400px] py-2">
+                               <ResponsiveContainer width="100%" height="100%">
+                                    <RechartsLineChart
+                                        data={chartData}
+                                        margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                                    >
+                                        <XAxis dataKey="name" />
+                                        <YAxis allowDecimals={false} />
+                                        <Tooltip content={<CustomTooltip />}/>
+                                        <Legend />
+                                        <Line type="monotone" dataKey="urges" stroke="#ef4444" name="Urges" />
+                                        <Line type="monotone" dataKey="resistances" stroke="#3b82f6" name="Resistances" />
+                                    </RechartsLineChart>
+                               </ResponsiveContainer>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div className="w-full h-[400px] py-4">
-                   <ResponsiveContainer width="100%" height="100%">
-                        <RechartsLineChart
-                            data={chartData}
-                            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-                        >
-                            <XAxis dataKey="name" />
-                            <YAxis allowDecimals={false} />
-                            <Tooltip content={<CustomTooltip />}/>
-                            <Legend />
-                            <Line type="monotone" dataKey="urges" stroke="#ef4444" name="Urges" />
-                            <Line type="monotone" dataKey="resistances" stroke="#3b82f6" name="Resistances" />
-                        </RechartsLineChart>
-                   </ResponsiveContainer>
-                </div>
-            </DialogContent>
-        </Dialog>
+            </div>
+        </div>
     )
 };
 
@@ -276,6 +393,10 @@ export function MindsetCategoriesCard() {
         isMindsetModalOpen,
         setIsMindsetModalOpen,
         setResources,
+        mindsetCards,
+        setMindsetCards,
+        schedule,
+        setSchedule,
     } = useAuth();
     
     const [hotResistances, setHotResistances] = useState<Set<string>>(new Set());
@@ -286,6 +407,78 @@ export function MindsetCategoriesCard() {
     const [newEntryType, setNewEntryType] = useState<'urge' | 'resistance'>('urge');
     const [selectedHabitId, setSelectedHabitId] = useState<string>('');
     const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
+    const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+    const [botheringPopup, setBotheringPopup] = useState<{ type: 'mismatch' | 'constraint'; pointId: string } | null>(null);
+    const [selectedBotheringHabitId, setSelectedBotheringHabitId] = useState('');
+    const [botheringTaskSlot, setBotheringTaskSlot] = useState<SlotName>('Evening');
+    const [newBotheringText, setNewBotheringText] = useState('');
+    const [botheringType, setBotheringType] = useState<'mismatch' | 'constraint'>('mismatch');
+    const [position, setPosition] = useState({ x: window.innerWidth / 2 - 360, y: window.innerHeight / 2 - 260 });
+    const dragState = React.useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
+
+    useEffect(() => {
+        if (!isMindsetModalOpen) return;
+        setPosition({
+            x: window.innerWidth / 2 - 460,
+            y: window.innerHeight / 2 - 320,
+        });
+    }, [isMindsetModalOpen]);
+
+    useEffect(() => {
+        if (isAddPopoverOpen && !selectedHabitId && habitCards.length > 0) {
+            setSelectedHabitId(habitCards[0].id);
+        }
+    }, [isAddPopoverOpen, selectedHabitId, habitCards]);
+
+    const getOrCreateBotheringCard = useCallback((type: 'mismatch' | 'constraint') => {
+        const id = `mindset_botherings_${type}`;
+        const existing = mindsetCards.find(c => c.id === id);
+        if (existing) return existing;
+        const newCard: MindsetCard = {
+            id,
+            title: type === 'mismatch' ? 'Mismatch Botherings' : 'Constraint Botherings',
+            icon: 'Brain',
+            points: [],
+        };
+        setMindsetCards(prev => [...prev, newCard]);
+        return newCard;
+    }, [mindsetCards, setMindsetCards]);
+
+    const addBothering = () => {
+        if (!newBotheringText.trim()) return;
+        const card = getOrCreateBotheringCard(botheringType);
+        const newPoint: MindsetPoint = { id: `bother_${Date.now()}`, text: newBotheringText.trim() };
+        setMindsetCards(prev => prev.map(c => c.id === card.id ? { ...c, points: [...c.points, newPoint] } : c));
+        setNewBotheringText('');
+    };
+
+    const deleteBothering = (type: 'mismatch' | 'constraint', pointId: string) => {
+        const cardId = `mindset_botherings_${type}`;
+        setMindsetCards(prev => prev.map(c => c.id === cardId ? { ...c, points: c.points.filter(p => p.id !== pointId) } : c));
+    };
+
+    const mismatchCard = mindsetCards.find(c => c.id === 'mindset_botherings_mismatch');
+    const constraintCard = mindsetCards.find(c => c.id === 'mindset_botherings_constraint');
+
+    const activeBotheringCard = botheringPopup?.type === 'mismatch' ? mismatchCard : constraintCard;
+    const activeBotheringPoint = activeBotheringCard?.points.find(p => p.id === botheringPopup?.pointId);
+    const isBotheringActive = (point?: MindsetPoint) =>
+        !!point && (point.tasks?.length || 0) > 0 && !point.completed;
+    const getTaskStats = (point?: MindsetPoint) => {
+        const total = point?.tasks?.length || 0;
+        const completed = point?.tasks?.filter(t => t.completed).length || 0;
+        return { total, completed, remaining: Math.max(0, total - completed) };
+    };
+
+    useEffect(() => {
+        if (!botheringPopup?.pointId) return;
+        setSelectedBotheringHabitId('');
+    }, [botheringPopup]);
+
+    const updateBotheringPoint = useCallback((type: 'mismatch' | 'constraint', pointId: string, updater: (point: MindsetPoint) => MindsetPoint) => {
+        const cardId = `mindset_botherings_${type}`;
+        setMindsetCards(prev => prev.map(c => c.id === cardId ? { ...c, points: c.points.map(p => p.id === pointId ? updater(p) : p) } : c));
+    }, [setMindsetCards]);
 
 
     const allLinkedResistances = React.useMemo(() => {
@@ -309,6 +502,69 @@ export function MindsetCategoriesCard() {
         });
         return links;
     }, [habitCards, mechanismCards]);
+
+    const scheduleActivityMap = useMemo(() => {
+        const map = new Map<string, { activity: Activity; dateKey: string; slotName: SlotName }>();
+        Object.entries(schedule).forEach(([dateKey, day]) => {
+            Object.entries(day).forEach(([slotName, activities]) => {
+                (activities as Activity[] | undefined)?.forEach(activity => {
+                    if (activity?.id) {
+                        map.set(activity.id, { activity, dateKey, slotName: slotName as SlotName });
+                    }
+                });
+            });
+        });
+        return map;
+    }, [schedule]);
+
+    useEffect(() => {
+        setMindsetCards(prev => {
+            let changed = false;
+            const next = prev.map(card => {
+                if (!card.id.startsWith('mindset_botherings_')) return card;
+                const updatedPoints = card.points.map(point => {
+                    if (!point.tasks || point.tasks.length === 0) return point;
+                    let tasksChanged = false;
+                    const newTasks = point.tasks
+                        .map(task => {
+                            const activityId = task.activityId || task.id;
+                            if (!activityId) return task;
+                            const match = scheduleActivityMap.get(activityId);
+                            if (!match) {
+                                tasksChanged = true;
+                                return null;
+                            }
+                            const { activity, dateKey, slotName } = match;
+                            if (
+                                task.details !== activity.details ||
+                                task.completed !== activity.completed ||
+                                task.type !== activity.type ||
+                                task.dateKey !== dateKey ||
+                                task.slotName !== slotName
+                            ) {
+                                tasksChanged = true;
+                                return {
+                                    ...task,
+                                    activityId,
+                                    details: activity.details,
+                                    completed: activity.completed,
+                                    type: activity.type,
+                                    dateKey,
+                                    slotName,
+                                };
+                            }
+                            return task;
+                        })
+                        .filter(Boolean) as MindsetPoint['tasks'];
+                    if (!tasksChanged) return point;
+                    changed = true;
+                    return { ...point, tasks: newTasks };
+                });
+                return changed ? { ...card, points: updatedPoints } : card;
+            });
+            return changed ? next : prev;
+        });
+    }, [scheduleActivityMap, setMindsetCards]);
     
     const handleResistanceClick = (e: React.MouseEvent, link: { habitId: string, stopper: Stopper }) => {
         const { habitId, stopper } = link;
@@ -435,61 +691,165 @@ export function MindsetCategoriesCard() {
         setIsAddPopoverOpen(false);
     };
 
+    const updateActivityById = useCallback((activityId: string, updater: (activity: Activity) => Activity) => {
+        setSchedule(prev => {
+            const next = { ...prev };
+            let updated = false;
+            for (const dateKey of Object.keys(next)) {
+                const day = { ...(next[dateKey] || {}) };
+                let dayChanged = false;
+                for (const slotName of Object.keys(day)) {
+                    const activities = (day[slotName as SlotName] as Activity[]) || [];
+                    const index = activities.findIndex(a => a.id === activityId);
+                    if (index > -1) {
+                        const updatedActivities = [...activities];
+                        updatedActivities[index] = updater(updatedActivities[index]);
+                        day[slotName as SlotName] = updatedActivities;
+                        dayChanged = true;
+                        updated = true;
+                        break;
+                    }
+                }
+                if (dayChanged) {
+                    next[dateKey] = day;
+                    break;
+                }
+            }
+            return updated ? next : prev;
+        });
+    }, [setSchedule]);
+
+    const removeActivityById = useCallback((activityId: string) => {
+        setSchedule(prev => {
+            const next = { ...prev };
+            let updated = false;
+            for (const dateKey of Object.keys(next)) {
+                const day = { ...(next[dateKey] || {}) };
+                let dayChanged = false;
+                for (const slotName of Object.keys(day)) {
+                    const activities = (day[slotName as SlotName] as Activity[]) || [];
+                    const filtered = activities.filter(a => a.id !== activityId);
+                    if (filtered.length !== activities.length) {
+                        day[slotName as SlotName] = filtered;
+                        dayChanged = true;
+                        updated = true;
+                        break;
+                    }
+                }
+                if (dayChanged) {
+                    next[dateKey] = day;
+                    break;
+                }
+            }
+            return updated ? next : prev;
+        });
+    }, [setSchedule]);
+
     return (
         <>
-            <Dialog open={isMindsetModalOpen} onOpenChange={setIsMindsetModalOpen}>
-                <DialogContent className="sm:max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Brain className="h-5 w-5 text-pink-500" />
-                            Resistances &amp; Urges
-                        </DialogTitle>
-                        <DialogDescription className="flex justify-between items-center">
-                            Review and log your encounters with mental friction.
-                            <Button variant="ghost" size="icon" onClick={() => setIsHourlyLogOpen(true)}>
-                                <LineChart className="h-4 w-4" />
-                            </Button>
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <Popover open={isAddPopoverOpen} onOpenChange={setIsAddPopoverOpen}>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" className="w-full mb-4">
-                                    <PlusCircle className="mr-2 h-4 w-4" />
-                                    Add New Entry
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-96 p-4 space-y-4">
-                                <Tabs value={newEntryType} onValueChange={(v) => setNewEntryType(v as any)} className="w-full">
-                                    <TabsList className="grid w-full grid-cols-2">
-                                        <TabsTrigger value="urge">Urge</TabsTrigger>
-                                        <TabsTrigger value="resistance">Resistance</TabsTrigger>
-                                    </TabsList>
-                                </Tabs>
-                                <Input 
-                                    value={newEntryText}
-                                    onChange={(e) => setNewEntryText(e.target.value)}
-                                    placeholder={`Describe the ${newEntryType}...`}
-                                />
-                                <Select onValueChange={setSelectedHabitId} value={selectedHabitId}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Link to a Habit..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {habitCards.map(habit => (
-                                            <SelectItem key={habit.id} value={habit.id}>{habit.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Button onClick={handleAddEntry} className="w-full">Add</Button>
-                            </PopoverContent>
-                        </Popover>
-                        <ScrollArea className="h-96 pr-4">
+            {isMindsetModalOpen && (
+            <div className="fixed inset-0 z-[140] pointer-events-none">
+                <div className="pointer-events-auto">
+                    <div
+                        className="fixed w-[920px] max-w-[95vw]"
+                        style={{ top: position.y, left: position.x }}
+                    >
+                        <div className="shadow-2xl border border-white/10 bg-[#141416]/95 backdrop-blur rounded-3xl overflow-hidden">
+                            <div
+                                className="px-5 py-4 border-b border-white/10 flex items-start justify-between cursor-grab select-none"
+                                onPointerDown={(event) => {
+                                    dragState.current = {
+                                        startX: event.clientX,
+                                        startY: event.clientY,
+                                        originX: position.x,
+                                        originY: position.y,
+                                    };
+                                    const handlePointerMove = (e: PointerEvent) => {
+                                        if (!dragState.current) return;
+                                        const dx = e.clientX - dragState.current.startX;
+                                        const dy = e.clientY - dragState.current.startY;
+                                        setPosition({
+                                            x: dragState.current.originX + dx,
+                                            y: dragState.current.originY + dy,
+                                        });
+                                    };
+                                    const handlePointerUp = () => {
+                                        dragState.current = null;
+                                        window.removeEventListener('pointermove', handlePointerMove);
+                                        window.removeEventListener('pointerup', handlePointerUp);
+                                    };
+                                    window.addEventListener('pointermove', handlePointerMove);
+                                    window.addEventListener('pointerup', handlePointerUp);
+                                }}
+                            >
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2 text-base font-semibold">
+                                        <Brain className="h-5 w-5 text-pink-500" />
+                                        Resistances, Urges &amp; Botherings
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Expectation vs reality. Capacity vs container.
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Button variant="ghost" size="icon" onClick={() => setIsHourlyLogOpen(true)}>
+                                        <LineChart className="h-4 w-4" />
+                                    </Button>
+                                    <Button variant="ghost" size="icon" onClick={() => setIsMindsetModalOpen(false)}>
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                            <div className="p-5 grid grid-cols-[1.35fr_1fr] gap-4">
+                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="text-sm font-semibold">Resistances &amp; Urges</div>
+                                        <span className="text-xs text-muted-foreground">
+                                            {sortedResistances.length} items
+                                        </span>
+                                    </div>
+                        <div className="rounded-xl border border-white/10 bg-black/20 p-3 mb-4">
+                            <button
+                                type="button"
+                                onClick={() => setIsQuickAddOpen((prev) => !prev)}
+                                className="w-full flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground"
+                            >
+                                Quick add
+                                <span className="text-[10px]">{isQuickAddOpen ? 'Hide' : 'Show'}</span>
+                            </button>
+                            {isQuickAddOpen && (
+                                <div className="mt-3 space-y-3">
+                                    <Tabs value={newEntryType} onValueChange={(v) => setNewEntryType(v as any)} className="w-full">
+                                        <TabsList className="grid w-full grid-cols-2">
+                                            <TabsTrigger value="urge">Urge</TabsTrigger>
+                                            <TabsTrigger value="resistance">Resistance</TabsTrigger>
+                                        </TabsList>
+                                    </Tabs>
+                                    <Input 
+                                        value={newEntryText}
+                                        onChange={(e) => setNewEntryText(e.target.value)}
+                                        placeholder={`Describe the ${newEntryType}...`}
+                                    />
+                                    <Select onValueChange={setSelectedHabitId} value={selectedHabitId}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Link to a Habit..." />
+                                        </SelectTrigger>
+                                        <SelectContent className="z-[200]">
+                                            {habitCards.map(habit => (
+                                                <SelectItem key={habit.id} value={habit.id}>{habit.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button onClick={handleAddEntry} className="w-full">Add</Button>
+                                </div>
+                            )}
+                        </div>
+                        <ScrollArea className="h-[420px] pr-4">
                              <ul className="space-y-2">
                                 {sortedResistances.map((link) => {
                                     const { className: highlightClass, dormant } = getResistanceHighlightClass(link.stopper);
                                     return (
-                                        <li key={`${link.habitId}-${link.stopper.id}`} className={cn("text-sm p-2 rounded-md transition-all", highlightClass)}>
+                                        <li key={`${link.habitId}-${link.stopper.id}`} className={cn("text-sm p-2 rounded-xl transition-all border border-white/5", highlightClass)}>
                                             <div
                                                 className="flex justify-between items-start w-full text-left"
                                             >
@@ -521,10 +881,137 @@ export function MindsetCategoriesCard() {
                                     </p>
                                 )}
                             </ul>
-                        </ScrollArea>
+                         </ScrollArea>
+                                </div>
+                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                    <div className="text-sm font-semibold mb-3">Botherings</div>
+                                    <Tabs value={botheringType} onValueChange={(v) => setBotheringType(v as any)}>
+                                        <TabsList className="grid grid-cols-2 w-full mb-3">
+                                            <TabsTrigger value="mismatch">Mismatch</TabsTrigger>
+                                            <TabsTrigger value="constraint">Constraint</TabsTrigger>
+                                        </TabsList>
+                                        <TabsContent value="mismatch" className="space-y-3">
+                                            <div className="text-xs text-muted-foreground">
+                                                Expectation vs Reality. Cognitive. Debuggable by understanding.
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Input value={newBotheringText} onChange={(e) => setNewBotheringText(e.target.value)} placeholder="Describe the mismatch..." />
+                                                <Button onClick={addBothering}>Add</Button>
+                                            </div>
+                                            <ScrollArea className="h-[420px] pr-2">
+                                                <ul className="space-y-2">
+                                                    {(mismatchCard?.points || [])
+                                                        .slice()
+                                                        .sort((a, b) => {
+                                                            const aActive = isBotheringActive(a);
+                                                            const bActive = isBotheringActive(b);
+                                                            if (aActive !== bActive) return aActive ? -1 : 1;
+                                                            if (!!a.completed !== !!b.completed) return a.completed ? 1 : -1;
+                                                            return 0;
+                                                        })
+                                                        .map(point => {
+                                                            const stats = getTaskStats(point);
+                                                            return (
+                                                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isBotheringActive(point) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-white/5")}>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="flex-1 min-w-0 text-left"
+                                                                        onClick={() => setBotheringPopup({ type: 'mismatch', pointId: point.id })}
+                                                                    >
+                                                                        <div className="flex items-center gap-2">
+                                                                            {point.completed ? <Check className="h-4 w-4 text-emerald-400" /> : null}
+                                                                            <span className={cn(point.completed && "line-through text-muted-foreground")}>{point.text}</span>
+                                                                        </div>
+                                                                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                                                            {point.endDate && (
+                                                                                <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
+                                                                                    {point.endDate}
+                                                                                </span>
+                                                                            )}
+                                                                            {stats.total > 0 && (
+                                                                                <span className="text-muted-foreground">
+                                                                                    {stats.completed}/{stats.total}
+                                                                                </span>
+                                                                            )}
+                                                                            {isBotheringActive(point) && (
+                                                                                <span className="h-2 w-2 rounded-full bg-emerald-400/80" />
+                                                                            )}
+                                                                        </div>
+                                                                    </button>
+                                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteBothering('mismatch', point.id)}>
+                                                                        <Trash2 className="h-3 w-3" />
+                                                                    </Button>
+                                                                </li>
+                                                            );
+                                                        })}
+                                                </ul>
+                                            </ScrollArea>
+                                        </TabsContent>
+                                        <TabsContent value="constraint" className="space-y-3">
+                                            <div className="text-xs text-muted-foreground">
+                                                Capacity &gt; Allowed space. Energy &gt; Channel. Growth &gt; Container. Produces ghutan and baichaini.
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Input value={newBotheringText} onChange={(e) => setNewBotheringText(e.target.value)} placeholder="Describe the constraint..." />
+                                                <Button onClick={addBothering}>Add</Button>
+                                            </div>
+                                            <ScrollArea className="h-[420px] pr-2">
+                                                <ul className="space-y-2">
+                                                    {(constraintCard?.points || [])
+                                                        .slice()
+                                                        .sort((a, b) => {
+                                                            const aActive = isBotheringActive(a);
+                                                            const bActive = isBotheringActive(b);
+                                                            if (aActive !== bActive) return aActive ? -1 : 1;
+                                                            if (!!a.completed !== !!b.completed) return a.completed ? 1 : -1;
+                                                            return 0;
+                                                        })
+                                                        .map(point => {
+                                                            const stats = getTaskStats(point);
+                                                            return (
+                                                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isBotheringActive(point) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-white/5")}>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="flex-1 min-w-0 text-left"
+                                                                        onClick={() => setBotheringPopup({ type: 'constraint', pointId: point.id })}
+                                                                    >
+                                                                        <div className="flex items-center gap-2">
+                                                                            {point.completed ? <Check className="h-4 w-4 text-emerald-400" /> : null}
+                                                                            <span className={cn(point.completed && "line-through text-muted-foreground")}>{point.text}</span>
+                                                                        </div>
+                                                                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                                                            {point.endDate && (
+                                                                                <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
+                                                                                    {point.endDate}
+                                                                                </span>
+                                                                            )}
+                                                                            {stats.total > 0 && (
+                                                                                <span className="text-muted-foreground">
+                                                                                    {stats.completed}/{stats.total}
+                                                                                </span>
+                                                                            )}
+                                                                            {isBotheringActive(point) && (
+                                                                                <span className="h-2 w-2 rounded-full bg-emerald-400/80" />
+                                                                            )}
+                                                                        </div>
+                                                                    </button>
+                                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteBothering('constraint', point.id)}>
+                                                                        <Trash2 className="h-3 w-3" />
+                                                                    </Button>
+                                                                </li>
+                                                            );
+                                                        })}
+                                                </ul>
+                                            </ScrollArea>
+                                        </TabsContent>
+                                    </Tabs>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </DialogContent>
-            </Dialog>
+                </div>
+            </div>
+            )}
             
             <LinkTechniqueModal
                 modalState={linkTechniqueModalState}
@@ -536,6 +1023,234 @@ export function MindsetCategoriesCard() {
                 onOpenChange={setIsHourlyLogOpen}
                 allLinkedResistances={allLinkedResistances}
             />
+
+            {botheringPopup && activeBotheringPoint && (
+                <div className="fixed inset-0 z-[170] pointer-events-none">
+                    <div className="pointer-events-auto fixed inset-0 flex items-center justify-center">
+                        <div className="w-[700px] max-w-[95vw] bg-[#151517]/95 border border-white/10 rounded-2xl shadow-2xl">
+                            <div className="p-4 border-b border-white/10 flex items-start justify-between">
+                                <div className="space-y-1">
+                                    <div className="text-base font-semibold">
+                                        {botheringPopup.type === 'mismatch' ? 'Mismatch Bothering' : 'Constraint Bothering'}
+                                    </div>
+                                    <div className="text-sm text-muted-foreground">{activeBotheringPoint.text}</div>
+                                </div>
+                                <Button variant="ghost" size="icon" onClick={() => setBotheringPopup(null)}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <div className="p-4 grid grid-cols-2 gap-4">
+                                <div className="space-y-4">
+                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
+                                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Helping Habits</div>
+                                        <div className="flex gap-2">
+                                            <Select value={selectedBotheringHabitId} onValueChange={setSelectedBotheringHabitId}>
+                                                <SelectTrigger className="flex-1">
+                                                    <SelectValue placeholder="Select habit..." />
+                                                </SelectTrigger>
+                                                <SelectContent className="z-[200]">
+                                                    {habitCards.map(habit => (
+                                                        <SelectItem key={habit.id} value={habit.id}>{habit.name}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <Button
+                                                onClick={() => {
+                                                    if (!selectedBotheringHabitId) return;
+                                                    updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                                        ...point,
+                                                        linkedHabitIds: Array.from(new Set([...(point.linkedHabitIds || []), selectedBotheringHabitId])),
+                                                    }));
+                                                    setSelectedBotheringHabitId('');
+                                                }}
+                                            >
+                                                Add
+                                            </Button>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {(activeBotheringPoint.linkedHabitIds || []).map((hid) => {
+                                                const habit = habitCards.find(h => h.id === hid);
+                                                if (!habit) return null;
+                                                return (
+                                                    <div key={hid} className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
+                                                        <span>{habit.name}</span>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-6 w-6"
+                                                            onClick={() => updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                                                ...point,
+                                                                linkedHabitIds: (point.linkedHabitIds || []).filter(id => id !== hid),
+                                                            }))}
+                                                        >
+                                                            <Trash2 className="h-3 w-3" />
+                                                        </Button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
+                                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Completion</div>
+                                        <Textarea
+                                            value={activeBotheringPoint.resolution || ''}
+                                            onChange={(e) => updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({ ...point, resolution: e.target.value }))}
+                                            placeholder="What ends this bothering? (clear resolution)"
+                                        />
+                                        <div className="flex items-center gap-2">
+                                            <Label className="text-xs text-muted-foreground">End date</Label>
+                                            <Input
+                                                type="date"
+                                                value={activeBotheringPoint.endDate || ''}
+                                                onChange={(e) => updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({ ...point, endDate: e.target.value }))}
+                                                className="h-8 w-auto"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant={activeBotheringPoint.completed ? "secondary" : "default"}
+                                                disabled={!activeBotheringPoint.completed && (activeBotheringPoint.tasks?.some(t => !t.completed) ?? false)}
+                                                onClick={() => updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({ ...point, completed: !point.completed }))}
+                                            >
+                                                {activeBotheringPoint.completed ? 'Mark Active' : 'Mark Complete'}
+                                            </Button>
+                                            {activeBotheringPoint.completed && (
+                                                <span className="text-xs text-emerald-400">Completed</span>
+                                            )}
+                                            {!activeBotheringPoint.completed && (activeBotheringPoint.tasks?.some(t => !t.completed) ?? false) && (
+                                                <span className="text-xs text-muted-foreground">Complete all tasks to finish</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
+                                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Tasks</div>
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                            <span>Slot</span>
+                                            <Select value={botheringTaskSlot} onValueChange={(v) => setBotheringTaskSlot(v as SlotName)}>
+                                                <SelectTrigger className="h-8">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent className="z-[200]">
+                                                    {(['Late Night','Dawn','Morning','Afternoon','Evening','Night'] as SlotName[]).map(slot => (
+                                                        <SelectItem key={slot} value={slot}>{slot}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" className="w-full justify-start h-8">
+                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Activity
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                        <BotheringAddActivityMenu
+                                            onAddActivity={(type, details) => {
+                                                const label = details || `New ${type.replace('-', ' ')}`;
+                                                const activityId = `bother_task_${Date.now()}_${Math.random()}`;
+                                                const dateKey = format(new Date(), 'yyyy-MM-dd');
+                                                const newActivity: Activity = {
+                                                    id: activityId,
+                                                    type,
+                                                    details: label,
+                                                    completed: false,
+                                                    slot: botheringTaskSlot,
+                                                    taskIds: [],
+                                                };
+                                                setSchedule(prev => {
+                                                    const day = prev[dateKey] || {};
+                                                    const slotActivities = (day[botheringTaskSlot] as Activity[]) || [];
+                                                    return {
+                                                        ...prev,
+                                                        [dateKey]: {
+                                                            ...day,
+                                                            [botheringTaskSlot]: [...slotActivities, newActivity],
+                                                        },
+                                                    };
+                                                });
+                                                updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                                    ...point,
+                                                    tasks: [
+                                                        ...(point.tasks || []),
+                                                        { id: activityId, activityId, type, details: label, completed: false, dateKey, slotName: botheringTaskSlot },
+                                                    ],
+                                                }));
+                                            }}
+                                        />
+                                        </DropdownMenu>
+                                    <ScrollArea className="h-[260px] pr-2">
+                                        <ul className="space-y-2">
+                                            {(activeBotheringPoint.tasks || []).map((task) => (
+                                                <li key={task.id} className="flex items-start gap-2 text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
+                                                    <button
+                                                        type="button"
+                                                        className={cn("h-6 w-6 rounded border border-white/10 flex items-center justify-center", task.completed && "bg-emerald-500/20 border-emerald-500/40")}
+                                                        onClick={() => {
+                                                            const nextCompleted = !task.completed;
+                                                            updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                                                ...point,
+                                                                tasks: (point.tasks || []).map(t => t.id === task.id ? { ...t, completed: nextCompleted } : t),
+                                                            }));
+                                                            const activityId = task.activityId || task.id;
+                                                            if (activityId) {
+                                                                updateActivityById(activityId, (activity) => ({ ...activity, completed: nextCompleted }));
+                                                            }
+                                                        }}
+                                                    >
+                                                        {task.completed ? <Check className="h-3 w-3 text-emerald-400" /> : null}
+                                                    </button>
+                                                    <div className="flex-1 space-y-1">
+                                                        <Input
+                                                            value={task.details}
+                                                            onChange={(e) => {
+                                                                const nextDetails = e.target.value;
+                                                                updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                                                    ...point,
+                                                                    tasks: (point.tasks || []).map(t => t.id === task.id ? { ...t, details: nextDetails } : t),
+                                                                }));
+                                                                const activityId = task.activityId || task.id;
+                                                                if (activityId) {
+                                                                    updateActivityById(activityId, (activity) => ({ ...activity, details: nextDetails }));
+                                                                }
+                                                            }}
+                                                        />
+                                                        <div className="text-xs text-muted-foreground capitalize">
+                                                            {task.type.replace('-', ' ')} {task.slotName ? `• ${task.slotName}` : ''}
+                                                        </div>
+                                                    </div>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6"
+                                                        onClick={() => {
+                                                            updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                                                ...point,
+                                                                tasks: (point.tasks || []).filter(t => t.id !== task.id),
+                                                            }));
+                                                            const activityId = task.activityId || task.id;
+                                                            if (activityId) {
+                                                                removeActivityById(activityId);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-3 w-3" />
+                                                    </Button>
+                                                </li>
+                                            ))}
+                                            {(!activeBotheringPoint.tasks || activeBotheringPoint.tasks.length === 0) && (
+                                                <p className="text-sm text-muted-foreground text-center py-8">
+                                                    No tasks yet. Add an activity to start.
+                                                </p>
+                                            )}
+                                        </ul>
+                                    </ScrollArea>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

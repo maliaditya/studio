@@ -427,6 +427,7 @@ interface AuthContextType {
   openBrainHackPopups: Record<string, {x: number, y: number}>;
   setOpenBrainHackPopups: React.Dispatch<React.SetStateAction<Record<string, {x: number, y: number}>>>;
   openBrainHackPopup: (hackId: string, event: React.MouseEvent) => void;
+  setIsMindsetModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   recalculateAndFixTaskTypes: () => void;
   openMindsetWidget: () => void;
   isMindsetModalOpen: boolean;
@@ -4968,6 +4969,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     handleCreateBrainHack,
     handleToggleDailyGoalCompletion,
     openBrainHackPopups, setOpenBrainHackPopups, openBrainHackPopup,
+    setIsMindsetModalOpen,
     recalculateAndFixTaskTypes,
     openMindsetWidget,
     isMindsetModalOpen, setIsMindsetModalOpen,

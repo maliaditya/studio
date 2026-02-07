@@ -687,6 +687,11 @@ export interface PathNode {
 export interface MindsetPoint {
   id: string;
   text: string;
+  completed?: boolean;
+  resolution?: string;
+  endDate?: string;
+  linkedHabitIds?: string[];
+  tasks?: { id: string; type: ActivityType; details: string; completed?: boolean; activityId?: string; dateKey?: string; slotName?: SlotName }[];
 }
 
 export interface MindsetTechniquePopupState {
