@@ -756,7 +756,16 @@ function MyPlatePageContent() {
                 </DialogContent>
             </Dialog>
             <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-                <DialogContent className="max-w-7xl h-[90vh] flex flex-col p-0">
+                <DialogContent
+                    className="max-w-7xl h-[90vh] flex flex-col p-0"
+                    onInteractOutside={(event) => {
+                        const target = event.target as HTMLElement | null;
+                        if (!target) return;
+                        if (target.closest('[data-radix-dropdown-menu-content]') || target.closest('[data-radix-popper-content-wrapper]')) {
+                            event.preventDefault();
+                        }
+                    }}
+                >
                     <DialogHeader className="p-4 border-b">
                         <DialogTitle>Weekly Timetable</DialogTitle>
                         <DialogDescription>

@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from './ui/scroll-area';
 import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer } from 'lucide-react';
-import { isToday, format } from 'date-fns';
+import { isToday, format, getISODay, parseISO, differenceInDays, differenceInMonths } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -222,6 +222,57 @@ export function TimeSlots({
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {slots.map((slot) => {
         const activities = (todaysSchedule[slot.name as keyof DailySchedule] as Activity[]) || [];
+        const routineInstances = (settings.routines || []).flatMap(r => {
+            if (!r || !r.routine) return [] as Activity[];
+            if (r.slot !== slot.name) return [] as Activity[];
+            const rule = r.routine;
+            const base = r.baseDate || r.createdAt;
+            try {
+                if (rule.type === 'daily') {
+                    return [{ ...r, id: `${r.id}_${dateKey}` } as Activity];
+                }
+                if (rule.type === 'weekly') {
+                    if (!base) return [] as Activity[];
+                    const baseDow = getISODay(parseISO(base));
+                    const thisDow = getISODay(date);
+                    if (baseDow === thisDow) return [{ ...r, id: `${r.id}_${dateKey}` } as Activity];
+                    return [] as Activity[];
+                }
+                if (rule.type === 'custom') {
+                    if (!base) return [] as Activity[];
+                    const interval = Math.max(1, rule.repeatInterval ?? rule.days ?? 1);
+                    const unit = rule.repeatUnit ?? 'day';
+                    const baseDate = parseISO(base);
+                    if (unit === 'month') {
+                        if (baseDate.getDate() !== date.getDate()) return [] as Activity[];
+                        const diffMonths = differenceInMonths(date, baseDate);
+                        if (diffMonths >= 0 && diffMonths % interval === 0) {
+                            return [{ ...r, id: `${r.id}_${dateKey}` } as Activity];
+                        }
+                        return [] as Activity[];
+                    }
+                    if (unit === 'week') {
+                        const diffDays = differenceInDays(date, baseDate);
+                        if (diffDays >= 0 && diffDays % (interval * 7) === 0) {
+                            return [{ ...r, id: `${r.id}_${dateKey}` } as Activity];
+                        }
+                        return [] as Activity[];
+                    }
+                    const diffDays = differenceInDays(date, baseDate);
+                    if (diffDays >= 0 && diffDays % interval === 0) {
+                        return [{ ...r, id: `${r.id}_${dateKey}` } as Activity];
+                    }
+                    return [] as Activity[];
+                }
+            } catch (e) {
+                return [] as Activity[];
+            }
+            return [] as Activity[];
+        });
+        const mergedActivities = [
+            ...activities,
+            ...routineInstances.filter(ri => !activities.some(a => a.id === ri.id))
+        ];
         const isCurrentSlotToday = isToday(date) && currentSlot === slot.name;
 
         return (
@@ -252,8 +303,8 @@ export function TimeSlots({
                     <div ref={provided.innerRef} {...provided.droppableProps} className="flex-grow min-h-0 mb-2">
                         <ScrollArea className="h-[200px] pr-2">
                             <ul className="space-y-2">
-                                {activities && activities.length > 0 ? (
-                                activities.map((activity, index) => (
+                                {mergedActivities && mergedActivities.length > 0 ? (
+                                mergedActivities.map((activity, index) => (
                                     <Draggable key={activity.id} draggableId={activity.id} index={index}>
                                     {(provided) => (
                                       <div

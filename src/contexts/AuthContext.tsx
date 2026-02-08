@@ -12,7 +12,7 @@ import {
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
 } from '@/lib/localAuth';
-import { format, addDays, parseISO, subDays, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay, getHours, startOfToday, isSameDay } from 'date-fns';
+import { format, addDays, parseISO, subDays, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay, getHours, startOfToday, isSameDay, getISODay, differenceInMonths } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
@@ -700,6 +700,95 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return newSchedule;
     });
   }, [setSchedule]);
+
+  const ensureRoutineInstancesForDate = useCallback((date: Date) => {
+    const dateKey = format(date, 'yyyy-MM-dd');
+    const routines = settings.routines || [];
+    if (routines.length === 0) return;
+
+    const isDue = (routine: Activity) => {
+      if (!routine.routine) return false;
+      const rule = routine.routine;
+      const base = routine.baseDate || routine.createdAt;
+      try {
+        if (rule.type === 'daily') return true;
+        if (rule.type === 'weekly') {
+          if (!base) return false;
+          const baseDow = getISODay(parseISO(base));
+          const thisDow = getISODay(date);
+          return baseDow === thisDow;
+        }
+        if (rule.type === 'custom') {
+          if (!base) return false;
+          const interval = Math.max(1, rule.repeatInterval ?? rule.days ?? 1);
+          const unit = rule.repeatUnit ?? 'day';
+          const baseDate = parseISO(base);
+          if (unit === 'month') {
+            if (baseDate.getDate() !== date.getDate()) return false;
+            const diffMonths = differenceInMonths(date, baseDate);
+            return diffMonths >= 0 && diffMonths % interval === 0;
+          }
+          if (unit === 'week') {
+            const diffDays = differenceInDays(date, baseDate);
+            return diffDays >= 0 && diffDays % (interval * 7) === 0;
+          }
+          const diffDays = differenceInDays(date, baseDate);
+          return diffDays >= 0 && diffDays % interval === 0;
+        }
+      } catch (e) {
+        return false;
+      }
+      return false;
+    };
+
+    setSchedule(prev => {
+      const next = { ...prev };
+      const day = { ...(next[dateKey] || {}) };
+      let changed = false;
+
+      const isGenericPlaceholder = (activity: Activity, routine: Activity) => {
+        if (activity.type !== routine.type) return false;
+        const detail = (activity.details || '').trim().toLowerCase();
+        if (!detail) return true;
+        const typeLabel = routine.type.replace('-', ' ');
+        const generic = `New ${typeLabel}`.trim().toLowerCase();
+        return detail === generic;
+      };
+
+      routines.forEach(r => {
+        if (!isDue(r)) return;
+        const instanceId = `${r.id}_${dateKey}`;
+        const slot = (r.slot || 'Evening') as SlotName;
+        const slotActivities = [...((day[slot] as Activity[]) || [])];
+        if (slotActivities.some(a => a.id === instanceId)) return;
+
+        const existingIndex = slotActivities.findIndex(a =>
+          (a.type === r.type && a.details === r.details) || isGenericPlaceholder(a, r)
+        );
+
+        const instance: Activity = {
+          ...r,
+          id: instanceId,
+          completed: false,
+          isRoutine: false,
+          taskIds: r.taskIds && r.taskIds.length > 0 ? r.taskIds : [r.id],
+        };
+
+        if (existingIndex >= 0) {
+          slotActivities[existingIndex] = { ...slotActivities[existingIndex], ...instance };
+        } else {
+          slotActivities.push(instance);
+        }
+
+        day[slot] = slotActivities;
+        changed = true;
+      });
+
+      if (!changed) return prev;
+      next[dateKey] = day;
+      return next;
+    });
+  }, [settings.routines, setSchedule]);
   
   const onLogDuration = useCallback((activity: Activity, duration: number) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -1861,6 +1950,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handleToggleComplete = useCallback((slotName: string, activityId: string, isCompleted?: boolean) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     let activityToUpdate: Activity | undefined;
+    let targetDateKey = todayKey;
+    let targetSlot = slotName;
 
     const daySchedule = schedule[todayKey] || {};
     if (daySchedule[slotName]) {
@@ -1869,33 +1960,98 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (activityIndex > -1) {
             activityToUpdate = activities[activityIndex];
-            const shouldBeCompleted = isCompleted !== undefined ? isCompleted : !activityToUpdate.completed;
-            
-            if (shouldBeCompleted && !activityToUpdate.completed) {
-                if (activityToUpdate.duration) {
-                     updateActivity({
-                        ...activityToUpdate,
-                        completed: true,
-                        completedAt: Date.now(),
-                    });
-                } else {
-                    onOpenFocusModal(activityToUpdate);
-                }
-            } else {
-                 updateActivity({
-                    ...activityToUpdate,
-                    completed: false,
-                    completedAt: undefined,
-                    duration: undefined,
-                    focusSessionEndTime: undefined,
-                    focusSessionInitialStartTime: undefined,
-                    focusSessionPauses: [],
-                    focusSessionStartTime: undefined,
-                });
-            }
         }
     }
-  }, [schedule, updateActivity, onOpenFocusModal]);
+
+    if (!activityToUpdate) {
+        const match = activityId.match(/_(\d{4}-\d{2}-\d{2})$/);
+        const inferredDateKey = match?.[1] || todayKey;
+        const baseId = match ? activityId.slice(0, -11) : activityId;
+        const routine = (settings.routines || []).find(r => r.id === baseId);
+        if (routine) {
+            targetDateKey = inferredDateKey;
+            targetSlot = routine.slot || slotName;
+            const fallbackTaskIds = routine.taskIds && routine.taskIds.length > 0 ? routine.taskIds : [baseId];
+            activityToUpdate = { ...routine, id: activityId, completed: false, isRoutine: false, taskIds: fallbackTaskIds };
+            setSchedule(prev => {
+                const next = { ...prev };
+                const day = { ...(next[targetDateKey] || {}) };
+                const slotActivities = [...((day[targetSlot as SlotName] as Activity[]) || [])];
+                if (!slotActivities.some(a => a.id === activityId)) {
+                    slotActivities.push(activityToUpdate!);
+                }
+                day[targetSlot as SlotName] = slotActivities;
+                next[targetDateKey] = day;
+                return next;
+            });
+        }
+    }
+
+    if (!activityToUpdate) return;
+
+    const shouldBeCompleted = isCompleted !== undefined ? isCompleted : !activityToUpdate.completed;
+    const baseMatch = activityToUpdate.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+    
+    if (shouldBeCompleted && !activityToUpdate.completed) {
+        if (activityToUpdate.duration) {
+             updateActivity({
+                ...activityToUpdate,
+                completed: true,
+                completedAt: Date.now(),
+            });
+        } else {
+            onOpenFocusModal(activityToUpdate);
+        }
+    } else {
+         updateActivity({
+            ...activityToUpdate,
+            completed: false,
+            completedAt: undefined,
+            duration: undefined,
+            focusSessionEndTime: undefined,
+            focusSessionInitialStartTime: undefined,
+            focusSessionPauses: [],
+            focusSessionStartTime: undefined,
+        });
+    }
+
+    if ((activityToUpdate.taskIds && activityToUpdate.taskIds.length > 0) || baseMatch) {
+        const linkedIds = new Set(activityToUpdate.taskIds || []);
+        linkedIds.add(activityToUpdate.id);
+        if (baseMatch) {
+            linkedIds.add(activityToUpdate.id.slice(0, -11));
+        }
+        setMindsetCards(prev => {
+            let changed = false;
+            const next = prev.map(card => {
+                if (!card.id.startsWith('mindset_botherings_')) return card;
+                const updatedPoints = card.points.map(point => {
+                    if (!point.tasks || point.tasks.length === 0) return point;
+                    let tasksChanged = false;
+                    const nextTasks = point.tasks.map(task => {
+                        if (!linkedIds.has(task.id) && !linkedIds.has(task.activityId || '')) {
+                            return task;
+                        }
+                        const nextHistory = task.recurrence && task.recurrence !== 'none'
+                            ? { ...(task.completionHistory || {}), [targetDateKey]: shouldBeCompleted }
+                            : task.completionHistory;
+                        tasksChanged = true;
+                        return {
+                            ...task,
+                            completed: shouldBeCompleted,
+                            completionHistory: nextHistory,
+                        };
+                    });
+                    if (!tasksChanged) return point;
+                    changed = true;
+                    return { ...point, tasks: nextTasks };
+                });
+                return changed ? { ...card, points: updatedPoints } : card;
+            });
+            return changed ? next : prev;
+        });
+    }
+  }, [schedule, settings.routines, updateActivity, onOpenFocusModal, setSchedule, setMindsetCards]);
 
   const onRemoveActivity = useCallback((slotName: string, activityId: string, date: Date) => {
     const dateKey = format(date, 'yyyy-MM-dd');
@@ -3177,13 +3333,18 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   
   const toggleRoutine = (activity: Activity, rule: RecurrenceRule | null, baseDate?: string) => {
     setSettings(prev => {
-      const newRoutines = (prev.routines || []).filter(r => 
+      const rawId = activity.id || '';
+      const normalizedId = rawId.replace(/_(\d{4}-\d{2}-\d{2})$/, '');
+      const routineId = normalizedId || `routine_${activity.type}_${activity.details.replace(/\s/g, '')}`;
+
+      const newRoutines = (prev.routines || []).filter(r =>
+          r.id !== routineId &&
           !(r.details === activity.details && r.type === activity.type && r.slot === activity.slot)
       );
       if (rule) {
           newRoutines.push({
               ...activity,
-              id: `routine_${activity.type}_${activity.details.replace(/\s/g, '')}`,
+              id: routineId,
               completed: false,
               routine: rule,
               isRoutine: true,
@@ -4738,6 +4899,28 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         setGlobalVolumeState(parseFloat(savedVolume));
     }
   }, [loadState]);
+
+  const lastRoutineDateKeyRef = useRef<string>('');
+  const lastRoutineSignatureRef = useRef<string>('');
+  useEffect(() => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const routineSignature = JSON.stringify(
+      (settings.routines || []).map(r => ({
+        id: r.id,
+        type: r.type,
+        slot: r.slot,
+        details: r.details,
+        routine: r.routine,
+        baseDate: r.baseDate,
+        createdAt: r.createdAt,
+      }))
+    );
+    if (lastRoutineDateKeyRef.current !== todayKey || lastRoutineSignatureRef.current !== routineSignature) {
+      lastRoutineDateKeyRef.current = todayKey;
+      lastRoutineSignatureRef.current = routineSignature;
+      ensureRoutineInstancesForDate(new Date());
+    }
+  }, [ensureRoutineInstancesForDate, settings.routines]);
   
    useEffect(() => {
     const interval = setInterval(() => {

@@ -9,13 +9,21 @@ import { parseISO, startOfDay, differenceInDays } from "date-fns";
 export function BotheringsCard() {
   const { mindsetCards } = useAuth();
 
-  const activeBotherings = useMemo(() => {
-    const sources = ["mindset_botherings_mismatch", "mindset_botherings_constraint", "mindset_botherings_external"];
-    return sources
-      .map((id) => mindsetCards.find((c) => c.id === id))
-      .flatMap((card) => card?.points || [])
-      .filter((point) => (point.tasks?.length || 0) > 0 && !point.completed);
+  const activeBotheringsByType = useMemo(() => {
+    const sources = [
+      { id: "mindset_botherings_external", label: "External" as const },
+      { id: "mindset_botherings_mismatch", label: "Mismatch" as const },
+      { id: "mindset_botherings_constraint", label: "Constraint" as const },
+    ];
+    return sources.map(({ id, label }) => ({
+      type: label,
+      points: (mindsetCards.find((c) => c.id === id)?.points || [])
+        .filter((point) => (point.tasks?.length || 0) > 0 && !point.completed),
+    }));
   }, [mindsetCards]);
+
+  const [activeTab, setActiveTab] = React.useState<'External' | 'Mismatch' | 'Constraint'>('External');
+  const activeBotherings = activeBotheringsByType.find(t => t.type === activeTab)?.points || [];
 
   const getDaysLeftLabel = (endDate?: string) => {
     if (!endDate) return "No end date";
@@ -30,16 +38,34 @@ export function BotheringsCard() {
 
   return (
     <Card className="bg-card/50 h-[420px]">
-      <CardHeader className="flex flex-row items-start justify-between">
-        <div>
-          <CardTitle className="flex items-center gap-2 text-primary">
-            <Brain />
-            Botherings
-          </CardTitle>
-          <CardDescription>Active botherings with linked tasks.</CardDescription>
+      <CardHeader className="flex flex-col gap-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-primary">
+              <Brain />
+              Botherings
+            </CardTitle>
+            <CardDescription>Active botherings with linked tasks.</CardDescription>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          {(['External', 'Mismatch', 'Constraint'] as const).map(tab => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              className={`px-2.5 py-1 rounded-full border text-xs transition ${
+                activeTab === tab
+                  ? 'border-emerald-400/50 text-emerald-300 bg-emerald-500/10'
+                  : 'border-white/10 text-muted-foreground hover:text-foreground hover:border-white/20'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
       </CardHeader>
-      <CardContent className="h-[320px] overflow-hidden">
+      <CardContent className="h-[320px] overflow-y-auto pr-2">
         {activeBotherings.length === 0 ? (
           <div className="text-center text-sm text-muted-foreground py-4">
             No active botherings.

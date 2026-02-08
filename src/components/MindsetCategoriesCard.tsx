@@ -156,54 +156,6 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     pomodoro: <Timer className="h-4 w-4" />,
 };
 
-const BotheringAddActivityMenu = ({
-    onAddActivity,
-}: {
-    onAddActivity: (type: ActivityType, details: string) => void;
-}) => {
-    const { coreSkills } = useAuth();
-    const specializations = coreSkills.filter(s => s.type === 'Specialization');
-
-    return (
-        <DropdownMenuContent className="w-56 p-2 z-[220]">
-            <p className="font-medium text-sm p-2">Select Activity</p>
-            {Object.entries(activityIcons).map(([type, icon]) => {
-                const activityType = type as ActivityType;
-                if (activityType === 'upskill' || activityType === 'deepwork') {
-                    return (
-                        <DropdownMenuSub key={type}>
-                            <DropdownMenuSubTrigger className="w-full justify-start">
-                                {icon}
-                                <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
-                            </DropdownMenuSubTrigger>
-                            <DropdownMenuPortal>
-                                <DropdownMenuSubContent className="z-[220]">
-                                    <ScrollArea className="h-48">
-                                        {specializations.length > 0 ? (
-                                            specializations.map(spec => (
-                                                <DropdownMenuItem key={spec.id} onClick={() => onAddActivity(activityType, spec.name)}>
-                                                    {spec.name}
-                                                </DropdownMenuItem>
-                                            ))
-                                        ) : (
-                                            <DropdownMenuItem disabled>No specializations defined</DropdownMenuItem>
-                                        )}
-                                    </ScrollArea>
-                                </DropdownMenuSubContent>
-                            </DropdownMenuPortal>
-                        </DropdownMenuSub>
-                    );
-                }
-                return (
-                    <DropdownMenuItem key={type} onClick={() => onAddActivity(activityType, '')}>
-                        {icon}
-                        <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
-                    </DropdownMenuItem>
-                );
-            })}
-        </DropdownMenuContent>
-    );
-};
 
 const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances }: { 
     isOpen: boolean; 
@@ -401,6 +353,8 @@ export function MindsetCategoriesCard() {
         schedule,
         setSchedule,
         toggleRoutine,
+        settings,
+        setSettings,
     } = useAuth();
     
     const [hotResistances, setHotResistances] = useState<Set<string>>(new Set());
@@ -414,7 +368,6 @@ export function MindsetCategoriesCard() {
     const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
     const [botheringPopup, setBotheringPopup] = useState<{ type: 'mismatch' | 'constraint' | 'external'; pointId: string } | null>(null);
     const [selectedBotheringHabitId, setSelectedBotheringHabitId] = useState('');
-    const [botheringTaskSlot, setBotheringTaskSlot] = useState<SlotName>('Evening');
     const [newBotheringText, setNewBotheringText] = useState('');
     const [newMismatchType, setNewMismatchType] = useState<MindsetPoint['mismatchType']>('mental-model');
     const [botheringType, setBotheringType] = useState<'mismatch' | 'constraint' | 'external'>('mismatch');
@@ -591,9 +544,11 @@ export function MindsetCategoriesCard() {
         Object.entries(schedule).forEach(([dateKey, day]) => {
             Object.entries(day).forEach(([slotName, activities]) => {
                 (activities as Activity[] | undefined)?.forEach(activity => {
-                    if (activity?.id) {
-                        map.set(activity.id, { activity, dateKey, slotName: slotName as SlotName });
-                    }
+                    if (!activity?.id) return;
+                    map.set(activity.id, { activity, dateKey, slotName: slotName as SlotName });
+                    (activity.taskIds || []).forEach(taskId => {
+                        map.set(taskId, { activity, dateKey, slotName: slotName as SlotName });
+                    });
                 });
             });
         });
@@ -809,9 +764,29 @@ export function MindsetCategoriesCard() {
                     break;
                 }
             }
-            return updated ? next : prev;
+            if (updated) return next;
+
+            // If not found, materialize a routine instance (for bothering repeat tasks)
+            const match = activityId.match(/_(\d{4}-\d{2}-\d{2})$/);
+            const inferredDateKey = match?.[1] || format(new Date(), 'yyyy-MM-dd');
+            const baseId = match ? activityId.slice(0, -11) : activityId;
+            const routine = (settings.routines || []).find(r => r.id === baseId);
+            if (!routine) return prev;
+
+            const slotName = routine.slot || 'Evening';
+            const day = { ...(next[inferredDateKey] || {}) };
+            const slotActivities = [...((day[slotName as SlotName] as Activity[]) || [])];
+            if (!slotActivities.some(a => a.id === activityId)) {
+                const fallbackTaskIds = routine.taskIds && routine.taskIds.length > 0 ? routine.taskIds : [baseId];
+                const instance: Activity = updater({ ...routine, id: activityId, completed: false, isRoutine: false, taskIds: fallbackTaskIds });
+                slotActivities.push(instance);
+                day[slotName as SlotName] = slotActivities;
+                next[inferredDateKey] = day;
+                return next;
+            }
+            return prev;
         });
-    }, [setSchedule]);
+    }, [setSchedule, settings.routines]);
 
     const removeActivityById = useCallback((activityId: string) => {
         setSchedule(prev => {
@@ -1316,275 +1291,97 @@ export function MindsetCategoriesCard() {
                                     <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
                                         <div className="text-xs uppercase tracking-wide text-muted-foreground">Tasks</div>
                                         <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                            <span>Slot</span>
-                                            <Select value={botheringTaskSlot} onValueChange={(v) => setBotheringTaskSlot(v as SlotName)}>
-                                                <SelectTrigger className="h-8">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent className="z-[200]">
-                                                    {(['Late Night','Dawn','Morning','Afternoon','Evening','Night'] as SlotName[]).map(slot => (
-                                                        <SelectItem key={slot} value={slot}>{slot}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
+                                            <span>Link routine</span>
                                         </div>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" className="w-full justify-start h-8">
-                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Activity
+                                                    <PlusCircle className="mr-2 h-4 w-4" /> Link Routine Task
                                                 </Button>
                                             </DropdownMenuTrigger>
-                                        <BotheringAddActivityMenu
-                                            onAddActivity={(type, details) => {
-                                                const label = details || `New ${type.replace('-', ' ')}`;
-                                                const activityId = `bother_task_${Date.now()}_${Math.random()}`;
-                                                const dateKey = format(new Date(), 'yyyy-MM-dd');
-                                                const newActivity: Activity = {
-                                                    id: activityId,
-                                                    type,
-                                                    details: label,
-                                                    completed: false,
-                                                    slot: botheringTaskSlot,
-                                                    taskIds: [],
-                                                };
-                                                setSchedule(prev => {
-                                                    const day = prev[dateKey] || {};
-                                                    const slotActivities = (day[botheringTaskSlot] as Activity[]) || [];
-                                                    return {
-                                                        ...prev,
-                                                        [dateKey]: {
-                                                            ...day,
-                                                            [botheringTaskSlot]: [...slotActivities, newActivity],
-                                                        },
-                                                    };
-                                                });
-                                                updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
-                                                    ...point,
-                                                    tasks: [
-                                                        ...(point.tasks || []),
-                                                        {
-                                                            id: activityId,
-                                                            activityId,
-                                                            type,
-                                                            details: label,
-                                                            completed: false,
-                                                            dateKey,
-                                                            slotName: botheringTaskSlot,
-                                                            recurrence: 'none',
-                                                            startDate: dateKey,
-                                                            completionHistory: undefined,
-                                                        },
-                                                    ],
-                                                }));
-                                            }}
-                                        />
+                                            <DropdownMenuContent className="w-64">
+                                                {(settings.routines || []).length === 0 && (
+                                                    <DropdownMenuItem disabled>No routines available</DropdownMenuItem>
+                                                )}
+                                                {(settings.routines || []).map(r => (
+                                                    <DropdownMenuItem
+                                                        key={r.id}
+                                                        onSelect={() => {
+                                                            const existing = (activeBotheringPoint.tasks || []).some(t => t.activityId === r.id || t.id === r.id);
+                                                            if (existing) return;
+                                                            updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                                                ...point,
+                                                                tasks: [
+                                                                    ...(point.tasks || []),
+                                                                    {
+                                                                        id: r.id,
+                                                                        activityId: r.id,
+                                                                        type: r.type,
+                                                                        details: r.details,
+                                                                        completed: false,
+                                                                        dateKey: format(new Date(), 'yyyy-MM-dd'),
+                                                                        slotName: r.slot as SlotName,
+                                                                        recurrence: r.routine?.type || 'none',
+                                                                        startDate: r.baseDate || r.createdAt || format(new Date(), 'yyyy-MM-dd'),
+                                                                        completionHistory: {},
+                                                                    },
+                                                                ],
+                                                            }));
+                                                            setSettings(prev => ({
+                                                                ...prev,
+                                                                routines: (prev.routines || []).map(rr => rr.id === r.id
+                                                                    ? { ...rr, taskIds: Array.from(new Set([...(rr.taskIds || []), r.id])) }
+                                                                    : rr
+                                                                ),
+                                                            }));
+                                                        }}
+                                                    >
+                                                        <span className="truncate">{r.details}</span>
+                                                        <span className="ml-auto text-xs text-muted-foreground">{r.slot}</span>
+                                                    </DropdownMenuItem>
+                                                ))}
+                                            </DropdownMenuContent>
                                         </DropdownMenu>
                                     <ScrollArea className="h-[420px] pr-2">
-                                        <ul className="space-y-2">
-                                            {(activeBotheringPoint.tasks || []).map((task) => (
-                                                <li key={task.id} className="flex items-start gap-2 text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
-                                                    <button
-                                                        type="button"
-                                                        className={cn("h-6 w-6 rounded border border-white/10 flex items-center justify-center", task.completed && "bg-emerald-500/20 border-emerald-500/40")}
-                                                        onClick={() => {
-                                                            const nextCompleted = !task.completed;
-                                                            const todayKey = format(new Date(), 'yyyy-MM-dd');
-                                                            const nextHistory = task.recurrence && task.recurrence !== 'none'
-                                                                ? { ...(task.completionHistory || {}), [todayKey]: nextCompleted }
-                                                                : task.completionHistory;
-                                                            updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
-                                                                ...point,
-                                                                tasks: (point.tasks || []).map(t => t.id === task.id ? { ...t, completed: nextCompleted, completionHistory: nextHistory } : t),
-                                                            }));
-                                                            const activityId = task.activityId || task.id;
-                                                            if (activityId) {
-                                                                updateActivityById(activityId, (activity) => ({ ...activity, completed: nextCompleted }));
-                                                            }
-                                                        }}
-                                                    >
-                                                        {task.completed ? <Check className="h-3 w-3 text-emerald-400" /> : null}
-                                                    </button>
-                                                    <div className="flex-1 space-y-1">
-                                                        <Input
-                                                            value={task.details}
-                                                            onChange={(e) => {
-                                                                const nextDetails = e.target.value;
-                                                                updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
-                                                                    ...point,
-                                                                    tasks: (point.tasks || []).map(t => t.id === task.id ? { ...t, details: nextDetails } : t),
-                                                                }));
-                                                                const activityId = task.activityId || task.id;
-                                                                if (activityId) {
-                                                                    updateActivityById(activityId, (activity) => ({ ...activity, details: nextDetails }));
-                                                                }
-                                                            }}
-                                                        />
-                                                        <div className="text-xs text-muted-foreground capitalize">
-                                                            {task.type.replace('-', ' ')} {task.slotName ? `• ${task.slotName}` : ''}
-                                                        </div>
-                                                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                                                            <span>Repeat</span>
-                                                            <Select
-                                                                value={task.recurrence || 'none'}
-                                                                onValueChange={(value) => {
-                                                                    const recurrence = value as 'none' | 'daily' | 'weekly' | 'custom';
-                                                                    const baseDate = task.startDate || task.dateKey || format(new Date(), 'yyyy-MM-dd');
-                                                                    updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
-                                                                        ...point,
-                                                                        tasks: (point.tasks || []).map(t => t.id === task.id ? {
-                                                                            ...t,
-                                                                            recurrence,
-                                                                            startDate: t.startDate || baseDate,
-                                                                            completionHistory: recurrence === 'none' ? undefined : (t.completionHistory || {}),
-                                                                            repeatInterval: recurrence === 'custom' ? (t.repeatInterval || 1) : t.repeatInterval,
-                                                                            repeatUnit: recurrence === 'custom' ? (t.repeatUnit || 'week') : t.repeatUnit,
-                                                                        } : t),
-                                                                    }));
-                                                                    const activityId = task.activityId || task.id;
-                                                                    const activity = activityId ? scheduleActivityMap.get(activityId)?.activity : null;
-                                                                    const routineActivity: Activity = activity || {
-                                                                        id: activityId || `routine_${Date.now()}`,
-                                                                        type: task.type,
-                                                                        details: task.details,
-                                                                        completed: false,
-                                                                        slot: task.slotName || botheringTaskSlot,
-                                                                        taskIds: [],
-                                                                    };
-                                                                    if (recurrence === 'none') {
-                                                                        toggleRoutine(routineActivity, null, baseDate);
-                                                                        return;
-                                                                    }
-                                                                    if (recurrence === 'custom') {
-                                                                        const interval = Math.max(1, task.repeatInterval || 1);
-                                                                        const unit = task.repeatUnit || 'week';
-                                                                        const days =
-                                                                            unit === 'day' ? interval :
-                                                                            unit === 'week' ? interval * 7 :
-                                                                            interval * 30;
-                                                                        toggleRoutine(routineActivity, { type: 'custom', days }, baseDate);
-                                                                        return;
-                                                                    }
-                                                                    toggleRoutine(routineActivity, { type: recurrence }, baseDate);
-                                                                }}
-                                                            >
-                                                                <SelectTrigger className="h-7 w-[120px]">
-                                                                    <SelectValue />
-                                                                </SelectTrigger>
-                                                                <SelectContent className="z-[200]">
-                                                                    <SelectItem value="none">None</SelectItem>
-                                                                    <SelectItem value="daily">Daily</SelectItem>
-                                                                    <SelectItem value="weekly">Weekly</SelectItem>
-                                                                    <SelectItem value="custom">Custom</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                        {task.recurrence === 'custom' && (
-                                                            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                                                                <span>Every</span>
-                                                                <Input
-                                                                    type="number"
-                                                                    min={1}
-                                                                    value={task.repeatInterval || 1}
-                                                                    onChange={(e) => {
-                                                                        const nextInterval = Math.max(1, parseInt(e.target.value, 10) || 1);
-                                                                        updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
-                                                                            ...point,
-                                                                            tasks: (point.tasks || []).map(t => t.id === task.id ? { ...t, repeatInterval: nextInterval } : t),
-                                                                        }));
-                                                                        const activityId = task.activityId || task.id;
-                                                                        const activity = activityId ? scheduleActivityMap.get(activityId)?.activity : null;
-                                                                        const baseDate = task.startDate || task.dateKey || format(new Date(), 'yyyy-MM-dd');
-                                                                        const unit = task.repeatUnit || 'week';
-                                                                        const days =
-                                                                            unit === 'day' ? nextInterval :
-                                                                            unit === 'week' ? nextInterval * 7 :
-                                                                            nextInterval * 30;
-                                                                        const routineActivity: Activity = activity || {
-                                                                            id: activityId || `routine_${Date.now()}`,
-                                                                            type: task.type,
-                                                                            details: task.details,
-                                                                            completed: false,
-                                                                            slot: task.slotName || botheringTaskSlot,
-                                                                            taskIds: [],
-                                                                        };
-                                                                        toggleRoutine(routineActivity, { type: 'custom', days }, baseDate);
-                                                                    }}
-                                                                    className="h-7 w-[64px]"
-                                                                />
-                                                                <Select
-                                                                    value={task.repeatUnit || 'week'}
-                                                                    onValueChange={(value) => {
-                                                                        const nextUnit = value as 'day' | 'week' | 'month';
-                                                                        updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
-                                                                            ...point,
-                                                                            tasks: (point.tasks || []).map(t => t.id === task.id ? { ...t, repeatUnit: nextUnit } : t),
-                                                                        }));
-                                                                        const activityId = task.activityId || task.id;
-                                                                        const activity = activityId ? scheduleActivityMap.get(activityId)?.activity : null;
-                                                                        const baseDate = task.startDate || task.dateKey || format(new Date(), 'yyyy-MM-dd');
-                                                                        const interval = Math.max(1, task.repeatInterval || 1);
-                                                                        const days =
-                                                                            nextUnit === 'day' ? interval :
-                                                                            nextUnit === 'week' ? interval * 7 :
-                                                                            interval * 30;
-                                                                        const routineActivity: Activity = activity || {
-                                                                            id: activityId || `routine_${Date.now()}`,
-                                                                            type: task.type,
-                                                                            details: task.details,
-                                                                            completed: false,
-                                                                            slot: task.slotName || botheringTaskSlot,
-                                                                            taskIds: [],
-                                                                        };
-                                                                        toggleRoutine(routineActivity, { type: 'custom', days }, baseDate);
-                                                                    }}
-                                                                >
-                                                                    <SelectTrigger className="h-7 w-[120px]">
-                                                                        <SelectValue />
-                                                                    </SelectTrigger>
-                                                                    <SelectContent className="z-[200]">
-                                                                        <SelectItem value="day">Days</SelectItem>
-                                                                        <SelectItem value="week">Weeks</SelectItem>
-                                                                        <SelectItem value="month">Months</SelectItem>
-                                                                    </SelectContent>
-                                                                </Select>
-                                                            </div>
-                                                        )}
-                                                        {(() => {
-                                                            const counts = getRecurringTaskCounts(task);
-                                                            if (!counts) return null;
-                                                            return (
-                                                                <div className="text-[11px] text-muted-foreground">
-                                                                    {counts.completed} done • {counts.missed} missed
-                                                                </div>
-                                                            );
-                                                        })()}
-                                                    </div>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-6 w-6"
-                                                        onClick={() => {
-                                                            updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
-                                                                ...point,
-                                                                tasks: (point.tasks || []).filter(t => t.id !== task.id),
-                                                            }));
-                                                            const activityId = task.activityId || task.id;
-                                                            if (activityId) {
-                                                                removeActivityById(activityId);
-                                                            }
-                                                        }}
-                                                    >
-                                                        <Trash2 className="h-3 w-3" />
-                                                    </Button>
-                                                </li>
-                                            ))}
-                                            {(!activeBotheringPoint.tasks || activeBotheringPoint.tasks.length === 0) && (
-                                                <p className="text-sm text-muted-foreground text-center py-8">
-                                                    No tasks yet. Add an activity to start.
-                                                </p>
-                                            )}
-                                        </ul>
-                                    </ScrollArea>
+    <ul className="space-y-2">
+        {(activeBotheringPoint.tasks || []).map((task) => {
+            const counts = getRecurringTaskCounts(task);
+            return (
+            <li key={task.id} className="flex items-center gap-2 text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
+                <div className="flex-1 min-w-0">
+                    <p className="truncate">{task.details}</p>
+                    {counts && (
+                        <p className="text-[11px] text-muted-foreground">
+                            {counts.completed} done • {counts.missed} missed
+                        </p>
+                    )}
+                </div>
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => {
+                        updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                            ...point,
+                            tasks: (point.tasks || []).filter(t => t.id !== task.id),
+                        }));
+                        const activityId = task.activityId || task.id;
+                        if (activityId) {
+                            removeActivityById(activityId);
+                        }
+                    }}
+                >
+                    <Trash2 className="h-3 w-3" />
+                </Button>
+            </li>
+        )})}
+        {(!activeBotheringPoint.tasks || activeBotheringPoint.tasks.length === 0) && (
+            <p className="text-sm text-muted-foreground text-center py-8">
+                No tasks yet. Link a routine to start.
+            </p>
+        )}
+    </ul>
+</ScrollArea>
                                 </div>
                             </div>
                         </div>
@@ -1594,3 +1391,4 @@ export function MindsetCategoriesCard() {
         </>
     );
 }
+

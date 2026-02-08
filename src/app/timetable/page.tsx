@@ -6,7 +6,7 @@ import ReactDOM from 'react-dom';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { format, startOfWeek, addDays, isToday, isBefore, startOfToday, parseISO, differenceInDays, getISODay } from 'date-fns';
+import { format, startOfWeek, addDays, isToday, isBefore, startOfToday, parseISO, differenceInDays, getISODay, differenceInMonths } from 'date-fns';
 import { ChevronLeft, ChevronRight, PlusCircle, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, Wind, AlertCircle, Brain, Trash2, Repeat } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { Activity, ActivityType, DailySchedule, SlotName, RecurrenceRule, ExerciseDefinition, WorkoutExercise, DatedWorkout } from '@/types/workout';
@@ -86,6 +86,14 @@ const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine 
     setIsBrowser(true);
   }, []);
 
+  const [customInterval, setCustomInterval] = React.useState(1);
+  const [customUnit, setCustomUnit] = React.useState<'day' | 'week' | 'month'>('day');
+  const applyCustomRepeat = () => {
+    const interval = Number(customInterval);
+    if (!Number.isFinite(interval) || interval <= 0) return;
+    onSetRoutine({ type: 'custom', repeatInterval: interval, repeatUnit: customUnit });
+  };
+
   const renderDraggable = (provided: any, snapshot: any) => {
     const item = (
       <div
@@ -120,6 +128,35 @@ const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine 
             <DropdownMenuContent>
                 <DropdownMenuItem onSelect={() => onSetRoutine({ type: 'daily' })}>Daily</DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => onSetRoutine({ type: 'weekly' })}>Weekly</DropdownMenuItem>
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>Custom…</DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                        <DropdownMenuSubContent className="w-56 p-3 space-y-2">
+                            <div className="text-xs text-muted-foreground">Repeat every</div>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="number"
+                                    min={1}
+                                    value={customInterval}
+                                    onChange={(e) => setCustomInterval(Math.max(1, Number(e.target.value || 1)))}
+                                    className="h-8 w-16 rounded-md border border-white/10 bg-background px-2 text-sm"
+                                />
+                                <select
+                                    value={customUnit}
+                                    onChange={(e) => setCustomUnit(e.target.value as 'day' | 'week' | 'month')}
+                                    className="h-8 flex-1 rounded-md border border-white/10 bg-background px-2 text-sm"
+                                >
+                                    <option value="day">days</option>
+                                    <option value="week">weeks</option>
+                                    <option value="month">months</option>
+                                </select>
+                            </div>
+                            <Button size="sm" className="w-full" onClick={applyCustomRepeat}>
+                                Apply
+                            </Button>
+                        </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                </DropdownMenuSub>
                 {activity.routine && <DropdownMenuSeparator />}
                 {activity.routine && <DropdownMenuItem onSelect={() => onSetRoutine(null)} className="text-destructive">No Repeat</DropdownMenuItem>}
             </DropdownMenuContent>
@@ -367,9 +404,27 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
                                     return [] as Activity[];
                                 }
                                 if (rule.type === 'custom') {
-                                    if (!base || !rule.days) return [] as Activity[];
-                                    const diff = differenceInDays(date, parseISO(base));
-                                    if (diff >= 0 && diff % rule.days === 0) {
+                                    if (!base) return [] as Activity[];
+                                    const interval = Math.max(1, rule.repeatInterval ?? rule.days ?? 1);
+                                    const unit = rule.repeatUnit ?? 'day';
+                                    const baseDate = parseISO(base);
+                                    if (unit === 'month') {
+                                        if (baseDate.getDate() !== date.getDate()) return [] as Activity[];
+                                        const diffMonths = differenceInMonths(date, baseDate);
+                                        if (diffMonths >= 0 && diffMonths % interval === 0) {
+                                            return [{ ...r, id: `${r.id}_${dateKey}` } as Activity];
+                                        }
+                                        return [] as Activity[];
+                                    }
+                                    if (unit === 'week') {
+                                        const diffDays = differenceInDays(date, baseDate);
+                                        if (diffDays >= 0 && diffDays % (interval * 7) === 0) {
+                                            return [{ ...r, id: `${r.id}_${dateKey}` } as Activity];
+                                        }
+                                        return [] as Activity[];
+                                    }
+                                    const diffDays = differenceInDays(date, baseDate);
+                                    if (diffDays >= 0 && diffDays % interval === 0) {
                                         return [{ ...r, id: `${r.id}_${dateKey}` } as Activity];
                                     }
                                     return [] as Activity[];
@@ -383,7 +438,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
                         // Merge routines with explicit schedule, avoiding duplicates by details/type/slot
                         const mergedActivities = [
                             ...allActivities,
-                            ...routineInstances.filter(ri => !allActivities.some(a => a.details === ri.details && a.type === ri.type && a.slot === ri.slot))
+                            ...routineInstances.filter(ri => !allActivities.some(a => a.id === ri.id))
                         ];
                         const isPastDay = isBefore(date, startOfToday());
                         

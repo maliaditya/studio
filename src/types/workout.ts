@@ -187,7 +187,9 @@ export interface SubTask {
 
 export type RecurrenceRule = {
   type: 'daily' | 'weekly' | 'custom';
-  days?: number; // for custom type
+  days?: number; // legacy custom day interval
+  repeatInterval?: number;
+  repeatUnit?: 'day' | 'week' | 'month';
 }
 
 export interface Activity {

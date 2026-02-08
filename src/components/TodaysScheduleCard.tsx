@@ -17,7 +17,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { ScrollArea } from './ui/scroll-area';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { motion, useDragControls } from 'framer-motion';
-import { format, isToday } from 'date-fns';
+import { format, isToday, getISODay, parseISO, differenceInDays, differenceInMonths } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { TimeAllocationChart } from './ProductivitySnapshot';
@@ -272,10 +272,61 @@ export function TodaysScheduleCard({
     const todaysSchedule = schedule[dayKey] || {};
     let allActivities = slotOrder.flatMap(slot => {
         const activities = todaysSchedule[slot];
-        if (activities && Array.isArray(activities) && activities.length > 0) {
-            return activities.map(activity => ({ slot, ...activity }));
-        }
-        return [];
+        const explicit = (activities && Array.isArray(activities)) ? activities : [];
+
+        const routineInstances = (settings.routines || []).flatMap(r => {
+            if (!r || !r.routine) return [] as Activity[];
+            if (r.slot !== slot) return [] as Activity[];
+            const rule = r.routine;
+            const base = r.baseDate || r.createdAt;
+            try {
+                if (rule.type === 'daily') {
+                    return [{ ...r, id: `${r.id}_${dayKey}` } as Activity];
+                }
+                if (rule.type === 'weekly') {
+                    if (!base) return [] as Activity[];
+                    const baseDow = getISODay(parseISO(base));
+                    const thisDow = getISODay(date);
+                    if (baseDow === thisDow) return [{ ...r, id: `${r.id}_${dayKey}` } as Activity];
+                    return [] as Activity[];
+                }
+                if (rule.type === 'custom') {
+                    if (!base) return [] as Activity[];
+                    const interval = Math.max(1, rule.repeatInterval ?? rule.days ?? 1);
+                    const unit = rule.repeatUnit ?? 'day';
+                    const baseDate = parseISO(base);
+                    if (unit === 'month') {
+                        if (baseDate.getDate() !== date.getDate()) return [] as Activity[];
+                        const diffMonths = differenceInMonths(date, baseDate);
+                        if (diffMonths >= 0 && diffMonths % interval === 0) {
+                            return [{ ...r, id: `${r.id}_${dayKey}` } as Activity];
+                        }
+                        return [] as Activity[];
+                    }
+                    if (unit === 'week') {
+                        const diffDays = differenceInDays(date, baseDate);
+                        if (diffDays >= 0 && diffDays % (interval * 7) === 0) {
+                            return [{ ...r, id: `${r.id}_${dayKey}` } as Activity];
+                        }
+                        return [] as Activity[];
+                    }
+                    const diffDays = differenceInDays(date, baseDate);
+                    if (diffDays >= 0 && diffDays % interval === 0) {
+                        return [{ ...r, id: `${r.id}_${dayKey}` } as Activity];
+                    }
+                    return [] as Activity[];
+                }
+            } catch (e) {
+                return [] as Activity[];
+            }
+            return [] as Activity[];
+        });
+
+        const merged = [
+            ...explicit,
+            ...routineInstances.filter(ri => !explicit.some(a => a.id === ri.id)),
+        ];
+        return merged.map(activity => ({ slot, ...activity }));
     });
 
     if (settings.agendaShowCurrentSlotOnly) {
@@ -288,7 +339,7 @@ export function TodaysScheduleCard({
         }
         return slotOrder.indexOf(a.slot as SlotName) - slotOrder.indexOf(b.slot as SlotName);
     });
-  }, [schedule, dayKey, settings.agendaShowCurrentSlotOnly, currentSlot]);
+  }, [schedule, dayKey, settings.agendaShowCurrentSlotOnly, currentSlot, settings.routines, date]);
 
   useEffect(() => {
     if (listRef.current) {
