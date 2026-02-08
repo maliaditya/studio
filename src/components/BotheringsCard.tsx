@@ -7,7 +7,7 @@ import { Brain } from "lucide-react";
 import { parseISO, startOfDay, differenceInDays } from "date-fns";
 
 export function BotheringsCard() {
-  const { mindsetCards } = useAuth();
+  const { mindsetCards, highlightedTaskIds, setHighlightedTaskIds } = useAuth();
 
   const activeBotheringsByType = useMemo(() => {
     const sources = [
@@ -34,6 +34,23 @@ export function BotheringsCard() {
     if (diff < 0) return `Overdue ${Math.abs(diff)}d`;
     if (diff === 0) return "Due today";
     return `${diff}d left`;
+  };
+
+  const getHighlightIds = (point: (typeof activeBotherings)[number]) => {
+    const ids = new Set<string>();
+    (point.tasks || []).forEach(t => {
+      if (t.id) ids.add(t.id);
+      if (t.activityId) ids.add(t.activityId);
+    });
+    return ids;
+  };
+
+  const setHighlightForPoint = (point: (typeof activeBotherings)[number]) => {
+    const ids = getHighlightIds(point);
+    const same =
+      ids.size === highlightedTaskIds.size &&
+      Array.from(ids).every(id => highlightedTaskIds.has(id));
+    setHighlightedTaskIds(same ? new Set() : ids);
   };
 
   return (
@@ -73,7 +90,11 @@ export function BotheringsCard() {
         ) : (
           <ul className="space-y-3">
             {activeBotherings.map((b) => (
-              <li key={b.id} className="rounded-lg border border-muted/40 bg-muted/20 p-3">
+              <li
+                key={b.id}
+                className="rounded-lg border border-muted/40 bg-muted/20 p-3 cursor-pointer hover:border-emerald-400/40 hover:bg-emerald-500/5 transition"
+                onClick={() => setHighlightForPoint(b)}
+              >
                 <div className="text-sm font-semibold">{b.text}</div>
                 <div className="mt-2 text-xs text-muted-foreground inline-flex items-center gap-2">
                   <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">

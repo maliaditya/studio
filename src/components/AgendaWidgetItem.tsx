@@ -61,7 +61,8 @@ export const AgendaWidgetItem = React.memo(({
     const { 
         setSelectedDeepWorkTask, 
         setSelectedUpskillTask,
-        findRootTask
+        findRootTask,
+        highlightedTaskIds
     } = useAuth();
     const router = useRouter();
 
@@ -96,12 +97,20 @@ export const AgendaWidgetItem = React.memo(({
         }
     };
 
+    const baseMatch = activity.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+    const baseId = baseMatch ? activity.id.slice(0, -11) : activity.id;
+    const isHighlighted =
+        highlightedTaskIds?.has(activity.id) ||
+        highlightedTaskIds?.has(baseId) ||
+        (activity.taskIds || []).some(id => highlightedTaskIds?.has(id));
+
     return (
         <li 
             className={cn(
                 "flex items-start gap-2 p-2 rounded-lg group transition-all",
                 context === 'timeslot' && 'bg-background',
-                onActivityClick && 'cursor-pointer'
+                onActivityClick && 'cursor-pointer',
+                isHighlighted && "ring-2 ring-emerald-400/50 bg-emerald-500/10"
             )}
             onClick={handleItemClick}
         >
