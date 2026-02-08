@@ -90,6 +90,7 @@ SearchPopup.displayName = 'SearchPopup';
 const CanvasPreviewPopup = ({
   title,
   drawingData,
+  canvasId,
   initialRect,
   onClose,
   onOpenInTab,
@@ -97,6 +98,7 @@ const CanvasPreviewPopup = ({
 }: {
   title: string;
   drawingData?: string | null;
+  canvasId: string;
   initialRect: { x: number; y: number; width: number; height: number };
   onClose: () => void;
   onOpenInTab: () => void;
@@ -106,6 +108,8 @@ const CanvasPreviewPopup = ({
   const [position, setPosition] = useState({ x: initialRect.x, y: initialRect.y });
   const [size, setSize] = useState({ width: initialRect.width, height: initialRect.height });
   const [isLoaded, setIsLoaded] = useState(false);
+  const [loadedFiles, setLoadedFiles] = useState<Record<string, any>>({});
+  const [loadedFilesKey, setLoadedFilesKey] = useState<string | null>(null);
   const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -126,18 +130,64 @@ const CanvasPreviewPopup = ({
     setIsLoaded(true);
   }, [storageKey]);
 
-  const initialData = useMemo(() => {
+  const parsedPreview = useMemo(() => {
     if (!drawingData) return { elements: [] as any[] };
     try {
       const parsed = JSON.parse(drawingData);
       if (Array.isArray(parsed.elements)) {
-        return { elements: parsed.elements, appState: parsed.appState };
+        return { elements: parsed.elements, appState: parsed.appState, filesMeta: parsed.files };
       }
     } catch (e) {
       console.error('Failed to parse preview canvas data:', e);
     }
     return { elements: [] as any[] };
   }, [drawingData]);
+
+  const initialData = useMemo(() => {
+    return { elements: parsedPreview.elements, appState: parsedPreview.appState };
+  }, [parsedPreview.elements, parsedPreview.appState]);
+
+  useEffect(() => {
+    const loadFiles = async () => {
+      if (!canvasId) {
+        setLoadedFiles({});
+        setLoadedFilesKey(null);
+        return;
+      }
+
+      const filesMeta = parsedPreview?.filesMeta;
+      if (!filesMeta || Object.keys(filesMeta).length === 0) {
+        setLoadedFiles({});
+        setLoadedFilesKey(canvasId);
+        return;
+      }
+
+      try {
+        const files = await loadExcalidrawFiles(canvasId, filesMeta);
+        setLoadedFiles(files);
+        setLoadedFilesKey(canvasId);
+      } catch (e) {
+        console.error("Failed to load preview files from IndexedDB:", e);
+        setLoadedFiles({});
+        setLoadedFilesKey(canvasId);
+      }
+    };
+
+    void loadFiles();
+  }, [canvasId, parsedPreview?.filesMeta]);
+
+  useEffect(() => {
+    const api = excalidrawAPIRef.current;
+    if (!api) return;
+    if (!loadedFilesKey || loadedFilesKey !== canvasId) return;
+    if (!loadedFiles || Object.keys(loadedFiles).length === 0) return;
+
+    if (typeof api.addFiles === 'function') {
+      api.addFiles(Object.values(loadedFiles));
+    } else if (typeof api.updateScene === 'function') {
+      api.updateScene({ files: loadedFiles });
+    }
+  }, [loadedFiles, loadedFilesKey, canvasId]);
 
   useEffect(() => {
     const api = excalidrawAPIRef.current;
@@ -799,6 +849,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         <CanvasPreviewPopup
           title={canvasPreview.title}
           drawingData={canvasPreview.drawing}
+          canvasId={`${canvasPreview.resourceId}-${canvasPreview.pointId}`}
           initialRect={{ x: canvasPreview.x, y: canvasPreview.y, width: canvasPreview.width, height: canvasPreview.height }}
           onClose={() => setCanvasPreview(null)}
           onOpenInTab={() => {
