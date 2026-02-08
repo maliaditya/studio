@@ -275,6 +275,8 @@ const CanvasPreviewPopup = ({
           minHeight: 240,
         }}
         className="fixed z-[160] rounded-2xl border border-white/10 bg-background/90 backdrop-blur-md shadow-2xl overflow-hidden resize both canvas-preview"
+        onMouseEnter={() => setIsBackgroundBlurred(true)}
+        onMouseLeave={() => setIsBackgroundBlurred(false)}
       >
         <div
           className="absolute top-2 left-2 z-20 flex items-center gap-1 rounded-full bg-background/60 border border-white/10 px-2 py-1 cursor-grab active:cursor-grabbing"
@@ -291,15 +293,6 @@ const CanvasPreviewPopup = ({
           <span className="text-[10px] text-muted-foreground/70">Drag</span>
         </div>
         <div className="absolute top-2 right-2 z-20 flex items-center gap-1 rounded-full bg-background/60 border border-white/10 px-1 py-0.5">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-[11px]"
-            onClick={() => setIsBackgroundBlurred(prev => !prev)}
-            title="Toggle background blur"
-          >
-            {isBackgroundBlurred ? 'Unblur' : 'Blur'}
-          </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpenInTab} title="Open in New Tab">
             <ArrowUpRight className="h-4 w-4" />
           </Button>
