@@ -108,6 +108,7 @@ const CanvasPreviewPopup = ({
   const [position, setPosition] = useState({ x: initialRect.x, y: initialRect.y });
   const [size, setSize] = useState({ width: initialRect.width, height: initialRect.height });
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isBackgroundBlurred, setIsBackgroundBlurred] = useState(false);
   const [loadedFiles, setLoadedFiles] = useState<Record<string, any>>({});
   const [loadedFilesKey, setLoadedFilesKey] = useState<string | null>(null);
   const dragState = useRef<{ startX: number; startY: number; originX: number; originY: number } | null>(null);
@@ -259,61 +260,75 @@ const CanvasPreviewPopup = ({
   }, [position, size, storageKey, isLoaded]);
 
   return (
-    <div
-      ref={containerRef}
-      style={{
-        top: position.y,
-        left: position.x,
-        width: size.width,
-        height: size.height,
-        minWidth: 320,
-        minHeight: 240,
-      }}
-      className="fixed z-[160] rounded-2xl border border-white/10 bg-background/90 backdrop-blur-md shadow-2xl overflow-hidden resize both canvas-preview"
-    >
+    <>
+      {isBackgroundBlurred && (
+        <div className="fixed inset-0 z-[150] bg-black/30 backdrop-blur-sm pointer-events-none" />
+      )}
       <div
-        className="absolute top-2 left-2 z-20 flex items-center gap-1 rounded-full bg-background/60 border border-white/10 px-2 py-1 cursor-grab active:cursor-grabbing"
-        onPointerDown={(event) => {
-          dragState.current = {
-            startX: event.clientX,
-            startY: event.clientY,
-            originX: position.x,
-            originY: position.y,
-          };
+        ref={containerRef}
+        style={{
+          top: position.y,
+          left: position.x,
+          width: size.width,
+          height: size.height,
+          minWidth: 320,
+          minHeight: 240,
         }}
+        className="fixed z-[160] rounded-2xl border border-white/10 bg-background/90 backdrop-blur-md shadow-2xl overflow-hidden resize both canvas-preview"
       >
-        <GripVertical className="h-3 w-3 text-muted-foreground/70" />
-        <span className="text-[10px] text-muted-foreground/70">Drag</span>
-      </div>
-      <div className="absolute top-2 right-2 z-20 flex items-center gap-1 rounded-full bg-background/60 border border-white/10 px-1 py-0.5">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpenInTab} title="Open in New Tab">
-          <ArrowUpRight className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} title="Close">
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-      <div className="h-full w-full">
-        <Excalidraw
-          initialData={initialData}
-          excalidrawAPI={(api) => (excalidrawAPIRef.current = api)}
-          theme="dark"
-          viewModeEnabled={true}
-          zenModeEnabled={true}
-          gridModeEnabled={false}
-          UIOptions={{
-            canvasActions: {
-              export: false,
-              loadScene: false,
-              saveToActiveFile: false,
-              toggleTheme: false,
-              clearCanvas: false,
-              changeViewBackgroundColor: false,
-            },
+        <div
+          className="absolute top-2 left-2 z-20 flex items-center gap-1 rounded-full bg-background/60 border border-white/10 px-2 py-1 cursor-grab active:cursor-grabbing"
+          onPointerDown={(event) => {
+            dragState.current = {
+              startX: event.clientX,
+              startY: event.clientY,
+              originX: position.x,
+              originY: position.y,
+            };
           }}
-        />
+        >
+          <GripVertical className="h-3 w-3 text-muted-foreground/70" />
+          <span className="text-[10px] text-muted-foreground/70">Drag</span>
+        </div>
+        <div className="absolute top-2 right-2 z-20 flex items-center gap-1 rounded-full bg-background/60 border border-white/10 px-1 py-0.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-[11px]"
+            onClick={() => setIsBackgroundBlurred(prev => !prev)}
+            title="Toggle background blur"
+          >
+            {isBackgroundBlurred ? 'Unblur' : 'Blur'}
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpenInTab} title="Open in New Tab">
+            <ArrowUpRight className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onClose} title="Close">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+        <div className="h-full w-full">
+          <Excalidraw
+            initialData={initialData}
+            excalidrawAPI={(api) => (excalidrawAPIRef.current = api)}
+            theme="dark"
+            viewModeEnabled={true}
+            zenModeEnabled={true}
+            gridModeEnabled={false}
+            UIOptions={{
+              canvasActions: {
+                export: false,
+                loadScene: false,
+                saveToActiveFile: false,
+                toggleTheme: false,
+                clearCanvas: false,
+                changeViewBackgroundColor: false,
+              },
+            }}
+          />
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
