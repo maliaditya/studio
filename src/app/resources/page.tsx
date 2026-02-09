@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useMemo, FormEvent, useEffect, useRef, useCallback, useDeferredValue } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -71,6 +71,23 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
             videoId = urlObj.pathname.slice(1);
         }
         if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=0`;
+    } catch (e) {}
+    return null;
+};
+
+const getYouTubeVideoId = (url: string | undefined): string | null => {
+    if (!url) return null;
+    try {
+        const urlObj = new URL(url);
+        if (urlObj.hostname.includes('youtube.com')) {
+            if (urlObj.pathname.startsWith('/shorts/')) {
+                return urlObj.pathname.split('/shorts/')[1] || null;
+            }
+            return urlObj.searchParams.get('v');
+        }
+        if (urlObj.hostname.includes('youtu.be')) {
+            return urlObj.pathname.slice(1) || null;
+        }
     } catch (e) {}
     return null;
 };
@@ -541,6 +558,49 @@ const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, 
 });
 SortablePoint.displayName = 'SortablePoint';
 
+const SearchResultCard = React.memo(({ resource, onOpen }: { resource: Resource; onOpen: (resourceId: string, event: React.MouseEvent) => void }) => {
+    const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
+    const icon = resource.type === 'habit' ? <Zap className="h-4 w-4 text-primary" /> :
+        resource.type === 'mechanism' ? <Workflow className="h-4 w-4 text-primary" /> :
+        resource.type === 'pdf' ? <FileIcon className="h-4 w-4 text-red-500" /> :
+        youtubeEmbedUrl ? <Youtube className="h-4 w-4 text-red-500" /> :
+        resource.type === 'card' ? <Library className="h-4 w-4 text-primary" /> :
+        <Globe className="h-4 w-4 text-muted-foreground" />;
+
+    return (
+        <Card className="h-full flex flex-col hover:shadow-lg transition-shadow">
+            <CardHeader className="flex-row items-center gap-3 space-y-0">
+                {icon}
+                <CardTitle className="text-base truncate flex-grow" title={resource.name || ""}>{resource.name || "Untitled"}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-grow flex flex-col pt-0">
+                <p className="text-xs text-muted-foreground line-clamp-2 flex-grow">
+                    {resource.description || (resource.link ? resource.link : "No description provided.")}
+                </p>
+                <div className="mt-auto pt-2 flex gap-2">
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        className="w-full"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onOpen(resource.id, e);
+                        }}
+                    >
+                        Open
+                    </Button>
+                    {resource.link && (
+                        <Button asChild variant="outline" size="sm" className="w-full">
+                            <a href={resource.link} target="_blank" rel="noopener noreferrer">Visit</a>
+                        </Button>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
+    );
+});
+SearchResultCard.displayName = 'SearchResultCard';
+
 
 const DraggableFolder = React.memo(({ folder, children, isDragging, ...props }: { folder: ResourceFolder, children: React.ReactNode, isDragging: boolean } & React.HTMLAttributes<HTMLDivElement>) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -650,6 +710,12 @@ function ResourcesPageContent() {
   const [activeId, setActiveId] = useState<string | null>(null);
   
   const [searchTerm, setSearchTerm] = useState('');
+  const deferredSearchTerm = useDeferredValue(searchTerm);
+  const normalizedSearchTerm = useMemo(
+    () => deferredSearchTerm.trim().toLowerCase(),
+    [deferredSearchTerm]
+  );
+  const isSearching = normalizedSearchTerm.length > 0;
   const [modelModalState, setModelModalState] = useState<{ isOpen: boolean; modelUrl: string | null }>({ isOpen: false, modelUrl: null });
 
   const [linkTextDialog, setLinkTextDialog] = useState<{ point: ResourcePoint, resourceId: string } | null>(null);
@@ -1116,17 +1182,29 @@ function ResourcesPageContent() {
     }
   };
   
+  const searchIndex = useMemo(() => {
+    if (!resources) return [];
+    return resources.map(res => {
+      const pointsText = (res.points || []).map(p => p.text ?? "").join(" ");
+      const pointsDisplayText = (res.points || []).map(p => (p as { displayText?: string }).displayText ?? "").join(" ");
+      const haystack = [
+        res.name ?? "",
+        res.description ?? "",
+        res.link ?? "",
+        pointsText,
+        pointsDisplayText,
+      ].join(" ").toLowerCase();
+      return { res, haystack };
+    });
+  }, [resources]);
+
   const filteredResources = useMemo(() => {
     if (!resources) return [];
 
-    if (searchTerm) {
-        const lowercasedTerm = searchTerm.toLowerCase();
-        return resources.filter(res =>
-            res.name.toLowerCase().includes(lowercasedTerm) ||
-            res.description?.toLowerCase().includes(lowercasedTerm) ||
-            res.link?.toLowerCase().includes(lowercasedTerm) ||
-            (res.points || []).some(p => p.text?.toLowerCase().includes(lowercasedTerm))
-        );
+    if (normalizedSearchTerm) {
+      return searchIndex
+        .filter(item => item.haystack.includes(normalizedSearchTerm))
+        .map(item => item.res);
     }
     
     if (selectedResourceFolderId) {
@@ -1134,7 +1212,7 @@ function ResourcesPageContent() {
     }
 
     return [];
-}, [resources, selectedResourceFolderId, searchTerm]);
+  }, [resources, selectedResourceFolderId, normalizedSearchTerm, searchIndex]);
 
   return (
     <div className="h-[calc(100vh-4rem)] overflow-hidden">
@@ -1233,9 +1311,22 @@ function ResourcesPageContent() {
                                         className="h-8 group/tab relative"
                                     >
                                         <span className="truncate max-w-[150px]">{folder.name}</span>
-                                        <button onClick={(e) => { e.stopPropagation(); closeTab(id); }} className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover/tab:opacity-100 transition-opacity flex items-center justify-center">
+                                        <span
+                                            role="button"
+                                            tabIndex={0}
+                                            onClick={(e) => { e.stopPropagation(); closeTab(id); }}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter' || e.key === ' ') {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    closeTab(id);
+                                                }
+                                            }}
+                                            className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground opacity-0 group-hover/tab:opacity-100 transition-opacity flex items-center justify-center"
+                                            aria-label={`Close ${folder.name}`}
+                                        >
                                             <X className="h-3 w-3" />
-                                        </button>
+                                        </span>
                                     </Button>
                                     ) : null;
                                 })}
@@ -1253,46 +1344,58 @@ function ResourcesPageContent() {
                     
                     <ScrollArea className="h-full pr-4">
                         {filteredResources.length > 0 ? (
-                            <SortableContext items={filteredResources.map(r => r.id)}>
-                            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-                                {filteredResources.map(res => (
-                                    <SortableResourceCard key={res.id} item={res} className="h-full" linkingFromId={linkingFromId}>
-                                    {res.type === 'habit' ? (
-                                        <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => setDeleteConfirmation({item: res})} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)} />
-                                    ) : res.type === 'mechanism' ? (
-                                        <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => setDeleteConfirmation({item: res})} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)} />
-                                    ) : res.type === 'card' ? (
-                                        <ResourceCardComponent
+                            isSearching ? (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                                    {filteredResources.map(res => (
+                                        <SearchResultCard
+                                            key={res.id}
                                             resource={res}
-                                            onUpdate={handleUpdateResource}
-                                            onDelete={() => setDeleteConfirmation({ item: res })}
-                                            onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)}
-                                            onOpenMarkdownModal={handleOpenMarkdownModal}
-                                            playingAudio={playingAudio}
-                                            setPlayingAudio={setPlayingAudio}
-                                            onLinkClick={handleLinkClick}
-                                            linkingFromId={linkingFromId}
-                                            onEditLinkText={handleEditLinkText}
-                                            onConvertToCard={onConvertToCard}
-                                            onOpenPdfViewer={openPdfViewer}
+                                            onOpen={(resourceId, event) => openGeneralPopup(resourceId, event)}
                                         />
-                                    ) : (
-                                        <ResourceCard
-                                            resource={res}
-                                            onUpdate={handleUpdateResource}
-                                            onDelete={() => setDeleteConfirmation({ item: res })}
-                                            onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)}
-                                            onLinkClick={handleLinkClick}
-                                            linkingFromId={linkingFromId}
-                                            onEditLinkText={handleEditLinkText}
-                                            onConvertToCard={onConvertToCard}
-                                            onOpenPdfViewer={openPdfViewer}
-                                        />
-                                    )}
-                                    </SortableResourceCard>
-                                ))}
-                            </div>
-                            </SortableContext>
+                                    ))}
+                                </div>
+                            ) : (
+                                <SortableContext items={filteredResources.map(r => r.id)}>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                                    {filteredResources.map(res => (
+                                        <SortableResourceCard key={res.id} item={res} className="h-full" linkingFromId={linkingFromId}>
+                                        {res.type === 'habit' ? (
+                                            <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => setDeleteConfirmation({item: res})} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)} />
+                                        ) : res.type === 'mechanism' ? (
+                                            <MechanismResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => setDeleteConfirmation({item: res})} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)} />
+                                        ) : res.type === 'card' ? (
+                                            <ResourceCardComponent
+                                                resource={res}
+                                                onUpdate={handleUpdateResource}
+                                                onDelete={() => setDeleteConfirmation({ item: res })}
+                                                onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)}
+                                                onOpenMarkdownModal={handleOpenMarkdownModal}
+                                                playingAudio={playingAudio}
+                                                setPlayingAudio={setPlayingAudio}
+                                                onLinkClick={handleLinkClick}
+                                                linkingFromId={linkingFromId}
+                                                onEditLinkText={handleEditLinkText}
+                                                onConvertToCard={onConvertToCard}
+                                                onOpenPdfViewer={openPdfViewer}
+                                            />
+                                        ) : (
+                                            <ResourceCard
+                                                resource={res}
+                                                onUpdate={handleUpdateResource}
+                                                onDelete={() => setDeleteConfirmation({ item: res })}
+                                                onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)}
+                                                onLinkClick={handleLinkClick}
+                                                linkingFromId={linkingFromId}
+                                                onEditLinkText={handleEditLinkText}
+                                                onConvertToCard={onConvertToCard}
+                                                onOpenPdfViewer={openPdfViewer}
+                                            />
+                                        )}
+                                        </SortableResourceCard>
+                                    ))}
+                                </div>
+                                </SortableContext>
+                            )
                         ) : (
                             <div className="text-center text-muted-foreground pt-16">
                             <p>{searchTerm ? "No resources found matching your search." : "This folder is empty. Add a resource to get started."}</p>
@@ -1485,15 +1588,18 @@ function ResourcesPageContent() {
 const ResourceCard = React.memo(({ resource, onUpdate, onDelete, onOpenNestedPopup, onLinkClick, linkingFromId, onEditLinkText, onConvertToCard, onOpenPdfViewer }: Omit<ResourceCardComponentProps, 'onOpenMarkdownModal' | 'playingAudio' | 'setPlayingAudio'> & { onOpenPdfViewer: (resource: Resource) => void }) => {
     const { setFloatingVideoUrl } = useAuth();
     const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+    const [showEmbed, setShowEmbed] = useState(false);
 
     const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
+    const youtubeVideoId = getYouTubeVideoId(resource.link);
+    const youtubeThumbUrl = youtubeVideoId ? `https://img.youtube.com/vi/${youtubeVideoId}/hqdefault.jpg` : null;
     const imageEmbedUrl = isImageUrl(resource.link) ? resource.link : null;
 
     if (imageEmbedUrl) {
         return (
             <Card className="overflow-hidden h-full flex flex-col">
                 <div className="aspect-video w-full bg-black relative">
-                    <Image src={imageEmbedUrl} alt={resource.name} layout="fill" objectFit="contain" data-ai-hint="illustration" />
+                    <Image src={imageEmbedUrl} alt={resource.name} fill style={{ objectFit: "contain" }} data-ai-hint="illustration" />
                 </div>
                 <CardContent className="p-3 flex-grow flex flex-col">
                     <p className="font-semibold text-sm truncate" title={resource.name}>{resource.name}</p>
@@ -1510,7 +1616,34 @@ const ResourceCard = React.memo(({ resource, onUpdate, onDelete, onOpenNestedPop
             <>
                 <Card className="overflow-hidden h-full flex flex-col">
                     <div className="aspect-video w-full bg-black relative group">
-                        <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full"></iframe>
+                        {showEmbed ? (
+                            <iframe src={youtubeEmbedUrl} title={resource.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen loading="lazy" className="w-full h-full"></iframe>
+                        ) : (
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                className="relative w-full h-full cursor-pointer"
+                                onClick={() => setShowEmbed(true)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        setShowEmbed(true);
+                                    }
+                                }}
+                                aria-label={`Play ${resource.name}`}
+                            >
+                                {youtubeThumbUrl ? (
+                                    <Image src={youtubeThumbUrl} alt={resource.name} fill style={{ objectFit: "cover" }} unoptimized />
+                                ) : (
+                                    <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">Preview unavailable</div>
+                                )}
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                    <div className="h-14 w-14 rounded-full bg-black/60 flex items-center justify-center">
+                                        <Play className="h-6 w-6 text-white" />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                          <div className="absolute top-2 right-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setFloatingVideoUrl(resource.link!)}><PictureInPicture className="h-4 w-4" /></Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-black/40 text-white hover:bg-black/70 hover:text-white" onClick={() => setEmbedUrl(youtubeEmbedUrl)}><Expand className="h-4 w-4" /></Button>

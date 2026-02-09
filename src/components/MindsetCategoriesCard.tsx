@@ -438,12 +438,22 @@ export function MindsetCategoriesCard() {
                 ? constraintCard
                 : externalCard;
     const activeBotheringPoint = activeBotheringCard?.points.find(p => p.id === botheringPopup?.pointId);
-    const isBotheringActive = (point?: MindsetPoint) =>
-        !!point && (point.tasks?.length || 0) > 0 && !point.completed;
-    const getTaskStats = (point?: MindsetPoint) => {
-        const total = point?.tasks?.length || 0;
-        const completed = point?.tasks?.filter(t => t.completed).length || 0;
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const getTodayTaskStats = (point?: MindsetPoint) => {
+        const tasks = point?.tasks || [];
+        if (tasks.length === 0) return { total: 0, completed: 0, remaining: 0 };
+        let total = 0;
+        let completed = 0;
+        tasks.forEach(task => {
+            if (!isTaskDueOnDate(task, todayKey)) return;
+            total += 1;
+            if (isTaskCompletedOnDate(task, todayKey)) completed += 1;
+        });
         return { total, completed, remaining: Math.max(0, total - completed) };
+    };
+    const isBotheringActive = (point?: MindsetPoint) => {
+        const stats = getTodayTaskStats(point);
+        return !!point && stats.total > 0 && stats.completed < stats.total;
     };
     const isTaskDueOnDate = (task: MindsetPoint['tasks'][number], dateKey: string) => {
         const startKey = task.startDate || task.dateKey;
@@ -980,17 +990,18 @@ export function MindsetCategoriesCard() {
                                                             return 0;
                                                         })
                                                         .map(point => {
-                                                            const stats = getTaskStats(point);
+                                                            const stats = getTodayTaskStats(point);
+                                                            const isDoneToday = stats.total > 0 && stats.completed === stats.total;
                                                             return (
-                                                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isBotheringActive(point) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-white/5")}>
+                                                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isDoneToday ? "bg-emerald-500/10 border-emerald-500/40" : isBotheringActive(point) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-white/5")}>
                                                                     <button
                                                                         type="button"
                                                                         className="flex-1 min-w-0 text-left"
                                                                         onClick={() => setBotheringPopup({ type: 'mismatch', pointId: point.id })}
                                                                     >
                                                                         <div className="flex items-center gap-2">
-                                                                            {point.completed ? <Check className="h-4 w-4 text-emerald-400" /> : null}
-                                                                            <span className={cn(point.completed && "line-through text-muted-foreground")}>{point.text}</span>
+                                                                            {isDoneToday ? <Check className="h-4 w-4 text-emerald-400" /> : null}
+                                                                            <span className={cn(isDoneToday && "line-through text-muted-foreground")}>{point.text}</span>
                                                                         </div>
                                                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                                                             {getDaysLeftLabel(point.endDate) ? (
@@ -1041,17 +1052,18 @@ export function MindsetCategoriesCard() {
                                                             return 0;
                                                         })
                                                         .map(point => {
-                                                            const stats = getTaskStats(point);
+                                                            const stats = getTodayTaskStats(point);
+                                                            const isDoneToday = stats.total > 0 && stats.completed === stats.total;
                                                             return (
-                                                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isBotheringActive(point) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-white/5")}>
+                                                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isDoneToday ? "bg-emerald-500/10 border-emerald-500/40" : isBotheringActive(point) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-white/5")}>
                                                                     <button
                                                                         type="button"
                                                                         className="flex-1 min-w-0 text-left"
                                                                         onClick={() => setBotheringPopup({ type: 'constraint', pointId: point.id })}
                                                                     >
                                                                         <div className="flex items-center gap-2">
-                                                                            {point.completed ? <Check className="h-4 w-4 text-emerald-400" /> : null}
-                                                                            <span className={cn(point.completed && "line-through text-muted-foreground")}>{point.text}</span>
+                                                                            {isDoneToday ? <Check className="h-4 w-4 text-emerald-400" /> : null}
+                                                                            <span className={cn(isDoneToday && "line-through text-muted-foreground")}>{point.text}</span>
                                                                         </div>
                                                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                                                             {getDaysLeftLabel(point.endDate) ? (
@@ -1102,17 +1114,18 @@ export function MindsetCategoriesCard() {
                             return 0;
                         })
                         .map(point => {
-                            const stats = getTaskStats(point);
+                            const stats = getTodayTaskStats(point);
+                            const isDoneToday = stats.total > 0 && stats.completed === stats.total;
                             return (
-                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isBotheringActive(point) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-white/5")}>
+                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isDoneToday ? "bg-emerald-500/10 border-emerald-500/40" : isBotheringActive(point) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-white/5")}>
                                     <button
                                         type="button"
                                         className="flex-1 min-w-0 text-left"
                                         onClick={() => setBotheringPopup({ type: 'external', pointId: point.id })}
                                     >
                                         <div className="flex items-center gap-2">
-                                            {point.completed ? <Check className="h-4 w-4 text-emerald-400" /> : null}
-                                            <span className={cn(point.completed && "line-through text-muted-foreground")}>{point.text}</span>
+                                            {isDoneToday ? <Check className="h-4 w-4 text-emerald-400" /> : null}
+                                            <span className={cn(isDoneToday && "line-through text-muted-foreground")}>{point.text}</span>
                                         </div>
                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                             {getDaysLeftLabel(point.endDate) ? (

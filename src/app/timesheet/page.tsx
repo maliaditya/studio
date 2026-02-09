@@ -232,8 +232,8 @@ const DayDetailModal = ({ isOpen, onOpenChange, data, allActivitiesData }: {
   );
 };
 
-const getLoggedMinutes = (activity: Activity, allDeepWorkLogs: any[], allUpskillLogs: any[], brandingLogs: any[], allLeadGenLogs: any[], allWorkoutLogs: any[], allMindProgrammingLogs: any[], dateKey: string): number => {
-    if (!activity.completed) return 0;
+const getLoggedMinutes = (activity: Activity, allDeepWorkLogs: any[], allUpskillLogs: any[], brandingLogs: any[], allLeadGenLogs: any[], allWorkoutLogs: any[], allMindProgrammingLogs: any[], dateKey: string, allowUncompleted = false): number => {
+    if (!allowUncompleted && !activity.completed) return 0;
 
     // Handle focus sessions first
     if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
@@ -979,7 +979,7 @@ export function TimesheetPageContent({
                     if (!isTaskCompletedOnDate(task, dateKey, activityMap)) return;
                     const act = activityMap.get(task.activityId || task.id);
                     if (act) {
-                        totalMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
+                        totalMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey, true);
                     }
                 });
             });
@@ -997,7 +997,7 @@ export function TimesheetPageContent({
                     if (!isTaskCompletedOnDate(task, dateKey, activityMap)) return;
                     const act = activityMap.get(task.activityId || task.id);
                     if (act) {
-                        totalMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
+                        totalMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey, true);
                     }
                 });
             });
@@ -1423,7 +1423,7 @@ export function TimesheetPageContent({
                                                                     if (!isTaskCompletedOnDate(task, dateKey, activityMap)) return;
                                                                     const act = activityMap.get(task.activityId || task.id);
                                                                     if (act) {
-                                                                        taskMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
+                                                                        taskMinutes += getLoggedMinutes(act, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey, true);
                                                                     }
                                                                 });
                                                                 const hours = taskMinutes / 60;
