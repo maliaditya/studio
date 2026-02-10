@@ -112,7 +112,36 @@ export function BotheringsCard() {
     return startKey === dateKey;
   };
 
+  const activityMapByDate = useMemo(() => {
+    const map = new Map<string, Map<string, { completed?: boolean }>>();
+    Object.entries(schedule || {}).forEach(([dateKey, day]) => {
+      const activityMap = new Map<string, { completed?: boolean }>();
+      Object.values(day).forEach((value: any) => {
+        if (!Array.isArray(value)) return;
+        value.forEach((act: any) => {
+          if (!act?.id) return;
+          activityMap.set(act.id, act);
+          const baseMatch = act.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+          if (baseMatch) {
+            const baseId = act.id.slice(0, -11);
+            if (!activityMap.has(baseId)) activityMap.set(baseId, act);
+          }
+        });
+      });
+      map.set(dateKey, activityMap);
+    });
+    return map;
+  }, [schedule]);
+
   const isTaskCompletedOnDate = (task: NonNullable<MindsetPoint["tasks"]>[number], dateKey: string) => {
+    const activityMap = activityMapByDate.get(dateKey);
+    const activity: any = activityMap?.get(task.activityId || task.id);
+    if (activity) {
+      if (activity.completed) return true;
+      if (activity.duration && activity.duration > 0) return true;
+      if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) return true;
+      if (activity.focusSessionInitialDuration && activity.focusSessionInitialDuration > 0) return true;
+    }
     if (task.recurrence && task.recurrence !== 'none') {
       return !!task.completionHistory?.[dateKey];
     }
@@ -124,6 +153,7 @@ export function BotheringsCard() {
     const today = startOfDay(new Date());
     const oneYearAgo = addDays(today, -365);
     let score = 0;
+    let hasAnyCompletion = false;
     const data: { date: string; fullDate: string; score: number }[] = [];
 
     for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
@@ -139,9 +169,12 @@ export function BotheringsCard() {
 
       if (due > 0) {
         if (completed === due) {
+          hasAnyCompletion = true;
           score += (1 - score) * 0.1;
         } else {
-          score *= 0.95;
+          if (hasAnyCompletion) {
+            score *= 0.95;
+          }
         }
       }
 
