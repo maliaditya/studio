@@ -17,7 +17,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { ScrollArea } from './ui/scroll-area';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { motion, useDragControls } from 'framer-motion';
-import { format, isToday, getISODay, parseISO, differenceInDays, differenceInMonths } from 'date-fns';
+import { format, isToday, getISODay, parseISO, differenceInDays, differenceInMonths, startOfDay, addDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { TimeAllocationChart } from './ProductivitySnapshot';
@@ -107,6 +107,7 @@ interface AgendaWidgetItemProps {
     onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
     context: 'agenda' | 'timeslot';
     loggedDuration?: string;
+    hasLoggedStopper?: boolean;
 }
 
 export const AgendaWidgetItem = React.memo(({ 
@@ -121,6 +122,7 @@ export const AgendaWidgetItem = React.memo(({
     onOpenHabitPopup, 
     context,
     loggedDuration,
+    hasLoggedStopper,
 }: AgendaWidgetItemProps) => {
     const { 
         setSelectedDeepWorkTask, 
@@ -143,6 +145,7 @@ export const AgendaWidgetItem = React.memo(({
     const linkedActivityName = activity.type === 'pomodoro' && activity.linkedActivityType
         ? activity.linkedActivityType.charAt(0).toUpperCase() + activity.linkedActivityType.slice(1).replace('-', ' ')
         : null;
+    const shouldStrike = activity.completed || !!hasLoggedStopper;
 
     const handleBadgeClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -212,7 +215,7 @@ export const AgendaWidgetItem = React.memo(({
                 <EditableActivityText
                     initialValue={activity.details}
                     onUpdate={(newDetails) => onUpdateActivity(activity.id, newDetails)}
-                    className={cn("text-sm font-medium w-full block", activity.completed && "line-through text-muted-foreground")}
+                    className={cn("text-sm font-medium w-full block", shouldStrike && "line-through text-muted-foreground")}
                 />
                  <div className="flex flex-wrap items-center gap-2 mt-1">
                     <div className="flex items-center gap-1 text-xs text-muted-foreground capitalize">
@@ -272,6 +275,7 @@ export function TodaysScheduleCard({
     setSchedule: setGlobalSchedule,
     resources,
     setResources,
+    mindsetCards,
     metaRules,
     patterns,
     syncWithGitHub,
@@ -280,6 +284,10 @@ export function TodaysScheduleCard({
     openDrawingCanvasFromHeader,
     dateOfBirth,
   } = useAuth();
+  
+  const toggleCurrentSlotOnly = () => {
+    setSettings(prev => ({ ...prev, agendaShowCurrentSlotOnly: !prev.agendaShowCurrentSlotOnly }));
+  };
   const router = useRouter();
 
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
@@ -303,6 +311,44 @@ export function TodaysScheduleCard({
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
 
   const todaysSchedule = useMemo(() => schedule[dayKey] || {}, [schedule, dayKey]);
+  const loggedTaskIds = useMemo(() => {
+    const start = startOfDay(date);
+    const end = addDays(start, 1);
+    const startMs = start.getTime();
+    const endMs = end.getTime();
+    const stopperById = new Map<string, { timestamps?: number[] }>();
+    (resources || []).forEach(resource => {
+      (resource.urges || []).forEach(stopper => stopperById.set(stopper.id, stopper));
+      (resource.resistances || []).forEach(stopper => stopperById.set(stopper.id, stopper));
+    });
+    const loggedStopperIds = new Set<string>();
+    stopperById.forEach((stopper, id) => {
+      if ((stopper.timestamps || []).some(ts => ts >= startMs && ts < endMs)) {
+        loggedStopperIds.add(id);
+      }
+    });
+    if (loggedStopperIds.size === 0) return new Set<string>();
+    const taskIds = new Set<string>();
+    (mindsetCards || []).forEach(card => {
+      if (!card.id.startsWith('mindset_botherings_')) return;
+      card.points.forEach(point => {
+        const linkedIds = [...(point.linkedUrgeIds || []), ...(point.linkedResistanceIds || [])];
+        if (!linkedIds.some(id => loggedStopperIds.has(id))) return;
+        (point.tasks || []).forEach(task => {
+          if (task.id) taskIds.add(task.id);
+          if (task.activityId) taskIds.add(task.activityId);
+        });
+      });
+    });
+    return taskIds;
+  }, [date, resources, mindsetCards]);
+
+  const isTaskLogged = useCallback((activity: Activity) => {
+    const baseMatch = activity.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+    const baseId = baseMatch ? activity.id.slice(0, -11) : activity.id;
+    if (loggedTaskIds.has(activity.id) || loggedTaskIds.has(baseId)) return true;
+    return (activity.taskIds || []).some(id => loggedTaskIds.has(id));
+  }, [loggedTaskIds]);
 
   const scheduledActivities = useMemo(() => {
     const todaysSchedule = schedule[dayKey] || {};
@@ -790,6 +836,7 @@ export function TodaysScheduleCard({
                                         onOpenHabitPopup={onOpenHabitPopup}
                                         context="agenda"
                                         loggedDuration={activityDurations[activity.id]}
+                                        hasLoggedStopper={isTaskLogged(activity)}
                                     />
                                 ))}
                                 </ul>
@@ -820,6 +867,14 @@ export function TodaysScheduleCard({
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setView('chart')}>
                     <PieChart className={cn("h-4 w-4", view === 'chart' && "text-primary")} />
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleCurrentSlotOnly}
+                    title={settings.agendaShowCurrentSlotOnly ? "Show all slots" : "Show current slot only"}
+                >
+                    <Target className={cn("h-4 w-4", settings.agendaShowCurrentSlotOnly && "text-primary")} />
                 </Button>
             </div>
             <div className="flex items-center">

@@ -44,6 +44,7 @@ interface AgendaWidgetItemProps {
     onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
     context: 'agenda' | 'timeslot';
     loggedDuration?: string;
+    hasLoggedStopper?: boolean;
 }
 
 export const AgendaWidgetItem = React.memo(({ 
@@ -58,6 +59,7 @@ export const AgendaWidgetItem = React.memo(({
     onOpenHabitPopup, 
     context,
     loggedDuration,
+    hasLoggedStopper,
 }: AgendaWidgetItemProps) => {
     const { 
         setSelectedDeepWorkTask, 
@@ -105,6 +107,7 @@ export const AgendaWidgetItem = React.memo(({
         highlightedTaskIds?.has(activity.id) ||
         highlightedTaskIds?.has(baseId) ||
         (activity.taskIds || []).some(id => highlightedTaskIds?.has(id));
+    const shouldStrike = activity.completed || !!hasLoggedStopper;
 
     const slotOrder = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
     const isPastSlot =
@@ -160,10 +163,10 @@ export const AgendaWidgetItem = React.memo(({
                     <EditableActivityText
                         initialValue={activity.details}
                         onUpdate={(newDetails) => onUpdateActivity(activity.id, newDetails)}
-                        className={cn("text-sm font-medium w-full block", activity.completed && "line-through text-muted-foreground")}
+                        className={cn("text-sm font-medium w-full block", shouldStrike && "line-through text-muted-foreground")}
                     />
                 ) : (
-                    <p className={cn("text-sm font-medium", activity.completed && "line-through text-muted-foreground")}>
+                    <p className={cn("text-sm font-medium", shouldStrike && "line-through text-muted-foreground")}>
                         {activity.details}
                     </p>
                 )}

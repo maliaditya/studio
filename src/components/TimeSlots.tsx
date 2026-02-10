@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition } from '@/types/workout';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from './ui/scroll-area';
 import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer } from 'lucide-react';
-import { isToday, format, getISODay, parseISO, differenceInDays, differenceInMonths } from 'date-fns';
+import { isToday, format, getISODay, parseISO, differenceInDays, differenceInMonths, startOfDay, addDays } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
@@ -108,9 +108,49 @@ export function TimeSlots({
         exerciseDefinitions,
         allWorkoutLogs,
         workoutPlanRotation,
+        resources,
+        mindsetCards,
     } = useAuth();
     const dateKey = useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
     const todaysSchedule = useMemo(() => schedule[dateKey] || {}, [schedule, dateKey]);
+    const loggedTaskIds = useMemo(() => {
+        const start = startOfDay(date);
+        const end = addDays(start, 1);
+        const startMs = start.getTime();
+        const endMs = end.getTime();
+        const stopperById = new Map<string, { timestamps?: number[] }>();
+        (resources || []).forEach(resource => {
+            (resource.urges || []).forEach(stopper => stopperById.set(stopper.id, stopper));
+            (resource.resistances || []).forEach(stopper => stopperById.set(stopper.id, stopper));
+        });
+        const loggedStopperIds = new Set<string>();
+        stopperById.forEach((stopper, id) => {
+            if ((stopper.timestamps || []).some(ts => ts >= startMs && ts < endMs)) {
+                loggedStopperIds.add(id);
+            }
+        });
+        if (loggedStopperIds.size === 0) return new Set<string>();
+        const taskIds = new Set<string>();
+        (mindsetCards || []).forEach(card => {
+            if (!card.id.startsWith('mindset_botherings_')) return;
+            card.points.forEach(point => {
+                const linkedIds = [...(point.linkedUrgeIds || []), ...(point.linkedResistanceIds || [])];
+                if (!linkedIds.some(id => loggedStopperIds.has(id))) return;
+                (point.tasks || []).forEach(task => {
+                    if (task.id) taskIds.add(task.id);
+                    if (task.activityId) taskIds.add(task.activityId);
+                });
+            });
+        });
+        return taskIds;
+    }, [date, resources, mindsetCards]);
+
+    const isTaskLogged = useCallback((activity: Activity) => {
+        const baseMatch = activity.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+        const baseId = baseMatch ? activity.id.slice(0, -11) : activity.id;
+        if (loggedTaskIds.has(activity.id) || loggedTaskIds.has(baseId)) return true;
+        return (activity.taskIds || []).some(id => loggedTaskIds.has(id));
+    }, [loggedTaskIds]);
 
 
   const slots = [
@@ -324,6 +364,7 @@ export function TimeSlots({
                                             onOpenHabitPopup={onOpenHabitPopup}
                                             context="timeslot"
                                             loggedDuration={activityDurations[activity.id]}
+                                            hasLoggedStopper={isTaskLogged(activity)}
                                         />
                                       </div>
                                     )}

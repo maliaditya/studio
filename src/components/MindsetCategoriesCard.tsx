@@ -1532,7 +1532,8 @@ export function MindsetCategoriesCard() {
                                         </div>
                                     </div>
                                 </div>
-                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
+                                {botheringPopup.type !== 'constraint' && (
+                                <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
                                         <div className="text-xs uppercase tracking-wide text-muted-foreground">Tasks</div>
                                         {botheringPopup.type !== 'constraint' && (
                                             <>
@@ -1590,73 +1591,7 @@ export function MindsetCategoriesCard() {
                                                 </DropdownMenu>
                                             </>
                                         )}
-                                        {botheringPopup.type === 'constraint' && (
-                                            <div className="rounded-lg border border-white/10 bg-black/20 p-2 space-y-2">
-                                                <div className="text-xs uppercase tracking-wide text-muted-foreground">Link mismatch bothering</div>
-                                                <div className="flex gap-2">
-                                                    <Select value={selectedMismatchLinkId} onValueChange={setSelectedMismatchLinkId}>
-                                                        <SelectTrigger className="flex-1">
-                                                            <SelectValue placeholder="Select mismatch..." />
-                                                        </SelectTrigger>
-                                                        <SelectContent className="z-[200]">
-                                                            {(mismatchCard?.points || []).map(point => (
-                                                                <SelectItem key={point.id} value={point.id}>{point.text}</SelectItem>
-                                                            ))}
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <Button
-                                                        onClick={() => {
-                                                            if (!selectedMismatchLinkId) return;
-                                                            updateBotheringPoint('constraint', activeBotheringPoint.id, (point) => ({
-                                                                ...point,
-                                                                linkedMismatchIds: Array.from(new Set([...(point.linkedMismatchIds || []), selectedMismatchLinkId])),
-                                                            }));
-                                                            setSelectedMismatchLinkId('');
-                                                        }}
-                                                    >
-                                                        Add
-                                                    </Button>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    {(activeBotheringPoint.linkedMismatchIds || []).map(mid => {
-                                                        const mismatch = mismatchCard?.points?.find(p => p.id === mid);
-                                                        if (!mismatch) return null;
-                                                        const data = buildBotheringConsistency(mismatch);
-                                                        const lastScore = data.length ? data[data.length - 1].score : 0;
-                                                        return (
-                                                            <div key={mid} className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
-                                                                <div className="min-w-0">
-                                                                    <div className="truncate font-medium">{mismatch.text}</div>
-                                                                    <div className="text-xs text-muted-foreground">Consistency: {lastScore}%</div>
-                                                                </div>
-                                                                <div className="flex items-center gap-1">
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-6 w-6"
-                                                                        onClick={() => setConsistencyModal({ pointId: mismatch.id, title: mismatch.text, data })}
-                                                                    >
-                                                                        <LineChart className="h-3.5 w-3.5 text-blue-500" />
-                                                                    </Button>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className="h-6 w-6"
-                                                                        onClick={() => updateBotheringPoint('constraint', activeBotheringPoint.id, (point) => ({
-                                                                            ...point,
-                                                                            linkedMismatchIds: (point.linkedMismatchIds || []).filter(id => id !== mid),
-                                                                        }))}
-                                                                    >
-                                                                        <Trash2 className="h-3 w-3" />
-                                                                    </Button>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        )}
-                                    <ScrollArea className="h-[420px] pr-2">
+                                <ScrollArea className="h-[420px] pr-2">
     <ul className="space-y-2">
         {(activeBotheringPoint.tasks || []).map((task) => {
             const counts = getRecurringTaskCounts(task);
@@ -1688,14 +1623,84 @@ export function MindsetCategoriesCard() {
                     <Trash2 className="h-3 w-3" />
                 </Button>
             </li>
-        )})}
+            );
+        })}
         {(!activeBotheringPoint.tasks || activeBotheringPoint.tasks.length === 0) && (
-            <p className="text-sm text-muted-foreground text-center py-8">
-                No tasks yet. Link a routine to start.
-            </p>
+            <div className="text-xs text-muted-foreground">No tasks yet. Link a routine to start.</div>
         )}
     </ul>
 </ScrollArea>
+                                </div>
+                                )}
+                                {botheringPopup.type === 'constraint' && (
+                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
+                                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Linked mismatches</div>
+                                        <div className="rounded-lg border border-white/10 bg-black/20 p-2 space-y-2">
+                                            <div className="text-xs uppercase tracking-wide text-muted-foreground">Link mismatch bothering</div>
+                                            <div className="flex gap-2">
+                                                <Select value={selectedMismatchLinkId} onValueChange={setSelectedMismatchLinkId}>
+                                                    <SelectTrigger className="flex-1">
+                                                        <SelectValue placeholder="Select mismatch..." />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="z-[200]">
+                                                        {(mismatchCard?.points || []).map(point => (
+                                                            <SelectItem key={point.id} value={point.id}>{point.text}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                <Button
+                                                    onClick={() => {
+                                                        if (!selectedMismatchLinkId) return;
+                                                        updateBotheringPoint('constraint', activeBotheringPoint.id, (point) => ({
+                                                            ...point,
+                                                            linkedMismatchIds: Array.from(new Set([...(point.linkedMismatchIds || []), selectedMismatchLinkId])),
+                                                        }));
+                                                        setSelectedMismatchLinkId('');
+                                                    }}
+                                                >
+                                                    Add
+                                                </Button>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {(activeBotheringPoint.linkedMismatchIds || []).map(mid => {
+                                                    const mismatch = mismatchCard?.points?.find(p => p.id === mid);
+                                                    if (!mismatch) return null;
+                                                    const data = buildBotheringConsistency(mismatch);
+                                                    const lastScore = data.length ? data[data.length - 1].score : 0;
+                                                    return (
+                                                        <div key={mid} className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
+                                                            <div className="min-w-0">
+                                                                <div className="truncate font-medium">{mismatch.text}</div>
+                                                                <div className="text-xs text-muted-foreground">Consistency: {lastScore}%</div>
+                                                            </div>
+                                                            <div className="flex items-center gap-1">
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-6 w-6"
+                                                                    onClick={() => setConsistencyModal({ pointId: mismatch.id, title: mismatch.text, data })}
+                                                                >
+                                                                    <LineChart className="h-3.5 w-3.5 text-blue-500" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="icon"
+                                                                    className="h-6 w-6"
+                                                                    onClick={() => updateBotheringPoint('constraint', activeBotheringPoint.id, (point) => ({
+                                                                        ...point,
+                                                                        linkedMismatchIds: (point.linkedMismatchIds || []).filter(id => id !== mid),
+                                                                    }))}
+                                                                >
+                                                                    <Trash2 className="h-3 w-3" />
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                                 </div>
                             </div>
                         </div>
