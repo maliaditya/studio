@@ -250,6 +250,11 @@ const getLoggedMinutes = (activity: Activity, allDeepWorkLogs: any[], allUpskill
         return activity.duration;
     }
 
+    // Fallback to planned focus duration when a session was started but no end time/logs exist
+    if (activity.completed && activity.focusSessionInitialDuration) {
+        return activity.focusSessionInitialDuration;
+    }
+
     const activityTaskInstanceIds = new Set(activity.taskIds || []);
     if (activityTaskInstanceIds.size === 0) return 0;
     
@@ -833,7 +838,15 @@ export function TimesheetPageContent({
             const allSlots = Object.values(daySchedule) as Activity[][];
             const activityMap = new Map<string, Activity>();
             allSlots.flat().forEach(act => {
-                if (act?.id) activityMap.set(act.id, act);
+                if (!act?.id) return;
+                activityMap.set(act.id, act);
+                const baseMatch = act.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+                if (baseMatch) {
+                    const baseId = act.id.slice(0, -11);
+                    if (!activityMap.has(baseId)) {
+                        activityMap.set(baseId, act);
+                    }
+                }
             });
             dayActivityMaps.set(dateKey, activityMap);
         });

@@ -18,13 +18,14 @@ import { Label } from './ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { format, isSameDay, isBefore, subDays, startOfDay, differenceInDays, parseISO, eachDayOfInterval, isAfter, getDay, differenceInMonths } from 'date-fns';
+import { format, isSameDay, isBefore, subDays, startOfDay, differenceInDays, parseISO, eachDayOfInterval, isAfter, getDay, differenceInMonths, addDays } from 'date-fns';
 import { LinkTechniqueModal } from './LinkTechniqueModal';
 import { ChartContainer } from './ui/chart';
 import { LineChart as RechartsLineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer } from 'recharts';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 
 const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
@@ -356,6 +357,7 @@ export function MindsetCategoriesCard() {
         settings,
         setSettings,
     } = useAuth();
+    const { toast } = useToast();
     
     const [hotResistances, setHotResistances] = useState<Set<string>>(new Set());
     const [isHourlyLogOpen, setIsHourlyLogOpen] = useState(false);
@@ -371,6 +373,9 @@ export function MindsetCategoriesCard() {
     const [newBotheringText, setNewBotheringText] = useState('');
     const [newMismatchType, setNewMismatchType] = useState<MindsetPoint['mismatchType']>('mental-model');
     const [botheringType, setBotheringType] = useState<'mismatch' | 'constraint' | 'external'>('mismatch');
+    const [pendingBotheringTaskIds, setPendingBotheringTaskIds] = useState<Set<string> | null>(null);
+    const [selectedMismatchLinkId, setSelectedMismatchLinkId] = useState('');
+    const [consistencyModal, setConsistencyModal] = useState<{ pointId: string; title: string; data: { date: string; fullDate: string; score: number }[] } | null>(null);
     const [position, setPosition] = useState(() => ({
         x: typeof window !== 'undefined' ? window.innerWidth / 2 - 360 : 0,
         y: typeof window !== 'undefined' ? window.innerHeight / 2 - 260 : 0,
@@ -383,6 +388,12 @@ export function MindsetCategoriesCard() {
             x: window.innerWidth / 2 - 460,
             y: window.innerHeight / 2 - 320,
         });
+    }, [isMindsetModalOpen]);
+
+    useEffect(() => {
+        if (!isMindsetModalOpen) {
+            setPendingBotheringTaskIds(null);
+        }
     }, [isMindsetModalOpen]);
 
     useEffect(() => {
@@ -438,6 +449,7 @@ export function MindsetCategoriesCard() {
                 ? constraintCard
                 : externalCard;
     const activeBotheringPoint = activeBotheringCard?.points.find(p => p.id === botheringPopup?.pointId);
+
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const getTodayTaskStats = (point?: MindsetPoint) => {
         const tasks = point?.tasks || [];
@@ -487,6 +499,41 @@ export function MindsetCategoriesCard() {
         if (task.dateKey && task.dateKey !== dateKey) return false;
         return !!task.completed;
     };
+
+    const buildBotheringConsistency = useCallback((point: MindsetPoint) => {
+        const today = startOfDay(new Date());
+        const oneYearAgo = addDays(today, -365);
+        let score = 0;
+        const data: { date: string; fullDate: string; score: number }[] = [];
+
+        for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
+            const dateKey = format(d, 'yyyy-MM-dd');
+            const tasks = point.tasks || [];
+            let due = 0;
+            let completed = 0;
+            tasks.forEach(task => {
+                if (!isTaskDueOnDate(task, dateKey)) return;
+                due += 1;
+                if (isTaskCompletedOnDate(task, dateKey)) completed += 1;
+            });
+
+            if (due > 0) {
+                if (completed === due) {
+                    score += (1 - score) * 0.1;
+                } else {
+                    score *= 0.95;
+                }
+            }
+
+            data.push({
+                date: format(d, 'MMM dd'),
+                fullDate: format(d, 'PPP'),
+                score: Math.round(score * 100),
+            });
+        }
+
+        return data;
+    }, [isTaskDueOnDate, isTaskCompletedOnDate]);
     const getRecurringTaskCounts = (task: MindsetPoint['tasks'][number]) => {
         if (!task.recurrence || task.recurrence === 'none') return null;
         const startKey = task.startDate || task.dateKey;
@@ -526,6 +573,67 @@ export function MindsetCategoriesCard() {
         setMindsetCards(prev => prev.map(c => c.id === cardId ? { ...c, points: c.points.map(p => p.id === pointId ? updater(p) : p) } : c));
     }, [setMindsetCards]);
 
+    const addStopperToBothering = useCallback((link: { stopper: Stopper; isUrge: boolean }) => {
+        if (!botheringPopup || !activeBotheringPoint) return;
+        updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => {
+            if (link.isUrge) {
+                const next = Array.from(new Set([...(point.linkedUrgeIds || []), link.stopper.id]));
+                return { ...point, linkedUrgeIds: next };
+            }
+            const next = Array.from(new Set([...(point.linkedResistanceIds || []), link.stopper.id]));
+            return { ...point, linkedResistanceIds: next };
+        });
+    }, [botheringPopup, activeBotheringPoint, updateBotheringPoint]);
+
+    const addStopperToLinkedBotheringsForTask = useCallback((link: { stopper: Stopper; isUrge: boolean }, taskIds: Set<string>) => {
+        let updatedCount = 0;
+        setMindsetCards(prev => prev.map(card => {
+            if (!card.id.startsWith('mindset_botherings_')) return card;
+            let cardChanged = false;
+            const nextPoints = card.points.map(point => {
+                const matches = (point.tasks || []).some(t => taskIds.has(t.id) || (t.activityId && taskIds.has(t.activityId)));
+                if (!matches) return point;
+                cardChanged = true;
+                updatedCount += 1;
+                if (link.isUrge) {
+                    const next = Array.from(new Set([...(point.linkedUrgeIds || []), link.stopper.id]));
+                    return { ...point, linkedUrgeIds: next };
+                }
+                const next = Array.from(new Set([...(point.linkedResistanceIds || []), link.stopper.id]));
+                return { ...point, linkedResistanceIds: next };
+            });
+            return cardChanged ? { ...card, points: nextPoints } : card;
+        }));
+        return updatedCount;
+    }, [setMindsetCards]);
+
+    useEffect(() => {
+        const handler = (event: Event) => {
+            const detail = (event as CustomEvent).detail as { type?: 'mismatch' | 'constraint' | 'external'; pointId?: string } | undefined;
+            if (!detail?.type || !detail?.pointId) return;
+            setBotheringType(detail.type);
+            setBotheringPopup({ type: detail.type, pointId: detail.pointId });
+        };
+        window.addEventListener('open-bothering-popup', handler as EventListener);
+        return () => window.removeEventListener('open-bothering-popup', handler as EventListener);
+    }, []);
+
+    useEffect(() => {
+        const handler = (event: Event) => {
+            const detail = (event as CustomEvent).detail as { taskId?: string; taskIds?: string[]; baseId?: string } | undefined;
+            if (!detail?.taskId) return;
+            const ids = new Set<string>([detail.taskId]);
+            (detail.taskIds || []).forEach(id => ids.add(id));
+            if (detail.baseId) ids.add(detail.baseId);
+            const baseMatch = detail.taskId.match(/_(\d{4}-\d{2}-\d{2})$/);
+            if (baseMatch) ids.add(detail.taskId.slice(0, -11));
+            setPendingBotheringTaskIds(ids);
+            setIsMindsetModalOpen(true);
+        };
+        window.addEventListener('open-resistance-list-for-task', handler as EventListener);
+        return () => window.removeEventListener('open-resistance-list-for-task', handler as EventListener);
+    }, [setIsMindsetModalOpen]);
+
 
     const allLinkedResistances = React.useMemo(() => {
         const links: { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string; }[] = [];
@@ -548,6 +656,29 @@ export function MindsetCategoriesCard() {
         });
         return links;
     }, [habitCards, mechanismCards]);
+
+    const stopperById = useMemo(() => {
+        const map = new Map<string, { habitId: string; habitName: string; stopper: Stopper; isUrge: boolean; mechanismName?: string }>();
+        allLinkedResistances.forEach(link => {
+            map.set(link.stopper.id, link);
+        });
+        return map;
+    }, [allLinkedResistances]);
+
+    const linkedStoppers = useMemo(() => {
+        if (!activeBotheringPoint) return [];
+        const entries: { id: string; isUrge: boolean }[] = [
+            ...(activeBotheringPoint.linkedUrgeIds || []).map(id => ({ id, isUrge: true })),
+            ...(activeBotheringPoint.linkedResistanceIds || []).map(id => ({ id, isUrge: false })),
+        ];
+        return entries
+            .map(entry => {
+                const link = stopperById.get(entry.id);
+                if (!link) return null;
+                return { ...entry, ...link };
+            })
+            .filter(Boolean) as Array<{ id: string; isUrge: boolean; habitId: string; habitName: string; stopper: Stopper; mechanismName?: string }>;
+    }, [activeBotheringPoint, stopperById]);
 
     const scheduleActivityMap = useMemo(() => {
         const map = new Map<string, { activity: Activity; dateKey: string; slotName: SlotName }>();
@@ -946,7 +1077,27 @@ export function MindsetCategoriesCard() {
                                                         <LineChart className="h-4 w-4 text-blue-500" />
                                                     </Button>
                                                     <span className="text-xs font-bold mr-1">{(link.stopper.timestamps?.length || 0)}</span>
-                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); logStopperEncounter(link.habitId, link.stopper.id); }}>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-6 w-6"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (botheringPopup && activeBotheringPoint) {
+                                                                addStopperToBothering(link);
+                                                                toast({ title: "Linked", description: "Added to this bothering." });
+                                                            }
+                                                            if (pendingBotheringTaskIds && pendingBotheringTaskIds.size > 0) {
+                                                                const count = addStopperToLinkedBotheringsForTask(link, pendingBotheringTaskIds);
+                                                                if (count > 0) {
+                                                                    toast({ title: "Linked", description: `Added to ${count} bothering${count > 1 ? 's' : ''}.` });
+                                                                } else {
+                                                                    toast({ title: "No linked bothering", description: "This task isn't linked to any bothering.", variant: "destructive" });
+                                                                }
+                                                            }
+                                                            logStopperEncounter(link.habitId, link.stopper.id);
+                                                        }}
+                                                    >
                                                         <PlusCircle className="h-4 w-4 text-green-500" />
                                                     </Button>
                                                 </div>
@@ -1023,9 +1174,19 @@ export function MindsetCategoriesCard() {
                                                                             )}
                                                                         </div>
                                                                     </button>
-                                                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteBothering('mismatch', point.id)}>
-                                                                        <Trash2 className="h-3 w-3" />
-                                                                    </Button>
+                                                                    <div className="flex items-center gap-1">
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-6 w-6"
+                                                                            onClick={() => setConsistencyModal({ pointId: point.id, title: point.text, data: buildBotheringConsistency(point) })}
+                                                                        >
+                                                                            <LineChart className="h-3.5 w-3.5 text-blue-500" />
+                                                                        </Button>
+                                                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteBothering('mismatch', point.id)}>
+                                                                            <Trash2 className="h-3 w-3" />
+                                                                        </Button>
+                                                                    </div>
                                                                 </li>
                                                             );
                                                         })}
@@ -1262,6 +1423,43 @@ export function MindsetCategoriesCard() {
                                     </div>
 
                                     <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
+                                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Resistances &amp; Urges</div>
+                                        {linkedStoppers.length === 0 ? (
+                                            <div className="text-xs text-muted-foreground">No urges or resistances linked yet.</div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {linkedStoppers.map((link) => (
+                                                    <div key={`${link.id}-${link.isUrge ? 'u' : 'r'}`} className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
+                                                        <div className="min-w-0">
+                                                            <div className="truncate font-medium">{link.stopper.text}</div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {link.isUrge ? 'Urge' : 'Resistance'} in: {link.habitName}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-xs font-bold">{link.stopper.timestamps?.length || 0}</span>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-6 w-6"
+                                                                onClick={() => {
+                                                                    updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                                                        ...point,
+                                                                        linkedUrgeIds: link.isUrge ? (point.linkedUrgeIds || []).filter(id => id !== link.id) : point.linkedUrgeIds,
+                                                                        linkedResistanceIds: !link.isUrge ? (point.linkedResistanceIds || []).filter(id => id !== link.id) : point.linkedResistanceIds,
+                                                                    }));
+                                                                }}
+                                                            >
+                                                                <Trash2 className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
                                         <div className="text-xs uppercase tracking-wide text-muted-foreground">Completion</div>
                                         <Textarea
                                             value={activeBotheringPoint.resolution || ''}
@@ -1303,58 +1501,128 @@ export function MindsetCategoriesCard() {
                                 </div>
                                     <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
                                         <div className="text-xs uppercase tracking-wide text-muted-foreground">Tasks</div>
-                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                            <span>Link routine</span>
-                                        </div>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" className="w-full justify-start h-8">
-                                                    <PlusCircle className="mr-2 h-4 w-4" /> Link Routine Task
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent className="w-64">
-                                                {(settings.routines || []).length === 0 && (
-                                                    <DropdownMenuItem disabled>No routines available</DropdownMenuItem>
-                                                )}
-                                                {(settings.routines || []).map(r => (
-                                                    <DropdownMenuItem
-                                                        key={r.id}
-                                                        onSelect={() => {
-                                                            const existing = (activeBotheringPoint.tasks || []).some(t => t.activityId === r.id || t.id === r.id);
-                                                            if (existing) return;
-                                                            updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                        {botheringPopup.type !== 'constraint' && (
+                                            <>
+                                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <span>Link routine</span>
+                                                </div>
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" className="w-full justify-start h-8">
+                                                            <PlusCircle className="mr-2 h-4 w-4" /> Link Routine Task
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent className="w-64">
+                                                        {(settings.routines || []).length === 0 && (
+                                                            <DropdownMenuItem disabled>No routines available</DropdownMenuItem>
+                                                        )}
+                                                        {(settings.routines || []).map(r => (
+                                                            <DropdownMenuItem
+                                                                key={r.id}
+                                                                onSelect={() => {
+                                                                    const existing = (activeBotheringPoint.tasks || []).some(t => t.activityId === r.id || t.id === r.id);
+                                                                    if (existing) return;
+                                                                    updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                                                        ...point,
+                                                                        tasks: [
+                                                                            ...(point.tasks || []),
+                                                                            {
+                                                                                id: r.id,
+                                                                                activityId: r.id,
+                                                                                type: r.type,
+                                                                                details: r.details,
+                                                                                completed: false,
+                                                                                dateKey: format(new Date(), 'yyyy-MM-dd'),
+                                                                                slotName: r.slot as SlotName,
+                                                                                recurrence: r.routine?.type || 'none',
+                                                                                startDate: r.baseDate || r.createdAt || format(new Date(), 'yyyy-MM-dd'),
+                                                                                completionHistory: {},
+                                                                            },
+                                                                        ],
+                                                                    }));
+                                                                    setSettings(prev => ({
+                                                                        ...prev,
+                                                                        routines: (prev.routines || []).map(rr => rr.id === r.id
+                                                                            ? { ...rr, taskIds: Array.from(new Set([...(rr.taskIds || []), r.id])) }
+                                                                            : rr
+                                                                        ),
+                                                                    }));
+                                                                }}
+                                                            >
+                                                                <span className="truncate">{r.details}</span>
+                                                                <span className="ml-auto text-xs text-muted-foreground">{r.slot}</span>
+                                                            </DropdownMenuItem>
+                                                        ))}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </>
+                                        )}
+                                        {botheringPopup.type === 'constraint' && (
+                                            <div className="rounded-lg border border-white/10 bg-black/20 p-2 space-y-2">
+                                                <div className="text-xs uppercase tracking-wide text-muted-foreground">Link mismatch bothering</div>
+                                                <div className="flex gap-2">
+                                                    <Select value={selectedMismatchLinkId} onValueChange={setSelectedMismatchLinkId}>
+                                                        <SelectTrigger className="flex-1">
+                                                            <SelectValue placeholder="Select mismatch..." />
+                                                        </SelectTrigger>
+                                                        <SelectContent className="z-[200]">
+                                                            {(mismatchCard?.points || []).map(point => (
+                                                                <SelectItem key={point.id} value={point.id}>{point.text}</SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <Button
+                                                        onClick={() => {
+                                                            if (!selectedMismatchLinkId) return;
+                                                            updateBotheringPoint('constraint', activeBotheringPoint.id, (point) => ({
                                                                 ...point,
-                                                                tasks: [
-                                                                    ...(point.tasks || []),
-                                                                    {
-                                                                        id: r.id,
-                                                                        activityId: r.id,
-                                                                        type: r.type,
-                                                                        details: r.details,
-                                                                        completed: false,
-                                                                        dateKey: format(new Date(), 'yyyy-MM-dd'),
-                                                                        slotName: r.slot as SlotName,
-                                                                        recurrence: r.routine?.type || 'none',
-                                                                        startDate: r.baseDate || r.createdAt || format(new Date(), 'yyyy-MM-dd'),
-                                                                        completionHistory: {},
-                                                                    },
-                                                                ],
+                                                                linkedMismatchIds: Array.from(new Set([...(point.linkedMismatchIds || []), selectedMismatchLinkId])),
                                                             }));
-                                                            setSettings(prev => ({
-                                                                ...prev,
-                                                                routines: (prev.routines || []).map(rr => rr.id === r.id
-                                                                    ? { ...rr, taskIds: Array.from(new Set([...(rr.taskIds || []), r.id])) }
-                                                                    : rr
-                                                                ),
-                                                            }));
+                                                            setSelectedMismatchLinkId('');
                                                         }}
                                                     >
-                                                        <span className="truncate">{r.details}</span>
-                                                        <span className="ml-auto text-xs text-muted-foreground">{r.slot}</span>
-                                                    </DropdownMenuItem>
-                                                ))}
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                                        Add
+                                                    </Button>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    {(activeBotheringPoint.linkedMismatchIds || []).map(mid => {
+                                                        const mismatch = mismatchCard?.points?.find(p => p.id === mid);
+                                                        if (!mismatch) return null;
+                                                        const data = buildBotheringConsistency(mismatch);
+                                                        const lastScore = data.length ? data[data.length - 1].score : 0;
+                                                        return (
+                                                            <div key={mid} className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
+                                                                <div className="min-w-0">
+                                                                    <div className="truncate font-medium">{mismatch.text}</div>
+                                                                    <div className="text-xs text-muted-foreground">Consistency: {lastScore}%</div>
+                                                                </div>
+                                                                <div className="flex items-center gap-1">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6"
+                                                                        onClick={() => setConsistencyModal({ pointId: mismatch.id, title: mismatch.text, data })}
+                                                                    >
+                                                                        <LineChart className="h-3.5 w-3.5 text-blue-500" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6"
+                                                                        onClick={() => updateBotheringPoint('constraint', activeBotheringPoint.id, (point) => ({
+                                                                            ...point,
+                                                                            linkedMismatchIds: (point.linkedMismatchIds || []).filter(id => id !== mid),
+                                                                        }))}
+                                                                    >
+                                                                        <Trash2 className="h-3 w-3" />
+                                                                    </Button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
                                     <ScrollArea className="h-[420px] pr-2">
     <ul className="space-y-2">
         {(activeBotheringPoint.tasks || []).map((task) => {
@@ -1400,6 +1668,40 @@ export function MindsetCategoriesCard() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {consistencyModal && (
+                <Dialog open onOpenChange={() => setConsistencyModal(null)}>
+                    <DialogContent className="sm:max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>Consistency</DialogTitle>
+                            <DialogDescription>{consistencyModal.title}</DialogDescription>
+                        </DialogHeader>
+                        {consistencyModal.data.length > 0 ? (
+                            <ChartContainer config={{ score: { label: 'Consistency %' } }} className="min-h-[300px] w-full pr-2">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <RechartsLineChart data={consistencyModal.data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                                        <XAxis dataKey="date" fontSize={10} />
+                                        <YAxis fontSize={10} domain={[0, 100]} />
+                                        <Tooltip content={({ active, payload, label }) => {
+                                            if (active && payload && payload.length) {
+                                                return (
+                                                    <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
+                                                        <p>{payload[0].payload.fullDate}: <strong>{payload[0].value}%</strong></p>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        }} />
+                                        <Line type="monotone" dataKey="score" stroke="#38bdf8" strokeWidth={2} dot={false} />
+                                    </RechartsLineChart>
+                                </ResponsiveContainer>
+                            </ChartContainer>
+                        ) : (
+                            <p className="text-center text-sm text-muted-foreground py-8">Not enough data to calculate consistency.</p>
+                        )}
+                    </DialogContent>
+                </Dialog>
             )}
         </>
     );

@@ -1,13 +1,18 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
-import { Brain } from "lucide-react";
-import { parseISO, startOfDay, differenceInDays, getDay, differenceInMonths, differenceInDays as diffDays, format } from "date-fns";
+import { Brain, ExternalLink, LineChart as LineChartIcon } from "lucide-react";
+import { parseISO, startOfDay, differenceInDays, getDay, differenceInMonths, differenceInDays as diffDays, format, addDays } from "date-fns";
+import type { MindsetPoint } from "@/types/workout";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { ChartContainer } from "@/components/ui/chart";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
 
 export function BotheringsCard() {
   const { mindsetCards, highlightedTaskIds, setHighlightedTaskIds, schedule } = useAuth();
+  const [consistencyModal, setConsistencyModal] = useState<{ title: string; data: { date: string; fullDate: string; score: number }[] } | null>(null);
 
   const activeBotheringsByType = useMemo(() => {
     const sources = [
@@ -15,15 +20,33 @@ export function BotheringsCard() {
       { id: "mindset_botherings_mismatch", label: "Mismatch" as const },
       { id: "mindset_botherings_constraint", label: "Constraint" as const },
     ];
-    return sources.map(({ id, label }) => ({
+    const typed = sources.map(({ id, label }) => ({
       type: label,
       points: (mindsetCards.find((c) => c.id === id)?.points || [])
         .filter((point) => (point.tasks?.length || 0) > 0 && !point.completed),
     }));
+    const parkedPoints = sources.flatMap(({ id, label }) =>
+      (mindsetCards.find((c) => c.id === id)?.points || [])
+        .filter((point) => (point.tasks?.length || 0) === 0 && !point.completed)
+        .map((point) => ({ point, sourceType: label }))
+    );
+    return [
+      ...typed.map(t => ({
+        type: t.type,
+        points: t.points.map(point => ({ point, sourceType: t.type })),
+      })),
+      { type: "Parked" as const, points: parkedPoints },
+    ];
   }, [mindsetCards]);
 
-  const [activeTab, setActiveTab] = React.useState<'External' | 'Mismatch' | 'Constraint'>('External');
+  const [activeTab, setActiveTab] = React.useState<'External' | 'Mismatch' | 'Constraint' | 'Parked'>('External');
   const activeBotherings = activeBotheringsByType.find(t => t.type === activeTab)?.points || [];
+  const tabCounts = useMemo(() => {
+    return activeBotheringsByType.reduce<Record<string, number>>((acc, item) => {
+      acc[item.type] = item.points.length;
+      return acc;
+    }, {});
+  }, [activeBotheringsByType]);
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const todayActivityIds = useMemo(() => {
     const ids = new Set<string>();
@@ -46,7 +69,7 @@ export function BotheringsCard() {
     return `${diff}d left`;
   };
 
-  const getHighlightIds = (point: (typeof activeBotherings)[number]) => {
+  const getHighlightIds = (point: MindsetPoint) => {
     const ids = new Set<string>();
     (point.tasks || []).forEach(t => {
       if (t.id) ids.add(t.id);
@@ -55,7 +78,7 @@ export function BotheringsCard() {
     return ids;
   };
 
-  const setHighlightForPoint = (point: (typeof activeBotherings)[number]) => {
+  const setHighlightForPoint = (point: MindsetPoint) => {
     const ids = getHighlightIds(point);
     const same =
       ids.size === highlightedTaskIds.size &&
@@ -63,7 +86,7 @@ export function BotheringsCard() {
     setHighlightedTaskIds(same ? new Set() : ids);
   };
 
-  const isTaskDueOnDate = (task: NonNullable<(typeof activeBotherings)[number]["tasks"]>[number], dateKey: string) => {
+  const isTaskDueOnDate = (task: NonNullable<MindsetPoint["tasks"]>[number], dateKey: string) => {
     const startKey = task.startDate || task.dateKey;
     if (!startKey) return false;
     const start = parseISO(startKey);
@@ -89,7 +112,7 @@ export function BotheringsCard() {
     return startKey === dateKey;
   };
 
-  const isTaskCompletedOnDate = (task: NonNullable<(typeof activeBotherings)[number]["tasks"]>[number], dateKey: string) => {
+  const isTaskCompletedOnDate = (task: NonNullable<MindsetPoint["tasks"]>[number], dateKey: string) => {
     if (task.recurrence && task.recurrence !== 'none') {
       return !!task.completionHistory?.[dateKey];
     }
@@ -97,7 +120,42 @@ export function BotheringsCard() {
     return !!task.completed;
   };
 
-  const getTodayStats = (point: (typeof activeBotherings)[number]) => {
+  const buildBotheringConsistency = useCallback((point: MindsetPoint) => {
+    const today = startOfDay(new Date());
+    const oneYearAgo = addDays(today, -365);
+    let score = 0;
+    const data: { date: string; fullDate: string; score: number }[] = [];
+
+    for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
+      const dateKey = format(d, 'yyyy-MM-dd');
+      const tasks = point.tasks || [];
+      let due = 0;
+      let completed = 0;
+      tasks.forEach(task => {
+        if (!isTaskDueOnDate(task, dateKey)) return;
+        due += 1;
+        if (isTaskCompletedOnDate(task, dateKey)) completed += 1;
+      });
+
+      if (due > 0) {
+        if (completed === due) {
+          score += (1 - score) * 0.1;
+        } else {
+          score *= 0.95;
+        }
+      }
+
+      data.push({
+        date: format(d, 'MMM dd'),
+        fullDate: format(d, 'PPP'),
+        score: Math.round(score * 100),
+      });
+    }
+
+    return data;
+  }, [isTaskDueOnDate, isTaskCompletedOnDate]);
+
+  const getTodayStats = (point: MindsetPoint) => {
     const tasks = point.tasks || [];
     let total = 0;
     let completed = 0;
@@ -122,11 +180,11 @@ export function BotheringsCard() {
               <Brain />
               Botherings
             </CardTitle>
-            <CardDescription>Active botherings with linked tasks.</CardDescription>
+            <CardDescription>Botherings grouped by task links.</CardDescription>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs">
-          {(['External', 'Mismatch', 'Constraint'] as const).map(tab => (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          {(['External', 'Mismatch', 'Constraint', 'Parked'] as const).map(tab => (
             <button
               key={tab}
               type="button"
@@ -137,7 +195,12 @@ export function BotheringsCard() {
                   : 'border-white/10 text-muted-foreground hover:text-foreground hover:border-white/20'
               }`}
             >
-              {tab}
+              <span className="inline-flex items-center gap-1.5">
+                <span>{tab}</span>
+                <span className="px-1.5 py-0.5 rounded-full border border-white/10 bg-background/40 text-[10px]">
+                  {tabCounts[tab] ?? 0}
+                </span>
+              </span>
             </button>
           ))}
         </div>
@@ -149,7 +212,8 @@ export function BotheringsCard() {
           </div>
         ) : (
           <ul className="space-y-3">
-            {activeBotherings.map((b) => {
+            {activeBotherings.map((item) => {
+              const b = item.point;
               const stats = getTodayStats(b);
               const isDoneToday = stats.total > 0 && stats.completed === stats.total;
               return (
@@ -162,13 +226,48 @@ export function BotheringsCard() {
                 }`}
                 onClick={() => setHighlightForPoint(b)}
               >
-                <div className={`text-sm font-semibold ${isDoneToday ? "line-through text-muted-foreground" : ""}`}>{b.text}</div>
+                <div className="flex items-start justify-between gap-2">
+                  <div className={`text-sm font-semibold ${isDoneToday ? "line-through text-muted-foreground" : ""}`}>{b.text}</div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      className="mt-0.5 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const data = buildBotheringConsistency(b);
+                        setConsistencyModal({ title: b.text, data });
+                      }}
+                      title="Show consistency"
+                    >
+                      <LineChartIcon className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      className="mt-0.5 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const type =
+                          item.sourceType === 'External' ? 'external' :
+                          item.sourceType === 'Mismatch' ? 'mismatch' :
+                          'constraint';
+                        window.dispatchEvent(new CustomEvent('open-bothering-popup', { detail: { type, pointId: b.id } }));
+                      }}
+                      title="Open bothering"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
                 <div className="mt-2 text-xs text-muted-foreground inline-flex items-center gap-2">
                   <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
                     {getDaysLeftLabel(b.endDate)}
                   </span>
-                  {stats.total > 0 ? (
-                    <span>{stats.completed}/{stats.total} done</span>
+                  {(b.tasks?.length || 0) === 0 ? (
+                    <span>No tasks linked</span>
+                  ) : stats.total > 0 ? (
+                    <span className={stats.completed === stats.total ? "line-through text-muted-foreground" : ""}>
+                      {stats.completed}/{stats.total} done
+                    </span>
                   ) : (
                     <span>No tasks due today</span>
                   )}
@@ -178,6 +277,39 @@ export function BotheringsCard() {
           </ul>
         )}
       </CardContent>
+      {consistencyModal && (
+        <Dialog open onOpenChange={() => setConsistencyModal(null)}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Consistency</DialogTitle>
+              <DialogDescription>{consistencyModal.title}</DialogDescription>
+            </DialogHeader>
+            {consistencyModal.data.length > 0 ? (
+              <ChartContainer config={{ score: { label: 'Consistency %' } }} className="min-h-[300px] w-full pr-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={consistencyModal.data} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                    <XAxis dataKey="date" fontSize={10} />
+                    <YAxis fontSize={10} domain={[0, 100]} />
+                    <Tooltip content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="p-2 bg-background border rounded-md text-xs shadow-lg max-w-sm">
+                            <p>{payload[0].payload.fullDate}: <strong>{payload[0].value}%</strong></p>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }} />
+                    <Line type="monotone" dataKey="score" stroke="#38bdf8" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            ) : (
+              <p className="text-center text-sm text-muted-foreground py-8">Not enough data to calculate consistency.</p>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
   );
 }

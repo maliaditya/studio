@@ -11,6 +11,8 @@ import {
   loginUser as localLoginUser, 
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
+  isCurrentSessionOwner,
+  refreshSessionHeartbeat,
 } from '@/lib/localAuth';
 import { format, addDays, parseISO, subDays, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay, getHours, startOfToday, isSameDay, getISODay, differenceInMonths } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
@@ -62,7 +64,7 @@ interface AuthContextType {
   currentUser: LocalUser | null;
   loading: boolean;
   register: (username: string, password:string) => Promise<void>;
-  signIn: (username: string, password: string) => Promise<void>;
+  signIn: (username: string, password: string, opts?: { force?: boolean }) => Promise<{ success: boolean; message: string; code?: "SESSION_ACTIVE" }>;
   signOut: () => Promise<void>;
   pushDataToCloud: () => void;
   pullDataFromCloud: (usernameOverride?: string) => Promise<void>;
@@ -1022,34 +1024,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [resources, resourceFolders, setResources, setResourceFolders, setGeneralPopups]);
 
   const updateDrawingData = useCallback((canvasId: string, data: string, onSaveComplete: () => void) => {
+    let target: { resourceId: string; pointId: string } | null = null;
+
     setDrawingCanvasState(prev => {
-        if (!prev) return null;
-        const updatedCanvases = (prev.openCanvases || []).map(c => 
-            c.id === canvasId ? { ...c, data: data } : c
-        );
-        return { ...prev, openCanvases: updatedCanvases };
+      if (!prev) return null;
+      const updatedCanvases = (prev.openCanvases || []).map(c =>
+        c.id === canvasId ? { ...c, data: data } : c
+      );
+      const canvasToUpdate = (prev.openCanvases || []).find(c => c.id === canvasId);
+      if (canvasToUpdate) {
+        target = { resourceId: canvasToUpdate.resourceId, pointId: canvasToUpdate.pointId };
+      }
+      return { ...prev, openCanvases: updatedCanvases };
     });
 
     setResources(prevResources => {
-        const canvasToUpdate = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
-        if (!canvasToUpdate) return prevResources;
-        
-        const { resourceId, pointId } = canvasToUpdate;
+      if (!target) return prevResources;
 
-        const updatedResources = prevResources.map(r => {
-            if (r.id === resourceId) {
-                const newPoints = (r.points || []).map(p => 
-                    p.id === pointId ? { ...p, drawing: data } : p
-                );
-                return { ...r, points: newPoints };
-            }
-            return r;
-        });
-        
-        onSaveComplete();
-        return updatedResources;
+      const updatedResources = prevResources.map(r => {
+        if (r.id === target!.resourceId) {
+          const newPoints = (r.points || []).map(p =>
+            p.id === target!.pointId ? { ...p, drawing: data } : p
+          );
+          return { ...r, points: newPoints };
+        }
+        return r;
+      });
+
+      onSaveComplete();
+      return updatedResources;
     });
-  }, [drawingCanvasState, setDrawingCanvasState, setResources]);
+  }, [setDrawingCanvasState, setResources]);
 
   const togglePinDrawing = (canvasId: string) => {
     setSettings(prev => {
@@ -1645,12 +1650,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(false);
   };
 
-  const signIn = async (username: string, password: string) => {
+  const signIn = async (username: string, password: string, opts?: { force?: boolean }) => {
       setLoading(true);
       const trimmedUsername = username.trim();
       const isDemoLogin = trimmedUsername.toLowerCase() === 'demo';
       const loginUsername = isDemoLogin ? 'demo' : trimmedUsername;
-      const { success, message, user } = await localLoginUser(loginUsername, password);
+      const { success, message, user, code } = await localLoginUser(loginUsername, password, opts);
       if (success && user) {
           setCurrentUser(user);
   
@@ -1694,9 +1699,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           router.push('/my-plate');
           toast({ title: "Success", description: message });
       } else {
-          toast({ title: "Error", description: message, variant: "destructive" });
+          if (code === "SESSION_ACTIVE") {
+              toast({ title: "Session Active", description: message, variant: "destructive" });
+          } else {
+              toast({ title: "Error", description: message, variant: "destructive" });
+          }
       }
     setLoading(false);
+    return { success, message, code };
   };
 
   const signOut = async () => {
@@ -1994,6 +2004,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const shouldBeCompleted = isCompleted !== undefined ? isCompleted : !activityToUpdate.completed;
     const baseMatch = activityToUpdate.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+
+    const slotOrder: SlotName[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+    const isPastSlotToday = () => {
+        if (!currentSlot) return false;
+        if (targetDateKey !== todayKey) return false;
+        const targetIndex = slotOrder.indexOf(targetSlot as SlotName);
+        const currentIndex = slotOrder.indexOf(currentSlot as SlotName);
+        if (targetIndex === -1 || currentIndex === -1) return false;
+        return targetIndex < currentIndex;
+    };
+
+    if (shouldBeCompleted && !activityToUpdate.completed && isPastSlotToday()) {
+        toast({
+            title: "Past Slot",
+            description: "Add an urge or resistance for this task before marking complete.",
+            variant: "destructive",
+        });
+        if (typeof window !== 'undefined') {
+            const baseId = baseMatch ? activityToUpdate.id.slice(0, -11) : undefined;
+            window.dispatchEvent(new CustomEvent('open-resistance-list-for-task', {
+                detail: {
+                    taskId: activityToUpdate.id,
+                    taskIds: activityToUpdate.taskIds || [],
+                    baseId,
+                },
+            }));
+        }
+        return;
+    }
     
     if (shouldBeCompleted && !activityToUpdate.completed) {
         if (activityToUpdate.duration) {
@@ -4902,6 +4941,30 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         setGlobalVolumeState(parseFloat(savedVolume));
     }
   }, [loadState]);
+
+  useEffect(() => {
+    if (!currentUser?.username) return;
+    refreshSessionHeartbeat(currentUser.username);
+    const interval = setInterval(() => {
+      refreshSessionHeartbeat(currentUser.username);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [currentUser?.username]);
+
+  useEffect(() => {
+    if (!currentUser?.username) return;
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== 'lifeos_active_session') return;
+      if (!isCurrentSessionOwner(currentUser.username)) {
+        toast({ title: "Session Ended", description: "Your account was opened in another session.", variant: "destructive" });
+        void localLogoutUser();
+        setCurrentUser(null);
+        router.push('/login');
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, [currentUser?.username, toast, router]);
 
   const lastRoutineDateKeyRef = useRef<string>('');
   const lastRoutineSignatureRef = useRef<string>('');

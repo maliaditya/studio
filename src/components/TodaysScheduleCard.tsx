@@ -125,7 +125,8 @@ export const AgendaWidgetItem = React.memo(({
     const { 
         setSelectedDeepWorkTask, 
         setSelectedUpskillTask,
-        findRootTask
+        findRootTask,
+        currentSlot,
     } = useAuth();
     const router = useRouter();
 
@@ -160,6 +161,28 @@ export const AgendaWidgetItem = React.memo(({
         }
     };
 
+    const isPastSlot =
+        isToday(date) &&
+        currentSlot &&
+        slotOrder.indexOf(activity.slot as any) !== -1 &&
+        slotOrder.indexOf(currentSlot as any) !== -1 &&
+        slotOrder.indexOf(activity.slot as any) < slotOrder.indexOf(currentSlot as any) &&
+        !activity.completed;
+
+    const handleAddUrgePrompt = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (typeof window === 'undefined') return;
+        const baseMatch = activity.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+        const baseId = baseMatch ? activity.id.slice(0, -11) : undefined;
+        window.dispatchEvent(new CustomEvent('open-resistance-list-for-task', {
+            detail: {
+                taskId: activity.id,
+                taskIds: activity.taskIds || [],
+                baseId,
+            },
+        }));
+    };
+
     return (
         <li 
             className={cn(
@@ -169,9 +192,22 @@ export const AgendaWidgetItem = React.memo(({
             )}
             onClick={handleItemClick}
         >
-            <button onClick={(e) => { e.stopPropagation(); onToggleComplete(activity.slot, activity.id); }} className="mt-0.5">
-                {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
-            </button>
+            <div className="mt-0.5 flex flex-col items-center gap-1">
+                <button onClick={(e) => { e.stopPropagation(); onToggleComplete(activity.slot, activity.id); }}>
+                    {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
+                </button>
+                {isPastSlot && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5"
+                        onClick={handleAddUrgePrompt}
+                        title="Add urge or resistance"
+                    >
+                        <PlusCircle className="h-3.5 w-3.5 text-amber-400" />
+                    </Button>
+                )}
+            </div>
             <div className="flex-grow min-w-0">
                 <EditableActivityText
                     initialValue={activity.details}

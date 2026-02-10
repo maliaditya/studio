@@ -14,12 +14,18 @@ export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [sessionBlockedMessage, setSessionBlockedMessage] = useState('');
   
   const { signIn, register, loading } = useAuth();
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
-    await signIn(username, password);
+    const result = await signIn(username, password);
+    if (result?.code === 'SESSION_ACTIVE') {
+      setSessionBlockedMessage(result.message);
+    } else if (result?.success) {
+      setSessionBlockedMessage('');
+    }
   };
 
   const handleRegister = async (e: FormEvent) => {
@@ -30,6 +36,7 @@ export default function LoginPage() {
       return;
     }
     await register(username, password);
+    setSessionBlockedMessage('');
   };
 
   return (
@@ -78,6 +85,26 @@ export default function LoginPage() {
                 <Button type="submit" className="w-full h-10" disabled={loading}>
                   {loading ? 'Logging in...' : 'Login'}
                 </Button>
+                {sessionBlockedMessage && (
+                  <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                    <p className="font-medium">Account already in use</p>
+                    <p className="text-destructive/90">{sessionBlockedMessage}</p>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      className="mt-3 w-full h-9"
+                      onClick={async () => {
+                        const result = await signIn(username, password, { force: true });
+                        if (result?.success) {
+                          setSessionBlockedMessage('');
+                        }
+                      }}
+                      disabled={loading}
+                    >
+                      Force Login (Log Out Other Session)
+                    </Button>
+                  </div>
+                )}
               </form>
             </TabsContent>
             <TabsContent value="register">

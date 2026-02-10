@@ -694,6 +694,9 @@ export interface MindsetPoint {
   endDate?: string;
   mismatchType?: 'mental-model' | 'cognitive-load' | 'threat-prediction' | 'action-sequencing';
   linkedHabitIds?: string[];
+  linkedUrgeIds?: string[];
+  linkedResistanceIds?: string[];
+  linkedMismatchIds?: string[];
   tasks?: {
     id: string;
     type: ActivityType;

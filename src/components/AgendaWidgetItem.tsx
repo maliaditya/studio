@@ -5,10 +5,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer, PlusCircle } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
+import { isToday } from 'date-fns';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { EditableActivityText } from './EditableActivityText';
@@ -62,7 +63,8 @@ export const AgendaWidgetItem = React.memo(({
         setSelectedDeepWorkTask, 
         setSelectedUpskillTask,
         findRootTask,
-        highlightedTaskIds
+        highlightedTaskIds,
+        currentSlot,
     } = useAuth();
     const router = useRouter();
 
@@ -104,19 +106,55 @@ export const AgendaWidgetItem = React.memo(({
         highlightedTaskIds?.has(baseId) ||
         (activity.taskIds || []).some(id => highlightedTaskIds?.has(id));
 
+    const slotOrder = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+    const isPastSlot =
+        isToday(date) &&
+        currentSlot &&
+        slotOrder.indexOf(activity.slot) !== -1 &&
+        slotOrder.indexOf(currentSlot) !== -1 &&
+        slotOrder.indexOf(activity.slot) < slotOrder.indexOf(currentSlot) &&
+        !activity.completed;
+
+    const handleAddUrgePrompt = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (typeof window === 'undefined') return;
+        const baseMatch = activity.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+        const baseId = baseMatch ? activity.id.slice(0, -11) : undefined;
+        window.dispatchEvent(new CustomEvent('open-resistance-list-for-task', {
+            detail: {
+                taskId: activity.id,
+                taskIds: activity.taskIds || [],
+                baseId,
+            },
+        }));
+    };
+
     return (
         <li 
             className={cn(
-                "flex items-start gap-2 p-2 rounded-lg group transition-all",
+                "flex items-start gap-2 p-2 rounded-lg border border-transparent group transition-all",
                 context === 'timeslot' && 'bg-background',
                 onActivityClick && 'cursor-pointer',
-                isHighlighted && "ring-2 ring-emerald-400/50 bg-emerald-500/10"
+                isHighlighted && "border-emerald-400/50 bg-emerald-500/10"
             )}
             onClick={handleItemClick}
         >
-            <button onClick={(e) => { e.stopPropagation(); onToggleComplete(activity.slot, activity.id); }} className="mt-0.5">
+            <div className="mt-0.5 flex flex-col items-center gap-1">
+                <button onClick={(e) => { e.stopPropagation(); onToggleComplete(activity.slot, activity.id); }}>
                 {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
-            </button>
+                </button>
+                {isPastSlot && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5"
+                        onClick={handleAddUrgePrompt}
+                        title="Add urge or resistance"
+                    >
+                        <PlusCircle className="h-3.5 w-3.5 text-amber-400" />
+                    </Button>
+                )}
+            </div>
             <div className="flex-grow min-w-0">
                 {(isAgendaContext || context === 'timeslot') && isInlineEditable ? (
                     <EditableActivityText

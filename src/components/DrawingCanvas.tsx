@@ -590,6 +590,17 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     });
   }, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!isDirty) return;
+    const intervalSeconds = Math.max(0, settings.drawingCanvasAutoSaveInterval ?? 30);
+    if (!intervalSeconds) return;
+    const timer = setTimeout(() => {
+      void handleSaveClick();
+    }, intervalSeconds * 1000);
+    return () => clearTimeout(timer);
+  }, [isOpen, isDirty, settings.drawingCanvasAutoSaveInterval, handleSaveClick]);
+
   const handleCanvasChange = useCallback(() => {
     if (isUserChange.current) {
         setIsDirty(true);
@@ -783,6 +794,13 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     void handleSaveClick();
     setIsLinkingResourceOpen(false);
   };
+
+  const handleClose = useCallback(async () => {
+    if (isDirty) {
+      await handleSaveClick();
+    }
+    onClose();
+  }, [isDirty, handleSaveClick, onClose]);
   
   if (!isOpen || !drawingCanvasState) return null;
 
@@ -829,7 +847,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleSaveClick}>
                         <Save className={cn("h-2.5 w-2.5", isDirty ? "text-red-500" : "text-green-500")} />
                     </Button>
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={onClose}><X className="h-2.5 w-2.5"/></Button>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleClose}><X className="h-2.5 w-2.5"/></Button>
                   </div>
               </CardHeader>
               <CardContent className="p-0 flex-grow relative">
