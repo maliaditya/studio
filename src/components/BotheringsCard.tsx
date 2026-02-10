@@ -205,7 +205,7 @@ export function BotheringsCard() {
   };
 
   return (
-    <Card className="bg-card/50 h-[520px]">
+    <Card className="bg-card/50 h-[520px] flex flex-col overflow-hidden">
       <CardHeader className="flex flex-col gap-3">
         <div className="flex items-start justify-between">
           <div>
@@ -238,7 +238,7 @@ export function BotheringsCard() {
           ))}
         </div>
       </CardHeader>
-      <CardContent className="h-[420px] overflow-y-auto pr-2">
+      <CardContent className="flex-1 overflow-y-auto pr-2">
         {activeBotherings.length === 0 ? (
           <div className="text-center text-sm text-muted-foreground py-4">
             No active botherings.

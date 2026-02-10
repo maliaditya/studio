@@ -113,6 +113,14 @@ export function TimeSlots({
     } = useAuth();
     const dateKey = useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
     const todaysSchedule = useMemo(() => schedule[dateKey] || {}, [schedule, dateKey]);
+    const [nowMs, setNowMs] = useState(() => Date.now());
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setNowMs(Date.now());
+        }, 30000);
+        return () => clearInterval(interval);
+    }, []);
     const loggedTaskIds = useMemo(() => {
         const start = startOfDay(date);
         const end = addDays(start, 1);
@@ -257,6 +265,15 @@ export function TimeSlots({
     });
   };
 
+  const formatTimeLeft = (msLeft: number) => {
+    if (msLeft <= 0) return "0m left";
+    const totalMinutes = Math.ceil(msLeft / 60000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (hours > 0) return `${hours}h ${minutes}m left`;
+    return `${minutes}m left`;
+  };
+
   return (
     <DragDropContext onDragEnd={onDragEnd}>
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -314,6 +331,18 @@ export function TimeSlots({
             ...routineInstances.filter(ri => !activities.some(a => a.id === ri.id))
         ];
         const isCurrentSlotToday = isToday(date) && currentSlot === slot.name;
+        let timeLeftLabel: string | null = null;
+        if (isCurrentSlotToday) {
+            const endTime = new Date(date);
+            if (slot.endHour >= 24) {
+                endTime.setDate(endTime.getDate() + 1);
+                endTime.setHours(0, 0, 0, 0);
+            } else {
+                endTime.setHours(slot.endHour, 0, 0, 0);
+            }
+            const msLeft = endTime.getTime() - nowMs;
+            timeLeftLabel = formatTimeLeft(msLeft);
+        }
 
         return (
           <Card
@@ -330,6 +359,11 @@ export function TimeSlots({
               <div>
                 <CardTitle className="text-lg font-medium">{slot.name}</CardTitle>
                 <CardDescription>{slot.time}</CardDescription>
+                {timeLeftLabel && (
+                    <div className="text-xs font-semibold text-emerald-400 mt-1">
+                        {timeLeftLabel}
+                    </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <div className="h-7 w-7 flex items-center justify-center">
