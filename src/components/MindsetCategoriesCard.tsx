@@ -1601,7 +1601,7 @@ export function MindsetCategoriesCard() {
                     <p className="truncate">{task.details}</p>
                     {counts && (
                         <p className="text-[11px] text-muted-foreground">
-                            {counts.completed} done • {counts.missed} missed
+                            {counts.completed} done � {counts.missed} missed
                         </p>
                     )}
                 </div>
@@ -1701,7 +1701,6 @@ export function MindsetCategoriesCard() {
                                         </div>
                                     </div>
                                 )}
-                                </div>
                             </div>
                         </div>
                     </div>
