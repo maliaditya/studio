@@ -674,8 +674,8 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
         }
 
         const rect = cardRef.current?.getBoundingClientRect();
-        const width = rect?.width ?? 520;
-        const height = rect?.height ?? 380;
+        const width = Math.max(360, Math.min(window.innerWidth * 0.6, 720));
+        const height = Math.max(260, Math.min(window.innerHeight * 0.55, 520));
         const x = (rect?.x ?? (window.innerWidth - width) / 2) + 20;
         const y = (rect?.y ?? (window.innerHeight - height) / 2) + 20;
 

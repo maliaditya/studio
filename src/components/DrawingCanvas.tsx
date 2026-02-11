@@ -582,6 +582,21 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   }, [drawingCanvasState?.activeCanvasId, drawingCanvasState?.openCanvases]);
 
   useEffect(() => {
+    if (!isOpen || !drawingCanvasState?.activeCanvasId) return;
+    const handleSaveShortcut = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      event.preventDefault();
+      void handleSaveClick();
+    };
+    window.addEventListener('keydown', handleSaveShortcut);
+    return () => window.removeEventListener('keydown', handleSaveShortcut);
+  }, [isOpen, drawingCanvasState?.activeCanvasId, handleSaveClick]);
+
+  useEffect(() => {
     if (isOpen) {
       const centerCanvas = () => {
         setPosition({
