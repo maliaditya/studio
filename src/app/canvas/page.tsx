@@ -4,7 +4,7 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy, ChevronsDown, ChevronsUp, Smartphone, Plus } from 'lucide-react';
+import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy, ChevronsDown, ChevronsUp, Smartphone, Plus, Paintbrush, Library } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -91,6 +91,60 @@ export const SearchPopup = React.memo(({ open, setOpen, onSelect, title }: { ope
 });
 SearchPopup.displayName = 'SearchPopup';
 
+const SubCanvasListContent = React.memo(({ resource, onSelect }: { resource: Resource; onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
+  const canvasPoints = useMemo(() => {
+    return (resource.points || []).filter(point => point.type === 'paint');
+  }, [resource.points]);
+
+  return (
+    <Command shouldFilter={true}>
+      <CommandInput placeholder="Search sub canvases..." />
+      <CommandList>
+        <CommandEmpty>No canvases found.</CommandEmpty>
+        <CommandGroup>
+          {canvasPoints.map((point) => (
+            <CommandItem
+              key={point.id}
+              value={point.text || 'Untitled Canvas'}
+              onSelect={() => onSelect(resource, point)}
+              className="flex justify-between items-center cursor-pointer"
+            >
+              <span>{point.text || 'Untitled Canvas'}</span>
+              <span className="text-xs text-muted-foreground">{resource.name}</span>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </CommandList>
+    </Command>
+  );
+});
+SubCanvasListContent.displayName = 'SubCanvasListContent';
+
+const SubCanvasListPopup = React.memo(({ open, setOpen, resource, onSelect }: { open: boolean; setOpen: (open: boolean) => void; resource: Resource; onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
+  const style: React.CSSProperties = {
+    position: 'fixed',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    zIndex: 130,
+  };
+
+  if (!open) return null;
+
+  return (
+    <div style={style}>
+      <Card className="w-[512px] shadow-2xl border-2 bg-popover">
+        <CardHeader className="p-3 border-b flex flex-row justify-between items-center">
+          <CardTitle className="text-base">Sub Canvases: {resource.name}</CardTitle>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setOpen(false)}><X className="h-4 w-4" /></Button>
+        </CardHeader>
+        <SubCanvasListContent resource={resource} onSelect={onSelect} />
+      </Card>
+    </div>
+  );
+});
+SubCanvasListPopup.displayName = 'SubCanvasListPopup';
+
 const ExcalidrawWrapper = ({
   activeCanvas,
   theme,
@@ -152,6 +206,7 @@ function DrawingCanvasPageContent() {
         togglePinDrawing,
         openDrawingCanvas,
         openCanvasResourceCard,
+        handleUpdateResource,
         settings,
         setSettings,
         resources,
@@ -167,6 +222,9 @@ function DrawingCanvasPageContent() {
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isLinkingSearchOpen, setIsLinkingSearchOpen] = useState(false);
     const [isHeaderCollapsed, setIsHeaderCollapsed] = useState(false);
+    const [tabContextMenu, setTabContextMenu] = useState<{ x: number; y: number; canvasId: string } | null>(null);
+    const [subCanvasListResourceId, setSubCanvasListResourceId] = useState<string | null>(null);
+    const contextMenuRef = useRef<HTMLDivElement>(null);
 
     const excalidrawAPIRef = useRef<any>(null);
     const { toast } = useToast();
@@ -175,6 +233,32 @@ function DrawingCanvasPageContent() {
     const isUserChange = useRef(false);
     const [loadedFiles, setLoadedFiles] = useState<Record<string, any>>({});
     const [loadedFilesCanvasId, setLoadedFilesCanvasId] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!tabContextMenu) return;
+        const handlePointerDown = (event: MouseEvent) => {
+            if (!contextMenuRef.current) {
+                setTabContextMenu(null);
+                return;
+            }
+            if (!contextMenuRef.current.contains(event.target as Node)) {
+                setTabContextMenu(null);
+            }
+        };
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setTabContextMenu(null);
+            }
+        };
+        window.addEventListener('pointerdown', handlePointerDown);
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('scroll', handlePointerDown, true);
+        return () => {
+            window.removeEventListener('pointerdown', handlePointerDown);
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('scroll', handlePointerDown, true);
+        };
+    }, [tabContextMenu]);
 
     useEffect(() => {
       setIsMounted(true);
@@ -486,6 +570,46 @@ function DrawingCanvasPageContent() {
             toast({ title: "Failed to copy", description: "Could not copy link to clipboard.", variant: "destructive" });
         });
     };
+
+    const handleCopyCanvasLink = useCallback((canvasId: string) => {
+        const targetCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
+        if (!targetCanvas) return;
+        const link = `canvas://${targetCanvas.resourceId}/${targetCanvas.pointId}`;
+        navigator.clipboard.writeText(link).then(() => {
+            toast({ title: "Copied to clipboard!", description: link });
+        }, () => {
+            toast({ title: "Failed to copy", description: "Could not copy link to clipboard.", variant: "destructive" });
+        });
+    }, [drawingCanvasState?.openCanvases, toast]);
+
+    const handleCreateSubCanvas = useCallback((canvasId: string) => {
+        const targetCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
+        if (!targetCanvas) return;
+        if (!resources) return;
+        const resource = resources.find(r => r.id === targetCanvas.resourceId);
+        if (!resource) {
+            toast({ title: "Resource not found", description: "Could not locate the canvas resource.", variant: "destructive" });
+            return;
+        }
+        const existingCanvases = (resource.points || []).filter(p => p.type === 'paint');
+        const nextIndex = existingCanvases.length + 1;
+        const newPoint: ResourcePoint = {
+            id: `point_canvas_${Date.now()}`,
+            text: `Sub Canvas ${nextIndex}`,
+            type: 'paint',
+        };
+        const updatedResource: Resource = {
+            ...resource,
+            points: [...(resource.points || []), newPoint],
+        };
+        handleUpdateResource(updatedResource);
+        openDrawingCanvas({
+            resourceId: resource.id,
+            pointId: newPoint.id,
+            name: newPoint.text || 'Sub Canvas',
+            initialDrawing: newPoint.drawing,
+        });
+    }, [drawingCanvasState?.openCanvases, handleUpdateResource, openDrawingCanvas, resources, toast]);
     
     if (isMobile) {
       return (
@@ -498,6 +622,8 @@ function DrawingCanvasPageContent() {
           </div>
       );
     }
+
+    const subCanvasListResource = resources?.find(r => r.id === subCanvasListResourceId) || null;
 
     return (
         <>
@@ -517,6 +643,14 @@ function DrawingCanvasPageContent() {
                                             size="sm"
                                             className="h-8 pl-2 pr-1 flex items-center gap-1 flex-shrink-0"
                                             onClick={() => handleTabClick(canvas.id)}
+                                            onContextMenu={(event) => {
+                                                event.preventDefault();
+                                                setTabContextMenu({
+                                                    x: event.clientX,
+                                                    y: event.clientY,
+                                                    canvasId: canvas.id,
+                                                });
+                                            }}
                                         >
                                             <span className="truncate max-w-[120px]">{canvas.name}</span>
                                             <button onClick={(e) => handleTogglePin(e, canvas.id)} className="p-1 rounded hover:bg-muted">
@@ -565,8 +699,66 @@ function DrawingCanvasPageContent() {
                     )}
                 </main>
             </div>
+            {tabContextMenu && (
+                <div
+                    ref={contextMenuRef}
+                    className="fixed z-[200] w-56 rounded-md border bg-popover shadow-lg p-1"
+                    style={{ top: tabContextMenu.y, left: tabContextMenu.x }}
+                >
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        onClick={() => {
+                            handleCreateSubCanvas(tabContextMenu.canvasId);
+                            setTabContextMenu(null);
+                        }}
+                    >
+                        <Paintbrush className="mr-2 h-4 w-4" />
+                        Sub Canvas
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        onClick={() => {
+                            const canvas = drawingCanvasState?.openCanvases?.find(c => c.id === tabContextMenu.canvasId);
+                            setSubCanvasListResourceId(canvas?.resourceId || null);
+                            setTabContextMenu(null);
+                        }}
+                    >
+                        <Library className="mr-2 h-4 w-4" />
+                        View All Sub Canvas
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        onClick={() => {
+                            handleCopyCanvasLink(tabContextMenu.canvasId);
+                            setTabContextMenu(null);
+                        }}
+                    >
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy URL
+                    </Button>
+                </div>
+            )}
             <SearchPopup open={isSearchOpen} setOpen={setIsSearchOpen} onSelect={handleSearchSelect} title="Search & Open Canvas" />
             <SearchPopup open={isLinkingSearchOpen} setOpen={setIsLinkingSearchOpen} onSelect={handleLinkingSearchSelect} title="Link to a Canvas" />
+            {subCanvasListResource && (
+                <SubCanvasListPopup
+                    open={!!subCanvasListResourceId}
+                    setOpen={(open) => setSubCanvasListResourceId(open ? subCanvasListResourceId : null)}
+                    resource={subCanvasListResource}
+                    onSelect={(resource, point) => {
+                        openDrawingCanvas({
+                            resourceId: resource.id,
+                            pointId: point.id,
+                            name: point.text || 'Untitled Canvas',
+                            initialDrawing: point.drawing,
+                        });
+                        setSubCanvasListResourceId(null);
+                    }}
+                />
+            )}
         </>
     );
 }
