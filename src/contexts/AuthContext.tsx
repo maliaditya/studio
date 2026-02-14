@@ -459,6 +459,40 @@ const usePrevious = <T,>(value: T) => {
 };
 
 const id = (prefix = "id") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+const normalizeUsernameKey = (username: string) => username.trim().toLowerCase();
+const getUserScopedStorageValue = (prefix: string, username: string): { key: string; value: string } | null => {
+  if (typeof window === 'undefined') return null;
+  const normalizedUsername = normalizeUsernameKey(username);
+  const candidates: Array<{ key: string; value: string }> = [];
+
+  // Backward compatibility: recover entries saved with mixed-case username suffixes.
+  for (let i = 0; i < localStorage.length; i += 1) {
+    const key = localStorage.key(i);
+    if (!key || !key.startsWith(prefix)) continue;
+    const suffix = key.slice(prefix.length);
+    if (normalizeUsernameKey(suffix) === normalizedUsername) {
+      const value = localStorage.getItem(key);
+      if (value !== null) {
+        candidates.push({ key, value });
+      }
+    }
+  }
+
+  if (candidates.length === 0) return null;
+  if (candidates.length === 1) return candidates[0];
+
+  // Prefer the fullest payload; this helps recover from accidental writes of empty state.
+  candidates.sort((a, b) => b.value.length - a.value.length);
+  return candidates[0];
+};
+const normalizePersistedPayload = (payload: any): { main: any; ui: any } | null => {
+  if (!payload || typeof payload !== 'object') return null;
+  if (payload.main && typeof payload.main === 'object') {
+    return { main: payload.main, ui: payload.ui && typeof payload.ui === 'object' ? payload.ui : {} };
+  }
+  // Legacy format: payload itself is the main data object.
+  return { main: payload, ui: {} };
+};
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
@@ -1406,9 +1440,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const saveState = useCallback(() => {
     if (currentUser?.username) {
+        const storageUsername = normalizeUsernameKey(currentUser.username);
         const allData = getAllUserData();
-        localStorage.setItem(`lifeos_data_${currentUser.username}`, JSON.stringify(allData.main));
-        localStorage.setItem(`lifeos_ui_state_${currentUser.username}`, JSON.stringify(allData.ui));
+        localStorage.setItem(`lifeos_data_${storageUsername}`, JSON.stringify(allData.main));
+        localStorage.setItem(`lifeos_ui_state_${storageUsername}`, JSON.stringify(allData.ui));
     }
   }, [currentUser, getAllUserData]);
 
@@ -1620,13 +1655,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
   
   const loadState = useCallback((username: string) => {
-    const mainDataString = localStorage.getItem(`lifeos_data_${username}`);
-    const uiDataString = localStorage.getItem(`lifeos_ui_state_${username}`);
+    const normalizedUsername = normalizeUsernameKey(username);
+    const normalizedMainKey = `lifeos_data_${normalizedUsername}`;
+    const normalizedUiKey = `lifeos_ui_state_${normalizedUsername}`;
+    const mainEntry = getUserScopedStorageValue('lifeos_data_', username);
+    const uiEntry = getUserScopedStorageValue('lifeos_ui_state_', username);
+    const mainDataString = mainEntry?.value ?? null;
+    const uiDataString = uiEntry?.value ?? null;
     
     if (mainDataString) {
       try {
-        const mainData = JSON.parse(mainDataString);
-        const uiData = uiDataString ? JSON.parse(uiDataString) : {};
+        const parsedMainData = JSON.parse(mainDataString);
+        const parsedUiData = uiDataString ? JSON.parse(uiDataString) : {};
+        const normalized = normalizePersistedPayload(parsedMainData);
+        if (!normalized) throw new Error('Local payload is not a valid object.');
+        const mainData = normalized.main;
+        const uiData = Object.keys(normalized.ui || {}).length > 0 ? normalized.ui : parsedUiData;
+        if (mainEntry?.key && mainEntry.key !== normalizedMainKey) {
+          localStorage.setItem(normalizedMainKey, mainEntry.value);
+        }
+        if (uiEntry?.key && uiEntry.key !== normalizedUiKey) {
+          localStorage.setItem(normalizedUiKey, uiEntry.value);
+        }
         loadImportedData(mainData, uiData);
       } catch (error) {
         console.error("Failed to parse data from localStorage", error);
@@ -1658,12 +1708,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { success, message, user, code } = await localLoginUser(loginUsername, password, opts);
       if (success && user) {
           setCurrentUser(user);
+          let didLoadData = false;
+          const localMainEntry = getUserScopedStorageValue('lifeos_data_', user.username);
+          const localMainDataString = localMainEntry?.value ?? null;
   
           if (user.username === 'demo') {
-              await pullDataFromCloud(user.username);
+              if (localMainDataString) {
+                loadState(user.username);
+                didLoadData = true;
+              } else {
+                await pullDataFromCloud(user.username);
+              }
           } else {
-            const mainDataString = localStorage.getItem(`lifeos_data_${user.username}`);
-            const ghSettingsString = localStorage.getItem(`github_settings_${user.username}`);
+            const ghSettingsEntry = getUserScopedStorageValue('github_settings_', user.username);
+            const ghSettingsString = ghSettingsEntry?.value ?? null;
 
             let settingsToLoad = settings;
             if (ghSettingsString) {
@@ -1673,28 +1731,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               } catch (e) { console.error("Error parsing GitHub settings from localStorage", e); }
             }
             
-            if (mainDataString) {
-                const mainData = JSON.parse(mainDataString);
+            if (localMainDataString) {
+                const mainData = JSON.parse(localMainDataString);
                 mainData.settings = {...mainData.settings, ...settingsToLoad};
                 loadState(user.username);
+                didLoadData = true;
             } else {
                 const mainDataResponse = await fetch(`/api/blob-sync?username=${user.username.toLowerCase()}`);
                 if (mainDataResponse.ok) {
                     const mainDataResult = await mainDataResponse.json();
                     if (mainDataResult.data) {
+                        const normalizedCloud = normalizePersistedPayload(mainDataResult.data);
+                        if (!normalizedCloud) {
+                          throw new Error('Cloud payload is malformed.');
+                        }
                         const githubSettingsResponse = await fetch(`/api/github-settings?username=${user.username.toLowerCase()}`);
                         if (githubSettingsResponse.ok) {
                             const githubSettingsResult = await githubSettingsResponse.json();
                             if (githubSettingsResult.settings) {
-                                const combinedSettings = { ...mainDataResult.data.main.settings, ...githubSettingsResult.settings };
-                                mainDataResult.data.main.settings = combinedSettings;
+                                const currentMainSettings = normalizedCloud.main?.settings || {};
+                                const combinedSettings = { ...currentMainSettings, ...githubSettingsResult.settings };
+                                normalizedCloud.main.settings = combinedSettings;
                             }
                         }
-                        loadImportedData(mainDataResult.data.main, mainDataResult.data.ui || {});
+                        loadImportedData(normalizedCloud.main, normalizedCloud.ui || {});
+                        didLoadData = true;
                     }
                 }
             }
         }
+          if (!didLoadData) {
+            setIsLoadingState(false);
+          }
         
           router.push('/my-plate');
           toast({ title: "Success", description: message });
@@ -1802,6 +1870,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: "Syncing...", description: "Fetching your latest data from the cloud." });
     }
 
+    let didLoadData = false;
     try {
         const response = await fetch(`/api/blob-sync?username=${effectiveUsername.toLowerCase()}`);
         
@@ -1817,15 +1886,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const result = JSON.parse(textData);
             const data = result.data;
 
-            if (data && data.main) {
+            if (data) {
+                const normalizedCloud = normalizePersistedPayload(data);
+                if (!normalizedCloud) {
+                  throw new Error("Cloud payload is malformed.");
+                }
                 const githubSettingsResponse = await fetch(`/api/github-settings?username=${effectiveUsername.toLowerCase()}`);
                 if (githubSettingsResponse.ok) {
                     const githubSettingsResult = await githubSettingsResponse.json();
                     if (githubSettingsResult.settings) {
-                        data.main.settings = { ...data.main.settings, ...githubSettingsResult.settings };
+                        const currentMainSettings = normalizedCloud.main?.settings || {};
+                        normalizedCloud.main.settings = { ...currentMainSettings, ...githubSettingsResult.settings };
                     }
                 }
-                loadImportedData(data.main, data.ui || {});
+                loadImportedData(normalizedCloud.main, normalizedCloud.ui || {});
+                didLoadData = true;
                 toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
             } else if (!localDataIsEmpty) {
                 toast({ title: "No Data Found", description: result.message || "No data was found in the cloud for this user." });
@@ -1844,6 +1919,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 description: error instanceof Error ? error.message : "An unknown error occurred.",
                 variant: "destructive",
             });
+        }
+    } finally {
+        if (!didLoadData) {
+          setIsLoadingState(false);
         }
     }
 };
