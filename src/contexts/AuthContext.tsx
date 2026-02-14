@@ -4134,6 +4134,37 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     return { dir, base };
   }
 
+  async function listGitHubDirectory(token: string, owner: string, repo: string, dir: string): Promise<Array<{ name: string; type: string; path: string; sha?: string }> | null> {
+    const endpoint = dir
+      ? `https://api.github.com/repos/${owner}/${repo}/contents/${dir}`
+      : `https://api.github.com/repos/${owner}/${repo}/contents`;
+    const response = await fetch(endpoint, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    if (response.status === 404) return null;
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error((errorData as any).message || `Failed to list GitHub directory: ${dir || '/'}`);
+    }
+    const data = await response.json();
+    return Array.isArray(data) ? data : null;
+  }
+
+  function pickLatestDatedBackupPath(
+    entries: Array<{ name: string; type: string; path: string }>,
+    username: string
+  ): string | null {
+    const pattern = new RegExp(`^lifeos_backup_${username}_(\\d{4}-\\d{2}-\\d{2})\\.json$`, 'i');
+    const candidates = entries
+      .filter(entry => entry.type === 'file' && pattern.test(entry.name))
+      .map(entry => {
+        const match = entry.name.match(pattern);
+        return { path: entry.path, date: match?.[1] || '' };
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+    return candidates[0]?.path || null;
+  }
+
   function withUserGitHubPrefix(path: string, username?: string | null): string {
     if (!username) return path;
     const cleaned = path.replace(/^\/+/, '');
@@ -4263,7 +4294,12 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         const prefixedPath = withUserGitHubPrefix(githubPath, username);
         const { dir } = getGitHubBaseDir(prefixedPath);
         const manifestPath = dir ? `${dir}/manifest.json` : 'manifest.json';
-        const manifest = await getGitHubJson<{ version: number; modules: Record<string, { path: string }> }>(githubToken, githubOwner, githubRepo, manifestPath);
+        const directoryEntries = await listGitHubDirectory(githubToken, githubOwner, githubRepo, dir);
+        const namesInDir = new Set((directoryEntries || []).map(entry => entry.name));
+        const hasManifest = namesInDir.has('manifest.json');
+        const manifest = hasManifest
+          ? await getGitHubJson<{ version: number; modules: Record<string, { path: string }> }>(githubToken, githubOwner, githubRepo, manifestPath)
+          : null;
 
         let useFullBackup = false;
         if (manifest && manifest.modules) {
@@ -4337,7 +4373,18 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             }
         }
 
-        const response = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${prefixedPath}`, {
+        let resolvedBackupPath = prefixedPath;
+        const preferredName = prefixedPath.split('/').pop() || prefixedPath;
+        if (!namesInDir.has(preferredName)) {
+            const latestPath = pickLatestDatedBackupPath(directoryEntries || [], username);
+            if (latestPath) {
+                resolvedBackupPath = latestPath;
+            } else {
+                throw new Error(`No backup file found in ${dir || '/'} for user ${username}.`);
+            }
+        }
+
+        const response = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${resolvedBackupPath}`, {
             headers: { 'Authorization': `token ${githubToken}` }
         });
         if (!response.ok) throw new Error('Failed to fetch file metadata from GitHub.');
