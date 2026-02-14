@@ -460,6 +460,7 @@ const usePrevious = <T,>(value: T) => {
 
 const id = (prefix = "id") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 const normalizeUsernameKey = (username: string) => username.trim().toLowerCase();
+const getMainBackupKey = (username: string) => `lifeos_main_backup_${normalizeUsernameKey(username)}`;
 const getUserScopedStorageValue = (prefix: string, username: string): { key: string; value: string } | null => {
   if (typeof window === 'undefined') return null;
   const normalizedUsername = normalizeUsernameKey(username);
@@ -1442,10 +1443,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (currentUser?.username) {
         const storageUsername = normalizeUsernameKey(currentUser.username);
         const allData = getAllUserData();
-        localStorage.setItem(`lifeos_data_${storageUsername}`, JSON.stringify(allData.main));
-        localStorage.setItem(`lifeos_ui_state_${storageUsername}`, JSON.stringify(allData.ui));
+        const mainDataKey = `lifeos_data_${storageUsername}`;
+        const uiDataKey = `lifeos_ui_state_${storageUsername}`;
+        const mainRefKey = `lifeos_data_ref_${storageUsername}`;
+        const serializedMain = JSON.stringify(allData.main);
+        const serializedUi = JSON.stringify(allData.ui);
+
+        try {
+          localStorage.setItem(mainDataKey, serializedMain);
+          localStorage.setItem(uiDataKey, serializedUi);
+          localStorage.removeItem(mainRefKey);
+          void deleteBackup(getMainBackupKey(storageUsername)).catch(() => undefined);
+        } catch (error) {
+          if (error instanceof DOMException && (error.name === 'QuotaExceededError' || error.code === 22)) {
+            void (async () => {
+              try {
+                await storeBackup(
+                  getMainBackupKey(storageUsername),
+                  new Blob([serializedMain], { type: 'application/json' })
+                );
+                localStorage.setItem(mainRefKey, getMainBackupKey(storageUsername));
+                localStorage.removeItem(mainDataKey);
+                localStorage.setItem(uiDataKey, serializedUi);
+              } catch (backupError) {
+                console.error('Failed to persist data after localStorage quota exceeded:', backupError);
+                toast({
+                  title: "Save Failed",
+                  description: "Storage is full. Please export a backup or clear old browser data.",
+                  variant: "destructive"
+                });
+              }
+            })();
+          } else {
+            console.error('Failed to save app state:', error);
+          }
+        }
     }
-  }, [currentUser, getAllUserData]);
+  }, [currentUser, getAllUserData, toast]);
 
   useEffect(() => {
     if (!isLoadingState) {
@@ -1654,14 +1688,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setTimeout(() => setIsLoadingState(false), 100);
   }, []);
   
-  const loadState = useCallback((username: string) => {
+  const loadState = useCallback(async (username: string) => {
     const normalizedUsername = normalizeUsernameKey(username);
     const normalizedMainKey = `lifeos_data_${normalizedUsername}`;
     const normalizedUiKey = `lifeos_ui_state_${normalizedUsername}`;
+    const normalizedMainRefKey = `lifeos_data_ref_${normalizedUsername}`;
     const mainEntry = getUserScopedStorageValue('lifeos_data_', username);
     const uiEntry = getUserScopedStorageValue('lifeos_ui_state_', username);
-    const mainDataString = mainEntry?.value ?? null;
+    const mainRefEntry = getUserScopedStorageValue('lifeos_data_ref_', username);
+    let mainDataString = mainEntry?.value ?? null;
     const uiDataString = uiEntry?.value ?? null;
+
+    if (!mainDataString) {
+      const backupRef = mainRefEntry?.value || getMainBackupKey(username);
+      try {
+        const backupBlob = await getBackup(backupRef);
+        if (backupBlob) {
+          mainDataString = await backupBlob.text();
+        }
+      } catch (error) {
+        console.error("Failed to load backup data from IndexedDB", error);
+      }
+    }
     
     if (mainDataString) {
       try {
@@ -1676,6 +1724,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         if (uiEntry?.key && uiEntry.key !== normalizedUiKey) {
           localStorage.setItem(normalizedUiKey, uiEntry.value);
+        }
+        if (mainRefEntry?.key && mainRefEntry.key !== normalizedMainRefKey) {
+          localStorage.setItem(normalizedMainRefKey, mainRefEntry.value);
         }
         loadImportedData(mainData, uiData);
       } catch (error) {
@@ -1714,7 +1765,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
           if (user.username === 'demo') {
               if (localMainDataString) {
-                loadState(user.username);
+                await loadState(user.username);
                 didLoadData = true;
               } else {
                 await pullDataFromCloud(user.username);
@@ -1734,7 +1785,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (localMainDataString) {
                 const mainData = JSON.parse(localMainDataString);
                 mainData.settings = {...mainData.settings, ...settingsToLoad};
-                loadState(user.username);
+                await loadState(user.username);
                 didLoadData = true;
             } else {
                 const mainDataResponse = await fetch(`/api/blob-sync?username=${user.username.toLowerCase()}`);
@@ -5009,7 +5060,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     const user = getCurrentLocalUser();
     if (user) {
       setCurrentUser(user);
-      loadState(user.username);
+      void loadState(user.username);
     }
     setLoading(false);
     const savedTheme = typeof window !== 'undefined' ? localStorage.getItem('lifeos_theme') || 'ad-dark' : 'ad-dark';
