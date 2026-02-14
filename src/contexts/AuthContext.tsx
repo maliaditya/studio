@@ -4300,28 +4300,64 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         const manifest = hasManifest
           ? await getGitHubJson<{ version: number; modules: Record<string, { path: string }> }>(githubToken, githubOwner, githubRepo, manifestPath)
           : null;
+        let effectiveManifest = manifest;
+
+        // Compatibility mode: repositories that have modular files but no manifest.json.
+        if (!effectiveManifest && namesInDir.has('modules')) {
+            const modulesBase = dir ? `${dir}/modules` : 'modules';
+            const moduleEntries = await listGitHubDirectory(githubToken, githubOwner, githubRepo, modulesBase);
+            const moduleNames = new Set((moduleEntries || []).map(entry => entry.name));
+            const modules: Record<string, { path: string }> = {};
+
+            if (moduleNames.has('core.json')) modules.core = { path: `${modulesBase}/core.json` };
+            if (moduleNames.has('workouts.json')) modules.workouts = { path: `${modulesBase}/workouts.json` };
+            if (moduleNames.has('knowledge.json')) modules.knowledge = { path: `${modulesBase}/knowledge.json` };
+            if (moduleNames.has('ui.json')) modules.ui = { path: `${modulesBase}/ui.json` };
+            if (moduleNames.has('resources.json')) modules.resources = { path: `${modulesBase}/resources.json` };
+
+            // Optional indexes used by newer modular format.
+            if (moduleNames.has('resources-folders')) {
+              modules['resources-folders-index'] = { path: `${modulesBase}/resources-folders/index.json` };
+            }
+            if (moduleNames.has('canvas-files')) {
+              modules['canvas-files-index'] = { path: `${modulesBase}/canvas-files/index.json` };
+            }
+
+            effectiveManifest = { version: 1, modules };
+        }
 
         let useFullBackup = false;
-        if (manifest && manifest.modules) {
-            const core = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.core?.path);
-            const workouts = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.workouts?.path);
-            let resourcesMod = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.resources?.path);
-            const knowledge = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.knowledge?.path);
-            const ui = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules.ui?.path);
-            const canvasFilesIndex = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, manifest.modules['canvas-files-index']?.path);
+        if (effectiveManifest && effectiveManifest.modules) {
+            const core = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules.core?.path);
+            const workouts = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules.workouts?.path);
+            let resourcesMod = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules.resources?.path);
+            const knowledge = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules.knowledge?.path);
+            const ui = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules.ui?.path);
+            const canvasFilesIndex = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules['canvas-files-index']?.path);
 
             // Prefer per-folder resource modules when present
-            let folderModuleEntries = Object.entries(manifest.modules)
+            let folderModuleEntries = Object.entries(effectiveManifest.modules)
               .filter(([key]) => key.startsWith('resources-folder-'))
               .map(([, value]) => value?.path)
               .filter(Boolean) as string[];
 
             // If an index exists, use it for faster import
-            const folderIndexPath = manifest.modules['resources-folders-index']?.path;
+            const folderIndexPath = effectiveManifest.modules['resources-folders-index']?.path;
             if (folderIndexPath) {
                 const indexPayload = await getGitHubJson<{ folders?: Array<{ id: string; path: string }> }>(githubToken, githubOwner, githubRepo, folderIndexPath);
                 if (indexPayload?.folders && Array.isArray(indexPayload.folders)) {
                     folderModuleEntries = indexPayload.folders.map(f => f.path).filter(Boolean);
+                }
+            }
+
+            // Compatibility fallback: if no index, enumerate modules/resources-folders directly.
+            if (folderModuleEntries.length === 0) {
+                const resourcesFoldersBase = dir ? `${dir}/modules/resources-folders` : 'modules/resources-folders';
+                const resourcesFolderEntries = await listGitHubDirectory(githubToken, githubOwner, githubRepo, resourcesFoldersBase);
+                if (resourcesFolderEntries && resourcesFolderEntries.length > 0) {
+                    folderModuleEntries = resourcesFolderEntries
+                      .filter(entry => entry.type === 'file' && entry.name.endsWith('.json') && entry.name !== 'index.json')
+                      .map(entry => entry.path);
                 }
             }
 
