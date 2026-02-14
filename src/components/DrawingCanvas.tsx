@@ -581,6 +581,34 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [drawingCanvasState?.activeCanvasId, drawingCanvasState?.openCanvases]);
 
+  const handleSaveClick = useCallback(async () => {
+    if (!excalidrawAPIRef.current || !drawingCanvasState?.activeCanvasId) {
+        return;
+    }
+  
+    const elements = excalidrawAPIRef.current.getSceneElements();
+    const appState = excalidrawAPIRef.current.getAppState();
+    const files = typeof excalidrawAPIRef.current.getFiles === 'function' ? excalidrawAPIRef.current.getFiles() : {};
+    const filesMeta = await saveExcalidrawFiles(drawingCanvasState.activeCanvasId, files);
+    const drawingData = JSON.stringify({
+        type: "excalidraw",
+        version: 2,
+        source: "dock-app",
+        elements: elements,
+        appState: {
+            viewBackgroundColor: appState.viewBackgroundColor,
+            gridSize: appState.gridSize,
+        },
+        files: filesMeta,
+    });
+  
+    updateDrawingData(drawingCanvasState.activeCanvasId, drawingData, () => {
+        setIsDirty(false);
+        isUserChange.current = false;
+        toast({ title: "Canvas Saved" });
+    });
+  }, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
+
   useEffect(() => {
     if (!isOpen || !drawingCanvasState?.activeCanvasId) return;
     const handleSaveShortcut = (event: KeyboardEvent) => {
@@ -691,34 +719,6 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     }
   }, [loadedFiles, loadedFilesCanvasId, activeCanvas?.id]);
   
-  const handleSaveClick = useCallback(async () => {
-    if (!excalidrawAPIRef.current || !drawingCanvasState?.activeCanvasId) {
-        return;
-    }
-  
-    const elements = excalidrawAPIRef.current.getSceneElements();
-    const appState = excalidrawAPIRef.current.getAppState();
-    const files = typeof excalidrawAPIRef.current.getFiles === 'function' ? excalidrawAPIRef.current.getFiles() : {};
-    const filesMeta = await saveExcalidrawFiles(drawingCanvasState.activeCanvasId, files);
-    const drawingData = JSON.stringify({
-        type: "excalidraw",
-        version: 2,
-        source: "dock-app",
-        elements: elements,
-        appState: {
-            viewBackgroundColor: appState.viewBackgroundColor,
-            gridSize: appState.gridSize,
-        },
-        files: filesMeta,
-    });
-  
-    updateDrawingData(drawingCanvasState.activeCanvasId, drawingData, () => {
-        setIsDirty(false);
-        isUserChange.current = false;
-        toast({ title: "Canvas Saved" });
-    });
-  }, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
-
   useEffect(() => {
     if (!isOpen) return;
     if (!isDirty) return;
