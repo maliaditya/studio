@@ -461,6 +461,14 @@ const usePrevious = <T,>(value: T) => {
 const id = (prefix = "id") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 const normalizeUsernameKey = (username: string) => username.trim().toLowerCase();
 const getMainBackupKey = (username: string) => `lifeos_main_backup_${normalizeUsernameKey(username)}`;
+const safeSetLocalStorage = (key: string, value: string) => {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    return false;
+  }
+};
 const getUserScopedStorageValue = (prefix: string, username: string): { key: string; value: string } | null => {
   if (typeof window === 'undefined') return null;
   const normalizedUsername = normalizeUsernameKey(username);
@@ -1448,8 +1456,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const mainRefKey = `lifeos_data_ref_${storageUsername}`;
         const serializedMain = JSON.stringify(allData.main);
         const serializedUi = JSON.stringify(allData.ui);
+        const persistMainToIndexedDb = async () => {
+          await storeBackup(
+            getMainBackupKey(storageUsername),
+            new Blob([serializedMain], { type: 'application/json' })
+          );
+          safeSetLocalStorage(mainRefKey, getMainBackupKey(storageUsername));
+          localStorage.removeItem(mainDataKey);
+          safeSetLocalStorage(uiDataKey, serializedUi);
+        };
 
         try {
+          const isAlreadyInOverflowMode = !!localStorage.getItem(mainRefKey);
+          if (isAlreadyInOverflowMode) {
+            void persistMainToIndexedDb().catch((backupError) => {
+              console.error('Failed to persist overflow data to IndexedDB:', backupError);
+            });
+            return;
+          }
+
           localStorage.setItem(mainDataKey, serializedMain);
           localStorage.setItem(uiDataKey, serializedUi);
           localStorage.removeItem(mainRefKey);
@@ -1458,13 +1483,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (error instanceof DOMException && (error.name === 'QuotaExceededError' || error.code === 22)) {
             void (async () => {
               try {
-                await storeBackup(
-                  getMainBackupKey(storageUsername),
-                  new Blob([serializedMain], { type: 'application/json' })
-                );
-                localStorage.setItem(mainRefKey, getMainBackupKey(storageUsername));
-                localStorage.removeItem(mainDataKey);
-                localStorage.setItem(uiDataKey, serializedUi);
+                await persistMainToIndexedDb();
               } catch (backupError) {
                 console.error('Failed to persist data after localStorage quota exceeded:', backupError);
                 toast({
@@ -1720,13 +1739,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const mainData = normalized.main;
         const uiData = Object.keys(normalized.ui || {}).length > 0 ? normalized.ui : parsedUiData;
         if (mainEntry?.key && mainEntry.key !== normalizedMainKey) {
-          localStorage.setItem(normalizedMainKey, mainEntry.value);
+          safeSetLocalStorage(normalizedMainKey, mainEntry.value);
         }
         if (uiEntry?.key && uiEntry.key !== normalizedUiKey) {
-          localStorage.setItem(normalizedUiKey, uiEntry.value);
+          safeSetLocalStorage(normalizedUiKey, uiEntry.value);
         }
         if (mainRefEntry?.key && mainRefEntry.key !== normalizedMainRefKey) {
-          localStorage.setItem(normalizedMainRefKey, mainRefEntry.value);
+          safeSetLocalStorage(normalizedMainRefKey, mainRefEntry.value);
         }
         loadImportedData(mainData, uiData);
       } catch (error) {
@@ -1761,30 +1780,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setCurrentUser(user);
           let didLoadData = false;
           const localMainEntry = getUserScopedStorageValue('lifeos_data_', user.username);
+          const localMainRefEntry = getUserScopedStorageValue('lifeos_data_ref_', user.username);
           const localMainDataString = localMainEntry?.value ?? null;
+          const hasLocalMainState = !!localMainDataString || !!localMainRefEntry?.value;
   
           if (user.username === 'demo') {
-              if (localMainDataString) {
+              if (hasLocalMainState) {
                 await loadState(user.username);
                 didLoadData = true;
               } else {
                 await pullDataFromCloud(user.username);
               }
           } else {
-            const ghSettingsEntry = getUserScopedStorageValue('github_settings_', user.username);
-            const ghSettingsString = ghSettingsEntry?.value ?? null;
-
-            let settingsToLoad = settings;
-            if (ghSettingsString) {
-              try {
-                const ghSettings = JSON.parse(ghSettingsString);
-                settingsToLoad = {...settings, ...ghSettings};
-              } catch (e) { console.error("Error parsing GitHub settings from localStorage", e); }
-            }
-            
-            if (localMainDataString) {
-                const mainData = JSON.parse(localMainDataString);
-                mainData.settings = {...mainData.settings, ...settingsToLoad};
+            if (hasLocalMainState) {
                 await loadState(user.username);
                 didLoadData = true;
             } else {
