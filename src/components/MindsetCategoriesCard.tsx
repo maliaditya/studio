@@ -512,6 +512,32 @@ export function MindsetCategoriesCard() {
         });
         return map;
     }, [schedule]);
+    const scheduledDatesByTaskId = useMemo(() => {
+        const map = new Map<string, Set<string>>();
+        Object.entries(schedule || {}).forEach(([dateKey, day]) => {
+            Object.values(day).forEach((value: any) => {
+                if (!Array.isArray(value)) return;
+                value.forEach((act: any) => {
+                    if (!act?.id) return;
+                    const ids = new Set<string>();
+                    ids.add(act.id);
+                    const baseMatch = act.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+                    if (baseMatch) {
+                        ids.add(act.id.slice(0, -11));
+                    }
+                    (act.taskIds || []).forEach((taskId: string) => {
+                        if (taskId) ids.add(taskId);
+                    });
+                    ids.forEach((id) => {
+                        if (!id) return;
+                        if (!map.has(id)) map.set(id, new Set<string>());
+                        map.get(id)!.add(dateKey);
+                    });
+                });
+            });
+        });
+        return map;
+    }, [schedule]);
 
     const isTaskCompletedOnDate = (task: MindsetPoint['tasks'][number], dateKey: string) => {
         const activityMap = activityMapByDate.get(dateKey);
@@ -528,6 +554,12 @@ export function MindsetCategoriesCard() {
         if (task.dateKey && task.dateKey !== dateKey) return false;
         return !!task.completed;
     };
+    const isTaskScheduledOnDate = (task: MindsetPoint['tasks'][number], dateKey: string) => {
+        const activityId = task.activityId || task.id;
+        if (activityId && scheduledDatesByTaskId.get(activityId)?.has(dateKey)) return true;
+        if (task.id && task.id !== activityId && scheduledDatesByTaskId.get(task.id)?.has(dateKey)) return true;
+        return false;
+    };
 
     const buildBotheringConsistency = useCallback((point: MindsetPoint) => {
         const today = startOfDay(new Date());
@@ -543,19 +575,17 @@ export function MindsetCategoriesCard() {
             let completed = 0;
             tasks.forEach(task => {
                 if (!isTaskDueOnDate(task, dateKey)) return;
+                if (!isTaskScheduledOnDate(task, dateKey)) return;
                 due += 1;
                 if (isTaskCompletedOnDate(task, dateKey)) completed += 1;
             });
 
-            if (due > 0) {
-                if (completed === due) {
-                    hasAnyCompletion = true;
-                    score += (1 - score) * 0.1;
-                } else {
-                    if (hasAnyCompletion) {
-                        score *= 0.95;
-                    }
-                }
+            if (due === 0) continue;
+            if (completed === due) {
+                hasAnyCompletion = true;
+                score += (1 - score) * 0.1;
+            } else if (hasAnyCompletion) {
+                score *= 0.95;
             }
 
             data.push({
@@ -566,7 +596,7 @@ export function MindsetCategoriesCard() {
         }
 
         return data;
-    }, [isTaskDueOnDate, isTaskCompletedOnDate]);
+    }, [isTaskDueOnDate, isTaskScheduledOnDate, isTaskCompletedOnDate]);
     const getRecurringTaskCounts = (task: MindsetPoint['tasks'][number]) => {
         if (!task.recurrence || task.recurrence === 'none') return null;
         const startKey = task.startDate || task.dateKey;
@@ -580,8 +610,9 @@ export function MindsetCategoriesCard() {
         days.forEach(day => {
             const key = format(day, 'yyyy-MM-dd');
             if (!isTaskDueOnDate(task, key)) return;
-            if (task.completionHistory?.[key]) completed += 1;
-            else if (key !== format(today, 'yyyy-MM-dd')) missed += 1;
+            if (!isTaskScheduledOnDate(task, key)) return;
+            if (isTaskCompletedOnDate(task, key)) completed += 1;
+            else if (key !== todayKey) missed += 1;
         });
         return { completed, missed };
     };
@@ -1601,7 +1632,7 @@ export function MindsetCategoriesCard() {
                     <p className="truncate">{task.details}</p>
                     {counts && (
                         <p className="text-[11px] text-muted-foreground">
-                            {counts.completed} done � {counts.missed} missed
+                            {counts.completed} done | {counts.missed} missed
                         </p>
                     )}
                 </div>
