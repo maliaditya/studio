@@ -1782,6 +1782,7 @@ export function MindsetCategoriesCard() {
                                                                     {linkableRoutinesForBothering.map(r => (
                                                                         <DropdownMenuItem
                                                                             key={r.id}
+                                                                            className="max-w-full"
                                                                             onSelect={() => {
                                                                                 const existing = (activeBotheringPoint.tasks || []).some(t => t.activityId === r.id || t.id === r.id);
                                                                                 if (existing) return;
@@ -1812,8 +1813,8 @@ export function MindsetCategoriesCard() {
                                                                                 }));
                                                                             }}
                                                                         >
-                                                                            <span className="truncate">{r.details}</span>
-                                                                            <span className="ml-auto text-xs text-muted-foreground">{r.slot}</span>
+                                                                            <span className="min-w-0 flex-1 truncate">{r.details}</span>
+                                                                            <span className="ml-2 shrink-0 text-xs text-muted-foreground">{r.slot}</span>
                                                                         </DropdownMenuItem>
                                                                     ))}
                                                                 </div>
@@ -1828,9 +1829,9 @@ export function MindsetCategoriesCard() {
         {(activeBotheringPoint.tasks || []).map((task) => {
             const counts = getRecurringTaskCounts(task);
             return (
-            <li key={task.id} className="flex items-center gap-2 text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
-                <div className="flex-1 min-w-0">
-                    <p className="truncate">{task.details}</p>
+            <li key={task.id} className="relative overflow-hidden text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
+                <div className="min-w-0 pr-8">
+                    <p className="break-words leading-snug">{task.details}</p>
                     {counts && (
                         <p className="text-[11px] text-muted-foreground">
                             {counts.completed} done | {counts.missed} missed
@@ -1840,7 +1841,7 @@ export function MindsetCategoriesCard() {
                 <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6"
+                    className="absolute right-1 top-1/2 h-6 w-6 -translate-y-1/2 shrink-0"
                     onClick={() => {
                         updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
                             ...point,
