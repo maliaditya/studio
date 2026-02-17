@@ -10,7 +10,7 @@ import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, Hi
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { BrainHack, Stopper, MindsetCard, MindsetPoint, Activity, SlotName } from '@/types/workout';
+import { BrainHack, Stopper, MindsetCard, MindsetPoint, Activity, SlotName, CoreDomainId } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -155,6 +155,30 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     distraction: <Wind className="h-4 w-4 text-yellow-500" />,
     mindset: <Brain className="h-4 w-4" />,
     pomodoro: <Timer className="h-4 w-4" />,
+};
+
+const CORE_OPTIONS_BY_BOTHERING: Record<'mismatch' | 'constraint' | 'external', Array<{ id: CoreDomainId; label: string }>> = {
+    external: [
+        { id: 'health', label: 'Health' },
+        { id: 'relations', label: 'Relations' },
+        { id: 'creativity', label: 'Creativity / Expression' },
+    ],
+    mismatch: [
+        { id: 'meaning', label: 'Meaning / Direction' },
+        { id: 'competence', label: 'Competence / Skill' },
+        { id: 'transcendence', label: 'Transcendence' },
+    ],
+    constraint: [
+        { id: 'wealth', label: 'Wealth' },
+        { id: 'autonomy', label: 'Autonomy' },
+        { id: 'contribution', label: 'Contribution' },
+    ],
+};
+
+const DEFAULT_CORE_BY_BOTHERING: Record<'mismatch' | 'constraint' | 'external', CoreDomainId> = {
+    external: 'health',
+    mismatch: 'meaning',
+    constraint: 'wealth',
 };
 
 
@@ -429,6 +453,7 @@ export function MindsetCategoriesCard() {
         const newPoint: MindsetPoint = {
             id: `bother_${Date.now()}`,
             text: newBotheringText.trim(),
+            coreDomainId: DEFAULT_CORE_BY_BOTHERING[botheringType],
             ...(botheringType === 'mismatch' ? { mismatchType: newMismatchType } : {}),
         };
         setMindsetCards(prev => prev.map(c => c.id === card.id ? { ...c, points: [...c.points, newPoint] } : c));
@@ -479,6 +504,16 @@ export function MindsetCategoriesCard() {
                 ? constraintCard
                 : externalCard;
     const activeBotheringPoint = activeBotheringCard?.points.find(p => p.id === botheringPopup?.pointId);
+    const activeCoreOptions = botheringPopup ? CORE_OPTIONS_BY_BOTHERING[botheringPopup.type] : [];
+    const activeDefaultCore = botheringPopup ? DEFAULT_CORE_BY_BOTHERING[botheringPopup.type] : 'health';
+    const activeSelectedCore = useMemo(() => {
+        if (!activeBotheringPoint) return activeDefaultCore;
+        const selected = activeBotheringPoint.coreDomainId;
+        if (selected && activeCoreOptions.some(option => option.id === selected)) {
+            return selected;
+        }
+        return activeDefaultCore;
+    }, [activeBotheringPoint, activeCoreOptions, activeDefaultCore]);
     const globallyLinkedRoutineIds = useMemo(() => {
         const ids = new Set<string>();
         mindsetCards
@@ -518,7 +553,6 @@ export function MindsetCategoriesCard() {
         setBotheringTitleDraft(activeBotheringPoint.text || '');
         setIsEditingBotheringTitle(false);
     }, [activeBotheringPoint?.id, activeBotheringPoint?.text]);
-
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const getTodayTaskStats = (point?: MindsetPoint) => {
         const tasks = getEffectiveBotheringTasks(point);
@@ -705,6 +739,16 @@ export function MindsetCategoriesCard() {
         const cardId = `mindset_botherings_${type}`;
         setMindsetCards(prev => prev.map(c => c.id === cardId ? { ...c, points: c.points.map(p => p.id === pointId ? updater(p) : p) } : c));
     }, [setMindsetCards]);
+    useEffect(() => {
+        if (!botheringPopup || !activeBotheringPoint) return;
+        if (activeBotheringPoint.coreDomainId) return;
+        const fallbackCore = DEFAULT_CORE_BY_BOTHERING[botheringPopup.type];
+        updateBotheringPoint(
+            botheringPopup.type,
+            activeBotheringPoint.id,
+            (point) => ({ ...point, coreDomainId: point.coreDomainId || fallbackCore })
+        );
+    }, [botheringPopup?.type, activeBotheringPoint?.id, activeBotheringPoint?.coreDomainId, updateBotheringPoint]);
 
     const addStopperToBothering = useCallback((link: { stopper: Stopper; isUrge: boolean }) => {
         if (!botheringPopup || !activeBotheringPoint) return;
@@ -1559,6 +1603,28 @@ export function MindsetCategoriesCard() {
                                             </Select>
                                         </div>
                                     )}
+                                    <div className="pt-2">
+                                        <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Core Type</div>
+                                        <Select
+                                            value={activeSelectedCore}
+                                            onValueChange={(value) =>
+                                                updateBotheringPoint(
+                                                    botheringPopup.type,
+                                                    activeBotheringPoint.id,
+                                                    (point) => ({ ...point, coreDomainId: value as CoreDomainId })
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger className="h-8 w-[240px]">
+                                                <SelectValue placeholder="Select core type" />
+                                            </SelectTrigger>
+                                            <SelectContent className="z-[200]">
+                                                {activeCoreOptions.map(option => (
+                                                    <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
                                 <Button variant="ghost" size="icon" className="shrink-0" onClick={() => setBotheringPopup(null)}>
                                     <X className="h-4 w-4" />

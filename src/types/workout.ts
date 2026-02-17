@@ -690,6 +690,7 @@ export interface MindsetPoint {
   id: string;
   text: string;
   completed?: boolean;
+  coreDomainId?: CoreDomainId;
   resolution?: string;
   endDate?: string;
   mismatchType?: 'mental-model' | 'cognitive-load' | 'threat-prediction' | 'action-sequencing';
@@ -774,6 +775,17 @@ export interface WidgetVisibility {
   spacedRepetition: boolean;
 }
 
+export type CoreDomainId =
+  | 'health'
+  | 'wealth'
+  | 'relations'
+  | 'meaning'
+  | 'competence'
+  | 'autonomy'
+  | 'creativity'
+  | 'contribution'
+  | 'transcendence';
+
 export interface UserSettings {
   carryForward: boolean;
   autoPush: boolean;
@@ -802,6 +814,7 @@ export interface UserSettings {
   lastSync?: { sha: string, timestamp: number };
   githubModuleHashes?: Record<string, string>;
   pinnedCanvasIds?: string[];
+  coreStateManualOverrides?: Partial<Record<string, CoreDomainId>>;
   routineRebalanceLearning?: {
     history: Array<{
       id: string;

@@ -51,7 +51,7 @@ function PersonalBrandingPageContent() {
   const { 
     currentUser, 
     exportData,
-    brandingLogs, setAllBrandingLogs,
+    brandingLogs, setBrandingLogs,
     deepWorkDefinitions, setDeepWorkDefinitions,
   } = useAuth();
   
@@ -133,7 +133,7 @@ function PersonalBrandingPageContent() {
   }, [currentDatedLog]);
 
   const updateOrAddLog = (updatedLog: DatedWorkout) => {
-    setAllBrandingLogs(prevLogs => {
+    setBrandingLogs(prevLogs => {
       const existingLogIndex = prevLogs.findIndex(log => log.id === updatedLog.id);
       if (existingLogIndex > -1) {
         const newLogs = [...prevLogs];
@@ -210,7 +210,7 @@ function PersonalBrandingPageContent() {
     const existingLog = brandingLogs.find(log => log.id === dateKey);
     if (existingLog) {
       const updatedExercises = existingLog.exercises.filter(ex => ex.id !== exerciseId);
-      if (updatedExercises.length === 0) setAllBrandingLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
+      if (updatedExercises.length === 0) setBrandingLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
       else updateOrAddLog({ ...existingLog, exercises: updatedExercises });
     }
   };

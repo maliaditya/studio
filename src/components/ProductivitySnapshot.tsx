@@ -35,6 +35,7 @@ import { ChartsPageContent as ChartsPageContentActual } from '@/app/charts/page'
 import { HabitDashboardMonthControls, TimesheetPageContent } from '@/app/timesheet/page';
 import { TimetablePageContent } from '@/app/timetable/page';
 import { WeeklyReviewModal } from './WeeklyReviewModal';
+import { CoreStatesModal } from './CoreStatesModal';
 
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -275,6 +276,7 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
   const [timesheetDashboardMonth, setTimesheetDashboardMonth] = useState(startOfMonth(new Date()));
   const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
   const [isWeeklyReviewModalOpen, setIsWeeklyReviewModalOpen] = useState(false);
+  const [isCoreStatesModalOpen, setIsCoreStatesModalOpen] = useState(false);
 
 
   const themeColors = useThemeColors();
@@ -404,6 +406,10 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
             <Button variant="outline" size="icon" onClick={() => setIsTimesheetModalOpen(true)}>
               <Clock className="h-4 w-4" />
               <span className="sr-only">Open Timesheet</span>
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => setIsCoreStatesModalOpen(true)}>
+              <BrainIcon className="h-4 w-4" />
+              <span className="sr-only">Open Core States</span>
             </Button>
             <Button variant="outline" size="icon" onClick={() => setIsChartModalOpen(true)}>
               <BarChart3 className="h-4 w-4" />
@@ -553,6 +559,10 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
       <WeeklyReviewModal
         isOpen={isWeeklyReviewModalOpen}
         onOpenChange={setIsWeeklyReviewModalOpen}
+      />
+      <CoreStatesModal
+        isOpen={isCoreStatesModalOpen}
+        onOpenChange={setIsCoreStatesModalOpen}
       />
 
       {selectedReleaseInfo && (

@@ -558,6 +558,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     agendaShowCurrentSlotOnly: false,
     spacedRepetitionSlot: 'Late Night',
     pinnedCanvasIds: [],
+    coreStateManualOverrides: {},
     routineRebalanceLearning: {
       history: [],
     },
@@ -1735,6 +1736,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         agendaShowCurrentSlotOnly: false,
         spacedRepetitionSlot: 'Late Night',
           pinnedCanvasIds: [],
+          coreStateManualOverrides: {},
           githubModuleHashes: {},
           routineRebalanceLearning: {
             history: [],
