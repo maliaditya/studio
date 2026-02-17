@@ -3816,6 +3816,23 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       return newCard;
   };
 
+  const PERSISTENT_TOAST_DURATION_MS = 24 * 60 * 60 * 1000;
+
+  type GitHubAssetSyncProgress = {
+    phase: 'preparing' | 'uploading' | 'complete' | 'failed';
+    total: number;
+    processed: number;
+    uploaded: number;
+    skipped: number;
+    currentItem?: string;
+    note?: string;
+  };
+
+  type GitHubAssetSyncOptions = {
+    silent?: boolean;
+    onProgress?: (progress: GitHubAssetSyncProgress) => void;
+  };
+
   const syncWithGitHub = async () => {
     const syncToast = toast({ title: "Syncing...", description: "Preparing upload..." });
 
@@ -3877,12 +3894,31 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         const message = `LifeOS backup: ${new Date().toISOString()}`;
 
         const nextHashes: Record<string, string> = { ...(settings.githubModuleHashes || {}) };
+        const shouldSkipUnchangedPath = async (pathToCheck: string, hashToCheck: string) => {
+          if (nextHashes[pathToCheck] !== hashToCheck) return false;
+          try {
+            const remoteSha = await getGitHubFileSha(token, owner, repo, pathToCheck);
+            return !!remoteSha;
+          } catch {
+            return false;
+          }
+        };
 
         // Modular sync (writes alongside the single backup)
         const modulesBase = dir ? `${dir}/modules` : 'modules';
         const manifestPath = dir ? `${dir}/manifest.json` : 'manifest.json';
         const modules = buildModuleData(allData);
-        const canvasFileIndex = Object.fromEntries(getCanvasFilesMetaByCanvasId());
+        const canvasFilesMetaByCanvasId = getCanvasFilesMetaByCanvasId();
+        const allCanvasIds = Array.from(new Set(
+          (modules.resources?.resources || []).flatMap((resource: Resource) =>
+            (resource.points || [])
+              .filter((point) => point.type === 'paint')
+              .map((point) => `${resource.id}-${point.id}`)
+          )
+        ));
+        const canvasFileIndex = Object.fromEntries(
+          allCanvasIds.map((canvasId) => [canvasId, canvasFilesMetaByCanvasId.get(canvasId) || {}])
+        );
         const updatedAt = new Date().toISOString();
 
         const moduleEntries: { name: string; path: string; content: string }[] = [
@@ -3949,7 +3985,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           }, {} as Record<string, { path: string; updatedAt: string }>),
         };
 
-        const totalCandidates = 1 + moduleEntries.length + Object.keys(canvasFileIndex).length + 1;
+        const totalCandidates = 1 + moduleEntries.length + allCanvasIds.length + 1;
         let processed = 0;
         let pushed = 0;
         let skipped = 0;
@@ -3961,7 +3997,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         };
 
         const backupHash = await hashString(content);
-        if (nextHashes[prefixedPath] !== backupHash) {
+        if (!(await shouldSkipUnchangedPath(prefixedPath, backupHash))) {
           const sha = await getGitHubFileSha(token, owner, repo, prefixedPath);
           await pushToGitHub(token, owner, repo, prefixedPath, content, message, sha, { suppressToast: true });
           nextHashes[prefixedPath] = backupHash;
@@ -3976,7 +4012,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
         for (const entry of moduleEntries) {
           const moduleHash = await hashString(entry.content);
-          if (nextHashes[entry.path] === moduleHash) {
+          if (await shouldSkipUnchangedPath(entry.path, moduleHash)) {
             skipped += 1;
             processed += 1;
             updateProgress(`Skipped ${entry.path}`);
@@ -4024,7 +4060,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           const canvasPath = `${canvasFilesBase}/${canvasId}.json`;
           const canvasContent = JSON.stringify({ canvasId, files: filesMeta }, null, 2);
           const canvasHash = await hashString(canvasContent);
-          if (nextHashes[canvasPath] === canvasHash) {
+          if (await shouldSkipUnchangedPath(canvasPath, canvasHash)) {
             skipped += 1;
             processed += 1;
             updateProgress(`Skipped ${canvasPath}`);
@@ -4038,9 +4074,34 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           updateProgress(`Pushed ${canvasPath}`);
         }
 
+        // Delete stale canvas metadata files that are no longer present locally
+        try {
+          const listResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${canvasFilesBase}`, {
+            headers: { 'Authorization': `token ${token}` }
+          });
+          if (listResp.ok) {
+            const listData = await listResp.json();
+            const expectedCanvasFiles = new Set(allCanvasIds.map((canvasId) => `${canvasId}.json`));
+            for (const item of listData || []) {
+              if (item?.type !== 'file' || !item?.name || !item?.sha) continue;
+              if (item.name === 'index.json') continue;
+              if (!expectedCanvasFiles.has(item.name)) {
+                const delPath = `${canvasFilesBase}/${item.name}`;
+                await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${delPath}`, {
+                  method: 'DELETE',
+                  headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ message: `Delete stale canvas file: ${item.name}`, sha: item.sha }),
+                });
+              }
+            }
+          }
+        } catch (e) {
+          console.debug('Failed to prune canvas files', e);
+        }
+
         const manifestContent = JSON.stringify(manifest, null, 2);
         const manifestHash = await hashString(manifestContent);
-        if (nextHashes[manifestPath] !== manifestHash) {
+        if (!(await shouldSkipUnchangedPath(manifestPath, manifestHash))) {
           const manifestSha = await getGitHubFileSha(token, owner, repo, manifestPath);
           await pushToGitHub(token, owner, repo, manifestPath, manifestContent, `LifeOS manifest`, manifestSha, { suppressToast: true });
           nextHashes[manifestPath] = manifestHash;
@@ -5137,12 +5198,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           return;
       }
 
-      const canvasFilesById = getCanvasFilesMetaByCanvasId();
-      if (canvasFilesById.size === 0) {
-          toast({ title: "No canvas metadata found", description: "No canvases with image metadata were found in your data." });
-          return;
-      }
-
+      const localCanvasFilesById = getCanvasFilesMetaByCanvasId();
       const folderPath = withUserGitHubPrefix(`images_${username}`, username);
       const prefixedPath = withUserGitHubPrefix(settings.githubPath || 'backup.json', username);
       const { dir } = getGitHubBaseDir(prefixedPath);
@@ -5151,6 +5207,27 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       toast({ title: "Fetching images...", description: "Downloading images from GitHub to this browser." });
 
       try {
+          const remoteCanvasIndex = await getGitHubJson<{ canvases?: string[] }>(
+              githubToken,
+              githubOwner,
+              githubRepo,
+              `${canvasFilesBase}/index.json`
+          );
+          const remoteCanvasIds = new Set(
+              Array.isArray(remoteCanvasIndex?.canvases)
+                  ? remoteCanvasIndex!.canvases!.filter((canvasId): canvasId is string => typeof canvasId === 'string' && canvasId.length > 0)
+                  : []
+          );
+          const candidateCanvasIds = new Set<string>([
+              ...Array.from(localCanvasFilesById.keys()),
+              ...Array.from(remoteCanvasIds),
+          ]);
+
+          if (candidateCanvasIds.size === 0) {
+              toast({ title: "No canvas metadata found", description: "No canvases with image metadata were found in local or GitHub index." });
+              return;
+          }
+
           const listResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${folderPath}`, {
               headers: { 'Authorization': `token ${githubToken}` }
           });
@@ -5186,15 +5263,19 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
               return new Blob([bytes], { type: mimeType });
           };
 
-          for (const [canvasId, filesMetaFromLocal] of canvasFilesById.entries()) {
-              let filesMeta = filesMetaFromLocal;
+          for (const canvasId of candidateCanvasIds) {
+              let filesMeta = localCanvasFilesById.get(canvasId) || {};
               try {
                   const canvasMeta = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, `${canvasFilesBase}/${canvasId}.json`);
-                  if (canvasMeta?.files && typeof canvasMeta.files === 'object') {
+                  if (canvasMeta?.files && typeof canvasMeta.files === 'object' && Object.keys(canvasMeta.files).length > 0) {
                       filesMeta = canvasMeta.files;
                   }
               } catch (e) {
                   // fallback to local metadata
+              }
+
+              if (!filesMeta || Object.keys(filesMeta).length === 0) {
+                  continue;
               }
 
               for (const fileId of Object.keys(filesMeta || {})) {
