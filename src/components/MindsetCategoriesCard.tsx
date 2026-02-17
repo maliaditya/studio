@@ -376,6 +376,8 @@ export function MindsetCategoriesCard() {
     const [pendingBotheringTaskIds, setPendingBotheringTaskIds] = useState<Set<string> | null>(null);
     const [selectedMismatchLinkId, setSelectedMismatchLinkId] = useState('');
     const [consistencyModal, setConsistencyModal] = useState<{ pointId: string; title: string; data: { date: string; fullDate: string; score: number }[] } | null>(null);
+    const [isEditingBotheringTitle, setIsEditingBotheringTitle] = useState(false);
+    const [botheringTitleDraft, setBotheringTitleDraft] = useState('');
     const [position, setPosition] = useState(() => ({
         x: typeof window !== 'undefined' ? window.innerWidth / 2 - 360 : 0,
         y: typeof window !== 'undefined' ? window.innerHeight / 2 - 260 : 0,
@@ -477,6 +479,15 @@ export function MindsetCategoriesCard() {
                 ? constraintCard
                 : externalCard;
     const activeBotheringPoint = activeBotheringCard?.points.find(p => p.id === botheringPopup?.pointId);
+    useEffect(() => {
+        if (!activeBotheringPoint) {
+            setIsEditingBotheringTitle(false);
+            setBotheringTitleDraft('');
+            return;
+        }
+        setBotheringTitleDraft(activeBotheringPoint.text || '');
+        setIsEditingBotheringTitle(false);
+    }, [activeBotheringPoint?.id, activeBotheringPoint?.text]);
 
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const getTodayTaskStats = (point?: MindsetPoint) => {
@@ -1433,25 +1444,72 @@ export function MindsetCategoriesCard() {
                 <div className="fixed inset-0 z-[170] pointer-events-none">
                     <div className="pointer-events-auto fixed inset-0 flex items-center justify-center">
                         <div className="w-[700px] max-w-[95vw] bg-[#151517]/95 border border-white/10 rounded-2xl shadow-2xl">
-                            <div className="p-4 border-b border-white/10 flex items-start justify-between">
-                                <div className="space-y-1">
+                            <div className="p-4 border-b border-white/10 flex items-start justify-between gap-2">
+                                <div className="space-y-2 flex-1 min-w-0">
                                     <div className="text-base font-semibold">
                                         {botheringPopup.type === 'mismatch' ? 'Mismatch Bothering' : botheringPopup.type === 'constraint' ? 'Constraint Bothering' : 'External Bothering'}
                                     </div>
                                     <div className="pt-1 space-y-1">
-                                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Title</Label>
-                                        <Input
-                                            value={activeBotheringPoint.text}
-                                            onChange={(e) =>
-                                                updateBotheringPoint(
-                                                    botheringPopup.type,
-                                                    activeBotheringPoint.id,
-                                                    (point) => ({ ...point, text: e.target.value })
-                                                )
-                                            }
-                                            placeholder="Bothering title"
-                                            className="h-8"
-                                        />
+                                        <div className="flex items-center justify-between gap-2">
+                                            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Title</Label>
+                                            {isEditingBotheringTitle ? (
+                                                <div className="flex items-center gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7 px-2 text-xs"
+                                                        onClick={() => {
+                                                            setBotheringTitleDraft(activeBotheringPoint.text || '');
+                                                            setIsEditingBotheringTitle(false);
+                                                        }}
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                    <Button
+                                                        variant="secondary"
+                                                        size="sm"
+                                                        className="h-7 px-2 text-xs"
+                                                        onClick={() => {
+                                                            const nextTitle = botheringTitleDraft.trim();
+                                                            if (!nextTitle) {
+                                                                toast({ title: 'Title required', description: 'Bothering title cannot be empty.', variant: 'destructive' });
+                                                                return;
+                                                            }
+                                                            updateBotheringPoint(
+                                                                botheringPopup.type,
+                                                                activeBotheringPoint.id,
+                                                                (point) => ({ ...point, text: nextTitle })
+                                                            );
+                                                            setIsEditingBotheringTitle(false);
+                                                        }}
+                                                    >
+                                                        Save
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 px-2 text-xs"
+                                                    onClick={() => setIsEditingBotheringTitle(true)}
+                                                >
+                                                    Edit
+                                                </Button>
+                                            )}
+                                        </div>
+                                        {isEditingBotheringTitle ? (
+                                            <Textarea
+                                                value={botheringTitleDraft}
+                                                onChange={(e) => setBotheringTitleDraft(e.target.value)}
+                                                placeholder="Bothering title"
+                                                rows={2}
+                                                className="!min-h-0 resize-none overflow-hidden leading-snug border-none bg-transparent px-0 py-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                                            />
+                                        ) : (
+                                            <div className="text-sm text-foreground/90 whitespace-pre-wrap break-words">
+                                                {activeBotheringPoint.text}
+                                            </div>
+                                        )}
                                     </div>
                                     {botheringPopup.type === 'mismatch' && (
                                         <div className="pt-2">
@@ -1472,7 +1530,7 @@ export function MindsetCategoriesCard() {
                                         </div>
                                     )}
                                 </div>
-                                <Button variant="ghost" size="icon" onClick={() => setBotheringPopup(null)}>
+                                <Button variant="ghost" size="icon" className="shrink-0" onClick={() => setBotheringPopup(null)}>
                                     <X className="h-4 w-4" />
                                 </Button>
                             </div>
