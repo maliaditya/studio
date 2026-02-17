@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 
 const featureCards = [
     {
@@ -124,7 +125,7 @@ export default function LandingPage() {
   
   const handleProceed = () => {
     if (dontShowAgain && currentUser) {
-        localStorage.setItem('dock_hide_landing_page', 'true');
+        safeSetLocalStorageItem('dock_hide_landing_page', 'true');
     }
     router.push(currentUser ? "/my-plate" : "/login");
   };

@@ -1,8 +1,10 @@
 
 import { put, head } from '@vercel/blob';
 import { NextResponse } from 'next/server';
+import { getSessionUserFromRequest } from '@/lib/serverSession';
 
 export const dynamic = 'force-dynamic';
+const normalizeUsername = (username: string) => username.trim().toLowerCase();
 
 /**
  * POST /api/github-settings
@@ -22,7 +24,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Username is required.' }, { status: 400 });
   }
 
-  const blobPathname = `github-settings/${username.toLowerCase()}.json`;
+  const requestedUsername = normalizeUsername(username);
+  const sessionUser = getSessionUserFromRequest(request);
+  if (!sessionUser) {
+    return NextResponse.json({ error: 'Unauthorized. Please sign in again.' }, { status: 401 });
+  }
+  if (sessionUser !== requestedUsername) {
+    return NextResponse.json({ error: 'Forbidden. You can only access your own settings.' }, { status: 403 });
+  }
+
+  const blobPathname = `github-settings/${requestedUsername}.json`;
 
   try {
     const settingsData = { githubToken, githubOwner, githubRepo, githubPath };
@@ -34,7 +45,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, message: 'GitHub settings saved.', blob });
   } catch (error) {
-    console.error(`Error in POST /api/github-settings for user ${username}:`, error);
+    console.error(`Error in POST /api/github-settings for user ${requestedUsername}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
@@ -59,7 +70,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Username is required.' }, { status: 400 });
   }
 
-  const blobPathname = `github-settings/${username.toLowerCase()}.json`;
+  const requestedUsername = normalizeUsername(username);
+  const sessionUser = getSessionUserFromRequest(request);
+  if (!sessionUser) {
+    return NextResponse.json({ error: 'Unauthorized. Please sign in again.' }, { status: 401 });
+  }
+  if (sessionUser !== requestedUsername) {
+    return NextResponse.json({ error: 'Forbidden. You can only access your own settings.' }, { status: 403 });
+  }
+
+  const blobPathname = `github-settings/${requestedUsername}.json`;
 
   try {
     const blob = await head(blobPathname);
@@ -77,7 +97,7 @@ export async function GET(request: Request) {
     if (error?.status === 404 || error?.message?.includes('404')) {
         return NextResponse.json({ settings: null, message: "No GitHub settings found for this user." }, { status: 200 });
     }
-    console.error(`GitHub settings read error for user ${username}:`, error);
+    console.error(`GitHub settings read error for user ${requestedUsername}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
     return NextResponse.json({ error: `Failed to read GitHub settings: ${errorMessage}` }, { status: 500 });
   }

@@ -13,6 +13,7 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { BrainHack, ExerciseDefinition } from '@/types/workout';
 import { cn } from '@/lib/utils';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
@@ -309,7 +310,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
     const handleMouseUp = () => {
         setIsDragging(false);
         if (parentId === null) {
-            localStorage.setItem('brain_hacks_position', JSON.stringify(position));
+            safeSetLocalStorageItem('brain_hacks_position', JSON.stringify(position));
         }
     };
 

@@ -15,6 +15,7 @@ import type { Resource, ResourcePoint } from '@/types/workout';
 import { useDraggable } from '@dnd-kit/core';
 import dynamic from 'next/dynamic';
 import { loadExcalidrawFiles, saveExcalidrawFiles, type ExcalidrawFilesMetaMap } from '@/lib/excalidrawFileStore';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -245,7 +246,7 @@ const CanvasPreviewPopup = ({
     const zoom = api?.getAppState?.()?.zoom?.value;
     try {
       if (!isLoaded) return;
-      localStorage.setItem(
+      safeSetLocalStorageItem(
         storageKey,
         JSON.stringify({
           x: position.x,

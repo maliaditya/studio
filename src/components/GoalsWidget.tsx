@@ -12,6 +12,7 @@ import { motion } from 'framer-motion';
 import { Target, Check } from 'lucide-react';
 import type { CoreSkill } from '@/types/workout';
 import { Checkbox } from './ui/checkbox';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 
 export function GoalsWidget() {
     const { 
@@ -58,7 +59,7 @@ export function GoalsWidget() {
     
     const handleMouseUp = useCallback(() => {
         setIsDragging(false);
-        localStorage.setItem('goals_widget_position', JSON.stringify(position));
+        safeSetLocalStorageItem('goals_widget_position', JSON.stringify(position));
     }, [position]);
 
     useEffect(() => {

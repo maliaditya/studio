@@ -1,6 +1,8 @@
 
 import { put, list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
+import { hashPassword } from '@/lib/password';
+import { attachSessionCookie } from '@/lib/serverSession';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +20,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Username and password are required.' }, { status: 400 });
   }
 
-  const blobPathname = `auth/${username.toLowerCase()}.json`;
+  const normalizedUsername = String(username).trim().toLowerCase();
+  const blobPathname = `auth/${normalizedUsername}.json`;
 
   try {
     // Check if user already exists
@@ -28,14 +31,19 @@ export async function POST(request: Request) {
     }
 
     // Create user data
-    const userData = { password };
+    const userData = {
+      ...hashPassword(password),
+      createdAt: new Date().toISOString(),
+    };
     const blob = await put(blobPathname, JSON.stringify(userData), {
       access: 'public', // Hobby plan requirement
       contentType: 'application/json',
       addRandomSuffix: false,
     });
 
-    return NextResponse.json({ success: true, message: 'Registration successful.', blob });
+    const response = NextResponse.json({ success: true, message: 'Registration successful.', blob });
+    attachSessionCookie(response, normalizedUsername);
+    return response;
   } catch (error) {
     console.error('Error in POST /api/auth/register:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';

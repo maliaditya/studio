@@ -38,6 +38,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { WorkoutHeatmap } from '@/components/WorkoutHeatmap';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 import { WorkoutPlanModal } from '@/components/WorkoutPlanModal';
 import {
   AlertDialog,
@@ -136,7 +137,7 @@ function MindProgrammingPageContent() {
     const year = getYear(today);
     const week = getISOWeek(today);
     const backupPromptKey = `backupPrompt_mind_${year}-${week}`;
-    localStorage.setItem(backupPromptKey, 'true');
+    safeSetLocalStorageItem(backupPromptKey, 'true');
     setShowBackupPrompt(false);
   };
 

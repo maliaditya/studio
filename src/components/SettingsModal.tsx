@@ -29,11 +29,12 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Copy, Trash2, RefreshCw, Github } from 'lucide-react';
+import { Copy, Trash2, RefreshCw, Github, HardDrive } from 'lucide-react';
 import type { Activity, ActivityType, WorkoutSchedulingMode, WidgetVisibility, SlotName } from '@/types/workout';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Progress } from './ui/progress';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -56,6 +57,25 @@ const WIDGET_NAMES: { id: keyof WidgetVisibility, label: string }[] = [
 ];
 
 const SLOT_NAMES: SlotName[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+const LOCAL_STORAGE_BUDGET_BYTES = 5 * 1024 * 1024; // Practical browser limit target for localStorage.
+const USER_SCOPED_KEY_PREFIXES = ['lifeos_data_', 'lifeos_ui_state_', 'lifeos_data_ref_'];
+
+type StorageHealthSnapshot = {
+  totalBytes: number;
+  lifeosBytes: number;
+  totalKeys: number;
+  lifeosKeys: number;
+  usagePct: number;
+  legacyUserKeys: string[];
+  largestLifeosKeys: Array<{ key: string; bytes: number }>;
+};
+
+const formatBytes = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  return `${(kb / 1024).toFixed(2)} MB`;
+};
 
 
 export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
@@ -65,6 +85,8 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
   const [specializationName, setSpecializationName] = useState('');
   const [copyType, setCopyType] = useState<'specialization' | 'micro-skills'>('specialization');
+  const [storageHealth, setStorageHealth] = useState<StorageHealthSnapshot | null>(null);
+  const [isRefreshingStorage, setIsRefreshingStorage] = useState(false);
 
   // State for GitHub settings inputs
   const [localSettings, setLocalSettings] = useState(settings);
@@ -215,6 +237,90 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const handleLocalSettingChange = (key: keyof typeof settings, value: any) => {
     setLocalSettings(prev => ({...prev, [key]: value}));
   };
+
+  const refreshStorageHealth = React.useCallback(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      setIsRefreshingStorage(true);
+      const username = currentUser?.username?.trim().toLowerCase() || '';
+      let totalBytes = 0;
+      let lifeosBytes = 0;
+      let lifeosKeys = 0;
+      const lifeosEntries: Array<{ key: string; bytes: number }> = [];
+
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const key = localStorage.key(i);
+        if (!key) continue;
+        const value = localStorage.getItem(key) || '';
+        const size = new Blob([key]).size + new Blob([value]).size;
+        totalBytes += size;
+
+        if (key.startsWith('lifeos_')) {
+          lifeosBytes += size;
+          lifeosKeys += 1;
+          lifeosEntries.push({ key, bytes: size });
+        }
+      }
+
+      const legacyUserKeys: string[] = [];
+      if (username) {
+        USER_SCOPED_KEY_PREFIXES.forEach((prefix) => {
+          const canonicalKey = `${prefix}${username}`;
+          const canonicalValue = localStorage.getItem(canonicalKey);
+          if (canonicalValue === null) return;
+
+          for (let i = 0; i < localStorage.length; i += 1) {
+            const key = localStorage.key(i);
+            if (!key || !key.startsWith(prefix) || key === canonicalKey) continue;
+            const suffix = key.slice(prefix.length);
+            if (suffix.trim().toLowerCase() === username) {
+              legacyUserKeys.push(key);
+            }
+          }
+        });
+      }
+
+      lifeosEntries.sort((a, b) => b.bytes - a.bytes);
+      setStorageHealth({
+        totalBytes,
+        lifeosBytes,
+        totalKeys: localStorage.length,
+        lifeosKeys,
+        usagePct: Math.min(100, (totalBytes / LOCAL_STORAGE_BUDGET_BYTES) * 100),
+        legacyUserKeys: Array.from(new Set(legacyUserKeys)),
+        largestLifeosKeys: lifeosEntries.slice(0, 3),
+      });
+    } finally {
+      setIsRefreshingStorage(false);
+    }
+  }, [currentUser?.username]);
+
+  const clearLegacyUserStorageKeys = () => {
+    if (!storageHealth || storageHealth.legacyUserKeys.length === 0) {
+      toast({ title: 'No stale keys', description: 'No legacy duplicate user keys were found.' });
+      return;
+    }
+
+    try {
+      storageHealth.legacyUserKeys.forEach((key) => localStorage.removeItem(key));
+      toast({
+        title: 'Cleanup complete',
+        description: `Removed ${storageHealth.legacyUserKeys.length} legacy localStorage key(s).`,
+      });
+      refreshStorageHealth();
+    } catch (error) {
+      toast({
+        title: 'Cleanup failed',
+        description: error instanceof Error ? error.message : 'Could not remove legacy keys.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    refreshStorageHealth();
+  }, [isOpen, refreshStorageHealth]);
   
   const handleGithubSettingsSave = async () => {
     setSettings(prev => ({
@@ -234,6 +340,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
         const response = await fetch('/api/github-settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify({
                 username: currentUser.username,
                 githubToken: localSettings.githubToken,
@@ -818,6 +925,103 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                   <Separator />
                   <div className="space-y-4">
                      <h3 className="font-semibold">Data Management</h3>
+                      <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <HardDrive className="h-4 w-4 text-sky-300" />
+                            <div>
+                              <div className="text-sm font-medium">Storage Health</div>
+                              <div className="text-xs text-muted-foreground">Tracks localStorage pressure and safe cleanup options.</div>
+                            </div>
+                          </div>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={refreshStorageHealth}
+                            disabled={isRefreshingStorage}
+                          >
+                            <RefreshCw className={`mr-2 h-3.5 w-3.5 ${isRefreshingStorage ? 'animate-spin' : ''}`} />
+                            Refresh
+                          </Button>
+                        </div>
+
+                        {storageHealth ? (
+                          <>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                              <div className="rounded border border-white/10 p-2">
+                                <div className="text-muted-foreground">Total Used</div>
+                                <div className="mt-1 font-semibold">{formatBytes(storageHealth.totalBytes)}</div>
+                              </div>
+                              <div className="rounded border border-white/10 p-2">
+                                <div className="text-muted-foreground">LifeOS Used</div>
+                                <div className="mt-1 font-semibold">{formatBytes(storageHealth.lifeosBytes)}</div>
+                              </div>
+                              <div className="rounded border border-white/10 p-2">
+                                <div className="text-muted-foreground">All Keys</div>
+                                <div className="mt-1 font-semibold">{storageHealth.totalKeys}</div>
+                              </div>
+                              <div className="rounded border border-white/10 p-2">
+                                <div className="text-muted-foreground">LifeOS Keys</div>
+                                <div className="mt-1 font-semibold">{storageHealth.lifeosKeys}</div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <span>Approx localStorage usage (5MB target)</span>
+                                <span>{storageHealth.usagePct.toFixed(1)}%</span>
+                              </div>
+                              <Progress value={storageHealth.usagePct} className="h-1.5" />
+                            </div>
+
+                            {storageHealth.largestLifeosKeys.length > 0 ? (
+                              <div className="space-y-1">
+                                <div className="text-xs text-muted-foreground">Largest LifeOS keys</div>
+                                {storageHealth.largestLifeosKeys.map((entry) => (
+                                  <div key={entry.key} className="flex items-center justify-between text-xs rounded border border-white/10 px-2 py-1">
+                                    <span className="truncate pr-2" title={entry.key}>{entry.key}</span>
+                                    <span className="font-medium">{formatBytes(entry.bytes)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+
+                            <div className="flex items-center justify-between gap-3">
+                              <Label htmlFor="cleanup-legacy-keys" className="font-normal text-xs text-muted-foreground leading-relaxed">
+                                Remove old duplicate user keys from previous mixed-case username saves (only when canonical key exists).
+                              </Label>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    id="cleanup-legacy-keys"
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={storageHealth.legacyUserKeys.length === 0}
+                                  >
+                                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                                    Clean Legacy Keys ({storageHealth.legacyUserKeys.length})
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Clean legacy localStorage keys?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This removes duplicate user-scoped keys and keeps canonical lowercase keys.
+                                      Total keys to remove: {storageHealth.legacyUserKeys.length}.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={clearLegacyUserStorageKeys}>Yes, clean</AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-xs text-muted-foreground">Storage snapshot not loaded yet.</div>
+                        )}
+                      </div>
                      <div className="flex items-center justify-between">
                         <Label htmlFor="recalculate-types" className="font-normal text-sm text-muted-foreground">
                           Fix misclassified tasks (e.g., tasks showing as "Objective" that shouldn't be).

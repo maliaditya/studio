@@ -5,6 +5,7 @@
 // It keeps a local session token (the username) in localStorage.
 
 import type { LocalUser } from '@/types/workout';
+import { safeSetLocalStorageItem, safeSetSessionStorageItem } from '@/lib/safeStorage';
 
 const CURRENT_USER_KEY = "currentUser"; // Stores username string of logged-in user
 const ACTIVE_SESSION_KEY = "lifeos_active_session"; // Stores active session metadata
@@ -23,7 +24,7 @@ const getTabId = () => {
   const existing = sessionStorage.getItem(TAB_ID_KEY);
   if (existing) return existing;
   const next = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  sessionStorage.setItem(TAB_ID_KEY, next);
+  safeSetSessionStorageItem(TAB_ID_KEY, next);
   return next;
 };
 
@@ -42,7 +43,7 @@ const readActiveSession = (): ActiveSession | null => {
 
 const writeActiveSession = (session: ActiveSession) => {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(ACTIVE_SESSION_KEY, JSON.stringify(session));
+  safeSetLocalStorageItem(ACTIVE_SESSION_KEY, JSON.stringify(session));
 };
 
 const isSessionStale = (session: ActiveSession) => Date.now() - session.lastSeen > SESSION_TTL_MS;
@@ -101,6 +102,7 @@ export async function registerUser(username: string, password: string): Promise<
     const response = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ username, password }),
     });
 
@@ -113,7 +115,7 @@ export async function registerUser(username: string, password: string): Promise<
     // On successful registration, automatically log the user in locally
     const user: LocalUser = { username };
     if (typeof window !== 'undefined') {
-      localStorage.setItem(CURRENT_USER_KEY, username);
+      safeSetLocalStorageItem(CURRENT_USER_KEY, username);
       establishSession(username);
     }
     return { success: true, message: result.message, user };
@@ -133,6 +135,7 @@ export async function loginUser(
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ username, password }),
     });
 
@@ -148,7 +151,7 @@ export async function loginUser(
 
     const user: LocalUser = { username };
     if (typeof window !== 'undefined') {
-      localStorage.setItem(CURRENT_USER_KEY, username);
+      safeSetLocalStorageItem(CURRENT_USER_KEY, username);
       establishSession(username);
     }
     
@@ -161,8 +164,13 @@ export async function loginUser(
 }
 
 export function logoutUser(): Promise<void> {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     if (typeof window !== 'undefined') {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      } catch {
+        // Non-blocking: local sign-out should still proceed.
+      }
       clearSessionIfOwned();
       localStorage.removeItem(CURRENT_USER_KEY);
     }

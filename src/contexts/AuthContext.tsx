@@ -538,6 +538,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const { toast } = useToast();
   const [localChangeCount, setLocalChangeCount] = useState(0);
+  const cloudRevisionRef = useRef<number | null>(null);
   const [currentSlot, setCurrentSlot] = useState('');
 
   const [isLoadingState, setIsLoadingState] = useState(true);
@@ -1828,15 +1829,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 await loadState(user.username);
                 didLoadData = true;
             } else {
-                const mainDataResponse = await fetch(`/api/blob-sync?username=${user.username.toLowerCase()}`);
+                const mainDataResponse = await fetch(`/api/blob-sync?username=${user.username.toLowerCase()}`, {
+                  credentials: 'include',
+                });
                 if (mainDataResponse.ok) {
                     const mainDataResult = await mainDataResponse.json();
+                    if (typeof mainDataResult?.revision === 'number') {
+                      cloudRevisionRef.current = mainDataResult.revision;
+                    }
                     if (mainDataResult.data) {
                         const normalizedCloud = normalizePersistedPayload(mainDataResult.data);
                         if (!normalizedCloud) {
                           throw new Error('Cloud payload is malformed.');
                         }
-                        const githubSettingsResponse = await fetch(`/api/github-settings?username=${user.username.toLowerCase()}`);
+                        const githubSettingsResponse = await fetch(`/api/github-settings?username=${user.username.toLowerCase()}`, {
+                          credentials: 'include',
+                        });
                         if (githubSettingsResponse.ok) {
                             const githubSettingsResult = await githubSettingsResponse.json();
                             if (githubSettingsResult.settings) {
@@ -1871,6 +1879,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     setLoading(true);
     await localLogoutUser();
+    cloudRevisionRef.current = null;
     setCurrentUser(null);
     router.push('/login');
     setLoading(false);
@@ -1886,15 +1895,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Syncing...", description: "Pushing demo data to the cloud." });
     try {
         const allUserData = getAllUserData().main;
-        const requestBody = { username, data: allUserData, demo_override_token: token };
+        const requestBody = {
+          username,
+          data: allUserData,
+          demo_override_token: token,
+          baseRevision: cloudRevisionRef.current ?? 0,
+        };
         const response = await fetch('/api/blob-sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify(requestBody),
         });
         const result = await response.json();
+        if (response.status === 409 && typeof result?.serverRevision === 'number') {
+            cloudRevisionRef.current = result.serverRevision;
+        }
         if (!response.ok) {
             throw new Error(result.error || 'Failed to push data.');
+        }
+        if (typeof result?.revision === 'number') {
+          cloudRevisionRef.current = result.revision;
         }
         toast({ title: "Success", description: "Demo data has been saved to the cloud." });
     } catch (error) {
@@ -1923,16 +1944,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
         const allUserData = getAllUserData();
-        const requestBody = { username, data: allUserData };
+        const requestBody = { username, data: allUserData, baseRevision: cloudRevisionRef.current ?? 0 };
         const response = await fetch('/api/blob-sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
             body: JSON.stringify(requestBody),
         });
 
         const result = await response.json();
+        if (response.status === 409 && typeof result?.serverRevision === 'number') {
+            cloudRevisionRef.current = result.serverRevision;
+        }
         if (!response.ok) {
             throw new Error(result.error || 'Failed to push data.');
+        }
+        if (typeof result?.revision === 'number') {
+          cloudRevisionRef.current = result.revision;
         }
 
         toast({ title: "Success", description: "Your data has been saved to the cloud." });
@@ -1963,43 +1991,45 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     let didLoadData = false;
     try {
-        const response = await fetch(`/api/blob-sync?username=${effectiveUsername.toLowerCase()}`);
+        const response = await fetch(`/api/blob-sync?username=${effectiveUsername.toLowerCase()}`, {
+          credentials: 'include',
+        });
         
         if (!response.ok) {
             const errorResult = await response.json().catch(() => ({ error: `HTTP error! status: ${response.status}` }));
             throw new Error(errorResult.error || 'Failed to fetch data.');
         }
-        
-        const textData = await response.text();
+
+        const result = await response.json();
+        if (typeof result?.revision === 'number') {
+          cloudRevisionRef.current = result.revision;
+        }
         const localDataIsEmpty = coreSkills.length === 0 && projects.length === 0;
 
-        if (textData) {
-            const result = JSON.parse(textData);
-            const data = result.data;
-
-            if (data) {
-                const normalizedCloud = normalizePersistedPayload(data);
-                if (!normalizedCloud) {
-                  throw new Error("Cloud payload is malformed.");
-                }
-                const githubSettingsResponse = await fetch(`/api/github-settings?username=${effectiveUsername.toLowerCase()}`);
-                if (githubSettingsResponse.ok) {
-                    const githubSettingsResult = await githubSettingsResponse.json();
-                    if (githubSettingsResult.settings) {
-                        const currentMainSettings = normalizedCloud.main?.settings || {};
-                        normalizedCloud.main.settings = { ...currentMainSettings, ...githubSettingsResult.settings };
-                    }
-                }
-                loadImportedData(normalizedCloud.main, normalizedCloud.ui || {});
-                didLoadData = true;
-                toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
-            } else if (!localDataIsEmpty) {
-                toast({ title: "No Data Found", description: result.message || "No data was found in the cloud for this user." });
+        if (result?.data) {
+            const normalizedCloud = normalizePersistedPayload(result.data);
+            if (!normalizedCloud) {
+              throw new Error("Cloud payload is malformed.");
             }
-        } else if (localDataIsEmpty) {
-            toast({ title: "No Data Found", description: "No local or remote data. Start by creating some items!" });
+            const githubSettingsResponse = await fetch(`/api/github-settings?username=${effectiveUsername.toLowerCase()}`, {
+              credentials: 'include',
+            });
+            if (githubSettingsResponse.ok) {
+                const githubSettingsResult = await githubSettingsResponse.json();
+                if (githubSettingsResult.settings) {
+                    const currentMainSettings = normalizedCloud.main?.settings || {};
+                    normalizedCloud.main.settings = { ...currentMainSettings, ...githubSettingsResult.settings };
+                }
+            }
+            loadImportedData(normalizedCloud.main, normalizedCloud.ui || {});
+            didLoadData = true;
+            toast({ title: "Sync Successful", description: "Data pulled from cloud and loaded." });
+        } else if (!localDataIsEmpty) {
+            toast({ title: "No Data Found", description: result?.message || "No data was found in the cloud for this user." });
+        } else if (result?.message) {
+            toast({ title: "No Data Found", description: result.message });
         } else {
-            toast({ title: "Empty Remote File", description: "The backup file in the cloud is empty. Your local data has not been overwritten." });
+            toast({ title: "No Data Found", description: "No local or remote data. Start by creating some items!" });
         }
   
     } catch (error) {
@@ -3831,7 +3861,40 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         return;
     }
 
+    const prefixedPath = withUserGitHubPrefix(path, username);
+    const { dir } = getGitHubBaseDir(prefixedPath);
+    const syncStatusPath = dir ? `${dir}/sync-status.json` : 'sync-status.json';
+    const syncId = `sync_${Date.now()}`;
+    const updateSyncStatus = async (
+      status: 'in_progress' | 'completed' | 'failed',
+      extra?: Record<string, unknown>
+    ) => {
+      const payload = JSON.stringify(
+        {
+          status,
+          syncId,
+          user: username,
+          updatedAt: new Date().toISOString(),
+          ...extra,
+        },
+        null,
+        2
+      );
+      const statusSha = await getGitHubFileSha(token, owner, repo, syncStatusPath);
+      await pushToGitHub(
+        token,
+        owner,
+        repo,
+        syncStatusPath,
+        payload,
+        `LifeOS sync status: ${status}`,
+        statusSha,
+        { suppressToast: true }
+      );
+    };
+
     try {
+        await updateSyncStatus('in_progress', { phase: 'modules', startedAt: new Date().toISOString() });
         const allData = getAllUserData();
         const content = JSON.stringify(allData, null, 2);
         const message = `LifeOS backup: ${new Date().toISOString()}`;
@@ -3839,8 +3902,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         const nextHashes: Record<string, string> = { ...(settings.githubModuleHashes || {}) };
 
         // Modular sync (writes alongside the single backup)
-        const prefixedPath = withUserGitHubPrefix(path, username);
-        const { dir } = getGitHubBaseDir(prefixedPath);
         const modulesBase = dir ? `${dir}/modules` : 'modules';
         const manifestPath = dir ? `${dir}/manifest.json` : 'manifest.json';
         const modules = buildModuleData(allData);
@@ -4018,24 +4079,36 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         setSettings(prev => ({ ...prev, githubModuleHashes: nextHashes }));
 
         // After pushing modules and metadata, also push binary assets (images, audio, PDFs)
-        try {
-          syncToast.update({ title: 'Uploading assets', description: 'Uploading images...' });
-          await syncCanvasImagesToGitHub();
-          syncToast.update({ title: 'Uploading assets', description: 'Uploading audio...' });
-          await syncAudioFilesToGitHub();
-          syncToast.update({ title: 'Uploading assets', description: 'Uploading PDFs...' });
-          await syncPdfFilesToGitHub();
-        } catch (assetErr) {
-          console.error('Asset upload during sync failed:', assetErr);
-          syncToast.update({ title: 'Asset Upload Failed', description: assetErr instanceof Error ? assetErr.message : String(assetErr), variant: 'destructive' });
-        }
+        syncToast.update({ title: 'Uploading assets', description: 'Uploading images...' });
+        await syncCanvasImagesToGitHub();
+        syncToast.update({ title: 'Uploading assets', description: 'Uploading audio...' });
+        await syncAudioFilesToGitHub();
+        syncToast.update({ title: 'Uploading assets', description: 'Uploading PDFs...' });
+        await syncPdfFilesToGitHub();
+
+        await updateSyncStatus('completed', {
+          phase: 'done',
+          completedAt: new Date().toISOString(),
+          pushed,
+          skipped,
+          manifestPath,
+        });
 
         syncToast.update({
           title: "Sync Complete",
-          description: `${pushed} pushed • ${skipped} skipped`,
+          description: `${pushed} pushed | ${skipped} skipped`,
         });
 
     } catch (error) {
+        try {
+          await updateSyncStatus('failed', {
+            phase: 'error',
+            failedAt: new Date().toISOString(),
+            error: error instanceof Error ? error.message : String(error),
+          });
+        } catch (statusError) {
+          console.error('Failed to write GitHub sync status:', statusError);
+        }
         console.error("GitHub sync failed:", error);
         syncToast.update({
             title: "Sync Failed",
@@ -4333,6 +4406,20 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     try {
         const prefixedPath = withUserGitHubPrefix(githubPath, username);
         const { dir } = getGitHubBaseDir(prefixedPath);
+        const syncStatusPath = dir ? `${dir}/sync-status.json` : 'sync-status.json';
+        const syncStatus = await getGitHubJson<{ status?: string; startedAt?: string; updatedAt?: string }>(
+          githubToken,
+          githubOwner,
+          githubRepo,
+          syncStatusPath
+        );
+        if (syncStatus?.status === 'in_progress') {
+          const startedAtMs = syncStatus.startedAt ? Date.parse(syncStatus.startedAt) : NaN;
+          const isLikelyActive = Number.isFinite(startedAtMs) && (Date.now() - startedAtMs) < 15 * 60 * 1000;
+          if (isLikelyActive) {
+            throw new Error('A GitHub sync is currently in progress. Please wait a minute and retry download.');
+          }
+        }
         const manifestPath = dir ? `${dir}/manifest.json` : 'manifest.json';
         const directoryEntries = await listGitHubDirectory(githubToken, githubOwner, githubRepo, dir);
         const namesInDir = new Set((directoryEntries || []).map(entry => entry.name));

@@ -36,6 +36,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 
 function LeadGenerationPageContent() {
   const { toast } = useToast();
@@ -80,7 +81,7 @@ function LeadGenerationPageContent() {
     const year = getYear(today);
     const week = getISOWeek(today);
     const backupPromptKey = `backupPrompt_leadgen_${year}-${week}`;
-    localStorage.setItem(backupPromptKey, 'true');
+    safeSetLocalStorageItem(backupPromptKey, 'true');
     setShowBackupPrompt(false);
   };
 

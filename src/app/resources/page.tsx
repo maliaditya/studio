@@ -36,6 +36,7 @@ import { Separator } from '@/components/ui/separator';
 import { EditableField, DoubleEditableField, EmotionEditableField, EditableResourcePoint } from '@/components/EditableFields';
 import { HabitResourceCard } from '@/components/HabitResourceCard';
 import { MechanismResourceCard } from '@/components/MechanismResourceCard';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { storePdf } from '@/lib/audioDB';
@@ -913,7 +914,7 @@ function ResourcesPageContent() {
   useEffect(() => {
     // Save collapsed state to localStorage
     if (resourceFolders) {
-        localStorage.setItem('collapsedResourceFolders', JSON.stringify(Array.from(collapsedFolders)));
+        safeSetLocalStorageItem('collapsedResourceFolders', JSON.stringify(Array.from(collapsedFolders)));
     }
   }, [collapsedFolders, resourceFolders]);
   

@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Calendar } from './ui/calendar';
 import { format, differenceInDays, startOfToday, parseISO } from 'date-fns';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 
 const EditablePriority = React.memo(({ priority, onUpdate, onDelete, onToggle, onSetDeadline }: {
     priority: Priority;
@@ -198,7 +199,7 @@ export function TopPrioritiesCard() {
     
     const handleMouseUp = () => {
         setIsDragging(false);
-        localStorage.setItem('top_priorities_position', JSON.stringify(position));
+        safeSetLocalStorageItem('top_priorities_position', JSON.stringify(position));
     };
 
     useEffect(() => {

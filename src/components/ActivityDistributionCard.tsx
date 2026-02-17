@@ -10,6 +10,7 @@ import type { Activity, ActivityType, DailySchedule, DatedWorkout, FullSchedule 
 import { ScrollArea } from './ui/scroll-area';
 import { PieChart as PieChartIcon, X, LineChart as LineChartIcon, Expand } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 import { Button } from './ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -444,7 +445,7 @@ export function ActivityDistributionCard() {
     
     const handleMouseUp = () => {
         setIsDragging(false);
-        localStorage.setItem('all_resistances_position', JSON.stringify(position));
+        safeSetLocalStorageItem('all_resistances_position', JSON.stringify(position));
     };
 
     useEffect(() => {

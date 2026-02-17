@@ -29,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 
 const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
@@ -113,7 +114,7 @@ function PersonalBrandingPageContent() {
     const year = getYear(today);
     const week = getISOWeek(today);
     const backupPromptKey = `backupPrompt_branding_${year}-${week}`;
-    localStorage.setItem(backupPromptKey, 'true');
+    safeSetLocalStorageItem(backupPromptKey, 'true');
     setShowBackupPrompt(false);
   };
 

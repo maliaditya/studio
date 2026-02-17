@@ -13,6 +13,7 @@ import type { MicroSkill } from '@/types/workout';
 import { format, parseISO, addDays, differenceInDays, isBefore, isToday, startOfToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 
 export function SpacedRepetitionPopup() {
     const { coreSkills, deepWorkDefinitions, getDescendantLeafNodes, scheduleTaskFromMindMap, currentSlot } = useAuth();
@@ -47,7 +48,7 @@ export function SpacedRepetitionPopup() {
 
     useEffect(() => {
       if (isClient) {
-        localStorage.setItem('spacedRepetition_showOnlyToday', JSON.stringify(showOnlyToday));
+        safeSetLocalStorageItem('spacedRepetition_showOnlyToday', JSON.stringify(showOnlyToday));
       }
     }, [showOnlyToday, isClient]);
 
@@ -131,7 +132,7 @@ export function SpacedRepetitionPopup() {
     
     const handleMouseUp = () => {
         setIsDragging(false);
-        localStorage.setItem('spaced_repetition_position', JSON.stringify(position));
+        safeSetLocalStorageItem('spaced_repetition_position', JSON.stringify(position));
     };
 
     useEffect(() => {

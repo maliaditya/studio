@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Route, Lightbulb, Flashlight, ArrowRight } from 'lucide-react';
 import type { ExerciseDefinition } from '@/types/workout';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 
 export function SkillPathWidget() {
     const { 
@@ -108,7 +109,7 @@ export function SkillPathWidget() {
     
     const handleMouseUp = useCallback(() => {
         setIsDragging(false);
-        localStorage.setItem('skill_path_widget_position', JSON.stringify(position));
+        safeSetLocalStorageItem('skill_path_widget_position', JSON.stringify(position));
     }, [position]);
 
     useEffect(() => {

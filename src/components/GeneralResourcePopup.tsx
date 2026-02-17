@@ -28,6 +28,7 @@ import { SearchPopup } from './DrawingCanvas';
 import ReactPlayer from 'react-player/youtube';
 import { format, parseISO } from 'date-fns';
 import AudioMiniPlayer from './AudioMiniPlayer';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
     if (!url) return null;
@@ -270,7 +271,7 @@ const CanvasPreviewPopup = ({
     const zoom = api?.getAppState?.()?.zoom?.value;
     try {
       if (!isLoaded) return;
-      localStorage.setItem(
+      safeSetLocalStorageItem(
         storageKey,
         JSON.stringify({
           x: position.x,

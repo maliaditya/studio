@@ -20,6 +20,7 @@ import { motion, useDragControls } from 'framer-motion';
 import { format, isToday, getISODay, parseISO, differenceInDays, differenceInMonths, startOfDay, addDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { getExercisesForDay } from '@/lib/workoutUtils';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 import { TimeAllocationChart } from './ProductivitySnapshot';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -901,7 +902,7 @@ export function TodaysScheduleCard({
         }}
         onDragEnd={() => {
             if (positionKey) {
-                localStorage.setItem(positionKey, JSON.stringify(position));
+                safeSetLocalStorageItem(positionKey, JSON.stringify(position));
             }
         }}
         dragMomentum={false}

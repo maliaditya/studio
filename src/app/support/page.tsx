@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import type { Release } from '@/types/workout';
 import { format, parseISO } from 'date-fns';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 
 export default function SupportPage() {
     const isMobile = useIsMobile();
@@ -77,7 +78,7 @@ export default function SupportPage() {
             const response = await fetch('/api/support-count', { method: 'POST' });
             const data = await response.json();
             setCount(data.count);
-            localStorage.setItem('has_supported_dock', 'true');
+            safeSetLocalStorageItem('has_supported_dock', 'true');
             setHasSupported(true);
         } catch (error) {
             console.error("Failed to update support count:", error);
