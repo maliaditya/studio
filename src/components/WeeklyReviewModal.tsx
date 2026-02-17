@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "./ui/scroll-area";
@@ -224,6 +224,33 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
       points: (mindsetCards.find((c) => c.id === id)?.points || []).filter((p) => !p.completed),
     }));
   }, [mindsetCards]);
+  const mismatchPointById = useMemo(() => {
+    const mismatchPoints = mindsetCards.find((c) => c.id === "mindset_botherings_mismatch")?.points || [];
+    return new Map(mismatchPoints.map((point) => [point.id, point] as const));
+  }, [mindsetCards]);
+  const getEffectiveBotheringTasks = useCallback((point: MindsetPoint, type: BotheringType): BotheringTask[] => {
+    const directTasks = point.tasks || [];
+    if (type !== "Constraint") return directTasks;
+
+    const merged: BotheringTask[] = [...directTasks];
+    const seen = new Set<string>();
+    merged.forEach((task) => {
+      seen.add(task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`);
+    });
+
+    (point.linkedMismatchIds || []).forEach((mismatchId) => {
+      const mismatch = mismatchPointById.get(mismatchId);
+      if (!mismatch?.tasks?.length) return;
+      mismatch.tasks.forEach((task) => {
+        const key = task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        merged.push(task);
+      });
+    });
+
+    return merged;
+  }, [mismatchPointById]);
 
   const activityMapByDate = useMemo(() => {
     const map = new Map<string, Map<string, { completed?: boolean; duration?: number; focusSessionInitialStartTime?: number; focusSessionEndTime?: number; focusSessionInitialDuration?: number }>>();
@@ -322,8 +349,8 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
     return !!task.completed;
   };
 
-  const getTodayTaskStats = (point: MindsetPoint) => {
-    const tasks = point.tasks || [];
+  const getTodayTaskStats = (point: MindsetPoint, type: BotheringType) => {
+    const tasks = getEffectiveBotheringTasks(point, type);
     let scheduled = 0;
     let completed = 0;
     const pendingTaskNames: string[] = [];
@@ -347,7 +374,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
   const summaryByType = botheringsByType.map(({ type, points }) => {
     const totals = points.reduce(
       (acc, point) => {
-        const stats = getTodayTaskStats(point);
+        const stats = getTodayTaskStats(point, type);
         acc.todayScheduled += stats.scheduled;
         acc.todayCompleted += stats.completed;
         acc.todayPending += stats.pending;
@@ -364,7 +391,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
   });
 
   const allBotherings = botheringsByType.flatMap(({ type, points }) =>
-    points.map((point) => ({ type, point }))
+    points.map((point) => ({ type, point, tasks: getEffectiveBotheringTasks(point, type) }))
   );
   const routineRebalanceSuggestions = useMemo(() => {
     const todayDate = startOfDay(parseISO(todayKey));
@@ -1316,8 +1343,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
   }, [habitCards, mechanismCards]);
 
   const riskCandidates = allBotherings
-    .map(({ type, point }) => {
-      const tasks = point.tasks || [];
+    .map(({ type, point, tasks }) => {
       if (tasks.length === 0) return null;
       const parsedDeadline = point.endDate ? parseISO(point.endDate) : null;
       const hasDeadline = !!parsedDeadline && !Number.isNaN(parsedDeadline.getTime());

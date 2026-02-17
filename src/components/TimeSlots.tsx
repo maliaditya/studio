@@ -113,6 +113,16 @@ export function TimeSlots({
     } = useAuth();
     const dateKey = useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
     const todaysSchedule = useMemo(() => schedule[dateKey] || {}, [schedule, dateKey]);
+    const explicitActivityIdsForDay = useMemo(() => {
+        const ids = new Set<string>();
+        Object.values(todaysSchedule).forEach((value) => {
+            if (!Array.isArray(value)) return;
+            value.forEach((activity) => {
+                if (activity?.id) ids.add(activity.id);
+            });
+        });
+        return ids;
+    }, [todaysSchedule]);
     const [nowMs, setNowMs] = useState(() => Date.now());
 
     useEffect(() => {
@@ -173,6 +183,7 @@ export function TimeSlots({
   const onDragEnd = (result: DropResult) => {
     const { source, destination } = result;
     if (!destination) return;
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
     const sourceSlotName = source.droppableId;
     const destinationSlotName = destination.droppableId;
 
@@ -184,7 +195,7 @@ export function TimeSlots({
 
         if (!movedActivity) return currentSchedule;
         
-        movedActivity.slot = destinationSlotName;
+        const movedActivityWithSlot: Activity = { ...movedActivity, slot: destinationSlotName as SlotName };
 
         daySchedule[sourceSlotName as SlotName] = sourceActivities;
 
@@ -192,7 +203,7 @@ export function TimeSlots({
             ? sourceActivities 
             : [...((daySchedule[destinationSlotName as SlotName] as Activity[]) || [])];
         
-        destActivities.splice(destination.index, 0, movedActivity);
+        destActivities.splice(destination.index, 0, movedActivityWithSlot);
         daySchedule[destinationSlotName as SlotName] = destActivities;
 
         return { ...currentSchedule, [dateKey]: daySchedule };
@@ -328,7 +339,8 @@ export function TimeSlots({
         });
         const mergedActivities = [
             ...activities,
-            ...routineInstances.filter(ri => !activities.some(a => a.id === ri.id))
+            // De-dupe across the whole day so moved routine instances do not reappear in their original slot.
+            ...routineInstances.filter((ri) => !explicitActivityIdsForDay.has(ri.id))
         ];
         const isCurrentSlotToday = isToday(date) && currentSlot === slot.name;
         let timeLeftLabel: string | null = null;
@@ -349,7 +361,7 @@ export function TimeSlots({
             key={slot.name}
             id={`slot-card-${slot.name.replace(/\s+/g, '-')}`}
             className={cn(
-              "transition-all duration-300 ease-in-out transform hover:-translate-y-1 flex flex-col",
+              "transition-all duration-300 ease-in-out flex flex-col",
               isCurrentSlotToday
                 ? 'ring-2 ring-primary shadow-2xl bg-card'
                 : 'shadow-md bg-card/60'

@@ -353,6 +353,13 @@ export function TodaysScheduleCard({
 
   const scheduledActivities = useMemo(() => {
     const todaysSchedule = schedule[dayKey] || {};
+    const explicitActivityIdsForDay = new Set<string>();
+    Object.values(todaysSchedule).forEach((value) => {
+      if (!Array.isArray(value)) return;
+      value.forEach((activity) => {
+        if (activity?.id) explicitActivityIdsForDay.add(activity.id);
+      });
+    });
     let allActivities = slotOrder.flatMap(slot => {
         const activities = todaysSchedule[slot];
         const explicit = (activities && Array.isArray(activities)) ? activities : [];
@@ -407,7 +414,8 @@ export function TodaysScheduleCard({
 
         const merged = [
             ...explicit,
-            ...routineInstances.filter(ri => !explicit.some(a => a.id === ri.id)),
+            // De-dupe across the whole day so moved routine instances do not reappear in their original slot.
+            ...routineInstances.filter((ri) => !explicitActivityIdsForDay.has(ri.id)),
         ];
         return merged.map(activity => ({ slot, ...activity }));
     });

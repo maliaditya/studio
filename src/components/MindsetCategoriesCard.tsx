@@ -441,6 +441,34 @@ export function MindsetCategoriesCard() {
     const mismatchCard = mindsetCards.find(c => c.id === 'mindset_botherings_mismatch');
     const constraintCard = mindsetCards.find(c => c.id === 'mindset_botherings_constraint');
     const externalCard = mindsetCards.find(c => c.id === 'mindset_botherings_external');
+    const mismatchPointById = useMemo(() => {
+        return new Map((mismatchCard?.points || []).map((point) => [point.id, point] as const));
+    }, [mismatchCard?.points]);
+    const constraintPointIdSet = useMemo(() => {
+        return new Set((constraintCard?.points || []).map((point) => point.id));
+    }, [constraintCard?.points]);
+    const getEffectiveBotheringTasks = useCallback((point?: MindsetPoint) => {
+        if (!point) return [] as NonNullable<MindsetPoint['tasks']>;
+        const directTasks = point.tasks || [];
+        if (!constraintPointIdSet.has(point.id)) return directTasks;
+
+        const merged = [...directTasks];
+        const seen = new Set<string>();
+        merged.forEach(task => {
+            seen.add(task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ''}`);
+        });
+        (point.linkedMismatchIds || []).forEach(mismatchId => {
+            const mismatch = mismatchPointById.get(mismatchId);
+            if (!mismatch?.tasks?.length) return;
+            mismatch.tasks.forEach(task => {
+                const key = task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ''}`;
+                if (seen.has(key)) return;
+                seen.add(key);
+                merged.push(task);
+            });
+        });
+        return merged;
+    }, [constraintPointIdSet, mismatchPointById]);
 
     const activeBotheringCard =
         botheringPopup?.type === 'mismatch'
@@ -452,7 +480,7 @@ export function MindsetCategoriesCard() {
 
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const getTodayTaskStats = (point?: MindsetPoint) => {
-        const tasks = point?.tasks || [];
+        const tasks = getEffectiveBotheringTasks(point);
         if (tasks.length === 0) return { total: 0, completed: 0, remaining: 0 };
         let total = 0;
         let completed = 0;
@@ -567,10 +595,10 @@ export function MindsetCategoriesCard() {
         let score = 0;
         let hasAnyCompletion = false;
         const data: { date: string; fullDate: string; score: number }[] = [];
+        const tasks = getEffectiveBotheringTasks(point);
 
         for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
             const dateKey = format(d, 'yyyy-MM-dd');
-            const tasks = point.tasks || [];
             let due = 0;
             let completed = 0;
             tasks.forEach(task => {
@@ -596,7 +624,7 @@ export function MindsetCategoriesCard() {
         }
 
         return data;
-    }, [isTaskDueOnDate, isTaskScheduledOnDate, isTaskCompletedOnDate]);
+    }, [getEffectiveBotheringTasks, isTaskDueOnDate, isTaskScheduledOnDate, isTaskCompletedOnDate]);
     const getRecurringTaskCounts = (task: MindsetPoint['tasks'][number]) => {
         if (!task.recurrence || task.recurrence === 'none') return null;
         const startKey = task.startDate || task.dateKey;
@@ -1410,7 +1438,21 @@ export function MindsetCategoriesCard() {
                                     <div className="text-base font-semibold">
                                         {botheringPopup.type === 'mismatch' ? 'Mismatch Bothering' : botheringPopup.type === 'constraint' ? 'Constraint Bothering' : 'External Bothering'}
                                     </div>
-                                    <div className="text-sm text-muted-foreground">{activeBotheringPoint.text}</div>
+                                    <div className="pt-1 space-y-1">
+                                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Title</Label>
+                                        <Input
+                                            value={activeBotheringPoint.text}
+                                            onChange={(e) =>
+                                                updateBotheringPoint(
+                                                    botheringPopup.type,
+                                                    activeBotheringPoint.id,
+                                                    (point) => ({ ...point, text: e.target.value })
+                                                )
+                                            }
+                                            placeholder="Bothering title"
+                                            className="h-8"
+                                        />
+                                    </div>
                                     {botheringPopup.type === 'mismatch' && (
                                         <div className="pt-2">
                                             <Select
@@ -1656,8 +1698,12 @@ export function MindsetCategoriesCard() {
             </li>
             );
         })}
-        {(!activeBotheringPoint.tasks || activeBotheringPoint.tasks.length === 0) && (
-            <div className="text-xs text-muted-foreground">No tasks yet. Link a routine to start.</div>
+        {(getEffectiveBotheringTasks(activeBotheringPoint).length === 0) && (
+            <div className="text-xs text-muted-foreground">
+                {botheringPopup?.type === 'constraint'
+                    ? 'No linked mismatch tasks yet. Link mismatch botherings below.'
+                    : 'No tasks yet. Link a routine to start.'}
+            </div>
         )}
     </ul>
 </ScrollArea>

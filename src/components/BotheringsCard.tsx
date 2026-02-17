@@ -10,9 +10,40 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ChartContainer } from "@/components/ui/chart";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
 
+type BotheringSourceType = "External" | "Mismatch" | "Constraint";
+type BotheringTask = NonNullable<MindsetPoint["tasks"]>[number];
+
 export function BotheringsCard() {
   const { mindsetCards, highlightedTaskIds, setHighlightedTaskIds, schedule } = useAuth();
   const [consistencyModal, setConsistencyModal] = useState<{ title: string; data: { date: string; fullDate: string; score: number }[] } | null>(null);
+  const mismatchPointById = useMemo(() => {
+    const mismatchPoints = mindsetCards.find((c) => c.id === "mindset_botherings_mismatch")?.points || [];
+    return new Map(mismatchPoints.map((point) => [point.id, point] as const));
+  }, [mindsetCards]);
+
+  const getEffectiveTasks = useCallback((point: MindsetPoint, sourceType: BotheringSourceType): BotheringTask[] => {
+    const directTasks = point.tasks || [];
+    if (sourceType !== "Constraint") return directTasks;
+
+    const merged: BotheringTask[] = [...directTasks];
+    const seen = new Set<string>();
+    merged.forEach((task) => {
+      seen.add(task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`);
+    });
+
+    (point.linkedMismatchIds || []).forEach((mismatchId) => {
+      const mismatch = mismatchPointById.get(mismatchId);
+      if (!mismatch?.tasks?.length) return;
+      mismatch.tasks.forEach((task) => {
+        const key = task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        merged.push(task);
+      });
+    });
+
+    return merged;
+  }, [mismatchPointById]);
 
   const activeBotheringsByType = useMemo(() => {
     const sources = [
@@ -23,11 +54,11 @@ export function BotheringsCard() {
     const typed = sources.map(({ id, label }) => ({
       type: label,
       points: (mindsetCards.find((c) => c.id === id)?.points || [])
-        .filter((point) => (point.tasks?.length || 0) > 0 && !point.completed),
+        .filter((point) => getEffectiveTasks(point, label).length > 0 && !point.completed),
     }));
     const parkedPoints = sources.flatMap(({ id, label }) =>
       (mindsetCards.find((c) => c.id === id)?.points || [])
-        .filter((point) => (point.tasks?.length || 0) === 0 && !point.completed)
+        .filter((point) => getEffectiveTasks(point, label).length === 0 && !point.completed)
         .map((point) => ({ point, sourceType: label }))
     );
     return [
@@ -37,7 +68,7 @@ export function BotheringsCard() {
       })),
       { type: "Parked" as const, points: parkedPoints },
     ];
-  }, [mindsetCards]);
+  }, [mindsetCards, getEffectiveTasks]);
 
   const [activeTab, setActiveTab] = React.useState<'External' | 'Mismatch' | 'Constraint' | 'Parked'>('External');
   const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -62,17 +93,17 @@ export function BotheringsCard() {
     return `${diff}d left`;
   };
 
-  const getHighlightIds = (point: MindsetPoint) => {
+  const getHighlightIds = (point: MindsetPoint, sourceType: BotheringSourceType) => {
     const ids = new Set<string>();
-    (point.tasks || []).forEach(t => {
+    getEffectiveTasks(point, sourceType).forEach(t => {
       if (t.id) ids.add(t.id);
       if (t.activityId) ids.add(t.activityId);
     });
     return ids;
   };
 
-  const setHighlightForPoint = (point: MindsetPoint) => {
-    const ids = getHighlightIds(point);
+  const setHighlightForPoint = (point: MindsetPoint, sourceType: BotheringSourceType) => {
+    const ids = getHighlightIds(point, sourceType);
     const same =
       ids.size === highlightedTaskIds.size &&
       Array.from(ids).every(id => highlightedTaskIds.has(id));
@@ -174,16 +205,16 @@ export function BotheringsCard() {
     return false;
   };
 
-  const buildBotheringConsistency = useCallback((point: MindsetPoint) => {
+  const buildBotheringConsistency = useCallback((point: MindsetPoint, sourceType: BotheringSourceType) => {
     const today = startOfDay(new Date());
     const oneYearAgo = addDays(today, -365);
     let score = 0;
     let hasAnyCompletion = false;
     const data: { date: string; fullDate: string; score: number }[] = [];
+    const tasks = getEffectiveTasks(point, sourceType);
 
     for (let d = new Date(oneYearAgo); d <= today; d = addDays(d, 1)) {
       const dateKey = format(d, 'yyyy-MM-dd');
-      const tasks = point.tasks || [];
       let due = 0;
       let completed = 0;
       tasks.forEach(task => {
@@ -209,10 +240,10 @@ export function BotheringsCard() {
     }
 
     return data;
-  }, [isTaskDueOnDate, isTaskScheduledOnDate, isTaskCompletedOnDate]);
+  }, [getEffectiveTasks, isTaskDueOnDate, isTaskScheduledOnDate, isTaskCompletedOnDate]);
 
-  const getTodayStats = (point: MindsetPoint) => {
-    const tasks = point.tasks || [];
+  const getTodayStats = (point: MindsetPoint, sourceType: BotheringSourceType) => {
+    const tasks = getEffectiveTasks(point, sourceType);
     let total = 0;
     let completed = 0;
     tasks.forEach(t => {
@@ -230,7 +261,7 @@ export function BotheringsCard() {
     if (group.type === 'Parked') return group;
     return {
       ...group,
-      points: group.points.filter(({ point }) => getTodayStats(point).total > 0),
+      points: group.points.filter(({ point, sourceType }) => getTodayStats(point, sourceType).total > 0),
     };
   });
   const activeBotherings = visibleBotheringsByType.find(t => t.type === activeTab)?.points || [];
@@ -282,7 +313,7 @@ export function BotheringsCard() {
           <ul className="space-y-3">
             {activeBotherings.map((item) => {
               const b = item.point;
-              const stats = getTodayStats(b);
+              const stats = getTodayStats(b, item.sourceType);
               const isDoneToday = stats.total > 0 && stats.completed === stats.total;
               return (
               <li
@@ -292,7 +323,7 @@ export function BotheringsCard() {
                     ? "border-emerald-400/50 bg-emerald-500/10"
                     : "border-muted/40 bg-muted/20 hover:border-emerald-400/40 hover:bg-emerald-500/5"
                 }`}
-                onClick={() => setHighlightForPoint(b)}
+                onClick={() => setHighlightForPoint(b, item.sourceType)}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className={`text-sm font-semibold ${isDoneToday ? "line-through text-muted-foreground" : ""}`}>{b.text}</div>
@@ -302,7 +333,7 @@ export function BotheringsCard() {
                       className="mt-0.5 text-muted-foreground hover:text-foreground"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const data = buildBotheringConsistency(b);
+                        const data = buildBotheringConsistency(b, item.sourceType);
                         setConsistencyModal({ title: b.text, data });
                       }}
                       title="Show consistency"
@@ -330,7 +361,7 @@ export function BotheringsCard() {
                   <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
                     {getDaysLeftLabel(b.endDate)}
                   </span>
-                  {(b.tasks?.length || 0) === 0 ? (
+                  {getEffectiveTasks(b, item.sourceType).length === 0 ? (
                     <span>No tasks linked</span>
                   ) : stats.total > 0 ? (
                     <span className={stats.completed === stats.total ? "line-through text-muted-foreground" : ""}>

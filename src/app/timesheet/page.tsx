@@ -851,16 +851,45 @@ export function TimesheetPageContent({
             dayActivityMaps.set(dateKey, activityMap);
         });
 
-        const botherings = ['mindset_botherings_mismatch', 'mindset_botherings_constraint', 'mindset_botherings_external']
-            .map(id => mindsetCards.find(c => c.id === id))
-            .flatMap(card => card?.points || [])
-            .filter(point => (point.tasks?.length || 0) > 0 && !point.completed)
-            .map(point => ({
-                id: point.id,
-                text: point.text,
-                endDate: point.endDate,
-                tasks: point.tasks || [],
-            }));
+        const mismatchPointById = new Map(
+            (mindsetCards.find(c => c.id === 'mindset_botherings_mismatch')?.points || []).map(point => [point.id, point] as const)
+        );
+        const getEffectiveBotheringTasks = (point: MindsetPoint, cardId: string) => {
+            const directTasks = point.tasks || [];
+            if (cardId !== 'mindset_botherings_constraint') return directTasks;
+
+            const merged = [...directTasks];
+            const seen = new Set<string>();
+            merged.forEach(task => {
+                seen.add(task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ''}`);
+            });
+            (point.linkedMismatchIds || []).forEach(mismatchId => {
+                const mismatch = mismatchPointById.get(mismatchId);
+                if (!mismatch?.tasks?.length) return;
+                mismatch.tasks.forEach(task => {
+                    const key = task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ''}`;
+                    if (seen.has(key)) return;
+                    seen.add(key);
+                    merged.push(task);
+                });
+            });
+            return merged;
+        };
+        const botheringCardIds = ['mindset_botherings_mismatch', 'mindset_botherings_constraint', 'mindset_botherings_external'];
+        const botherings = botheringCardIds
+            .flatMap(cardId => {
+                const card = mindsetCards.find(c => c.id === cardId);
+                if (!card) return [] as Array<{ id: string; text: string; endDate?: string; tasks: NonNullable<MindsetPoint['tasks']> }>;
+                return (card.points || [])
+                    .filter(point => !point.completed)
+                    .map(point => ({
+                        id: point.id,
+                        text: point.text,
+                        endDate: point.endDate,
+                        tasks: getEffectiveBotheringTasks(point, cardId),
+                    }));
+            })
+            .filter(point => point.tasks.length > 0);
 
         const isTaskDueOnDate = (task: MindsetPoint['tasks'][number], dateKey: string) => {
             const startKey = task.startDate || task.dateKey;
