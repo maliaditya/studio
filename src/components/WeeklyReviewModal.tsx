@@ -57,6 +57,9 @@ type RoutineRebalanceSuggestion = {
   confidence: number;
   reason: string;
   impact: string;
+  targetRule?: NonNullable<Activity["routine"]>;
+  currentCadenceLabel?: string;
+  targetCadenceLabel?: string;
 };
 
 const BOTHERING_SOURCES: Array<{ id: string; type: BotheringType }> = [
@@ -96,6 +99,75 @@ const mismatchTypeLabel = (mismatchType?: MindsetPoint["mismatchType"]) => {
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 const formatPct = (value: number) => `${Math.round(value * 100)}%`;
+const cadenceToDays = (interval: number, unit: "day" | "week" | "month") => {
+  if (unit === "week") return interval * 7;
+  if (unit === "month") return interval * 30;
+  return interval;
+};
+const getCadenceLabel = (rule?: Activity["routine"] | null) => {
+  if (!rule) return "none";
+  if (rule.type === "daily") return "daily";
+  if (rule.type === "weekly") return "weekly";
+  const interval = Math.max(1, Math.floor(rule.repeatInterval ?? rule.days ?? 1));
+  const unit = rule.repeatUnit ?? "day";
+  const unitLabel = interval === 1 ? unit : `${unit}s`;
+  return `every ${interval} ${unitLabel}`;
+};
+const getRuleSignature = (rule?: Activity["routine"] | null) => {
+  if (!rule) return "";
+  if (rule.type === "daily" || rule.type === "weekly") return rule.type;
+  const interval = Math.max(1, Math.floor(rule.repeatInterval ?? rule.days ?? 1));
+  const unit = rule.repeatUnit ?? "day";
+  return `custom:${interval}:${unit}`;
+};
+const getRelaxedCadencePlan = (routine: Activity) => {
+  if (!routine.routine) return null;
+  const rule = routine.routine;
+
+  if (rule.type === "daily") {
+    return {
+      currentCadenceLabel: "daily",
+      targetCadenceLabel: "every 2 days",
+      targetIntervalDays: 2,
+      targetRule: {
+        type: "custom",
+        repeatInterval: 2,
+        repeatUnit: "day",
+      } as NonNullable<Activity["routine"]>,
+    };
+  }
+
+  if (rule.type === "weekly") {
+    return {
+      currentCadenceLabel: "weekly",
+      targetCadenceLabel: "every 2 weeks",
+      targetIntervalDays: 14,
+      targetRule: {
+        type: "custom",
+        repeatInterval: 2,
+        repeatUnit: "week",
+      } as NonNullable<Activity["routine"]>,
+    };
+  }
+
+  const currentInterval = Math.max(1, Math.floor(rule.repeatInterval ?? rule.days ?? 1));
+  const currentUnit = rule.repeatUnit ?? "day";
+  const targetInterval = Math.min(currentUnit === "day" ? 14 : currentUnit === "week" ? 8 : 6, currentInterval + 1);
+  if (targetInterval <= currentInterval) return null;
+
+  return {
+    currentCadenceLabel: getCadenceLabel(rule),
+    targetCadenceLabel: `every ${targetInterval} ${targetInterval === 1 ? currentUnit : `${currentUnit}s`}`,
+    targetIntervalDays: cadenceToDays(targetInterval, currentUnit),
+    targetRule: {
+      type: "custom",
+      repeatInterval: targetInterval,
+      repeatUnit: currentUnit,
+    } as NonNullable<Activity["routine"]>,
+  };
+};
+const getSuggestionKey = (suggestion: RoutineRebalanceSuggestion) =>
+  `${suggestion.id}::${suggestion.action}::${suggestion.suggestedSlot || ""}::${getRuleSignature(suggestion.targetRule)}`;
 
 const riskTone = (score: number) => {
   if (score >= 0.75) {
@@ -403,7 +475,8 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
       return acc;
     }, {} as Record<SlotName, number>);
 
-    const suggestions: RoutineRebalanceSuggestion[] = [];
+    const moveSuggestions: RoutineRebalanceSuggestion[] = [];
+    const staggerSuggestions: RoutineRebalanceSuggestion[] = [];
 
     routineStats.forEach((stat) => {
       const overloaded = (stat.missed >= 3 && stat.missRate >= 0.35 && stat.scheduled >= 5) || (stat.missRate >= 0.55 && stat.scheduled >= 4);
@@ -415,8 +488,8 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
       const pressureGain = currentPressure - slotPressure[bestSlot];
 
       if (pressureGain > 0.1) {
-        const confidence = clamp01(0.45 + stat.missRate * 0.35 + pressureGain * 0.35);
-        suggestions.push({
+        const confidence = clamp01(0.42 + stat.missRate * 0.34 + pressureGain * 0.34);
+        moveSuggestions.push({
           id: stat.routine.id,
           details: stat.routine.details,
           action: "move_slot",
@@ -429,12 +502,14 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
           reason: `High misses in ${stat.slot} with lower pressure in ${bestSlot}.`,
           impact: `Estimated pressure drop: ${Math.round(pressureGain * 100)}%.`,
         });
-        return;
       }
 
-      if (stat.routine.routine?.type === "daily" && stat.missRate >= 0.6 && stat.scheduled >= 8) {
-        const confidence = clamp01(0.4 + stat.missRate * 0.4);
-        suggestions.push({
+      const cadencePlan = getRelaxedCadencePlan(stat.routine);
+      const cadenceOverload = stat.missRate >= 0.5 && stat.scheduled >= 4 && stat.missed >= 2;
+      if (cadencePlan && cadenceOverload) {
+        const cadenceLift = Math.min(1, cadencePlan.targetIntervalDays / Math.max(1, stat.scheduled));
+        const confidence = clamp01(0.36 + stat.missRate * 0.42 + Math.max(0, 0.18 - pressureGain) * 0.25 + cadenceLift * 0.07);
+        staggerSuggestions.push({
           id: stat.routine.id,
           details: stat.routine.details,
           action: "stagger",
@@ -443,13 +518,44 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
           missed: stat.missed,
           due: stat.scheduled,
           confidence,
-          reason: "Daily cadence is overloading execution capacity.",
-          impact: "Try every 2 days for 2 weeks, then reassess.",
+          reason: `Execution is breaking at ${cadencePlan.currentCadenceLabel}; easing cadence should recover consistency.`,
+          impact: `Suggest ${cadencePlan.targetCadenceLabel} for 2 weeks, then reassess.`,
+          targetRule: cadencePlan.targetRule,
+          currentCadenceLabel: cadencePlan.currentCadenceLabel,
+          targetCadenceLabel: cadencePlan.targetCadenceLabel,
         });
       }
     });
 
-    return suggestions.sort((a, b) => b.confidence - a.confidence).slice(0, 8);
+    moveSuggestions.sort((a, b) => b.confidence - a.confidence);
+    staggerSuggestions.sort((a, b) => b.confidence - a.confidence);
+
+    const merged: RoutineRebalanceSuggestion[] = [];
+    const usedRoutineIds = new Set<string>();
+    const maxCards = 8;
+    const pushUnique = (candidate?: RoutineRebalanceSuggestion) => {
+      if (!candidate) return;
+      if (usedRoutineIds.has(candidate.id)) return;
+      usedRoutineIds.add(candidate.id);
+      merged.push(candidate);
+    };
+
+    // Keep the feed mixed so it does not collapse to only slot-move cards.
+    if (staggerSuggestions.length > 0) {
+      pushUnique(staggerSuggestions.shift());
+    }
+    while (merged.length < maxCards && (moveSuggestions.length > 0 || staggerSuggestions.length > 0)) {
+      pushUnique(moveSuggestions.shift());
+      if (merged.length >= maxCards) break;
+      pushUnique(moveSuggestions.shift());
+      if (merged.length >= maxCards) break;
+      pushUnique(staggerSuggestions.shift());
+      if (moveSuggestions.length === 0 && staggerSuggestions.length > 0) {
+        pushUnique(staggerSuggestions.shift());
+      }
+    }
+
+    return merged.slice(0, maxCards);
   }, [settings.routines, schedule, todayKey]);
   const routineById = useMemo(() => {
     return new Map((settings.routines || []).map((routine) => [routine.id, routine] as const));
@@ -463,19 +569,22 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
       const currentSlot = (routine.slot || "Evening") as SlotName;
       return currentSlot === suggestion.currentSlot && currentSlot !== suggestion.suggestedSlot;
     }
-    return !!routine.routine && routine.routine.type === "daily";
+    if (!routine.routine || !suggestion.targetRule) return false;
+    return getRuleSignature(routine.routine) !== getRuleSignature(suggestion.targetRule);
   };
 
   const applyRoutineSuggestion = (suggestion: RoutineRebalanceSuggestion) => {
     if (applyingSuggestionId) return;
-    setApplyingSuggestionId(suggestion.id);
+    const applyKey = getSuggestionKey(suggestion);
+    setApplyingSuggestionId(applyKey);
     try {
       const stillSuggested = routineRebalanceSuggestions.some(
         (candidate) =>
           candidate.id === suggestion.id &&
           candidate.action === suggestion.action &&
           candidate.currentSlot === suggestion.currentSlot &&
-          candidate.suggestedSlot === suggestion.suggestedSlot
+          candidate.suggestedSlot === suggestion.suggestedSlot &&
+          getRuleSignature(candidate.targetRule) === getRuleSignature(suggestion.targetRule)
       );
       if (!stillSuggested) {
         toast({
@@ -565,10 +674,18 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
         return;
       }
 
-      if (!routine.routine || routine.routine.type !== "daily") {
+      if (!routine.routine || !suggestion.targetRule) {
         toast({
           title: "Cannot apply",
-          description: "Staggering is only allowed for routines currently set to daily.",
+          description: "Cadence relaxation is no longer valid for this routine.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (getRuleSignature(routine.routine) === getRuleSignature(suggestion.targetRule)) {
+        toast({
+          title: "Routine changed",
+          description: "This cadence suggestion has already been applied or is outdated.",
           variant: "destructive",
         });
         return;
@@ -580,11 +697,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
           r.id === suggestion.id
             ? {
                 ...r,
-                routine: {
-                  type: "custom",
-                  repeatInterval: 2,
-                  repeatUnit: "day",
-                },
+                routine: { ...suggestion.targetRule },
               }
             : r
         ),
@@ -592,7 +705,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
 
       toast({
         title: "Suggestion applied",
-        description: `"${routine.details}" changed to every 2 days (guarded apply).`,
+        description: `"${routine.details}" cadence changed: ${suggestion.currentCadenceLabel || getCadenceLabel(routine.routine)} -> ${suggestion.targetCadenceLabel || getCadenceLabel(suggestion.targetRule)} (guarded apply).`,
       });
     } finally {
       setApplyingSuggestionId(null);
@@ -963,10 +1076,11 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {routineRebalanceSuggestions.map((s) => {
+                    const suggestionKey = getSuggestionKey(s);
                     const canApply = isSuggestionApplyEligible(s);
-                    const isApplying = applyingSuggestionId === s.id;
+                    const isApplying = applyingSuggestionId === suggestionKey;
                     return (
-                      <Card key={`suggest-${s.id}`} className="border-fuchsia-400/35 bg-fuchsia-500/[0.03]">
+                      <Card key={`suggest-${suggestionKey}`} className="border-fuchsia-400/35 bg-fuchsia-500/[0.03]">
                         <CardContent className="p-4 space-y-3">
                           <div className="flex items-center justify-between gap-2">
                             <div className="font-semibold truncate">{s.details}</div>
@@ -978,15 +1092,19 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                             <Badge variant="outline">Missed {s.missed}/{s.due}</Badge>
                             <Badge variant="outline">Miss rate {(s.missRate * 100).toFixed(0)}%</Badge>
                             <Badge variant="outline">Current {s.currentSlot}</Badge>
-                            {s.suggestedSlot ? <Badge variant="secondary">Suggest {s.suggestedSlot}</Badge> : null}
+                            {s.action === "move_slot" && s.suggestedSlot ? <Badge variant="secondary">Suggest {s.suggestedSlot}</Badge> : null}
+                            {s.action === "stagger" && s.targetCadenceLabel ? <Badge variant="secondary">Suggest {s.targetCadenceLabel}</Badge> : null}
                           </div>
                           <div className="text-sm text-muted-foreground">{s.reason}</div>
                           <div className="text-sm">
                             <span className="font-semibold">
-                              {s.action === "move_slot" ? "Action: Move slot" : "Action: Stagger frequency"}
+                              {s.action === "move_slot" ? "Action: Move slot" : "Action: Ease cadence"}
                             </span>
                             {s.action === "move_slot" && s.suggestedSlot ? (
                               <span className="text-muted-foreground"> ({s.currentSlot} -> {s.suggestedSlot})</span>
+                            ) : null}
+                            {s.action === "stagger" && s.targetCadenceLabel ? (
+                              <span className="text-muted-foreground"> ({s.currentCadenceLabel || "current"} -> {s.targetCadenceLabel})</span>
                             ) : null}
                           </div>
                           <div className="text-xs text-muted-foreground">{s.impact}</div>
@@ -1315,7 +1433,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                 <div className="mt-1 text-muted-foreground">
                   {applyDialogTarget.action === "move_slot" && applyDialogTarget.suggestedSlot
                     ? `Move slot: ${applyDialogTarget.currentSlot} -> ${applyDialogTarget.suggestedSlot}`
-                    : "Stagger frequency: daily -> every 2 days"}
+                    : `Ease cadence: ${applyDialogTarget.currentCadenceLabel || "current"} -> ${applyDialogTarget.targetCadenceLabel || "target cadence"}`}
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">Confidence {(applyDialogTarget.confidence * 100).toFixed(0)}%</div>
               </div>
