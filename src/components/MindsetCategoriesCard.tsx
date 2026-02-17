@@ -479,6 +479,36 @@ export function MindsetCategoriesCard() {
                 ? constraintCard
                 : externalCard;
     const activeBotheringPoint = activeBotheringCard?.points.find(p => p.id === botheringPopup?.pointId);
+    const globallyLinkedRoutineIds = useMemo(() => {
+        const ids = new Set<string>();
+        mindsetCards
+            .filter(card => card.id.startsWith('mindset_botherings_'))
+            .forEach(card => {
+                (card.points || []).forEach(point => {
+                    (point.tasks || []).forEach(task => {
+                        const linkedId = task.activityId || task.id;
+                        if (linkedId) ids.add(linkedId);
+                    });
+                });
+            });
+        return ids;
+    }, [mindsetCards]);
+    const globallyLinkedMismatchIds = useMemo(() => {
+        const ids = new Set<string>();
+        (constraintCard?.points || []).forEach(point => {
+            (point.linkedMismatchIds || []).forEach(id => {
+                if (id) ids.add(id);
+            });
+        });
+        return ids;
+    }, [constraintCard?.points]);
+    const linkableRoutinesForBothering = useMemo(() => {
+        if (!activeBotheringPoint || botheringPopup?.type === 'constraint') return [];
+        return (settings.routines || []).filter(routine => !globallyLinkedRoutineIds.has(routine.id));
+    }, [activeBotheringPoint, botheringPopup?.type, globallyLinkedRoutineIds, settings.routines]);
+    const linkableMismatchBotherings = useMemo(() => {
+        return (mismatchCard?.points || []).filter(point => !point.completed && !globallyLinkedMismatchIds.has(point.id));
+    }, [mismatchCard?.points, globallyLinkedMismatchIds]);
     useEffect(() => {
         if (!activeBotheringPoint) {
             setIsEditingBotheringTitle(false);
@@ -1677,47 +1707,52 @@ export function MindsetCategoriesCard() {
                                                             <PlusCircle className="mr-2 h-4 w-4" /> Link Routine Task
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent className="w-64">
-                                                        {(settings.routines || []).length === 0 && (
-                                                            <DropdownMenuItem disabled>No routines available</DropdownMenuItem>
+                                                    <DropdownMenuContent className="w-72 p-1">
+                                                        {linkableRoutinesForBothering.length === 0 ? (
+                                                            <DropdownMenuItem disabled>No unlinked routines available</DropdownMenuItem>
+                                                        ) : (
+                                                            <ScrollArea className="h-64">
+                                                                <div className="pr-1">
+                                                                    {linkableRoutinesForBothering.map(r => (
+                                                                        <DropdownMenuItem
+                                                                            key={r.id}
+                                                                            onSelect={() => {
+                                                                                const existing = (activeBotheringPoint.tasks || []).some(t => t.activityId === r.id || t.id === r.id);
+                                                                                if (existing) return;
+                                                                                updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+                                                                                    ...point,
+                                                                                    tasks: [
+                                                                                        ...(point.tasks || []),
+                                                                                        {
+                                                                                            id: r.id,
+                                                                                            activityId: r.id,
+                                                                                            type: r.type,
+                                                                                            details: r.details,
+                                                                                            completed: false,
+                                                                                            dateKey: format(new Date(), 'yyyy-MM-dd'),
+                                                                                            slotName: r.slot as SlotName,
+                                                                                            recurrence: r.routine?.type || 'none',
+                                                                                            startDate: r.baseDate || r.createdAt || format(new Date(), 'yyyy-MM-dd'),
+                                                                                            completionHistory: {},
+                                                                                        },
+                                                                                    ],
+                                                                                }));
+                                                                                setSettings(prev => ({
+                                                                                    ...prev,
+                                                                                    routines: (prev.routines || []).map(rr => rr.id === r.id
+                                                                                        ? { ...rr, taskIds: Array.from(new Set([...(rr.taskIds || []), r.id])) }
+                                                                                        : rr
+                                                                                    ),
+                                                                                }));
+                                                                            }}
+                                                                        >
+                                                                            <span className="truncate">{r.details}</span>
+                                                                            <span className="ml-auto text-xs text-muted-foreground">{r.slot}</span>
+                                                                        </DropdownMenuItem>
+                                                                    ))}
+                                                                </div>
+                                                            </ScrollArea>
                                                         )}
-                                                        {(settings.routines || []).map(r => (
-                                                            <DropdownMenuItem
-                                                                key={r.id}
-                                                                onSelect={() => {
-                                                                    const existing = (activeBotheringPoint.tasks || []).some(t => t.activityId === r.id || t.id === r.id);
-                                                                    if (existing) return;
-                                                                    updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
-                                                                        ...point,
-                                                                        tasks: [
-                                                                            ...(point.tasks || []),
-                                                                            {
-                                                                                id: r.id,
-                                                                                activityId: r.id,
-                                                                                type: r.type,
-                                                                                details: r.details,
-                                                                                completed: false,
-                                                                                dateKey: format(new Date(), 'yyyy-MM-dd'),
-                                                                                slotName: r.slot as SlotName,
-                                                                                recurrence: r.routine?.type || 'none',
-                                                                                startDate: r.baseDate || r.createdAt || format(new Date(), 'yyyy-MM-dd'),
-                                                                                completionHistory: {},
-                                                                            },
-                                                                        ],
-                                                                    }));
-                                                                    setSettings(prev => ({
-                                                                        ...prev,
-                                                                        routines: (prev.routines || []).map(rr => rr.id === r.id
-                                                                            ? { ...rr, taskIds: Array.from(new Set([...(rr.taskIds || []), r.id])) }
-                                                                            : rr
-                                                                        ),
-                                                                    }));
-                                                                }}
-                                                            >
-                                                                <span className="truncate">{r.details}</span>
-                                                                <span className="ml-auto text-xs text-muted-foreground">{r.slot}</span>
-                                                            </DropdownMenuItem>
-                                                        ))}
                                                     </DropdownMenuContent>
                                                 </DropdownMenu>
                                             </>
@@ -1778,9 +1813,13 @@ export function MindsetCategoriesCard() {
                                                         <SelectValue placeholder="Select mismatch..." />
                                                     </SelectTrigger>
                                                     <SelectContent className="z-[200]">
-                                                        {(mismatchCard?.points || []).map(point => (
-                                                            <SelectItem key={point.id} value={point.id}>{point.text}</SelectItem>
-                                                        ))}
+                                                        {linkableMismatchBotherings.length === 0 ? (
+                                                            <SelectItem value="__none__" disabled>No unlinked mismatches available</SelectItem>
+                                                        ) : (
+                                                            linkableMismatchBotherings.map(point => (
+                                                                <SelectItem key={point.id} value={point.id}>{point.text}</SelectItem>
+                                                            ))
+                                                        )}
                                                     </SelectContent>
                                                 </Select>
                                                 <Button
