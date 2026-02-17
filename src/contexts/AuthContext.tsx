@@ -461,6 +461,21 @@ const usePrevious = <T,>(value: T) => {
 const id = (prefix = "id") => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
 const normalizeUsernameKey = (username: string) => username.trim().toLowerCase();
 const getMainBackupKey = (username: string) => `lifeos_main_backup_${normalizeUsernameKey(username)}`;
+const isQuotaExceededStorageError = (error: unknown) => {
+  if (!error || typeof error !== 'object') return false;
+  const maybeError = error as { name?: string; code?: number; message?: string };
+  const name = maybeError.name || '';
+  const code = maybeError.code;
+  const message = (maybeError.message || '').toLowerCase();
+  return (
+    name === 'QuotaExceededError' ||
+    name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+    code === 22 ||
+    code === 1014 ||
+    message.includes('quota') ||
+    message.includes('exceeded')
+  );
+};
 const safeSetLocalStorage = (key: string, value: string) => {
   try {
     localStorage.setItem(key, value);
@@ -1124,14 +1139,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const setTheme = useCallback((newTheme: string) => {
     setThemeState(newTheme);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('lifeos_theme', newTheme);
+      safeSetLocalStorage('lifeos_theme', newTheme);
     }
   }, []);
 
   const setGlobalVolume = useCallback((newVolume: number) => {
     setGlobalVolumeState(newVolume);
     if (typeof window !== 'undefined') {
-        localStorage.setItem('lifeos_global_volume', String(newVolume));
+        safeSetLocalStorage('lifeos_global_volume', String(newVolume));
     }
   }, []);
 
@@ -1465,6 +1480,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           localStorage.removeItem(mainDataKey);
           safeSetLocalStorage(uiDataKey, serializedUi);
         };
+        const persistToIndexedDbWithGuard = () => {
+          void (async () => {
+            try {
+              await persistMainToIndexedDb();
+            } catch (backupError) {
+              console.error('Failed to persist data after localStorage quota exceeded:', backupError);
+              toast({
+                title: "Save Failed",
+                description: "Storage is full. Please export a backup or clear old browser data.",
+                variant: "destructive"
+              });
+            }
+          })();
+        };
+        const persistToLocalStorage = () => {
+          const wroteMain = safeSetLocalStorage(mainDataKey, serializedMain);
+          if (!wroteMain) return false;
+
+          const wroteUi = safeSetLocalStorage(uiDataKey, serializedUi);
+          if (!wroteUi) {
+            localStorage.removeItem(mainDataKey);
+            return false;
+          }
+
+          localStorage.removeItem(mainRefKey);
+          void deleteBackup(getMainBackupKey(storageUsername)).catch(() => undefined);
+          return true;
+        };
 
         try {
           const isAlreadyInOverflowMode = !!localStorage.getItem(mainRefKey);
@@ -1475,24 +1518,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return;
           }
 
-          localStorage.setItem(mainDataKey, serializedMain);
-          localStorage.setItem(uiDataKey, serializedUi);
-          localStorage.removeItem(mainRefKey);
-          void deleteBackup(getMainBackupKey(storageUsername)).catch(() => undefined);
+          const persistedLocally = persistToLocalStorage();
+          if (!persistedLocally) {
+            persistToIndexedDbWithGuard();
+          }
         } catch (error) {
-          if (error instanceof DOMException && (error.name === 'QuotaExceededError' || error.code === 22)) {
-            void (async () => {
-              try {
-                await persistMainToIndexedDb();
-              } catch (backupError) {
-                console.error('Failed to persist data after localStorage quota exceeded:', backupError);
-                toast({
-                  title: "Save Failed",
-                  description: "Storage is full. Please export a backup or clear old browser data.",
-                  variant: "destructive"
-                });
-              }
-            })();
+          if (isQuotaExceededStorageError(error)) {
+            persistToIndexedDbWithGuard();
           } else {
             console.error('Failed to save app state:', error);
           }

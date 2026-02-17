@@ -160,7 +160,7 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
   level = 0, collapsedFolders, toggleFolderCollapse, onPin, pinnedFolderIds, activeDragId
 }) => {
   return (
-    <ul className={cn(level > 0 && "pl-4 border-l ml-2 space-y-1")}>
+    <ul className={cn("min-w-0", level > 0 && "pl-4 border-l ml-2 space-y-1")}>
       {folders.map(folder => {
         const children = allFolders.filter(f => f.parentId === folder.id).sort((a,b) => a.name.localeCompare(b.name));
         const isCollapsed = collapsedFolders.has(folder.id);
@@ -168,16 +168,16 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
         const isPinned = pinnedFolderIds.has(folder.id);
 
         return (
-          <li key={folder.id}>
+          <li key={folder.id} className="min-w-0">
             <DroppableFolder folder={folder} >
                 <DraggableFolder folder={folder} isDragging={activeDragId === folder.id}>
                     <div 
                         onContextMenu={(e) => onContextMenu(e, folder)} 
                         onClick={() => onSelect(folder.id)}
-                        className={cn("flex items-center gap-1 p-1 rounded-md hover:bg-muted cursor-pointer group", isSelected && "bg-accent")}
+                        className={cn("flex items-center gap-1 p-1 rounded-md hover:bg-muted cursor-pointer group min-w-0", isSelected && "bg-accent")}
                     >
                         {children.length > 0 && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => {e.stopPropagation(); toggleFolderCollapse(folder.id); }}>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={(e) => {e.stopPropagation(); toggleFolderCollapse(folder.id); }}>
                                 <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
                             </Button>
                         )}
@@ -190,13 +190,13 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
                                 onBlur={handleSaveEditFolder}
                                 onKeyDown={e => e.key === 'Enter' && handleSaveEditFolder()}
                                 autoFocus
-                                className="h-7 text-sm"
+                                className="h-7 text-sm min-w-0 flex-1"
                             />
                         ) : (
-                            <span className="truncate flex-grow" title={folder.name}>{folder.name}</span>
+                            <span className="block min-w-0 flex-1 truncate" title={folder.name}>{folder.name}</span>
                         )}
                         
-                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onPin(folder.id); }}>
                                 {isPinned ? <PinOff className="h-4 w-4 text-yellow-500"/> : <Pin className="h-4 w-4"/>}
                             </Button>
@@ -1589,6 +1589,7 @@ const ResourceCard = React.memo(({ resource, onUpdate, onDelete, onOpenNestedPop
     const { setFloatingVideoUrl } = useAuth();
     const [embedUrl, setEmbedUrl] = useState<string | null>(null);
     const [showEmbed, setShowEmbed] = useState(false);
+    const [showModelViewer, setShowModelViewer] = useState(false);
 
     const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
     const youtubeVideoId = getYouTubeVideoId(resource.link);
@@ -1659,7 +1660,42 @@ const ResourceCard = React.memo(({ resource, onUpdate, onDelete, onOpenNestedPop
             </>
         )
     }
-    
+
+    if (resource.type === 'model3d') {
+        const modelSrc = resource.modelUrl || resource.link;
+        return (
+            <>
+                <Card className="h-full flex flex-col">
+                    <CardHeader className="flex-row items-center gap-3 space-y-0">
+                        <Library className="h-5 w-5 flex-shrink-0 text-primary" />
+                        <CardTitle className="text-base truncate flex-grow" title={resource.name}>{resource.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-grow flex flex-col pt-0">
+                        <p className="text-xs text-muted-foreground line-clamp-2 flex-grow">{resource.description || '3D model resource.'}</p>
+                        <div className="mt-auto pt-2">
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                className="w-full"
+                                disabled={!modelSrc}
+                                onClick={() => setShowModelViewer(true)}
+                            >
+                                Open 3D Model
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Dialog open={showModelViewer} onOpenChange={setShowModelViewer}>
+                    <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+                        <div className="flex-grow min-h-0">
+                            {modelSrc ? <ModelViewer modelUrl={modelSrc} /> : <div className="h-full flex items-center justify-center text-sm text-muted-foreground">No model source available.</div>}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </>
+        );
+    }
+     
      if (resource.type === 'pdf') {
         return (
             <Card className="h-full flex flex-col cursor-pointer" onClick={() => onOpenPdfViewer(resource)}>

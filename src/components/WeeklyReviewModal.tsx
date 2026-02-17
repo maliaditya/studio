@@ -1,13 +1,25 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "./ui/scroll-area";
 import { Badge } from "./ui/badge";
+import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { addDays, differenceInCalendarDays, differenceInDays, differenceInMonths, format, getDay, parseISO, startOfDay } from "date-fns";
-import type { MindsetPoint } from "@/types/workout";
+import type { Activity, MindsetPoint, SlotName } from "@/types/workout";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   AlertTriangle,
   Blocks,
@@ -15,6 +27,7 @@ import {
   Gauge,
   Globe2,
   ListChecks,
+  Loader2,
   ShieldAlert,
   SplitSquareVertical,
   Target,
@@ -31,6 +44,20 @@ interface WeeklyReviewModalProps {
 
 type BotheringType = "External" | "Mismatch" | "Constraint";
 type BotheringTask = NonNullable<MindsetPoint["tasks"]>[number];
+const SLOT_ORDER: SlotName[] = ["Late Night", "Dawn", "Morning", "Afternoon", "Evening", "Night"];
+type RoutineRebalanceSuggestion = {
+  id: string;
+  details: string;
+  action: "move_slot" | "stagger";
+  currentSlot: SlotName;
+  suggestedSlot?: SlotName;
+  missRate: number;
+  missed: number;
+  due: number;
+  confidence: number;
+  reason: string;
+  impact: string;
+};
 
 const BOTHERING_SOURCES: Array<{ id: string; type: BotheringType }> = [
   { id: "mindset_botherings_external", type: "External" },
@@ -96,7 +123,10 @@ const riskTone = (score: number) => {
 };
 
 export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalProps) {
-  const { mindsetCards, schedule } = useAuth();
+  const { mindsetCards, schedule, setSchedule, habitCards, mechanismCards, settings, setSettings } = useAuth();
+  const { toast } = useToast();
+  const [applyDialogTarget, setApplyDialogTarget] = useState<RoutineRebalanceSuggestion | null>(null);
+  const [applyingSuggestionId, setApplyingSuggestionId] = useState<string | null>(null);
   const today = startOfDay(new Date());
   const todayKey = format(today, "yyyy-MM-dd");
 
@@ -248,6 +278,354 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
   const allBotherings = botheringsByType.flatMap(({ type, points }) =>
     points.map((point) => ({ type, point }))
   );
+  const routineRebalanceSuggestions = useMemo(() => {
+    const todayDate = startOfDay(parseISO(todayKey));
+    const routines = (settings.routines || []).filter((r) => !!r.routine);
+    if (routines.length === 0) return [] as RoutineRebalanceSuggestion[];
+
+    const windowDays = 21;
+    const windowStart = addDays(todayDate, -(windowDays - 1));
+    const pastDateKeys: string[] = [];
+    for (let d = new Date(windowStart); d < todayDate; d = addDays(d, 1)) {
+      pastDateKeys.push(format(d, "yyyy-MM-dd"));
+    }
+
+    const normalizeSlot = (slot?: string): SlotName => {
+      const casted = (slot || "Evening") as SlotName;
+      return SLOT_ORDER.includes(casted) ? casted : "Evening";
+    };
+
+    const isRoutineDueOnDate = (routine: Activity, dateKey: string) => {
+      if (!routine.routine) return false;
+      const rule = routine.routine;
+      const baseKey = routine.baseDate || (routine as any).createdAt || routine.dateKey;
+      const date = parseISO(dateKey);
+      if (Number.isNaN(date.getTime())) return false;
+      if (rule.type === "daily") return true;
+      if (!baseKey) return false;
+      const base = parseISO(baseKey);
+      if (Number.isNaN(base.getTime()) || startOfDay(base) > startOfDay(date)) return false;
+      if (rule.type === "weekly") return getDay(base) === getDay(date);
+      if (rule.type === "custom") {
+        const interval = Math.max(1, rule.repeatInterval ?? rule.days ?? 1);
+        const unit = rule.repeatUnit ?? "day";
+        if (unit === "month") {
+          if (base.getDate() !== date.getDate()) return false;
+          const diffMonths = differenceInMonths(date, base);
+          return diffMonths >= 0 && diffMonths % interval === 0;
+        }
+        if (unit === "week") {
+          const diffDayCount = differenceInDays(date, base);
+          return diffDayCount >= 0 && diffDayCount % (interval * 7) === 0;
+        }
+        const diffDayCount = differenceInDays(date, base);
+        return diffDayCount >= 0 && diffDayCount % interval === 0;
+      }
+      return false;
+    };
+
+    const isCompletedActivity = (activity: Activity) => {
+      if (activity.completed) return true;
+      if (activity.duration && activity.duration > 0) return true;
+      if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) return true;
+      if (activity.focusSessionInitialDuration && activity.focusSessionInitialDuration > 0) return true;
+      return false;
+    };
+
+    const findRoutineInstance = (routine: Activity, dateKey: string) => {
+      const day = schedule?.[dateKey];
+      if (!day) return null;
+      const instanceId = `${routine.id}_${dateKey}`;
+      const allActivities: Activity[] = [];
+      Object.values(day).forEach((slotValue: any) => {
+        if (!Array.isArray(slotValue)) return;
+        slotValue.forEach((item: any) => {
+          if (!item || typeof item !== "object") return;
+          if (!("id" in item) || !("type" in item)) return;
+          allActivities.push(item as Activity);
+        });
+      });
+      const exact = allActivities.find((a) => a.id === instanceId);
+      if (exact) return exact;
+      const byTaskLink = allActivities.find((a) => (a.taskIds || []).includes(routine.id));
+      if (byTaskLink) return byTaskLink;
+      const bySameDetails = allActivities.find((a) => a.type === routine.type && a.details === routine.details);
+      if (bySameDetails) return bySameDetails;
+      return null;
+    };
+
+    const routineStats = routines.map((routine) => {
+      let due = 0;
+      let scheduled = 0;
+      let completed = 0;
+      let missed = 0;
+
+      pastDateKeys.forEach((dateKey) => {
+        if (!isRoutineDueOnDate(routine, dateKey)) return;
+        due += 1;
+        const instance = findRoutineInstance(routine, dateKey);
+        if (!instance) return;
+        scheduled += 1;
+        if (isCompletedActivity(instance)) completed += 1;
+        else missed += 1;
+      });
+
+      const missRate = scheduled > 0 ? missed / scheduled : 0;
+      return {
+        routine,
+        due,
+        scheduled,
+        completed,
+        missed,
+        missRate,
+        slot: normalizeSlot(routine.slot),
+      };
+    });
+
+    const slotAgg = SLOT_ORDER.reduce(
+      (acc, slot) => {
+        acc[slot] = { due: 0, missed: 0 };
+        return acc;
+      },
+      {} as Record<SlotName, { due: number; missed: number }>
+    );
+    routineStats.forEach((r) => {
+      slotAgg[r.slot].due += r.due;
+      slotAgg[r.slot].missed += r.missed;
+    });
+    const maxDue = Math.max(1, ...SLOT_ORDER.map((slot) => slotAgg[slot].due));
+    const slotPressure = SLOT_ORDER.reduce((acc, slot) => {
+      const due = slotAgg[slot].due;
+      const missed = slotAgg[slot].missed;
+      const missRate = due > 0 ? missed / due : 0;
+      const load = due / maxDue;
+      acc[slot] = 0.65 * missRate + 0.35 * load;
+      return acc;
+    }, {} as Record<SlotName, number>);
+
+    const suggestions: RoutineRebalanceSuggestion[] = [];
+
+    routineStats.forEach((stat) => {
+      const overloaded = (stat.missed >= 3 && stat.missRate >= 0.35 && stat.scheduled >= 5) || (stat.missRate >= 0.55 && stat.scheduled >= 4);
+      if (!overloaded) return;
+
+      const currentPressure = slotPressure[stat.slot];
+      const targetSlots = SLOT_ORDER.filter((slot) => slot !== stat.slot).sort((a, b) => slotPressure[a] - slotPressure[b]);
+      const bestSlot = targetSlots[0];
+      const pressureGain = currentPressure - slotPressure[bestSlot];
+
+      if (pressureGain > 0.1) {
+        const confidence = clamp01(0.45 + stat.missRate * 0.35 + pressureGain * 0.35);
+        suggestions.push({
+          id: stat.routine.id,
+          details: stat.routine.details,
+          action: "move_slot",
+          currentSlot: stat.slot,
+          suggestedSlot: bestSlot,
+          missRate: stat.missRate,
+          missed: stat.missed,
+          due: stat.scheduled,
+          confidence,
+          reason: `High misses in ${stat.slot} with lower pressure in ${bestSlot}.`,
+          impact: `Estimated pressure drop: ${Math.round(pressureGain * 100)}%.`,
+        });
+        return;
+      }
+
+      if (stat.routine.routine?.type === "daily" && stat.missRate >= 0.6 && stat.scheduled >= 8) {
+        const confidence = clamp01(0.4 + stat.missRate * 0.4);
+        suggestions.push({
+          id: stat.routine.id,
+          details: stat.routine.details,
+          action: "stagger",
+          currentSlot: stat.slot,
+          missRate: stat.missRate,
+          missed: stat.missed,
+          due: stat.scheduled,
+          confidence,
+          reason: "Daily cadence is overloading execution capacity.",
+          impact: "Try every 2 days for 2 weeks, then reassess.",
+        });
+      }
+    });
+
+    return suggestions.sort((a, b) => b.confidence - a.confidence).slice(0, 8);
+  }, [settings.routines, schedule, todayKey]);
+  const routineById = useMemo(() => {
+    return new Map((settings.routines || []).map((routine) => [routine.id, routine] as const));
+  }, [settings.routines]);
+
+  const isSuggestionApplyEligible = (suggestion: RoutineRebalanceSuggestion) => {
+    const routine = routineById.get(suggestion.id);
+    if (!routine) return false;
+    if (suggestion.action === "move_slot") {
+      if (!suggestion.suggestedSlot || !SLOT_ORDER.includes(suggestion.suggestedSlot)) return false;
+      const currentSlot = (routine.slot || "Evening") as SlotName;
+      return currentSlot === suggestion.currentSlot && currentSlot !== suggestion.suggestedSlot;
+    }
+    return !!routine.routine && routine.routine.type === "daily";
+  };
+
+  const applyRoutineSuggestion = (suggestion: RoutineRebalanceSuggestion) => {
+    if (applyingSuggestionId) return;
+    setApplyingSuggestionId(suggestion.id);
+    try {
+      const stillSuggested = routineRebalanceSuggestions.some(
+        (candidate) =>
+          candidate.id === suggestion.id &&
+          candidate.action === suggestion.action &&
+          candidate.currentSlot === suggestion.currentSlot &&
+          candidate.suggestedSlot === suggestion.suggestedSlot
+      );
+      if (!stillSuggested) {
+        toast({
+          title: "Suggestion changed",
+          description: "This suggestion is no longer active. Please review the refreshed recommendations.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const routine = routineById.get(suggestion.id);
+      if (!routine) {
+        toast({
+          title: "Routine not found",
+          description: "The routine no longer exists. Nothing was changed.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (suggestion.action === "move_slot") {
+        const targetSlot = suggestion.suggestedSlot;
+        if (!targetSlot || !SLOT_ORDER.includes(targetSlot)) {
+          toast({
+            title: "Invalid slot suggestion",
+            description: "Could not apply this slot change safely.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const currentSlot = (routine.slot || "Evening") as SlotName;
+        if (currentSlot !== suggestion.currentSlot || currentSlot === targetSlot) {
+          toast({
+            title: "Routine changed",
+            description: "This routine has already changed. Refresh the suggestion before applying.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        setSettings((prev) => ({
+          ...prev,
+          routines: (prev.routines || []).map((r) => (r.id === suggestion.id ? { ...r, slot: targetSlot } : r)),
+        }));
+
+        setSchedule((prev) => {
+          const todayDay = prev[todayKey];
+          if (!todayDay) return prev;
+          const routineInstanceId = `${suggestion.id}_${todayKey}`;
+          let matched: Activity | null = null;
+          let changed = false;
+          const nextDay = { ...todayDay };
+
+          SLOT_ORDER.forEach((slot) => {
+            const slotActivities = nextDay[slot];
+            if (!Array.isArray(slotActivities)) return;
+            const list = slotActivities as Activity[];
+            const filtered = list.filter((activity) => {
+              const isMatch = activity.id === routineInstanceId;
+              if (isMatch && !matched) matched = activity;
+              return !isMatch;
+            });
+            if (filtered.length !== list.length) {
+              nextDay[slot] = filtered;
+              changed = true;
+            }
+          });
+
+          if (!matched) return prev;
+          const targetActivities = Array.isArray(nextDay[targetSlot]) ? [...(nextDay[targetSlot] as Activity[])] : [];
+          const existingIndex = targetActivities.findIndex((activity) => activity.id === routineInstanceId);
+          const movedInstance: Activity = { ...matched, slot: targetSlot };
+          if (existingIndex >= 0) targetActivities[existingIndex] = { ...targetActivities[existingIndex], ...movedInstance };
+          else targetActivities.push(movedInstance);
+          nextDay[targetSlot] = targetActivities;
+          changed = true;
+
+          if (!changed) return prev;
+          return { ...prev, [todayKey]: nextDay };
+        });
+
+        toast({
+          title: "Suggestion applied",
+          description: `"${routine.details}" moved to ${targetSlot}.`,
+        });
+        return;
+      }
+
+      if (!routine.routine || routine.routine.type !== "daily") {
+        toast({
+          title: "Cannot apply",
+          description: "Staggering is only allowed for routines currently set to daily.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setSettings((prev) => ({
+        ...prev,
+        routines: (prev.routines || []).map((r) =>
+          r.id === suggestion.id
+            ? {
+                ...r,
+                routine: {
+                  type: "custom",
+                  repeatInterval: 2,
+                  repeatUnit: "day",
+                },
+              }
+            : r
+        ),
+      }));
+
+      toast({
+        title: "Suggestion applied",
+        description: `"${routine.details}" changed to every 2 days (guarded apply).`,
+      });
+    } finally {
+      setApplyingSuggestionId(null);
+      setApplyDialogTarget(null);
+    }
+  };
+
+  const linkedStopperById = useMemo(() => {
+    const map = new Map<string, { id: string; text: string; isUrge: boolean; habitName: string; mechanismName?: string }>();
+    habitCards.forEach((habit) => {
+      const urgeMechanismName = mechanismCards.find((m) => m.id === habit.response?.resourceId)?.name;
+      const resistanceMechanismName = mechanismCards.find((m) => m.id === habit.newResponse?.resourceId)?.name;
+      (habit.urges || []).forEach((stopper) => {
+        map.set(stopper.id, {
+          id: stopper.id,
+          text: stopper.text,
+          isUrge: true,
+          habitName: habit.name,
+          mechanismName: urgeMechanismName,
+        });
+      });
+      (habit.resistances || []).forEach((stopper) => {
+        map.set(stopper.id, {
+          id: stopper.id,
+          text: stopper.text,
+          isUrge: false,
+          habitName: habit.name,
+          mechanismName: resistanceMechanismName,
+        });
+      });
+    });
+    return map;
+  }, [habitCards, mechanismCards]);
 
   const riskCandidates = allBotherings
     .map(({ type, point }) => {
@@ -343,6 +721,28 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
       const requiredPerDay = requiredCompletions / daysForRecovery;
       const deadlineLabel =
         daysLeft === null ? "No deadline" : daysLeft < 0 ? `Overdue ${Math.abs(daysLeft)}d` : daysLeft === 0 ? "Due today" : `${daysLeft}d left`;
+      const linkedStoppers = [
+        ...(point.linkedUrgeIds || []).map((id) => ({ id, isUrge: true })),
+        ...(point.linkedResistanceIds || []).map((id) => ({ id, isUrge: false })),
+      ]
+        .map((entry) => {
+          const found = linkedStopperById.get(entry.id);
+          if (!found) return null;
+          return {
+            id: found.id,
+            text: found.text,
+            isUrge: entry.isUrge,
+            habitName: found.habitName,
+            mechanismName: found.mechanismName,
+          };
+        })
+        .filter(Boolean) as Array<{
+          id: string;
+          text: string;
+          isUrge: boolean;
+          habitName: string;
+          mechanismName?: string;
+        }>;
 
       return {
         id: point.id,
@@ -363,6 +763,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
         daysForRecovery,
         pendingTodayTaskNames: Array.from(new Set(pendingTodayTaskNames)),
         pendingTaskInstances: Array.from(new Set(pendingTaskInstances)),
+        linkedStoppers,
       };
     })
     .filter(Boolean) as Array<{
@@ -384,6 +785,13 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
       daysForRecovery: number;
       pendingTodayTaskNames: string[];
       pendingTaskInstances: string[];
+      linkedStoppers: Array<{
+        id: string;
+        text: string;
+        isUrge: boolean;
+        habitName: string;
+        mechanismName?: string;
+      }>;
     }>;
 
   const sortRiskCards = (a: (typeof riskCandidates)[number], b: (typeof riskCandidates)[number]) => {
@@ -400,6 +808,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
   const totalPendingToday = summaryByType.reduce((sum, item) => sum + item.todayPending, 0);
   const totalRiskCards = atRiskCards.length;
   const totalPotentialRiskCards = potentialRiskCards.length;
+  const totalRebalanceSuggestions = routineRebalanceSuggestions.length;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -414,7 +823,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
 
         <ScrollArea className="h-[72vh] pr-3">
           <div className="space-y-5 py-1">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
               <Card className="md:col-span-2 border-white/10 bg-gradient-to-br from-white/[0.06] to-white/[0.02]">
                 <CardContent className="p-4 space-y-4">
                   <div className="text-xs uppercase tracking-wide text-muted-foreground">System Pulse</div>
@@ -463,6 +872,17 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                   </div>
                   <div className="text-3xl font-semibold">{totalPotentialRiskCards}</div>
                   <div className="text-xs text-muted-foreground">downtrend without near deadline</div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-white/10 bg-gradient-to-br from-fuchsia-500/10 via-fuchsia-500/5 to-transparent">
+                <CardContent className="p-4 h-full flex flex-col justify-between">
+                  <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-fuchsia-200/80">
+                    <Gauge className="h-3.5 w-3.5" />
+                    Rebalance Suggestions
+                  </div>
+                  <div className="text-3xl font-semibold">{totalRebalanceSuggestions}</div>
+                  <div className="text-xs text-muted-foreground">suggest-first, guarded apply</div>
                 </CardContent>
               </Card>
 
@@ -522,6 +942,75 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                   </Card>
                 );
               })}
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Gauge className="h-4 w-4 text-fuchsia-300" />
+                <h3 className="text-lg font-semibold">Routine Rebalance Suggestions</h3>
+                <Badge variant="outline" className="border-fuchsia-400/40 text-fuchsia-200 bg-fuchsia-500/10">
+                  Suggest + Guarded Apply
+                </Badge>
+              </div>
+              <div className="text-xs text-muted-foreground">No automatic rescheduling is applied. You can apply each suggestion with guard checks.</div>
+
+              {routineRebalanceSuggestions.length === 0 ? (
+                <Card className="border-fuchsia-500/30 bg-fuchsia-500/5">
+                  <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                    No rebalance recommendation right now. Routine miss pressure is within acceptable range.
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {routineRebalanceSuggestions.map((s) => {
+                    const canApply = isSuggestionApplyEligible(s);
+                    const isApplying = applyingSuggestionId === s.id;
+                    return (
+                      <Card key={`suggest-${s.id}`} className="border-fuchsia-400/35 bg-fuchsia-500/[0.03]">
+                        <CardContent className="p-4 space-y-3">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="font-semibold truncate">{s.details}</div>
+                            <Badge variant="outline" className="border-white/20">
+                              {(s.confidence * 100).toFixed(0)}% confidence
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <Badge variant="outline">Missed {s.missed}/{s.due}</Badge>
+                            <Badge variant="outline">Miss rate {(s.missRate * 100).toFixed(0)}%</Badge>
+                            <Badge variant="outline">Current {s.currentSlot}</Badge>
+                            {s.suggestedSlot ? <Badge variant="secondary">Suggest {s.suggestedSlot}</Badge> : null}
+                          </div>
+                          <div className="text-sm text-muted-foreground">{s.reason}</div>
+                          <div className="text-sm">
+                            <span className="font-semibold">
+                              {s.action === "move_slot" ? "Action: Move slot" : "Action: Stagger frequency"}
+                            </span>
+                            {s.action === "move_slot" && s.suggestedSlot ? (
+                              <span className="text-muted-foreground"> ({s.currentSlot} -> {s.suggestedSlot})</span>
+                            ) : null}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{s.impact}</div>
+                          <div className="flex items-center justify-between gap-2 pt-1">
+                            <div className="text-[11px] text-muted-foreground">
+                              {canApply ? "Guard checks passed" : "Guard check failed (routine changed)"}
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-fuchsia-400/40 text-fuchsia-100 hover:bg-fuchsia-500/10"
+                              disabled={!canApply || isApplying || !!applyingSuggestionId}
+                              onClick={() => setApplyDialogTarget(s)}
+                            >
+                              {isApplying ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                              Apply (Guarded)
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div className="relative py-1">
@@ -633,6 +1122,35 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                             <div className="text-xs text-muted-foreground">No pending scheduled task.</div>
                           )}
                         </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <ShieldAlert className="h-3.5 w-3.5" />
+                            Linked Urges / Resistances
+                          </div>
+                          {risk.linkedStoppers.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {risk.linkedStoppers.slice(0, 6).map((link) => (
+                                <Badge
+                                  key={`${risk.id}-linked-${link.id}`}
+                                  variant="outline"
+                                  className={cn(
+                                    "max-w-full truncate",
+                                    link.isUrge
+                                      ? "border-red-400/40 text-red-200 bg-red-500/10"
+                                      : "border-blue-400/40 text-blue-200 bg-blue-500/10"
+                                  )}
+                                  title={`${link.habitName}${link.mechanismName ? ` | ${link.mechanismName}` : ""}`}
+                                >
+                                  {link.isUrge ? "Urge" : "Resistance"}: {link.text}
+                                </Badge>
+                              ))}
+                              {risk.linkedStoppers.length > 6 ? <Badge variant="outline">+{risk.linkedStoppers.length - 6} more</Badge> : null}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-muted-foreground">No linked urges or resistances.</div>
+                          )}
+                        </div>
                       </CardContent>
                     </Card>
                   );
@@ -741,6 +1259,35 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                             <div className="text-xs text-muted-foreground">No pending scheduled task.</div>
                           )}
                         </div>
+
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <ShieldAlert className="h-3.5 w-3.5" />
+                            Linked Urges / Resistances
+                          </div>
+                          {risk.linkedStoppers.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {risk.linkedStoppers.slice(0, 6).map((link) => (
+                                <Badge
+                                  key={`${risk.id}-potential-linked-${link.id}`}
+                                  variant="outline"
+                                  className={cn(
+                                    "max-w-full truncate",
+                                    link.isUrge
+                                      ? "border-red-400/40 text-red-200 bg-red-500/10"
+                                      : "border-blue-400/40 text-blue-200 bg-blue-500/10"
+                                  )}
+                                  title={`${link.habitName}${link.mechanismName ? ` | ${link.mechanismName}` : ""}`}
+                                >
+                                  {link.isUrge ? "Urge" : "Resistance"}: {link.text}
+                                </Badge>
+                              ))}
+                              {risk.linkedStoppers.length > 6 ? <Badge variant="outline">+{risk.linkedStoppers.length - 6} more</Badge> : null}
+                            </div>
+                          ) : (
+                            <div className="text-xs text-muted-foreground">No linked urges or resistances.</div>
+                          )}
+                        </div>
                       </CardContent>
                     </Card>
                   );
@@ -749,6 +1296,46 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
             </div>
           </div>
         </ScrollArea>
+        <AlertDialog
+          open={!!applyDialogTarget}
+          onOpenChange={(open) => {
+            if (!open && !applyingSuggestionId) setApplyDialogTarget(null);
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Apply guarded routine suggestion?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will update the routine rule only after validation checks pass at apply time.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {applyDialogTarget ? (
+              <div className="rounded-md border border-white/10 bg-muted/30 p-3 text-sm">
+                <div className="font-medium">{applyDialogTarget.details}</div>
+                <div className="mt-1 text-muted-foreground">
+                  {applyDialogTarget.action === "move_slot" && applyDialogTarget.suggestedSlot
+                    ? `Move slot: ${applyDialogTarget.currentSlot} -> ${applyDialogTarget.suggestedSlot}`
+                    : "Stagger frequency: daily -> every 2 days"}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">Confidence {(applyDialogTarget.confidence * 100).toFixed(0)}%</div>
+              </div>
+            ) : null}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={!!applyingSuggestionId}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={!applyDialogTarget || !!applyingSuggestionId}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (!applyDialogTarget) return;
+                  applyRoutineSuggestion(applyDialogTarget);
+                }}
+              >
+                {applyingSuggestionId ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                Apply
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );

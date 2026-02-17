@@ -18,6 +18,7 @@ import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
 import { useAuth } from '@/contexts/AuthContext';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { ModelViewer } from '@/components/ModelViewer';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -171,6 +172,7 @@ const ResourceCardComponent = ({ resource, onOpenNestedPopup, playingAudio, setP
 }) => {
     const hasMarkdownContent = resource.type === 'card' && (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
     const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+    const [showModelViewer, setShowModelViewer] = useState(false);
 
     const togglePlayAudio = () => {
       if (playingAudio?.id === resource.id && playingAudio.isPlaying) {
@@ -277,6 +279,41 @@ const ResourceCardComponent = ({ resource, onOpenNestedPopup, playingAudio, setP
                 </Dialog>
             </>
         )
+    }
+
+    if (resource.type === 'model3d') {
+        const modelSrc = resource.modelUrl || resource.link;
+        return (
+            <>
+                <Card className="h-full flex flex-col">
+                    <CardHeader className="flex-row items-center gap-3 space-y-0">
+                        <Library className="h-4 w-4 flex-shrink-0" />
+                        <CardTitle className="text-base truncate flex-grow" title={resource.name}>{resource.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex-grow flex flex-col pt-0">
+                        <p className="text-xs text-muted-foreground line-clamp-2 flex-grow">{resource.description || '3D model resource.'}</p>
+                        <div className="mt-auto pt-2">
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                className="w-full"
+                                disabled={!modelSrc}
+                                onClick={() => setShowModelViewer(true)}
+                            >
+                                Open 3D Model
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Dialog open={showModelViewer} onOpenChange={setShowModelViewer}>
+                    <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
+                        <div className="flex-grow min-h-0">
+                            {modelSrc ? <ModelViewer modelUrl={modelSrc} /> : <div className="h-full flex items-center justify-center text-sm text-muted-foreground">No model source available.</div>}
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </>
+        );
     }
 
     return (
@@ -440,21 +477,21 @@ export default function SharedFolderPage() {
       const isCollapsed = collapsedFolders.has(currentFolder.id);
 
       return (
-        <li key={currentFolder.id}>
+        <li key={currentFolder.id} className="min-w-0">
             <div 
                 onClick={() => { setSelectedFolderId(currentFolder.id); if (children.length > 0) toggleFolderCollapse(currentFolder.id); }}
-                className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group", selectedFolderId === currentFolder.id && "bg-muted")}
+                className={cn("flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer group min-w-0", selectedFolderId === currentFolder.id && "bg-muted")}
             >
                 {children.length > 0 ? (
-                    <ChevronDown className={cn("h-4 w-4 transition-transform", isCollapsed && "-rotate-90")} />
+                    <ChevronDown className={cn("h-4 w-4 transition-transform flex-shrink-0", isCollapsed && "-rotate-90")} />
                 ) : (
-                    <div className="w-4" />
+                    <div className="w-4 flex-shrink-0" />
                 )}
-                <Folder className="h-4 w-4"/>
-                <span className='flex-grow truncate'>{currentFolder.name}</span>
+                <Folder className="h-4 w-4 flex-shrink-0"/>
+                <span className='block min-w-0 flex-1 truncate' title={currentFolder.name}>{currentFolder.name}</span>
             </div>
             {!isCollapsed && children.length > 0 && (
-                <ul className="pl-4 border-l ml-4 space-y-1">
+                <ul className="pl-4 border-l ml-4 space-y-1 min-w-0">
                     {children.map(child => renderSidebarFolders(child, allChildFolders, level + 1))}
                 </ul>
             )}
