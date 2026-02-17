@@ -292,21 +292,6 @@ function DrawingCanvasPageContent() {
     }, [drawingCanvasState?.activeCanvasId, drawingCanvasState?.openCanvases]);
 
     useEffect(() => {
-        if (!drawingCanvasState?.activeCanvasId) return;
-        const handleSaveShortcut = (event: KeyboardEvent) => {
-            if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return;
-            const target = event.target as HTMLElement | null;
-            if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
-                return;
-            }
-            event.preventDefault();
-            void handleSaveClick();
-        };
-        window.addEventListener('keydown', handleSaveShortcut);
-        return () => window.removeEventListener('keydown', handleSaveShortcut);
-    }, [drawingCanvasState?.activeCanvasId, handleSaveClick]);
-
-    useEffect(() => {
       setIsMounted(true);
       const handleThemeChange = (e: MediaQueryListEvent) => {
           setTheme(e.matches ? 'dark' : 'light');
@@ -498,6 +483,21 @@ function DrawingCanvasPageContent() {
             toast({ title: "Canvas Saved" });
         });
     }, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
+
+    useEffect(() => {
+        if (!drawingCanvasState?.activeCanvasId) return;
+        const handleSaveShortcut = (event: KeyboardEvent) => {
+            if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return;
+            const target = event.target as HTMLElement | null;
+            if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+                return;
+            }
+            event.preventDefault();
+            void handleSaveClick();
+        };
+        window.addEventListener('keydown', handleSaveShortcut);
+        return () => window.removeEventListener('keydown', handleSaveShortcut);
+    }, [drawingCanvasState?.activeCanvasId, handleSaveClick]);
 
     const handleCanvasChange = useCallback(() => {
         if (isUserChange.current) {
