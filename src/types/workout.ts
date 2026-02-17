@@ -802,6 +802,20 @@ export interface UserSettings {
   lastSync?: { sha: string, timestamp: number };
   githubModuleHashes?: Record<string, string>;
   pinnedCanvasIds?: string[];
+  routineRebalanceLearning?: {
+    history: Array<{
+      id: string;
+      routineId: string;
+      action: 'move_slot' | 'stagger';
+      model?: 'pressure' | 'utilization';
+      fromSlot: SlotName;
+      toSlot?: SlotName;
+      appliedAt: number;
+      baselineMissRate: number;
+      baselineDue: number;
+      source: 'guarded_apply';
+    }>;
+  };
 }
 
 export interface ActiveFocusSession {

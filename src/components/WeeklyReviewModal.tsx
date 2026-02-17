@@ -9,7 +9,7 @@ import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { addDays, differenceInCalendarDays, differenceInDays, differenceInMonths, format, getDay, parseISO, startOfDay } from "date-fns";
-import type { Activity, MindsetPoint, SlotName } from "@/types/workout";
+import type { Activity, MindsetPoint, SlotName, UserSettings } from "@/types/workout";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +49,9 @@ type RoutineRebalanceSuggestion = {
   id: string;
   details: string;
   action: "move_slot" | "stagger";
+  source?: "routine" | "instance";
+  dateKey?: string;
+  model?: "pressure" | "utilization";
   currentSlot: SlotName;
   suggestedSlot?: SlotName;
   missRate: number;
@@ -57,10 +60,17 @@ type RoutineRebalanceSuggestion = {
   confidence: number;
   reason: string;
   impact: string;
+  targetSlotAwakeSignal?: number;
+  targetSlotAvgLoggedMinutes?: number;
+  targetSlotWastedHours?: number;
+  targetSlotStopperEvents?: number;
+  targetSlotLearningDelta?: number;
+  targetSlotLearningConfidence?: number;
   targetRule?: NonNullable<Activity["routine"]>;
   currentCadenceLabel?: string;
   targetCadenceLabel?: string;
 };
+type RoutineRebalanceLearningEvent = NonNullable<UserSettings["routineRebalanceLearning"]>["history"][number];
 
 const BOTHERING_SOURCES: Array<{ id: string; type: BotheringType }> = [
   { id: "mindset_botherings_external", type: "External" },
@@ -98,7 +108,9 @@ const mismatchTypeLabel = (mismatchType?: MindsetPoint["mismatchType"]) => {
 };
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const formatPct = (value: number) => `${Math.round(value * 100)}%`;
+const SLOT_CAPACITY_MINUTES = 240;
 const cadenceToDays = (interval: number, unit: "day" | "week" | "month") => {
   if (unit === "week") return interval * 7;
   if (unit === "month") return interval * 30;
@@ -167,7 +179,7 @@ const getRelaxedCadencePlan = (routine: Activity) => {
   };
 };
 const getSuggestionKey = (suggestion: RoutineRebalanceSuggestion) =>
-  `${suggestion.id}::${suggestion.action}::${suggestion.suggestedSlot || ""}::${getRuleSignature(suggestion.targetRule)}`;
+  `${suggestion.source || "routine"}::${suggestion.dateKey || ""}::${suggestion.id}::${suggestion.action}::${suggestion.suggestedSlot || ""}::${getRuleSignature(suggestion.targetRule)}`;
 
 const riskTone = (score: number) => {
   if (score >= 0.75) {
@@ -201,6 +213,10 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
   const [applyingSuggestionId, setApplyingSuggestionId] = useState<string | null>(null);
   const today = startOfDay(new Date());
   const todayKey = format(today, "yyyy-MM-dd");
+  const normalizeSlotName = (slot?: string): SlotName => {
+    const casted = (slot || "Evening") as SlotName;
+    return SLOT_ORDER.includes(casted) ? casted : "Evening";
+  };
 
   const botheringsByType = useMemo(() => {
     return BOTHERING_SOURCES.map(({ id, type }) => ({
@@ -353,7 +369,6 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
   const routineRebalanceSuggestions = useMemo(() => {
     const todayDate = startOfDay(parseISO(todayKey));
     const routines = (settings.routines || []).filter((r) => !!r.routine);
-    if (routines.length === 0) return [] as RoutineRebalanceSuggestion[];
 
     const windowDays = 21;
     const windowStart = addDays(todayDate, -(windowDays - 1));
@@ -361,10 +376,44 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
     for (let d = new Date(windowStart); d < todayDate; d = addDays(d, 1)) {
       pastDateKeys.push(format(d, "yyyy-MM-dd"));
     }
+    const utilizationWindowDays = 5;
+    const utilizationDateKeys: string[] = [];
+    for (let i = utilizationWindowDays; i >= 1; i -= 1) {
+      utilizationDateKeys.push(format(addDays(todayDate, -i), "yyyy-MM-dd"));
+    }
+    const utilizationDateKeySet = new Set(utilizationDateKeys);
 
-    const normalizeSlot = (slot?: string): SlotName => {
-      const casted = (slot || "Evening") as SlotName;
-      return SLOT_ORDER.includes(casted) ? casted : "Evening";
+    const normalizeSlot = normalizeSlotName;
+    const getSlotFromHour = (hour: number): SlotName => {
+      if (hour >= 0 && hour < 4) return "Late Night";
+      if (hour >= 4 && hour < 8) return "Dawn";
+      if (hour >= 8 && hour < 12) return "Morning";
+      if (hour >= 12 && hour < 16) return "Afternoon";
+      if (hour >= 16 && hour < 20) return "Evening";
+      return "Night";
+    };
+    const getSlotFromTimestamp = (timestamp: number): { slot: SlotName; dateKey: string } => {
+      const date = new Date(timestamp);
+      const slot = getSlotFromHour(date.getHours());
+      const dateKey = format(startOfDay(date), "yyyy-MM-dd");
+      return { slot, dateKey };
+    };
+    const getLoggedMinutes = (activity: Activity) => {
+      let minutes = 0;
+      if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+        const focusMinutes = Math.max(
+          0,
+          Math.round((activity.focusSessionEndTime - activity.focusSessionInitialStartTime) / 60000)
+        );
+        minutes = Math.max(minutes, focusMinutes);
+      }
+      if (activity.focusSessionInitialDuration && activity.focusSessionInitialDuration > 0) {
+        minutes = Math.max(minutes, activity.focusSessionInitialDuration);
+      }
+      if (activity.duration && activity.duration > 0) {
+        minutes = Math.max(minutes, activity.duration);
+      }
+      return minutes;
     };
 
     const isRoutineDueOnDate = (routine: Activity, dateKey: string) => {
@@ -425,12 +474,80 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
       if (bySameDetails) return bySameDetails;
       return null;
     };
+    const learningHistory = settings.routineRebalanceLearning?.history || [];
+    const routineByIdForLearning = new Map(routines.map((routine) => [routine.id, routine] as const));
+    const analysisToday = addDays(todayDate, -1);
+    const getWindowCompletionStats = (
+      routine: Activity,
+      windowStartDate: Date,
+      windowEndDate: Date,
+      expectedSlot?: SlotName
+    ) => {
+      let scheduled = 0;
+      let completed = 0;
+      const start = startOfDay(windowStartDate);
+      const end = startOfDay(windowEndDate);
+      if (end < start) return { scheduled: 0, completed: 0, rate: 0 };
+      for (let d = new Date(start); d <= end; d = addDays(d, 1)) {
+        const dateKey = format(d, "yyyy-MM-dd");
+        if (!isRoutineDueOnDate(routine, dateKey)) continue;
+        const instance = findRoutineInstance(routine, dateKey);
+        if (!instance) continue;
+        const instanceSlot = normalizeSlot(instance.slot || routine.slot);
+        if (expectedSlot && instanceSlot !== expectedSlot) continue;
+        scheduled += 1;
+        if (isCompletedActivity(instance)) completed += 1;
+      }
+      return { scheduled, completed, rate: scheduled > 0 ? completed / scheduled : 0 };
+    };
+    const slotLearningAgg = SLOT_ORDER.reduce((acc, slot) => {
+      acc[slot] = { sumDelta: 0, count: 0, positive: 0, negative: 0 };
+      return acc;
+    }, {} as Record<SlotName, { sumDelta: number; count: number; positive: number; negative: number }>);
+    learningHistory.forEach((event) => {
+      if (event.action !== "move_slot" || !event.toSlot) return;
+      const routine = routineByIdForLearning.get(event.routineId);
+      if (!routine || !routine.routine) return;
+      const appliedDay = startOfDay(new Date(event.appliedAt));
+      if (Number.isNaN(appliedDay.getTime())) return;
+      const daysSinceApply = differenceInCalendarDays(analysisToday, appliedDay);
+      if (daysSinceApply < 3) return;
+
+      const beforeStart = addDays(appliedDay, -7);
+      const beforeEnd = addDays(appliedDay, -1);
+      const afterStart = addDays(appliedDay, 1);
+      const afterEnd = addDays(appliedDay, Math.min(7, daysSinceApply));
+      if (afterEnd < afterStart) return;
+
+      const before = getWindowCompletionStats(routine, beforeStart, beforeEnd, event.fromSlot);
+      const after = getWindowCompletionStats(routine, afterStart, afterEnd, event.toSlot);
+      if (before.scheduled < 2 || after.scheduled < 2) return;
+
+      const delta = after.rate - before.rate;
+      const agg = slotLearningAgg[event.toSlot];
+      agg.sumDelta += delta;
+      agg.count += 1;
+      if (delta >= 0) agg.positive += 1;
+      else agg.negative += 1;
+    });
+    const slotLearning = SLOT_ORDER.reduce((acc, slot) => {
+      const agg = slotLearningAgg[slot];
+      const meanDelta = agg.count > 0 ? agg.sumDelta / agg.count : 0;
+      const confidence = clamp01(agg.count / 6);
+      const learnedLift = clamp(meanDelta, -0.25, 0.25) * confidence;
+      acc[slot] = { meanDelta, confidence, learnedLift, count: agg.count, positive: agg.positive, negative: agg.negative };
+      return acc;
+    }, {} as Record<SlotName, { meanDelta: number; confidence: number; learnedLift: number; count: number; positive: number; negative: number }>);
 
     const routineStats = routines.map((routine) => {
       let due = 0;
       let scheduled = 0;
       let completed = 0;
       let missed = 0;
+      const slotOutcomeAgg = SLOT_ORDER.reduce((acc, slot) => {
+        acc[slot] = { seen: 0, completed: 0 };
+        return acc;
+      }, {} as Record<SlotName, { seen: number; completed: number }>);
 
       pastDateKeys.forEach((dateKey) => {
         if (!isRoutineDueOnDate(routine, dateKey)) return;
@@ -438,11 +555,22 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
         const instance = findRoutineInstance(routine, dateKey);
         if (!instance) return;
         scheduled += 1;
-        if (isCompletedActivity(instance)) completed += 1;
-        else missed += 1;
+        const instanceSlot = normalizeSlot(instance.slot || routine.slot);
+        slotOutcomeAgg[instanceSlot].seen += 1;
+        if (isCompletedActivity(instance)) {
+          completed += 1;
+          slotOutcomeAgg[instanceSlot].completed += 1;
+        } else {
+          missed += 1;
+        }
       });
 
       const missRate = scheduled > 0 ? missed / scheduled : 0;
+      const slotCompletionRate = SLOT_ORDER.reduce((acc, slot) => {
+        const seen = slotOutcomeAgg[slot].seen;
+        acc[slot] = seen > 0 ? slotOutcomeAgg[slot].completed / seen : 0;
+        return acc;
+      }, {} as Record<SlotName, number>);
       return {
         routine,
         due,
@@ -451,8 +579,74 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
         missed,
         missRate,
         slot: normalizeSlot(routine.slot),
+        slotCompletionRate,
       };
     });
+
+    const slotUtilizationAgg = SLOT_ORDER.reduce((acc, slot) => {
+      acc[slot] = {
+        totalLoggedMinutes: 0,
+        dayCount: 0,
+        daysWithLowUtilization: 0,
+        daysWithHighUtilization: 0,
+      };
+      return acc;
+    }, {} as Record<SlotName, { totalLoggedMinutes: number; dayCount: number; daysWithLowUtilization: number; daysWithHighUtilization: number }>);
+    utilizationDateKeys.forEach((dateKey) => {
+      const day = schedule?.[dateKey];
+      SLOT_ORDER.forEach((slot) => {
+        const slotActivities = Array.isArray(day?.[slot]) ? (day?.[slot] as Activity[]) : [];
+        const loggedMinutes = slotActivities.reduce((sum, activity) => sum + getLoggedMinutes(activity), 0);
+        const agg = slotUtilizationAgg[slot];
+        agg.totalLoggedMinutes += loggedMinutes;
+        agg.dayCount += 1;
+        if (loggedMinutes <= 120) agg.daysWithLowUtilization += 1;
+        if (loggedMinutes >= 180) agg.daysWithHighUtilization += 1;
+      });
+    });
+
+    const slotStopperAgg = SLOT_ORDER.reduce((acc, slot) => {
+      acc[slot] = { events: 0, daysActive: new Set<string>() };
+      return acc;
+    }, {} as Record<SlotName, { events: number; daysActive: Set<string> }>);
+    (habitCards || []).forEach((habit) => {
+      const allStoppers = [...(habit.urges || []), ...(habit.resistances || [])];
+      allStoppers.forEach((stopper) => {
+        (stopper.timestamps || []).forEach((timestamp) => {
+          if (!timestamp || !Number.isFinite(timestamp)) return;
+          const { slot, dateKey } = getSlotFromTimestamp(timestamp);
+          if (!utilizationDateKeySet.has(dateKey)) return;
+          slotStopperAgg[slot].events += 1;
+          slotStopperAgg[slot].daysActive.add(dateKey);
+        });
+      });
+    });
+
+    const slotBehavior = SLOT_ORDER.reduce((acc, slot) => {
+      const util = slotUtilizationAgg[slot];
+      const stop = slotStopperAgg[slot];
+      const dayCount = Math.max(1, util.dayCount);
+      const avgLoggedMinutes = util.totalLoggedMinutes / dayCount;
+      const wastedRatio = clamp01((SLOT_CAPACITY_MINUTES - avgLoggedMinutes) / SLOT_CAPACITY_MINUTES);
+      const lowUtilRate = util.daysWithLowUtilization / dayCount;
+      const highUtilRate = util.daysWithHighUtilization / dayCount;
+      const stopperDaysRate = stop.daysActive.size / dayCount;
+      const stopperEventRate = clamp01(stop.events / (dayCount * 2));
+      const awakeSignal = clamp01(stopperDaysRate * 0.65 + stopperEventRate * 0.35);
+      const opportunityScore = clamp01(wastedRatio * 0.55 + awakeSignal * 0.45);
+      acc[slot] = {
+        avgLoggedMinutes,
+        wastedRatio,
+        lowUtilRate,
+        highUtilRate,
+        awakeSignal,
+        stopperEvents: stop.events,
+        opportunityScore,
+      };
+      return acc;
+    }, {} as Record<SlotName, { avgLoggedMinutes: number; wastedRatio: number; lowUtilRate: number; highUtilRate: number; awakeSignal: number; stopperEvents: number; opportunityScore: number }>);
+    const totalStopperEvents = SLOT_ORDER.reduce((sum, slot) => sum + slotBehavior[slot].stopperEvents, 0);
+    const stopperSignalAvailable = totalStopperEvents > 0;
 
     const slotAgg = SLOT_ORDER.reduce(
       (acc, slot) => {
@@ -480,39 +674,137 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
 
     routineStats.forEach((stat) => {
       const overloaded = (stat.missed >= 3 && stat.missRate >= 0.35 && stat.scheduled >= 5) || (stat.missRate >= 0.55 && stat.scheduled >= 4);
-      if (!overloaded) return;
-
       const currentPressure = slotPressure[stat.slot];
-      const targetSlots = SLOT_ORDER.filter((slot) => slot !== stat.slot).sort((a, b) => slotPressure[a] - slotPressure[b]);
-      const bestSlot = targetSlots[0];
-      const pressureGain = currentPressure - slotPressure[bestSlot];
+      const currentBehavior = slotBehavior[stat.slot];
+      const currentCompletionRate = stat.slotCompletionRate[stat.slot] || 0;
+      const moderatelyStruggling =
+        !overloaded &&
+        ((stat.missed >= 2 && stat.missRate >= 0.25 && stat.scheduled >= 4) ||
+          (stat.missRate >= 0.4 && stat.scheduled >= 3));
 
-      if (pressureGain > 0.1) {
-        const confidence = clamp01(0.42 + stat.missRate * 0.34 + pressureGain * 0.34);
+      const rankedTargets = SLOT_ORDER.filter((slot) => slot !== stat.slot)
+        .map((slot) => {
+          const targetPressure = slotPressure[slot];
+          const targetBehavior = slotBehavior[slot];
+          const targetLearning = slotLearning[slot];
+          const pressureGain = currentPressure - targetPressure;
+          const opportunityGain = targetBehavior.opportunityScore - currentBehavior.opportunityScore;
+          const slotFitGain = (stat.slotCompletionRate[slot] || 0) - currentCompletionRate;
+          const learnedGain = targetLearning.learnedLift;
+          const compositeGain = 0.34 * pressureGain + 0.34 * opportunityGain + 0.17 * slotFitGain + 0.15 * learnedGain;
+          const targetWastedHours = Math.max(0, (SLOT_CAPACITY_MINUTES - targetBehavior.avgLoggedMinutes) / 60);
+          const utilizationDriven =
+            targetBehavior.avgLoggedMinutes <= 150 &&
+            targetBehavior.wastedRatio >= 0.35 &&
+            (stopperSignalAvailable ? targetBehavior.awakeSignal >= 0.2 : targetBehavior.lowUtilRate >= 0.4);
+          return {
+            slot,
+            targetPressure,
+            targetBehavior,
+            targetLearning,
+            pressureGain,
+            opportunityGain,
+            slotFitGain,
+            learnedGain,
+            compositeGain,
+            targetWastedHours,
+            utilizationDriven,
+          };
+        })
+        .sort((a, b) => b.compositeGain - a.compositeGain);
+      const bestTarget = rankedTargets[0];
+      const hasViableAwakeEvidence =
+        !stopperSignalAvailable ||
+        (!!bestTarget && (bestTarget.targetBehavior.highUtilRate >= 0.2 || bestTarget.targetBehavior.awakeSignal >= 0.2));
+
+      const shouldMoveForOverload =
+        overloaded &&
+        !!bestTarget &&
+        bestTarget.compositeGain > 0.05 &&
+        (bestTarget.pressureGain > 0.08 || bestTarget.utilizationDriven) &&
+        hasViableAwakeEvidence;
+      const shouldMoveForUtilization =
+        moderatelyStruggling &&
+        !!bestTarget &&
+        bestTarget.compositeGain > 0.07 &&
+        bestTarget.utilizationDriven &&
+        bestTarget.opportunityGain > 0.05;
+      const shouldMoveForOptimization =
+        !overloaded &&
+        !moderatelyStruggling &&
+        !!bestTarget &&
+        stat.scheduled >= 1 &&
+        bestTarget.compositeGain > 0.06 &&
+        bestTarget.utilizationDriven &&
+        (bestTarget.opportunityGain > 0.06 ||
+          (bestTarget.targetLearning.confidence >= 0.2 && bestTarget.targetLearning.meanDelta > 0.03));
+
+      let moveGenerated = false;
+      if (bestTarget && (shouldMoveForOverload || shouldMoveForUtilization || shouldMoveForOptimization)) {
+        const confidence = clamp01(
+          (shouldMoveForOptimization ? 0.28 : 0.34) +
+            stat.missRate * (shouldMoveForOptimization ? 0.12 : 0.28) +
+            Math.max(0, bestTarget.compositeGain) * (shouldMoveForOptimization ? 0.34 : 0.3) +
+            bestTarget.targetBehavior.awakeSignal * (shouldMoveForOptimization ? 0.14 : 0.12) +
+            bestTarget.targetBehavior.wastedRatio * (shouldMoveForOptimization ? 0.12 : 0.1) +
+            Math.max(0, bestTarget.learnedGain) * 0.08
+        );
+        const primaryModel: RoutineRebalanceSuggestion["model"] = shouldMoveForUtilization || shouldMoveForOptimization ? "utilization" : "pressure";
+        const targetSignalText = stopperSignalAvailable
+          ? `awake signal from urge/resistance logs (${(bestTarget.targetBehavior.awakeSignal * 100).toFixed(0)}%)`
+          : `underused execution pattern (${Math.round(bestTarget.targetBehavior.avgLoggedMinutes)}m/240m)`;
+        const learningEvidence =
+          bestTarget.targetLearning.confidence >= 0.2
+            ? ` Historical lift: ${bestTarget.targetLearning.meanDelta >= 0 ? "+" : ""}${Math.round(bestTarget.targetLearning.meanDelta * 100)}% (conf ${(bestTarget.targetLearning.confidence * 100).toFixed(0)}%).`
+            : "";
+        const reason =
+          shouldMoveForOptimization
+            ? `${bestTarget.slot} is a higher-efficiency opportunity: ${targetSignalText} and unused capacity over last 5 days.${learningEvidence} Move from ${stat.slot} to improve throughput, even though miss pressure is currently moderate.`
+            : primaryModel === "utilization"
+            ? `${bestTarget.slot} shows ${targetSignalText} over last 5 days.${learningEvidence} Rebalancing from ${stat.slot} should capture this wasted block.`
+            : `High misses in ${stat.slot}; ${bestTarget.slot} has lower pressure and better utilization fit from last 5 days.${learningEvidence}`;
+        const impact =
+          shouldMoveForOptimization
+            ? `Optimization gain: ${bestTarget.targetWastedHours.toFixed(1)}h recoverable capacity per slot.`
+            : primaryModel === "utilization"
+            ? `Estimated reclaimed capacity: ${bestTarget.targetWastedHours.toFixed(1)}h/slot. ${stopperSignalAvailable ? `Awake signal ${(bestTarget.targetBehavior.awakeSignal * 100).toFixed(0)}% with ${bestTarget.targetBehavior.stopperEvents} urge/resistance events.` : "Based on low-utilization pattern from recent execution history."}`
+            : `Estimated pressure drop: ${Math.round(Math.max(0, bestTarget.pressureGain) * 100)}%. Additional free capacity: ${bestTarget.targetWastedHours.toFixed(1)}h/slot.`;
         moveSuggestions.push({
           id: stat.routine.id,
           details: stat.routine.details,
           action: "move_slot",
+          source: "routine",
+          model: primaryModel,
           currentSlot: stat.slot,
-          suggestedSlot: bestSlot,
+          suggestedSlot: bestTarget.slot,
           missRate: stat.missRate,
           missed: stat.missed,
           due: stat.scheduled,
           confidence,
-          reason: `High misses in ${stat.slot} with lower pressure in ${bestSlot}.`,
-          impact: `Estimated pressure drop: ${Math.round(pressureGain * 100)}%.`,
+          reason,
+          impact,
+          targetSlotAwakeSignal: bestTarget.targetBehavior.awakeSignal,
+          targetSlotAvgLoggedMinutes: bestTarget.targetBehavior.avgLoggedMinutes,
+          targetSlotWastedHours: bestTarget.targetWastedHours,
+          targetSlotStopperEvents: bestTarget.targetBehavior.stopperEvents,
+          targetSlotLearningDelta: bestTarget.targetLearning.meanDelta,
+          targetSlotLearningConfidence: bestTarget.targetLearning.confidence,
         });
+        moveGenerated = true;
       }
 
       const cadencePlan = getRelaxedCadencePlan(stat.routine);
       const cadenceOverload = stat.missRate >= 0.5 && stat.scheduled >= 4 && stat.missed >= 2;
-      if (cadencePlan && cadenceOverload) {
+      const severeCadenceFailure = stat.missRate >= 0.8 && stat.scheduled >= 6;
+      if (cadencePlan && cadenceOverload && (!moveGenerated || severeCadenceFailure)) {
         const cadenceLift = Math.min(1, cadencePlan.targetIntervalDays / Math.max(1, stat.scheduled));
-        const confidence = clamp01(0.36 + stat.missRate * 0.42 + Math.max(0, 0.18 - pressureGain) * 0.25 + cadenceLift * 0.07);
+        const bestPressureGain = bestTarget ? Math.max(0, bestTarget.pressureGain) : 0;
+        const confidence = clamp01(0.36 + stat.missRate * 0.42 + Math.max(0, 0.18 - bestPressureGain) * 0.25 + cadenceLift * 0.07);
         staggerSuggestions.push({
           id: stat.routine.id,
           details: stat.routine.details,
           action: "stagger",
+          source: "routine",
           currentSlot: stat.slot,
           missRate: stat.missRate,
           missed: stat.missed,
@@ -527,23 +819,175 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
       }
     });
 
+    if (moveSuggestions.length === 0 && staggerSuggestions.length === 0) {
+      const todayDay = schedule?.[todayKey];
+      if (todayDay) {
+        const todayPendingBySlot = SLOT_ORDER.reduce((acc, slot) => {
+          const slotActivities = Array.isArray(todayDay[slot]) ? (todayDay[slot] as Activity[]) : [];
+          acc[slot] = slotActivities.filter((activity) => !isCompletedActivity(activity)).length;
+          return acc;
+        }, {} as Record<SlotName, number>);
+        const maxPendingToday = Math.max(1, ...SLOT_ORDER.map((slot) => todayPendingBySlot[slot]));
+
+        const pendingTodayInstances: Activity[] = [];
+        const seenActivityIds = new Set<string>();
+        SLOT_ORDER.forEach((slot) => {
+          const slotActivities = Array.isArray(todayDay[slot]) ? (todayDay[slot] as Activity[]) : [];
+          slotActivities.forEach((activity) => {
+            if (!activity?.id || seenActivityIds.has(activity.id)) return;
+            if (activity.type === "interrupt") return;
+            if (isCompletedActivity(activity)) return;
+            seenActivityIds.add(activity.id);
+            pendingTodayInstances.push({ ...activity, slot });
+          });
+        });
+
+        const maxFallbackCards = 6;
+        const weakFallbackCandidates: Array<{
+          activity: Activity;
+          currentSlot: SlotName;
+          bestTarget: {
+            slot: SlotName;
+            targetBehavior: {
+              avgLoggedMinutes: number;
+              wastedRatio: number;
+              lowUtilRate: number;
+              highUtilRate: number;
+              awakeSignal: number;
+              stopperEvents: number;
+              opportunityScore: number;
+            };
+            targetLearning: {
+              meanDelta: number;
+              confidence: number;
+              learnedLift: number;
+              count: number;
+              positive: number;
+              negative: number;
+            };
+            opportunityGain: number;
+            pendingRelief: number;
+            score: number;
+            targetWastedHours: number;
+          };
+        }> = [];
+        for (const activity of pendingTodayInstances) {
+          if (moveSuggestions.length >= maxFallbackCards) break;
+          const currentSlot = normalizeSlot(activity.slot);
+          const currentBehavior = slotBehavior[currentSlot];
+          const rankedTargets = SLOT_ORDER.filter((slot) => slot !== currentSlot)
+            .map((slot) => {
+              const targetBehavior = slotBehavior[slot];
+              const targetLearning = slotLearning[slot];
+              const opportunityGain = targetBehavior.opportunityScore - currentBehavior.opportunityScore;
+              const pendingRelief = (todayPendingBySlot[currentSlot] - todayPendingBySlot[slot]) / maxPendingToday;
+              const score =
+                0.5 * opportunityGain +
+                0.25 * pendingRelief +
+                0.15 * Math.max(0, targetLearning.learnedLift) +
+                0.1 * targetBehavior.wastedRatio;
+              const targetWastedHours = Math.max(0, (SLOT_CAPACITY_MINUTES - targetBehavior.avgLoggedMinutes) / 60);
+              return { slot, targetBehavior, targetLearning, opportunityGain, pendingRelief, score, targetWastedHours };
+            })
+            .sort((a, b) => b.score - a.score);
+          const bestTarget = rankedTargets[0];
+          if (!bestTarget) continue;
+          weakFallbackCandidates.push({ activity, currentSlot, bestTarget });
+
+          const isActionable =
+            bestTarget.score > 0.04 &&
+            (bestTarget.opportunityGain > 0.02 || bestTarget.pendingRelief > 0.1);
+          if (!isActionable) continue;
+
+          const confidence = clamp01(
+            0.3 + Math.max(0, bestTarget.score) * 0.7 + bestTarget.targetBehavior.awakeSignal * 0.08
+          );
+          const learningEvidence =
+            bestTarget.targetLearning.confidence >= 0.05
+              ? ` Historical lift: ${bestTarget.targetLearning.meanDelta >= 0 ? "+" : ""}${Math.round(bestTarget.targetLearning.meanDelta * 100)}% (conf ${(bestTarget.targetLearning.confidence * 100).toFixed(0)}%).`
+              : "";
+
+          moveSuggestions.push({
+            id: activity.id,
+            details: activity.details,
+            action: "move_slot",
+            source: "instance",
+            dateKey: todayKey,
+            model: "utilization",
+            currentSlot,
+            suggestedSlot: bestTarget.slot,
+            missRate: 0,
+            missed: 0,
+            due: 1,
+            confidence,
+            reason: `${bestTarget.slot} has better today utilization opportunity than ${currentSlot} for this pending task.${learningEvidence}`,
+            impact: `Optimization gain: ${bestTarget.targetWastedHours.toFixed(1)}h recoverable capacity in target slot.`,
+            targetSlotAwakeSignal: bestTarget.targetBehavior.awakeSignal,
+            targetSlotAvgLoggedMinutes: bestTarget.targetBehavior.avgLoggedMinutes,
+            targetSlotWastedHours: bestTarget.targetWastedHours,
+            targetSlotStopperEvents: bestTarget.targetBehavior.stopperEvents,
+            targetSlotLearningDelta: bestTarget.targetLearning.meanDelta,
+            targetSlotLearningConfidence: bestTarget.targetLearning.confidence,
+          });
+        }
+
+        if (moveSuggestions.length === 0 && weakFallbackCandidates.length > 0) {
+          weakFallbackCandidates
+            .sort((a, b) => {
+              const scoreDiff = b.bestTarget.score - a.bestTarget.score;
+              if (Math.abs(scoreDiff) > 0.001) return scoreDiff;
+              return todayPendingBySlot[b.currentSlot] - todayPendingBySlot[a.currentSlot];
+            })
+            .slice(0, 3)
+            .forEach(({ activity, currentSlot, bestTarget }) => {
+              const confidence = clamp01(
+                0.24 + Math.max(0, bestTarget.score) * 0.55 + bestTarget.targetBehavior.awakeSignal * 0.06
+              );
+              moveSuggestions.push({
+                id: activity.id,
+                details: activity.details,
+                action: "move_slot",
+                source: "instance",
+                dateKey: todayKey,
+                model: "utilization",
+                currentSlot,
+                suggestedSlot: bestTarget.slot,
+                missRate: 0,
+                missed: 0,
+                due: 1,
+                confidence,
+                reason: `Low-signal optimization: ${bestTarget.slot} currently has slightly better utilization room than ${currentSlot}. Try this move for 2 days and reassess completion.`,
+                impact: `Pilot move to use ${bestTarget.targetWastedHours.toFixed(1)}h spare capacity in target slot.`,
+                targetSlotAwakeSignal: bestTarget.targetBehavior.awakeSignal,
+                targetSlotAvgLoggedMinutes: bestTarget.targetBehavior.avgLoggedMinutes,
+                targetSlotWastedHours: bestTarget.targetWastedHours,
+                targetSlotStopperEvents: bestTarget.targetBehavior.stopperEvents,
+                targetSlotLearningDelta: bestTarget.targetLearning.meanDelta,
+                targetSlotLearningConfidence: bestTarget.targetLearning.confidence,
+              });
+            });
+        }
+      }
+    }
+
     moveSuggestions.sort((a, b) => b.confidence - a.confidence);
     staggerSuggestions.sort((a, b) => b.confidence - a.confidence);
 
     const merged: RoutineRebalanceSuggestion[] = [];
     const usedRoutineIds = new Set<string>();
     const maxCards = 8;
+    let staggerCardCount = 0;
+    const maxStaggerCards = 2;
     const pushUnique = (candidate?: RoutineRebalanceSuggestion) => {
       if (!candidate) return;
+       if (candidate.action === "stagger" && staggerCardCount >= maxStaggerCards) return;
       if (usedRoutineIds.has(candidate.id)) return;
       usedRoutineIds.add(candidate.id);
+      if (candidate.action === "stagger") staggerCardCount += 1;
       merged.push(candidate);
     };
 
-    // Keep the feed mixed so it does not collapse to only slot-move cards.
-    if (staggerSuggestions.length > 0) {
-      pushUnique(staggerSuggestions.shift());
-    }
+    // Prefer concrete slot moves first; cadence easing is a guarded fallback.
     while (merged.length < maxCards && (moveSuggestions.length > 0 || staggerSuggestions.length > 0)) {
       pushUnique(moveSuggestions.shift());
       if (merged.length >= maxCards) break;
@@ -556,12 +1000,37 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
     }
 
     return merged.slice(0, maxCards);
-  }, [settings.routines, schedule, todayKey]);
+  }, [settings.routines, settings.routineRebalanceLearning, schedule, todayKey, habitCards]);
   const routineById = useMemo(() => {
     return new Map((settings.routines || []).map((routine) => [routine.id, routine] as const));
   }, [settings.routines]);
+  const appendLearningHistory = (prev: UserSettings, event: RoutineRebalanceLearningEvent): UserSettings => {
+    const previousLearning = prev.routineRebalanceLearning || { history: [] };
+    const nextHistory = [...(previousLearning.history || []), event].slice(-400);
+    return {
+      ...prev,
+      routineRebalanceLearning: {
+        ...previousLearning,
+        history: nextHistory,
+      },
+    };
+  };
 
   const isSuggestionApplyEligible = (suggestion: RoutineRebalanceSuggestion) => {
+    if (suggestion.action === "move_slot" && suggestion.source === "instance") {
+      if (!suggestion.suggestedSlot || !SLOT_ORDER.includes(suggestion.suggestedSlot)) return false;
+      const targetDateKey = suggestion.dateKey || todayKey;
+      const day = schedule?.[targetDateKey];
+      if (!day) return false;
+      let foundSlot: SlotName | null = null;
+      SLOT_ORDER.forEach((slot) => {
+        const list = Array.isArray(day[slot]) ? (day[slot] as Activity[]) : [];
+        if (list.some((activity) => activity.id === suggestion.id)) foundSlot = slot;
+      });
+      if (!foundSlot) return false;
+      return foundSlot === suggestion.currentSlot && foundSlot !== suggestion.suggestedSlot;
+    }
+
     const routine = routineById.get(suggestion.id);
     if (!routine) return false;
     if (suggestion.action === "move_slot") {
@@ -580,6 +1049,8 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
     try {
       const stillSuggested = routineRebalanceSuggestions.some(
         (candidate) =>
+          (candidate.source || "routine") === (suggestion.source || "routine") &&
+          (candidate.dateKey || "") === (suggestion.dateKey || "") &&
           candidate.id === suggestion.id &&
           candidate.action === suggestion.action &&
           candidate.currentSlot === suggestion.currentSlot &&
@@ -591,6 +1062,81 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
           title: "Suggestion changed",
           description: "This suggestion is no longer active. Please review the refreshed recommendations.",
           variant: "destructive",
+        });
+        return;
+      }
+
+      if (suggestion.action === "move_slot" && suggestion.source === "instance") {
+        const targetSlot = suggestion.suggestedSlot;
+        if (!targetSlot || !SLOT_ORDER.includes(targetSlot)) {
+          toast({
+            title: "Invalid slot suggestion",
+            description: "Could not apply this move safely.",
+            variant: "destructive",
+          });
+          return;
+        }
+        const targetDateKey = suggestion.dateKey || todayKey;
+        const day = schedule?.[targetDateKey];
+        if (!day) {
+          toast({
+            title: "Task not found",
+            description: "This task is no longer available for rebalancing.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        let foundSlot: SlotName | null = null;
+        SLOT_ORDER.forEach((slot) => {
+          const list = Array.isArray(day[slot]) ? (day[slot] as Activity[]) : [];
+          if (list.some((activity) => activity.id === suggestion.id)) foundSlot = slot;
+        });
+        if (!foundSlot || foundSlot !== suggestion.currentSlot || foundSlot === targetSlot) {
+          toast({
+            title: "Task changed",
+            description: "This task has already moved. Refresh suggestions.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        setSchedule((prev) => {
+          const todayDay = prev[targetDateKey];
+          if (!todayDay) return prev;
+          let matched: Activity | null = null;
+          let changed = false;
+          const nextDay = { ...todayDay };
+
+          SLOT_ORDER.forEach((slot) => {
+            const slotActivities = nextDay[slot];
+            if (!Array.isArray(slotActivities)) return;
+            const list = slotActivities as Activity[];
+            const filtered = list.filter((activity) => {
+              const isMatch = activity.id === suggestion.id;
+              if (isMatch && !matched) matched = activity;
+              return !isMatch;
+            });
+            if (filtered.length !== list.length) {
+              nextDay[slot] = filtered;
+              changed = true;
+            }
+          });
+
+          if (!matched) return prev;
+          const targetActivities = Array.isArray(nextDay[targetSlot]) ? [...(nextDay[targetSlot] as Activity[])] : [];
+          const movedInstance: Activity = { ...matched, slot: targetSlot };
+          targetActivities.push(movedInstance);
+          nextDay[targetSlot] = targetActivities;
+          changed = true;
+
+          if (!changed) return prev;
+          return { ...prev, [targetDateKey]: nextDay };
+        });
+
+        toast({
+          title: "Suggestion applied",
+          description: `"${suggestion.details}" moved to ${targetSlot}.`,
         });
         return;
       }
@@ -626,10 +1172,25 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
           return;
         }
 
-        setSettings((prev) => ({
-          ...prev,
-          routines: (prev.routines || []).map((r) => (r.id === suggestion.id ? { ...r, slot: targetSlot } : r)),
-        }));
+        setSettings((prev) => {
+          const learningEvent: RoutineRebalanceLearningEvent = {
+            id: `rr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            routineId: suggestion.id,
+            action: "move_slot",
+            model: suggestion.model,
+            fromSlot: suggestion.currentSlot,
+            toSlot: targetSlot,
+            appliedAt: Date.now(),
+            baselineMissRate: suggestion.missRate,
+            baselineDue: suggestion.due,
+            source: "guarded_apply",
+          };
+          const nextSettings: UserSettings = {
+            ...prev,
+            routines: (prev.routines || []).map((r) => (r.id === suggestion.id ? { ...r, slot: targetSlot } : r)),
+          };
+          return appendLearningHistory(nextSettings, learningEvent);
+        });
 
         setSchedule((prev) => {
           const todayDay = prev[todayKey];
@@ -691,17 +1252,31 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
         return;
       }
 
-      setSettings((prev) => ({
-        ...prev,
-        routines: (prev.routines || []).map((r) =>
-          r.id === suggestion.id
-            ? {
-                ...r,
-                routine: { ...suggestion.targetRule },
-              }
-            : r
-        ),
-      }));
+      setSettings((prev) => {
+        const learningEvent: RoutineRebalanceLearningEvent = {
+          id: `rr_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          routineId: suggestion.id,
+          action: "stagger",
+          model: suggestion.model,
+          fromSlot: suggestion.currentSlot,
+          appliedAt: Date.now(),
+          baselineMissRate: suggestion.missRate,
+          baselineDue: suggestion.due,
+          source: "guarded_apply",
+        };
+        const nextSettings: UserSettings = {
+          ...prev,
+          routines: (prev.routines || []).map((r) =>
+            r.id === suggestion.id
+              ? {
+                  ...r,
+                  routine: { ...suggestion.targetRule },
+                }
+              : r
+          ),
+        };
+        return appendLearningHistory(nextSettings, learningEvent);
+      });
 
       toast({
         title: "Suggestion applied",
@@ -1070,7 +1645,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
               {routineRebalanceSuggestions.length === 0 ? (
                 <Card className="border-fuchsia-500/30 bg-fuchsia-500/5">
                   <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                    No rebalance recommendation right now. Routine miss pressure is within acceptable range.
+                    No rebalance recommendation right now. Miss pressure and last-5-day utilization signals are both within acceptable range.
                   </CardContent>
                 </Card>
               ) : (
@@ -1089,11 +1664,41 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                             </Badge>
                           </div>
                           <div className="flex flex-wrap items-center gap-2 text-xs">
-                            <Badge variant="outline">Missed {s.missed}/{s.due}</Badge>
-                            <Badge variant="outline">Miss rate {(s.missRate * 100).toFixed(0)}%</Badge>
+                            {s.source === "instance" ? (
+                              <Badge variant="outline">Today pending task</Badge>
+                            ) : (
+                              <>
+                                <Badge variant="outline">Missed {s.missed}/{s.due}</Badge>
+                                <Badge variant="outline">Miss rate {(s.missRate * 100).toFixed(0)}%</Badge>
+                              </>
+                            )}
                             <Badge variant="outline">Current {s.currentSlot}</Badge>
+                            {s.model === "utilization" ? (
+                              <Badge variant="outline" className="border-sky-400/40 text-sky-200 bg-sky-500/10">
+                                Utilization model
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="border-amber-400/40 text-amber-200 bg-amber-500/10">
+                                Pressure model
+                              </Badge>
+                            )}
                             {s.action === "move_slot" && s.suggestedSlot ? <Badge variant="secondary">Suggest {s.suggestedSlot}</Badge> : null}
                             {s.action === "stagger" && s.targetCadenceLabel ? <Badge variant="secondary">Suggest {s.targetCadenceLabel}</Badge> : null}
+                            {s.action === "move_slot" && typeof s.targetSlotAwakeSignal === "number" ? (
+                              <Badge variant="outline">Awake {(s.targetSlotAwakeSignal * 100).toFixed(0)}%</Badge>
+                            ) : null}
+                            {s.action === "move_slot" && typeof s.targetSlotAvgLoggedMinutes === "number" ? (
+                              <Badge variant="outline">Avg {Math.round(s.targetSlotAvgLoggedMinutes)}m/240m</Badge>
+                            ) : null}
+                            {s.action === "move_slot" &&
+                            typeof s.targetSlotLearningDelta === "number" &&
+                            typeof s.targetSlotLearningConfidence === "number" &&
+                            s.targetSlotLearningConfidence >= 0.05 ? (
+                              <Badge variant="outline">
+                                Learn {s.targetSlotLearningDelta >= 0 ? "+" : ""}
+                                {Math.round(s.targetSlotLearningDelta * 100)}%
+                              </Badge>
+                            ) : null}
                           </div>
                           <div className="text-sm text-muted-foreground">{s.reason}</div>
                           <div className="text-sm">
@@ -1101,13 +1706,25 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                               {s.action === "move_slot" ? "Action: Move slot" : "Action: Ease cadence"}
                             </span>
                             {s.action === "move_slot" && s.suggestedSlot ? (
-                              <span className="text-muted-foreground"> ({s.currentSlot} -> {s.suggestedSlot})</span>
+                              <span className="text-muted-foreground"> ({s.currentSlot} -&gt; {s.suggestedSlot})</span>
                             ) : null}
                             {s.action === "stagger" && s.targetCadenceLabel ? (
-                              <span className="text-muted-foreground"> ({s.currentCadenceLabel || "current"} -> {s.targetCadenceLabel})</span>
+                              <span className="text-muted-foreground"> ({s.currentCadenceLabel || "current"} -&gt; {s.targetCadenceLabel})</span>
                             ) : null}
                           </div>
                           <div className="text-xs text-muted-foreground">{s.impact}</div>
+                          {s.action === "move_slot" &&
+                          typeof s.targetSlotLearningConfidence === "number" &&
+                          s.targetSlotLearningConfidence >= 0.05 ? (
+                            <div className="text-[11px] text-muted-foreground">
+                              Historical model confidence: {(s.targetSlotLearningConfidence * 100).toFixed(0)}%.
+                            </div>
+                          ) : null}
+                          {s.action === "move_slot" && typeof s.targetSlotStopperEvents === "number" ? (
+                            <div className="text-[11px] text-muted-foreground">
+                              Last 5 days: {s.targetSlotStopperEvents} urge/resistance events in suggested slot.
+                            </div>
+                          ) : null}
                           <div className="flex items-center justify-between gap-2 pt-1">
                             <div className="text-[11px] text-muted-foreground">
                               {canApply ? "Guard checks passed" : "Guard check failed (routine changed)"}
@@ -1193,7 +1810,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                               Consistency
                             </div>
                             <div className="mt-1 font-semibold">
-                              {formatPct(risk.previousRate)} -> {formatPct(risk.recentRate)}
+                              {formatPct(risk.previousRate)} -&gt; {formatPct(risk.recentRate)}
                             </div>
                           </div>
                           <div className="rounded-lg border border-white/10 bg-background/25 p-2.5">
@@ -1330,7 +1947,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                               Consistency
                             </div>
                             <div className="mt-1 font-semibold">
-                              {formatPct(risk.previousRate)} -> {formatPct(risk.recentRate)}
+                              {formatPct(risk.previousRate)} -&gt; {formatPct(risk.recentRate)}
                             </div>
                           </div>
                           <div className="rounded-lg border border-white/10 bg-background/25 p-2.5">

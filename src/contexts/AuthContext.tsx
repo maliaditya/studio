@@ -558,6 +558,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     agendaShowCurrentSlotOnly: false,
     spacedRepetitionSlot: 'Late Night',
     pinnedCanvasIds: [],
+    routineRebalanceLearning: {
+      history: [],
+    },
   });
 
   // Health State
@@ -1733,6 +1736,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         spacedRepetitionSlot: 'Late Night',
           pinnedCanvasIds: [],
           githubModuleHashes: {},
+          routineRebalanceLearning: {
+            history: [],
+          },
       };
     setSettings({ ...defaultSettings, ...(sanitizedMain.settings || {}) });
 
@@ -2204,35 +2210,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const shouldBeCompleted = isCompleted !== undefined ? isCompleted : !activityToUpdate.completed;
     const baseMatch = activityToUpdate.id.match(/_(\d{4}-\d{2}-\d{2})$/);
-
-    const slotOrder: SlotName[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
-    const isPastSlotToday = () => {
-        if (!currentSlot) return false;
-        if (targetDateKey !== todayKey) return false;
-        const targetIndex = slotOrder.indexOf(targetSlot as SlotName);
-        const currentIndex = slotOrder.indexOf(currentSlot as SlotName);
-        if (targetIndex === -1 || currentIndex === -1) return false;
-        return targetIndex < currentIndex;
-    };
-
-    if (shouldBeCompleted && !activityToUpdate.completed && isPastSlotToday()) {
-        toast({
-            title: "Past Slot",
-            description: "Add an urge or resistance for this task before marking complete.",
-            variant: "destructive",
-        });
-        if (typeof window !== 'undefined') {
-            const baseId = baseMatch ? activityToUpdate.id.slice(0, -11) : undefined;
-            window.dispatchEvent(new CustomEvent('open-resistance-list-for-task', {
-                detail: {
-                    taskId: activityToUpdate.id,
-                    taskIds: activityToUpdate.taskIds || [],
-                    baseId,
-                },
-            }));
-        }
-        return;
-    }
     
     if (shouldBeCompleted && !activityToUpdate.completed) {
         if (activityToUpdate.duration) {
