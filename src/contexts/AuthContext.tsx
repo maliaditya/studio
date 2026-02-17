@@ -4379,8 +4379,16 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
         return;
     }
-    toast({ title: "Downloading...", description: "Backup will be stored locally." });
+    const downloadToast = toast({ title: "Downloading...", description: "Step 1/7 Preparing GitHub download..." });
+    const setDownloadProgress = (step: number, message: string) => {
+      downloadToast.update({
+        title: "Downloading...",
+        description: `Step ${step}/7 ${message}`,
+      });
+    };
+
     try {
+        setDownloadProgress(2, "Checking remote sync status...");
         const prefixedPath = withUserGitHubPrefix(githubPath, username);
         const { dir } = getGitHubBaseDir(prefixedPath);
         const syncStatusPath = dir ? `${dir}/sync-status.json` : 'sync-status.json';
@@ -4397,6 +4405,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             throw new Error('A GitHub sync is currently in progress. Please wait a minute and retry download.');
           }
         }
+
+        setDownloadProgress(3, "Inspecting repository structure...");
         const manifestPath = dir ? `${dir}/manifest.json` : 'manifest.json';
         const directoryEntries = await listGitHubDirectory(githubToken, githubOwner, githubRepo, dir);
         const namesInDir = new Set((directoryEntries || []).map(entry => entry.name));
@@ -4430,8 +4440,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             effectiveManifest = { version: 1, modules };
         }
 
-        let useFullBackup = false;
         if (effectiveManifest && effectiveManifest.modules) {
+            setDownloadProgress(4, "Fetching modular backup files...");
             const core = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules.core?.path);
             const workouts = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules.workouts?.path);
             let resourcesMod = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules.resources?.path);
@@ -4468,7 +4478,12 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             if (folderModuleEntries.length > 0) {
                 const folderResources: Resource[] = [];
                 const folderFolders: ResourceFolder[] = [];
-                for (const folderPath of folderModuleEntries) {
+                for (let index = 0; index < folderModuleEntries.length; index += 1) {
+                    const folderPath = folderModuleEntries[index];
+                    downloadToast.update({
+                      title: "Downloading...",
+                      description: `Step 4/7 Loading modular folder ${index + 1}/${folderModuleEntries.length}...`,
+                    });
                     const folderPayload = await getGitHubJson<{ folderId?: string; folder?: ResourceFolder; resources?: Resource[] }>(githubToken, githubOwner, githubRepo, folderPath);
                     if (folderPayload?.folder) folderFolders.push(folderPayload.folder);
                     if (folderPayload?.resources && Array.isArray(folderPayload.resources)) {
@@ -4494,8 +4509,9 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             const hasCore = !!core;
             const hasResources = !!resourcesMod || folderModuleEntries.length > 0;
             if (!hasCore || !hasResources) {
-                useFullBackup = true;
+                setDownloadProgress(5, "Modular backup incomplete. Falling back to full backup...");
             } else {
+                setDownloadProgress(6, "Assembling and storing modular backup locally...");
                 const mergedMain = {
                     ...(core || {}),
                     ...(workouts || {}),
@@ -4508,11 +4524,12 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                 const blob = new Blob([JSON.stringify(merged)], { type: 'application/json' });
                 await storeBackup('github_backup', blob);
                 setImportBackupConfirmationOpen(true);
-                toast({ title: "Download Ready", description: "Modular backup has been assembled locally." });
+                downloadToast.update({ title: "Download Ready", description: "Modular backup has been assembled locally." });
                 return;
             }
         }
 
+        setDownloadProgress(5, "Resolving full backup file...");
         let resolvedBackupPath = prefixedPath;
         const preferredName = prefixedPath.split('/').pop() || prefixedPath;
         if (!namesInDir.has(preferredName)) {
@@ -4524,6 +4541,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             }
         }
 
+        setDownloadProgress(6, "Downloading full backup payload...");
         const response = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${resolvedBackupPath}`, {
             headers: { 'Authorization': `token ${githubToken}` }
         });
@@ -4544,12 +4562,15 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         if (!blob) {
             throw new Error('Failed to retrieve backup content from GitHub.');
         }
+
+        setDownloadProgress(7, "Saving backup locally...");
         await storeBackup('github_backup', blob);
 
         setImportBackupConfirmationOpen(true);
+        downloadToast.update({ title: "Download Ready", description: "Backup has been downloaded and stored locally." });
         
     } catch (error) {
-        toast({ title: 'Download Failed', description: error instanceof Error ? error.message : "Unknown error", variant: 'destructive' });
+        downloadToast.update({ title: 'Download Failed', description: error instanceof Error ? error.message : "Unknown error", variant: 'destructive' });
     }
   };
 
