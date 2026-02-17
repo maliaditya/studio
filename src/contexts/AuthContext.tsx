@@ -1087,37 +1087,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [resources, resourceFolders, setResources, setResourceFolders, setGeneralPopups]);
 
   const updateDrawingData = useCallback((canvasId: string, data: string, onSaveComplete: () => void) => {
-    let target: { resourceId: string; pointId: string } | null = null;
+    const canvasToUpdate = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
 
     setDrawingCanvasState(prev => {
       if (!prev) return null;
       const updatedCanvases = (prev.openCanvases || []).map(c =>
-        c.id === canvasId ? { ...c, data: data } : c
+        c.id === canvasId ? { ...c, data } : c
       );
-      const canvasToUpdate = (prev.openCanvases || []).find(c => c.id === canvasId);
-      if (canvasToUpdate) {
-        target = { resourceId: canvasToUpdate.resourceId, pointId: canvasToUpdate.pointId };
-      }
       return { ...prev, openCanvases: updatedCanvases };
     });
 
-    setResources(prevResources => {
-      if (!target) return prevResources;
-
-      const updatedResources = prevResources.map(r => {
-        if (r.id === target!.resourceId) {
-          const newPoints = (r.points || []).map(p =>
-            p.id === target!.pointId ? { ...p, drawing: data } : p
-          );
-          return { ...r, points: newPoints };
-        }
-        return r;
+    if (canvasToUpdate) {
+      setResources(prevResources => {
+        const updatedResources = prevResources.map(resource => {
+          if (resource.id !== canvasToUpdate.resourceId) return resource;
+          return {
+            ...resource,
+            points: (resource.points || []).map(point =>
+              point.id === canvasToUpdate.pointId ? { ...point, drawing: data } : point
+            ),
+          };
+        });
+        onSaveComplete();
+        return updatedResources;
       });
+      return;
+    }
 
-      onSaveComplete();
-      return updatedResources;
-    });
-  }, [setDrawingCanvasState, setResources]);
+    onSaveComplete();
+  }, [drawingCanvasState?.openCanvases, setDrawingCanvasState, setResources]);
 
   const togglePinDrawing = (canvasId: string) => {
     setSettings(prev => {
