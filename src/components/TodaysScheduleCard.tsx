@@ -5,8 +5,8 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow, Target, Calendar, X } from 'lucide-react';
-import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule, Resource, Stopper } from '@/types/workout';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow, Target, Calendar, X, Wallet, Users, Wrench, Blocks, HandHeart, Sparkles, HeartPulse, Palette } from 'lucide-react';
+import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule, Resource, Stopper, MindsetPoint, CoreDomainId } from '@/types/workout';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { Textarea } from './ui/textarea';
@@ -17,7 +17,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { ScrollArea } from './ui/scroll-area';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { motion, useDragControls } from 'framer-motion';
-import { format, isToday, getISODay, parseISO, differenceInDays, differenceInMonths, startOfDay, addDays } from 'date-fns';
+import { format, isToday, getISODay, getDay, parseISO, differenceInDays, differenceInMonths, startOfDay, addDays } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
@@ -130,6 +130,7 @@ export const AgendaWidgetItem = React.memo(({
         setSelectedUpskillTask,
         findRootTask,
         currentSlot,
+        highlightedTaskIds,
     } = useAuth();
     const router = useRouter();
 
@@ -143,6 +144,12 @@ export const AgendaWidgetItem = React.memo(({
     };
     
     const isPlanningTask = (activity.type === 'upskill' || activity.type === 'deepwork') && activity.linkedEntityType === 'specialization';
+    const baseMatch = activity.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+    const baseId = baseMatch ? activity.id.slice(0, -11) : activity.id;
+    const isHighlighted =
+      highlightedTaskIds?.has(activity.id) ||
+      highlightedTaskIds?.has(baseId) ||
+      (activity.taskIds || []).some((id) => highlightedTaskIds?.has(id));
     const linkedActivityName = activity.type === 'pomodoro' && activity.linkedActivityType
         ? activity.linkedActivityType.charAt(0).toUpperCase() + activity.linkedActivityType.slice(1).replace('-', ' ')
         : null;
@@ -192,6 +199,7 @@ export const AgendaWidgetItem = React.memo(({
             className={cn(
                 "flex items-start gap-2 p-2 rounded-lg group transition-all",
                 context === 'timeslot' && 'bg-background',
+                isHighlighted && "bg-emerald-500/10 ring-1 ring-emerald-400/50",
                 onActivityClick && 'cursor-pointer'
             )}
             onClick={handleItemClick}
@@ -286,6 +294,8 @@ export function TodaysScheduleCard({
     openMindsetWidget,
     openDrawingCanvasFromHeader,
     dateOfBirth,
+    highlightedTaskIds,
+    setHighlightedTaskIds,
   } = useAuth();
   
   const toggleCurrentSlotOnly = () => {
@@ -295,7 +305,8 @@ export function TodaysScheduleCard({
 
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
-  const [view, setView] = useState<'list' | 'chart' | 'urges' | 'resistances' | 'rules' | 'milestones'>('list');
+  const [view, setView] = useState<'list' | 'chart' | 'botherings' | 'core' | 'urges' | 'resistances' | 'rules' | 'milestones'>('list');
+  const [activeBotheringTab, setActiveBotheringTab] = useState<'External' | 'Mismatch' | 'Constraint' | 'Parked' | 'Current'>('External');
   const [newEntryText, setNewEntryText] = useState('');
   
   const dragControls = useDragControls()
@@ -314,6 +325,403 @@ export function TodaysScheduleCard({
   const dayKey = React.useMemo(() => format(date, 'yyyy-MM-dd'), [date]);
 
   const todaysSchedule = useMemo(() => schedule[dayKey] || {}, [schedule, dayKey]);
+  const todayActivityIds = useMemo(() => {
+    const ids = new Set<string>();
+    const daySchedule = schedule?.[dayKey] || {};
+    Object.values(daySchedule).flat().forEach((act: any) => {
+      if (act?.id) ids.add(act.id);
+      (act?.taskIds || []).forEach((tid: string) => ids.add(tid));
+    });
+    return ids;
+  }, [schedule, dayKey]);
+  const currentSlotActivityIds = useMemo(() => {
+    const ids = new Set<string>();
+    const daySchedule = schedule?.[dayKey] || {};
+    const slotItems = (daySchedule?.[currentSlot as keyof DailySchedule] || []) as Activity[];
+    (slotItems || []).forEach((act: any) => {
+      if (act?.id) ids.add(act.id);
+      (act?.taskIds || []).forEach((tid: string) => ids.add(tid));
+      const baseMatch = act?.id?.match?.(/_(\d{4}-\d{2}-\d{2})$/);
+      if (baseMatch) ids.add(act.id.slice(0, -11));
+    });
+    return ids;
+  }, [schedule, dayKey, currentSlot]);
+
+  const mismatchPointById = useMemo(() => {
+    const mismatchPoints = mindsetCards.find((c) => c.id === "mindset_botherings_mismatch")?.points || [];
+    return new Map(mismatchPoints.map((point) => [point.id, point] as const));
+  }, [mindsetCards]);
+
+  const getEffectiveBotheringTasks = useCallback((point: MindsetPoint, sourceType: BotheringSourceType): BotheringTask[] => {
+    const directTasks = point.tasks || [];
+    if (sourceType !== "Constraint") return directTasks;
+
+    const merged: BotheringTask[] = [...directTasks];
+    const seen = new Set<string>();
+    merged.forEach((task) => {
+      seen.add(task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`);
+    });
+
+    (point.linkedMismatchIds || []).forEach((mismatchId) => {
+      const mismatch = mismatchPointById.get(mismatchId);
+      if (!mismatch?.tasks?.length) return;
+      mismatch.tasks.forEach((task) => {
+        const key = task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        merged.push(task);
+      });
+    });
+
+    return merged;
+  }, [mismatchPointById]);
+
+  const isBotheringTaskDueOnDate = useCallback((task: BotheringTask, dateKey: string) => {
+    const startKey = task.startDate || task.dateKey;
+    if (!startKey) return false;
+    const start = parseISO(startKey);
+    const d = parseISO(dateKey);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(d.getTime())) return false;
+    if (startOfDay(start) > startOfDay(d)) return false;
+    if (task.recurrence === 'daily') return true;
+    if (task.recurrence === 'weekly') return getDay(start) === getDay(d);
+    if (task.recurrence === 'custom') {
+      const interval = Math.max(1, task.repeatInterval || 1);
+      if (task.repeatUnit === 'month') {
+        if (start.getDate() !== d.getDate()) return false;
+        const months = differenceInMonths(d, start);
+        return months >= 0 && months % interval === 0;
+      }
+      if (task.repeatUnit === 'week') {
+        const days = differenceInDays(d, start);
+        return days >= 0 && days % (interval * 7) === 0;
+      }
+      const days = differenceInDays(d, start);
+      return days >= 0 && days % interval === 0;
+    }
+    return startKey === dateKey;
+  }, []);
+
+  const activityMapByDate = useMemo(() => {
+    const map = new Map<string, Map<string, { completed?: boolean }>>();
+    Object.entries(schedule || {}).forEach(([dateKey, day]) => {
+      const activityMap = new Map<string, { completed?: boolean }>();
+      Object.values(day).forEach((value: any) => {
+        if (!Array.isArray(value)) return;
+        value.forEach((act: any) => {
+          if (!act?.id) return;
+          activityMap.set(act.id, act);
+          (act.taskIds || []).forEach((taskId: string) => {
+            if (!taskId) return;
+            if (!activityMap.has(taskId)) activityMap.set(taskId, act);
+          });
+          const baseMatch = act.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+          if (baseMatch) {
+            const baseId = act.id.slice(0, -11);
+            if (!activityMap.has(baseId)) activityMap.set(baseId, act);
+          }
+        });
+      });
+      map.set(dateKey, activityMap);
+    });
+    return map;
+  }, [schedule]);
+
+  const isBotheringTaskCompletedOnDate = useCallback((task: BotheringTask, dateKey: string) => {
+    const activityMap = activityMapByDate.get(dateKey);
+    const activity: any = activityMap?.get(task.activityId || task.id) || activityMap?.get(task.id);
+    if (activity) {
+      if (activity.completed) return true;
+      if (activity.duration && activity.duration > 0) return true;
+      if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) return true;
+      if (activity.focusSessionInitialDuration && activity.focusSessionInitialDuration > 0) return true;
+    }
+    if (task.recurrence && task.recurrence !== 'none') {
+      return !!task.completionHistory?.[dateKey];
+    }
+    if (task.dateKey && task.dateKey !== dateKey) return false;
+    return !!task.completed && (!task.dateKey || task.dateKey === dateKey);
+  }, [activityMapByDate]);
+
+  const activeBotheringsByType = useMemo(() => {
+    const sources = [
+      { id: "mindset_botherings_external", label: "External" as const },
+      { id: "mindset_botherings_mismatch", label: "Mismatch" as const },
+      { id: "mindset_botherings_constraint", label: "Constraint" as const },
+    ];
+    const typed = sources.map(({ id, label }) => ({
+      type: label,
+      points: (mindsetCards.find((c) => c.id === id)?.points || [])
+        .filter((point) => getEffectiveBotheringTasks(point, label).length > 0 && !point.completed),
+    }));
+    const parkedPoints = sources.flatMap(({ id, label }) =>
+      (mindsetCards.find((c) => c.id === id)?.points || [])
+        .filter((point) => getEffectiveBotheringTasks(point, label).length === 0 && !point.completed)
+        .map((point) => ({ point, sourceType: label }))
+    );
+    return [
+      ...typed.map(t => ({
+        type: t.type,
+        points: t.points.map(point => ({ point, sourceType: t.type })),
+      })),
+      { type: "Parked" as const, points: parkedPoints },
+    ];
+  }, [mindsetCards, getEffectiveBotheringTasks]);
+
+  const getTodayBotheringStats = useCallback((point: MindsetPoint, sourceType: BotheringSourceType) => {
+    const tasks = getEffectiveBotheringTasks(point, sourceType);
+    let total = 0;
+    let completed = 0;
+    tasks.forEach((t) => {
+      if (!isBotheringTaskDueOnDate(t, dayKey)) return;
+      const completedToday = isBotheringTaskCompletedOnDate(t, dayKey);
+      const scheduledToday = !!(
+        (t.activityId && todayActivityIds.has(t.activityId)) ||
+        (t.id && todayActivityIds.has(t.id))
+      );
+      if (!scheduledToday && !completedToday) return;
+      total += 1;
+      if (completedToday) completed += 1;
+    });
+    return { total, completed };
+  }, [dayKey, getEffectiveBotheringTasks, isBotheringTaskCompletedOnDate, isBotheringTaskDueOnDate, todayActivityIds]);
+  const getCurrentSlotBotheringStats = useCallback((point: MindsetPoint, sourceType: BotheringSourceType) => {
+    const tasks = getEffectiveBotheringTasks(point, sourceType);
+    let total = 0;
+    let completed = 0;
+    tasks.forEach((t) => {
+      if (!isBotheringTaskDueOnDate(t, dayKey)) return;
+      const inCurrentSlot = !!(
+        (t.activityId && currentSlotActivityIds.has(t.activityId)) ||
+        (t.id && currentSlotActivityIds.has(t.id))
+      );
+      if (!inCurrentSlot) return;
+      total += 1;
+      if (isBotheringTaskCompletedOnDate(t, dayKey)) completed += 1;
+    });
+    return { total, completed };
+  }, [currentSlotActivityIds, dayKey, getEffectiveBotheringTasks, isBotheringTaskCompletedOnDate, isBotheringTaskDueOnDate]);
+
+  const visibleBotheringsByType = useMemo(() => {
+    const byType = activeBotheringsByType.map((group) => {
+      if (group.type === "Parked") return group;
+      return {
+        ...group,
+        points: group.points.filter(({ point, sourceType }) => getTodayBotheringStats(point, sourceType).total > 0),
+      };
+    });
+    const currentPoints = byType
+      .filter((group) => group.type !== "Parked")
+      .flatMap((group) => group.points)
+      .filter(({ point, sourceType }) => getCurrentSlotBotheringStats(point, sourceType).total > 0);
+    return [...byType, { type: "Current" as const, points: currentPoints }];
+  }, [activeBotheringsByType, getCurrentSlotBotheringStats, getTodayBotheringStats]);
+
+  const activeBotherings = useMemo(
+    () => visibleBotheringsByType.find((t) => t.type === activeBotheringTab)?.points || [],
+    [activeBotheringTab, visibleBotheringsByType]
+  );
+
+  const botheringTabCounts = useMemo(
+    () => visibleBotheringsByType.reduce<Record<string, number>>((acc, item) => {
+      acc[item.type] = item.points.length;
+      return acc;
+    }, {}),
+    [visibleBotheringsByType]
+  );
+
+  const getBotheringHighlightIds = useCallback((point: MindsetPoint, sourceType: BotheringSourceType) => {
+    const ids = new Set<string>();
+    getEffectiveBotheringTasks(point, sourceType).forEach((t) => {
+      if (t.id) ids.add(t.id);
+      if (t.activityId) ids.add(t.activityId);
+    });
+    return ids;
+  }, [getEffectiveBotheringTasks]);
+
+  const selectBotheringInTodo = useCallback((point: MindsetPoint, sourceType: BotheringSourceType) => {
+    const ids = getBotheringHighlightIds(point, sourceType);
+    const same =
+      ids.size === highlightedTaskIds.size &&
+      Array.from(ids).every((id) => highlightedTaskIds.has(id));
+    setHighlightedTaskIds(same ? new Set() : ids);
+    setView('list');
+  }, [getBotheringHighlightIds, highlightedTaskIds, setHighlightedTaskIds]);
+
+  const getDaysLeftLabel = useCallback((endDate?: string) => {
+    if (!endDate) return "No end date";
+    const target = parseISO(endDate);
+    if (Number.isNaN(target.getTime())) return "No end date";
+    const today = startOfDay(new Date());
+    const diff = differenceInDays(target, today);
+    if (diff < 0) return `Overdue ${Math.abs(diff)}d`;
+    if (diff === 0) return "Due today";
+    return `${diff}d left`;
+  }, []);
+
+  const scoreCoreFromText = useCallback((text: string, coreId: CoreDomainId) => {
+    const haystack = (text || "").toLowerCase();
+    if (!haystack.trim()) return 0;
+    return CORE_KEYWORDS[coreId].reduce((sum, keyword) => sum + (haystack.includes(keyword) ? 1 : 0), 0);
+  }, []);
+
+  const detectAutoCore = useCallback((point: MindsetPoint, type: BotheringSourceType): CoreDomainId => {
+    const text = [
+      point.text,
+      point.resolution,
+      point.mismatchType,
+      ...(point.tasks || []).map((task) => task.details),
+    ].filter(Boolean).join(" ");
+    const candidates = CORE_GROUP_BY_TYPE[type];
+    let best = candidates[0];
+    let bestScore = -1;
+    candidates.forEach((coreId) => {
+      const score = scoreCoreFromText(text, coreId);
+      if (score > bestScore) {
+        best = coreId;
+        bestScore = score;
+      }
+    });
+    return bestScore > 0 ? best : TYPE_FALLBACK_CORE[type];
+  }, [scoreCoreFromText]);
+
+  const allBotheringsForCore = useMemo(() => {
+    const sources = [
+      { id: "mindset_botherings_external", type: "External" as const },
+      { id: "mindset_botherings_mismatch", type: "Mismatch" as const },
+      { id: "mindset_botherings_constraint", type: "Constraint" as const },
+    ];
+    return sources.flatMap(({ id, type }) => {
+      const points = (mindsetCards.find((c) => c.id === id)?.points || []).filter((point) => !point.completed);
+      return points.map((point) => {
+        const tasks = getEffectiveBotheringTasks(point, type);
+        const allowed = CORE_GROUP_BY_TYPE[type];
+        const saved = point.coreDomainId && allowed.includes(point.coreDomainId) ? point.coreDomainId : undefined;
+        return {
+          id: point.id,
+          type,
+          point,
+          tasks,
+          coreId: saved || detectAutoCore(point, type),
+        };
+      });
+    });
+  }, [detectAutoCore, getEffectiveBotheringTasks, mindsetCards]);
+
+  const coreStateCards = useMemo(() => {
+    const todayStart = startOfDay(date);
+    const day21 = addDays(todayStart, -20);
+    const day7 = addDays(todayStart, -6);
+    const day45 = addDays(todayStart, -44);
+
+    const buildState = (metrics: {
+      botheringCount: number;
+      due21: number;
+      completed21: number;
+      due7: number;
+      completed7: number;
+      backlog: number;
+      highRiskCount: number;
+      stopperRate: number;
+    }): CoreStateId => {
+      const completion21 = metrics.due21 > 0 ? metrics.completed21 / metrics.due21 : 0;
+      const completion7 = metrics.due7 > 0 ? metrics.completed7 / metrics.due7 : completion21;
+      const trend = completion7 - completion21;
+      const painSignal = metrics.highRiskCount > 0 || metrics.backlog >= 4 || (metrics.due7 > 0 && completion7 < 0.25);
+      const copingSignal = metrics.stopperRate >= 0.9 && completion7 < 0.45;
+      const engagementSignal = (metrics.due7 > 0 && completion7 >= 0.35) || metrics.completed7 >= 2;
+      const stabilitySignal = metrics.due21 >= 4 && completion21 >= 0.65 && metrics.backlog <= 2 && trend >= -0.08;
+      const integrationSignal = metrics.due21 >= 6 && completion21 >= 0.78 && completion7 >= 0.72 && metrics.backlog <= 1 && metrics.highRiskCount === 0 && metrics.stopperRate < 0.35;
+      if (metrics.botheringCount === 0 && metrics.due21 === 0) return "S0";
+      if (integrationSignal && completion21 >= 0.88) return "S6";
+      if (integrationSignal) return "S5";
+      if (stabilitySignal) return "S4";
+      if (copingSignal) return "S2";
+      if (engagementSignal && !painSignal) return "S3";
+      return "S1";
+    };
+
+    return CORE_DEFS.map((core) => {
+      const botherings = allBotheringsForCore.filter((b) => b.coreId === core.id);
+      const taskMap = new Map<string, BotheringTask>();
+      botherings.forEach((entry) => {
+        entry.tasks.forEach((task) => {
+          const key = task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`;
+          if (!taskMap.has(key)) taskMap.set(key, task);
+        });
+      });
+      const tasks = Array.from(taskMap.values());
+
+      let due21 = 0;
+      let completed21 = 0;
+      let due7 = 0;
+      let completed7 = 0;
+      let backlog = 0;
+      for (let d = new Date(day45); d <= todayStart; d = addDays(d, 1)) {
+        const dateKey = format(d, "yyyy-MM-dd");
+        const in21 = d >= day21;
+        const in7 = d >= day7;
+        tasks.forEach((task) => {
+          if (!isBotheringTaskDueOnDate(task, dateKey)) return;
+          const completed = isBotheringTaskCompletedOnDate(task, dateKey);
+          if (d < todayStart && !completed) backlog += 1;
+          if (in21) {
+            due21 += 1;
+            if (completed) completed21 += 1;
+          }
+          if (in7) {
+            due7 += 1;
+            if (completed) completed7 += 1;
+          }
+        });
+      }
+
+      let highRiskCount = 0;
+      botherings.forEach((entry) => {
+        const endDate = entry.point.endDate ? parseISO(entry.point.endDate) : null;
+        if (!endDate || Number.isNaN(endDate.getTime())) return;
+        const daysLeft = differenceInDays(startOfDay(endDate), todayStart);
+        if (daysLeft <= 14) highRiskCount += 1;
+      });
+
+      const stopperIds = new Set<string>();
+      botherings.forEach((entry) => {
+        (entry.point.linkedUrgeIds || []).forEach((id) => stopperIds.add(id));
+        (entry.point.linkedResistanceIds || []).forEach((id) => stopperIds.add(id));
+      });
+      const weekStartMs = day7.getTime();
+      const tomorrowMs = addDays(todayStart, 1).getTime();
+      let stopperEvents7 = 0;
+      (resources || []).forEach((resource) => {
+        [...(resource.urges || []), ...(resource.resistances || [])].forEach((s) => {
+          if (!stopperIds.has(s.id)) return;
+          stopperEvents7 += (s.timestamps || []).filter((ts) => ts >= weekStartMs && ts < tomorrowMs).length;
+        });
+      });
+
+      const completion21 = due21 > 0 ? completed21 / due21 : 0;
+      const completion7 = due7 > 0 ? completed7 / due7 : completion21;
+      const state = buildState({
+        botheringCount: botherings.length,
+        due21,
+        completed21,
+        due7,
+        completed7,
+        backlog,
+        highRiskCount,
+        stopperRate: stopperEvents7 / Math.max(1, due7),
+      });
+
+      return {
+        core,
+        state,
+        percent: Math.round(completion21 * 100),
+        backlog,
+        botherings: botherings.length,
+      };
+    });
+  }, [allBotheringsForCore, date, isBotheringTaskCompletedOnDate, isBotheringTaskDueOnDate, resources]);
+
   const loggedTaskIds = useMemo(() => {
     const start = startOfDay(date);
     const end = addDays(start, 1);
@@ -891,6 +1299,101 @@ export function TodaysScheduleCard({
               <div className="h-[250px] w-full">
                 <TimeAllocationChart timeAllocationData={timeAllocationData} />
               </div>
+            ) : view === 'botherings' ? (
+              <div className={cn("pr-2", isAgendaDocked ? "h-full overflow-y-auto" : "max-h-[70vh] md:max-h-[60vh] overflow-y-auto")}>
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  {(['External', 'Mismatch', 'Constraint', 'Current', 'Parked'] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setActiveBotheringTab(tab)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-full border text-xs transition",
+                        activeBotheringTab === tab
+                          ? "border-emerald-400/50 text-emerald-300 bg-emerald-500/10"
+                          : "border-white/10 text-muted-foreground hover:text-foreground hover:border-white/20"
+                      )}
+                    >
+                      <span className="inline-flex items-center gap-1.5">
+                        <span>{tab}</span>
+                        <span className="px-1.5 py-0.5 rounded-full border border-white/10 bg-background/40 text-[10px]">
+                          {botheringTabCounts[tab] ?? 0}
+                        </span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {activeBotherings.length === 0 ? (
+                  <div className="text-center text-sm text-muted-foreground py-6">
+                    No active botherings.
+                  </div>
+                ) : (
+                  <ul className="space-y-2">
+                    {activeBotherings.map((item) => {
+                      const b = item.point;
+                      const stats =
+                        activeBotheringTab === 'Current'
+                          ? getCurrentSlotBotheringStats(b, item.sourceType)
+                          : getTodayBotheringStats(b, item.sourceType);
+                      const isDoneToday = stats.total > 0 && stats.completed === stats.total;
+                      return (
+                        <li
+                          key={b.id}
+                          className={cn(
+                            "rounded-lg border p-3 cursor-pointer transition",
+                            isDoneToday
+                              ? "border-emerald-400/50 bg-emerald-500/10"
+                              : "border-muted/40 bg-muted/20 hover:border-emerald-400/40 hover:bg-emerald-500/5"
+                          )}
+                          onClick={() => selectBotheringInTodo(b, item.sourceType)}
+                        >
+                          <div className={cn("text-sm font-semibold", isDoneToday && "line-through text-muted-foreground")}>
+                            {b.text}
+                          </div>
+                          <div className="mt-2 text-xs text-muted-foreground inline-flex items-center gap-2">
+                            <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
+                              {getDaysLeftLabel(b.endDate)}
+                            </span>
+                            {getEffectiveBotheringTasks(b, item.sourceType).length === 0 ? (
+                              <span>No tasks linked</span>
+                            ) : stats.total > 0 ? (
+                              <span className={stats.completed === stats.total ? "line-through text-muted-foreground" : ""}>
+                                {stats.completed}/{stats.total} done
+                              </span>
+                            ) : (
+                              <span>No tasks due today</span>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            ) : view === 'core' ? (
+              <div className={cn("pr-2", isAgendaDocked ? "h-full overflow-y-auto" : "max-h-[70vh] md:max-h-[60vh] overflow-y-auto")}>
+                <div className="grid grid-cols-3 gap-2">
+                  {coreStateCards.map((item) => {
+                    const meta = STATE_META[item.state];
+                    return (
+                      <div key={item.core.id} className={cn("rounded-lg border p-2 bg-muted/20 min-h-[92px]", meta.cardClass)}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-muted-foreground shrink-0">{item.core.icon}</span>
+                          <span className="text-xs font-semibold truncate">{item.core.label}</span>
+                        </div>
+                        <div className="mt-2 space-y-0.5 text-[11px] text-muted-foreground">
+                          <div>{item.percent}%</div>
+                          <div>{item.botherings} bothers</div>
+                          <div className="flex items-center justify-between gap-2">
+                            <span>backlog {item.backlog}</span>
+                            <span className={cn("px-2 py-0.5 text-[10px] rounded-full border shrink-0", meta.badgeClass)}>{meta.label}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             ) : (
                 view === 'urges' ? <AllResistancesAndUrgesView type="urges" onBack={() => setView('list')} /> :
                 view === 'resistances' ? <AllResistancesAndUrgesView type="resistances" onBack={() => setView('list')} /> :
@@ -905,6 +1408,12 @@ export function TodaysScheduleCard({
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setView('chart')}>
                     <PieChart className={cn("h-4 w-4", view === 'chart' && "text-primary")} />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setView('botherings')}>
+                    <Brain className={cn("h-4 w-4", view === 'botherings' && "text-primary")} />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setView('core')}>
+                    <Shield className={cn("h-4 w-4", view === 'core' && "text-primary")} />
                 </Button>
                 <Button
                     variant="ghost"
@@ -962,3 +1471,50 @@ export function TodaysScheduleCard({
     </>
   );
 }
+
+type BotheringSourceType = "External" | "Mismatch" | "Constraint";
+type BotheringTask = NonNullable<MindsetPoint["tasks"]>[number];
+type CoreStateId = "S0" | "S1" | "S2" | "S3" | "S4" | "S5" | "S6";
+
+const CORE_DEFS: Array<{ id: CoreDomainId; label: string; icon: React.ReactNode; dominantType: BotheringSourceType }> = [
+  { id: "health", label: "Health", icon: <HeartPulse className="h-3.5 w-3.5" />, dominantType: "External" },
+  { id: "wealth", label: "Wealth", icon: <Wallet className="h-3.5 w-3.5" />, dominantType: "Constraint" },
+  { id: "relations", label: "Relations", icon: <Users className="h-3.5 w-3.5" />, dominantType: "External" },
+  { id: "meaning", label: "Meaning", icon: <Compass className="h-3.5 w-3.5" />, dominantType: "Mismatch" },
+  { id: "competence", label: "Competence", icon: <Wrench className="h-3.5 w-3.5" />, dominantType: "Mismatch" },
+  { id: "autonomy", label: "Autonomy", icon: <Blocks className="h-3.5 w-3.5" />, dominantType: "Constraint" },
+  { id: "creativity", label: "Creativity", icon: <Palette className="h-3.5 w-3.5" />, dominantType: "External" },
+  { id: "contribution", label: "Contribution", icon: <HandHeart className="h-3.5 w-3.5" />, dominantType: "Constraint" },
+  { id: "transcendence", label: "Transcendence", icon: <Sparkles className="h-3.5 w-3.5" />, dominantType: "Mismatch" },
+];
+
+const CORE_GROUP_BY_TYPE: Record<BotheringSourceType, CoreDomainId[]> = {
+  Constraint: ["wealth", "autonomy", "contribution"],
+  Mismatch: ["meaning", "competence", "transcendence"],
+  External: ["health", "relations", "creativity"],
+};
+const TYPE_FALLBACK_CORE: Record<BotheringSourceType, CoreDomainId> = {
+  Constraint: "wealth",
+  Mismatch: "meaning",
+  External: "health",
+};
+const CORE_KEYWORDS: Record<CoreDomainId, string[]> = {
+  health: ["health", "sleep", "energy", "fatigue", "food", "diet", "body", "ill", "anxiety", "insomnia", "workout"],
+  wealth: ["money", "income", "salary", "finance", "job", "cash", "expense", "wealth", "earning", "budget"],
+  relations: ["relation", "relationship", "friend", "family", "lonely", "rejection", "buddy", "people", "trust", "bond"],
+  meaning: ["meaning", "purpose", "direction", "empty", "confusion", "boredom", "existential", "goal", "narrative"],
+  competence: ["skill", "competence", "impostor", "procrastination", "practice", "learn", "performance", "ability"],
+  autonomy: ["autonomy", "control", "choice", "trapped", "dependency", "obligation", "freedom", "resentment"],
+  creativity: ["creativity", "creative", "expression", "art", "output", "restless", "style", "design", "write", "draw"],
+  contribution: ["contribution", "impact", "give", "help", "community", "value", "useful", "reach", "platform"],
+  transcendence: ["transcendence", "death", "identity", "spiritual", "truth", "silence", "unity", "meditation", "awareness"],
+};
+const STATE_META: Record<CoreStateId, { label: string; badgeClass: string; cardClass: string }> = {
+  S0: { label: "S0", badgeClass: "border-slate-400/40 text-slate-200 bg-slate-500/10", cardClass: "border-slate-500/30" },
+  S1: { label: "S1", badgeClass: "border-red-400/40 text-red-200 bg-red-500/10", cardClass: "border-red-500/35" },
+  S2: { label: "S2", badgeClass: "border-orange-400/40 text-orange-200 bg-orange-500/10", cardClass: "border-orange-500/35" },
+  S3: { label: "S3", badgeClass: "border-amber-400/40 text-amber-200 bg-amber-500/10", cardClass: "border-amber-500/35" },
+  S4: { label: "S4", badgeClass: "border-green-400/40 text-green-200 bg-green-500/10", cardClass: "border-green-500/35" },
+  S5: { label: "S5", badgeClass: "border-cyan-400/40 text-cyan-200 bg-cyan-500/10", cardClass: "border-cyan-500/35" },
+  S6: { label: "S6", badgeClass: "border-blue-400/40 text-blue-200 bg-blue-500/10", cardClass: "border-blue-500/35" },
+};
