@@ -308,6 +308,7 @@ export function TimesheetPageContent({
     const [collapsedHabitGroups, setCollapsedHabitGroups] = useState<Record<string, boolean>>({});
     const [collapsedSpecializations, setCollapsedSpecializations] = useState<Record<string, boolean>>({});
     const [habitDashboardTab, setHabitDashboardTab] = useState<'daily' | 'botherings'>('botherings');
+    const [botheringTypeTab, setBotheringTypeTab] = useState<'all' | 'external' | 'mismatch' | 'constraint'>('all');
     const [collapsedBotherings, setCollapsedBotherings] = useState<Record<string, boolean>>({});
     const dashboardOuterRef = useRef<HTMLDivElement>(null);
     const dashboardInnerRef = useRef<HTMLDivElement>(null);
@@ -815,14 +816,22 @@ export function TimesheetPageContent({
                 return [{ label: null as string | null, habits: list }];
             }
             const groups = new Map<string, { name: string; type: ActivityTypeType }[]>();
+            const ungrouped: { name: string; type: ActivityTypeType }[] = [];
             list.forEach(habit => {
                 const specialization = getSpecializationForHabit(habit);
-                if (!specialization) return;
+                if (!specialization) {
+                    ungrouped.push(habit);
+                    return;
+                }
                 const bucket = groups.get(specialization) || [];
                 bucket.push(habit);
                 groups.set(specialization, bucket);
             });
-            return Array.from(groups.entries()).map(([label, habits]) => ({ label, habits }));
+            const grouped = Array.from(groups.entries()).map(([label, habits]) => ({ label, habits }));
+            if (ungrouped.length > 0) {
+                grouped.unshift({ label: null as string | null, habits: ungrouped });
+            }
+            return grouped;
         };
 
         const orderedTypes = Object.keys(habitsByType).sort((a, b) => {
@@ -879,7 +888,11 @@ export function TimesheetPageContent({
         const botherings = botheringCardIds
             .flatMap(cardId => {
                 const card = mindsetCards.find(c => c.id === cardId);
-                if (!card) return [] as Array<{ id: string; text: string; endDate?: string; tasks: NonNullable<MindsetPoint['tasks']> }>;
+                if (!card) return [] as Array<{ id: string; text: string; endDate?: string; tasks: NonNullable<MindsetPoint['tasks']>; sourceType: 'external' | 'mismatch' | 'constraint' }>;
+                const sourceType: 'external' | 'mismatch' | 'constraint' =
+                    cardId === 'mindset_botherings_external' ? 'external'
+                    : cardId === 'mindset_botherings_mismatch' ? 'mismatch'
+                    : 'constraint';
                 return (card.points || [])
                     .filter(point => !point.completed)
                     .map(point => ({
@@ -887,15 +900,19 @@ export function TimesheetPageContent({
                         text: point.text,
                         endDate: point.endDate,
                         tasks: getEffectiveBotheringTasks(point, cardId),
+                        sourceType,
                     }));
             })
             .filter(point => point.tasks.length > 0);
-        const areAllBotheringsCollapsed = botherings.every((b) => collapsedBotherings[b.id] ?? true);
+        const filteredBotherings = botheringTypeTab === 'all'
+            ? botherings
+            : botherings.filter((b) => b.sourceType === botheringTypeTab);
+        const areAllBotheringsCollapsed = filteredBotherings.every((b) => collapsedBotherings[b.id] ?? true);
         const toggleAllBotherings = () => {
             const targetCollapsed = !areAllBotheringsCollapsed;
             setCollapsedBotherings(prev => {
                 const next = { ...prev };
-                botherings.forEach((b) => {
+                filteredBotherings.forEach((b) => {
                     next[b.id] = targetCollapsed;
                 });
                 return next;
@@ -973,7 +990,7 @@ export function TimesheetPageContent({
             const activityMap = dayActivityMaps.get(dateKey) || new Map();
             let total = 0;
             let completed = 0;
-            botherings.forEach(b => {
+            filteredBotherings.forEach(b => {
                 b.tasks.forEach(task => {
                     if (!isTaskDueOnDate(task, dateKey)) return;
                     total += 1;
@@ -1022,7 +1039,7 @@ export function TimesheetPageContent({
         });
         const maxDayMinutes = Math.max(1, ...dayTotals.map(d => d.totalMinutes));
 
-        const botheringTotals = botherings.map(b => {
+        const botheringTotals = filteredBotherings.map(b => {
             let totalMinutes = 0;
             daysInMonth.forEach(day => {
                 const dateKey = format(day, 'yyyy-MM-dd');
@@ -1044,7 +1061,7 @@ export function TimesheetPageContent({
             const dateKey = format(day, 'yyyy-MM-dd');
             const activityMap = dayActivityMaps.get(dateKey) || new Map();
             let totalMinutes = 0;
-            botherings.forEach(b => {
+            filteredBotherings.forEach(b => {
                 b.tasks.forEach(task => {
                     if (!isTaskDueOnDate(task, dateKey)) return;
                     if (!isTaskCompletedOnDate(task, dateKey, activityMap)) return;
@@ -1184,7 +1201,7 @@ export function TimesheetPageContent({
                             </div>
                             {daysInMonth.map((day, index) => {
                                 const dateKey = format(day, 'yyyy-MM-dd');
-                                const hasEndDate = habitDashboardTab === 'botherings' && botherings.some(b => b.endDate === dateKey);
+                                const hasEndDate = habitDashboardTab === 'botherings' && filteredBotherings.some(b => b.endDate === dateKey);
                                 return (
                                     <div key={day.toISOString()} className={cn(
                                         "h-8 flex items-center justify-center font-semibold text-muted-foreground border-b border-muted/30",
@@ -1393,12 +1410,37 @@ export function TimesheetPageContent({
                             ))
                             ) : (
                                 <>
-                                    {botherings.length === 0 && (
+                                    <div
+                                        className="h-8 px-2 border-b border-muted/20 bg-muted/10 flex items-center gap-2"
+                                        style={{ gridColumn: `1 / span ${daysInMonth.length + 2}` }}
+                                    >
+                                        {([
+                                            { id: 'all', label: 'All' },
+                                            { id: 'external', label: 'External' },
+                                            { id: 'mismatch', label: 'Mismatch' },
+                                            { id: 'constraint', label: 'Constraint' },
+                                        ] as const).map((tab) => (
+                                            <button
+                                                key={tab.id}
+                                                type="button"
+                                                onClick={() => setBotheringTypeTab(tab.id)}
+                                                className={cn(
+                                                    "px-2.5 py-1 rounded-full border text-[11px] transition",
+                                                    botheringTypeTab === tab.id
+                                                        ? "border-emerald-400/50 text-emerald-300 bg-emerald-500/10"
+                                                        : "border-white/10 text-muted-foreground hover:text-foreground hover:border-white/20"
+                                                )}
+                                            >
+                                                {tab.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {filteredBotherings.length === 0 && (
                                         <div className="text-center text-muted-foreground py-12 col-span-full">
                                             No active botherings with tasks.
                                         </div>
                                     )}
-                                    {botherings.map((bothering) => {
+                                    {filteredBotherings.map((bothering) => {
                                         const totalMinutes = botheringTotals.find(b => b.id === bothering.id)?.totalMinutes || 0;
                                         const isCollapsed = collapsedBotherings[bothering.id] ?? true;
                                         return (
@@ -1542,7 +1584,7 @@ export function TimesheetPageContent({
                 </div>
             </div>
         );
-    }, [effectiveDashboardMonth, schedule, collapsedHabitGroups, collapsedSpecializations, collapsedBotherings, upskillDefinitions, deepWorkDefinitions, microSkillMap, mindsetCards, habitDashboardTab, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs]);
+    }, [effectiveDashboardMonth, schedule, collapsedHabitGroups, collapsedSpecializations, collapsedBotherings, upskillDefinitions, deepWorkDefinitions, microSkillMap, mindsetCards, habitDashboardTab, botheringTypeTab, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs]);
 
     const timesheetBody = (
         <>
