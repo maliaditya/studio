@@ -3924,6 +3924,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     const prefixedPath = withUserGitHubPrefix(path, username);
     const { dir } = getGitHubBaseDir(prefixedPath);
     const syncStatusPath = dir ? `${dir}/sync-status.json` : 'sync-status.json';
+    let forcePushDirtyOnly = false;
     try {
       const remoteStatus = await getGitHubJson<{ status?: string; startedAt?: string; updatedAt?: string }>(
         token,
@@ -3946,6 +3947,9 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             details: "Remote is ahead. Pull first, then push.",
           });
           return;
+        }
+        if (decision === 'force') {
+          forcePushDirtyOnly = true;
         }
         if (decision === 'pull') {
           const imported = await pullAndImportFromGitHubForPushGuard();
@@ -4056,15 +4060,31 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       const manifestPath = dir ? `${dir}/manifest.json` : 'manifest.json';
       const modules = buildModuleData(allData);
       const canvasFilesMetaByCanvasId = getCanvasFilesMetaByCanvasId();
+      const canvasFilesFromDb = await getAllExcalidrawFiles();
+      canvasFilesFromDb.forEach(({ key, record }) => {
+        const sepIndex = key.indexOf(':');
+        if (sepIndex <= 0 || sepIndex >= key.length - 1) return;
+        const canvasId = key.slice(0, sepIndex);
+        const fileId = key.slice(sepIndex + 1);
+        if (!canvasId || !fileId) return;
+        const current = canvasFilesMetaByCanvasId.get(canvasId) || {};
+        if (!current[fileId]) {
+          current[fileId] = { mimeType: record?.mimeType || 'application/octet-stream' };
+        }
+        canvasFilesMetaByCanvasId.set(canvasId, current);
+      });
       const allCanvasIds = Array.from(new Set(
         (modules.resources?.resources || []).flatMap((resource: Resource) =>
           (resource.points || [])
             .filter((point) => point.type === 'paint')
             .map((point) => `${resource.id}-${point.id}`)
         )
-      ));
+      )).concat(
+        Array.from(canvasFilesMetaByCanvasId.keys()).filter((id) => id && !id.includes('undefined'))
+      );
+      const uniqueCanvasIds = Array.from(new Set(allCanvasIds));
       const canvasFileIndex = Object.fromEntries(
-        allCanvasIds.map((canvasId) => [canvasId, canvasFilesMetaByCanvasId.get(canvasId) || {}])
+        uniqueCanvasIds.map((canvasId) => [canvasId, canvasFilesMetaByCanvasId.get(canvasId) || {}])
       );
       const updatedAt = new Date().toISOString();
 
@@ -4113,7 +4133,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         version: 1,
         updatedAt,
         folder: `images_${currentUser?.username?.toLowerCase() || 'unknown'}`,
-        canvases: Object.keys(canvasFileIndex),
+        canvases: uniqueCanvasIds,
       };
       moduleEntries.push({
         name: 'canvas-files-index',
@@ -4130,20 +4150,24 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         }, {} as Record<string, { path: string; updatedAt: string }>),
       };
 
-      moduleTotals.total = 1 + moduleEntries.length + allCanvasIds.length + 1;
+      moduleTotals.total = forcePushDirtyOnly ? 0 : (1 + moduleEntries.length + uniqueCanvasIds.length + 1);
       const updateModuleProgress = (label: string) => {
         publishPushProgress("GitHub Push Running", label);
       };
 
       const backupHash = await hashString(content);
-      if (!(await shouldSkipUnchangedPath(prefixedPath, backupHash))) {
+      const backupDirty = nextHashes[prefixedPath] !== backupHash;
+      if (forcePushDirtyOnly && !backupDirty) {
+        // force mode uploads only locally dirty core files
+      } else if (!(await shouldSkipUnchangedPath(prefixedPath, backupHash))) {
+        if (forcePushDirtyOnly) moduleTotals.total += 1;
         const sha = await getGitHubFileSha(token, owner, repo, prefixedPath);
         await pushToGitHub(token, owner, repo, prefixedPath, content, message, sha, { suppressToast: true });
         nextHashes[prefixedPath] = backupHash;
         moduleTotals.pushed += 1;
         moduleTotals.processed += 1;
         updateModuleProgress(`Pushed ${prefixedPath}`);
-      } else {
+      } else if (!forcePushDirtyOnly) {
         moduleTotals.skipped += 1;
         moduleTotals.processed += 1;
         updateModuleProgress(`Skipped ${prefixedPath}`);
@@ -4151,10 +4175,17 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
       for (const entry of moduleEntries) {
         const moduleHash = await hashString(entry.content);
+        const moduleDirty = nextHashes[entry.path] !== moduleHash;
+        if (forcePushDirtyOnly && !moduleDirty) {
+          continue;
+        }
+        if (forcePushDirtyOnly) moduleTotals.total += 1;
         if (await shouldSkipUnchangedPath(entry.path, moduleHash)) {
-          moduleTotals.skipped += 1;
-          moduleTotals.processed += 1;
-          updateModuleProgress(`Skipped ${entry.path}`);
+          if (!forcePushDirtyOnly) {
+            moduleTotals.skipped += 1;
+            moduleTotals.processed += 1;
+            updateModuleProgress(`Skipped ${entry.path}`);
+          }
           continue;
         }
         const moduleSha = await getGitHubFileSha(token, owner, repo, entry.path);
@@ -4197,10 +4228,17 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         const canvasPath = `${canvasFilesBase}/${canvasId}.json`;
         const canvasContent = JSON.stringify({ canvasId, files: filesMeta }, null, 2);
         const canvasHash = await hashString(canvasContent);
+        const canvasDirty = nextHashes[canvasPath] !== canvasHash;
+        if (forcePushDirtyOnly && !canvasDirty) {
+          continue;
+        }
+        if (forcePushDirtyOnly) moduleTotals.total += 1;
         if (await shouldSkipUnchangedPath(canvasPath, canvasHash)) {
-          moduleTotals.skipped += 1;
-          moduleTotals.processed += 1;
-          updateModuleProgress(`Skipped ${canvasPath}`);
+          if (!forcePushDirtyOnly) {
+            moduleTotals.skipped += 1;
+            moduleTotals.processed += 1;
+            updateModuleProgress(`Skipped ${canvasPath}`);
+          }
           continue;
         }
         const canvasSha = await getGitHubFileSha(token, owner, repo, canvasPath);
@@ -4217,7 +4255,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         });
         if (listResp.ok) {
           const listData = await listResp.json();
-          const expectedCanvasFiles = new Set(allCanvasIds.map((canvasId) => `${canvasId}.json`));
+          const expectedCanvasFiles = new Set(uniqueCanvasIds.map((canvasId) => `${canvasId}.json`));
           for (const item of listData || []) {
             if (item?.type !== 'file' || !item?.name || !item?.sha) continue;
             if (item.name === 'index.json') continue;
@@ -4237,14 +4275,18 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
       const manifestContent = JSON.stringify(manifest, null, 2);
       const manifestHash = await hashString(manifestContent);
-      if (!(await shouldSkipUnchangedPath(manifestPath, manifestHash))) {
+      const manifestDirty = nextHashes[manifestPath] !== manifestHash;
+      if (forcePushDirtyOnly && !manifestDirty) {
+        // no-op in dirty-only force mode
+      } else if (!(await shouldSkipUnchangedPath(manifestPath, manifestHash))) {
+        if (forcePushDirtyOnly) moduleTotals.total += 1;
         const manifestSha = await getGitHubFileSha(token, owner, repo, manifestPath);
         await pushToGitHub(token, owner, repo, manifestPath, manifestContent, `LifeOS manifest`, manifestSha, { suppressToast: true });
         nextHashes[manifestPath] = manifestHash;
         moduleTotals.pushed += 1;
         moduleTotals.processed += 1;
         updateModuleProgress(`Pushed ${manifestPath}`);
-      } else {
+      } else if (!forcePushDirtyOnly) {
         moduleTotals.skipped += 1;
         moduleTotals.processed += 1;
         updateModuleProgress(`Skipped ${manifestPath}`);

@@ -427,6 +427,38 @@ export function TodaysScheduleCard({
     return map;
   }, [schedule]);
 
+  const scheduledDatesByTaskId = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    Object.entries(schedule || {}).forEach(([dateKey, day]) => {
+      Object.values(day).forEach((value: any) => {
+        if (!Array.isArray(value)) return;
+        value.forEach((act: any) => {
+          if (!act?.id) return;
+          const ids = new Set<string>();
+          ids.add(act.id);
+          const baseMatch = act.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+          if (baseMatch) ids.add(act.id.slice(0, -11));
+          (act.taskIds || []).forEach((taskId: string) => {
+            if (taskId) ids.add(taskId);
+          });
+          ids.forEach((id) => {
+            if (!id) return;
+            if (!map.has(id)) map.set(id, new Set<string>());
+            map.get(id)!.add(dateKey);
+          });
+        });
+      });
+    });
+    return map;
+  }, [schedule]);
+
+  const isBotheringTaskScheduledOnDate = useCallback((task: BotheringTask, dateKey: string) => {
+    const activityId = task.activityId || task.id;
+    if (activityId && scheduledDatesByTaskId.get(activityId)?.has(dateKey)) return true;
+    if (task.id && task.id !== activityId && scheduledDatesByTaskId.get(task.id)?.has(dateKey)) return true;
+    return false;
+  }, [scheduledDatesByTaskId]);
+
   const isBotheringTaskCompletedOnDate = useCallback((task: BotheringTask, dateKey: string) => {
     const activityMap = activityMapByDate.get(dateKey);
     const activity: any = activityMap?.get(task.activityId || task.id) || activityMap?.get(task.id);
@@ -591,22 +623,25 @@ export function TodaysScheduleCard({
       { id: "mindset_botherings_mismatch", type: "Mismatch" as const },
       { id: "mindset_botherings_constraint", type: "Constraint" as const },
     ];
+    const manualOverrides = settings.coreStateManualOverrides || {};
     return sources.flatMap(({ id, type }) => {
       const points = (mindsetCards.find((c) => c.id === id)?.points || []).filter((point) => !point.completed);
       return points.map((point) => {
         const tasks = getEffectiveBotheringTasks(point, type);
         const allowed = CORE_GROUP_BY_TYPE[type];
+        const manualCandidate = manualOverrides[point.id];
+        const manual = manualCandidate && allowed.includes(manualCandidate) ? manualCandidate : undefined;
         const saved = point.coreDomainId && allowed.includes(point.coreDomainId) ? point.coreDomainId : undefined;
         return {
           id: point.id,
           type,
           point,
           tasks,
-          coreId: saved || detectAutoCore(point, type),
+          coreId: saved || manual || detectAutoCore(point, type),
         };
       });
     });
-  }, [detectAutoCore, getEffectiveBotheringTasks, mindsetCards]);
+  }, [detectAutoCore, getEffectiveBotheringTasks, mindsetCards, settings.coreStateManualOverrides]);
 
   const coreStateCards = useMemo(() => {
     const todayStart = startOfDay(date);
@@ -622,18 +657,21 @@ export function TodaysScheduleCard({
       completed7: number;
       backlog: number;
       highRiskCount: number;
+      stopperEvents7: number;
       stopperRate: number;
+      expansionCompletions21: number;
     }): CoreStateId => {
       const completion21 = metrics.due21 > 0 ? metrics.completed21 / metrics.due21 : 0;
       const completion7 = metrics.due7 > 0 ? metrics.completed7 / metrics.due7 : completion21;
       const trend = completion7 - completion21;
       const painSignal = metrics.highRiskCount > 0 || metrics.backlog >= 4 || (metrics.due7 > 0 && completion7 < 0.25);
-      const copingSignal = metrics.stopperRate >= 0.9 && completion7 < 0.45;
+      const copingSignal = metrics.stopperEvents7 >= 2 && metrics.stopperRate >= 0.9 && completion7 < 0.45;
       const engagementSignal = (metrics.due7 > 0 && completion7 >= 0.35) || metrics.completed7 >= 2;
       const stabilitySignal = metrics.due21 >= 4 && completion21 >= 0.65 && metrics.backlog <= 2 && trend >= -0.08;
       const integrationSignal = metrics.due21 >= 6 && completion21 >= 0.78 && completion7 >= 0.72 && metrics.backlog <= 1 && metrics.highRiskCount === 0 && metrics.stopperRate < 0.35;
-      if (metrics.botheringCount === 0 && metrics.due21 === 0) return "S0";
-      if (integrationSignal && completion21 >= 0.88) return "S6";
+      const expansionSignal = integrationSignal && (metrics.expansionCompletions21 >= 2 || (metrics.completed21 >= 10 && completion21 >= 0.88));
+      if (metrics.botheringCount === 0 && metrics.due21 === 0 && metrics.stopperEvents7 === 0) return "S0";
+      if (expansionSignal) return "S6";
       if (integrationSignal) return "S5";
       if (stabilitySignal) return "S4";
       if (copingSignal) return "S2";
@@ -657,17 +695,25 @@ export function TodaysScheduleCard({
       let due7 = 0;
       let completed7 = 0;
       let backlog = 0;
+      let expansionCompletions21 = 0;
       for (let d = new Date(day45); d <= todayStart; d = addDays(d, 1)) {
         const dateKey = format(d, "yyyy-MM-dd");
         const in21 = d >= day21;
         const in7 = d >= day7;
         tasks.forEach((task) => {
           if (!isBotheringTaskDueOnDate(task, dateKey)) return;
+          if (!isBotheringTaskScheduledOnDate(task, dateKey)) return;
           const completed = isBotheringTaskCompletedOnDate(task, dateKey);
           if (d < todayStart && !completed) backlog += 1;
           if (in21) {
             due21 += 1;
-            if (completed) completed21 += 1;
+            if (completed) {
+              completed21 += 1;
+              const details = (task.details || "").toLowerCase();
+              if (EXPANSION_KEYWORDS.some((keyword) => details.includes(keyword))) {
+                expansionCompletions21 += 1;
+              }
+            }
           }
           if (in7) {
             due7 += 1;
@@ -681,7 +727,17 @@ export function TodaysScheduleCard({
         const endDate = entry.point.endDate ? parseISO(entry.point.endDate) : null;
         if (!endDate || Number.isNaN(endDate.getTime())) return;
         const daysLeft = differenceInDays(startOfDay(endDate), todayStart);
-        if (daysLeft <= 14) highRiskCount += 1;
+        if (daysLeft > 14) return;
+        let pendingBeforeToday = 0;
+        for (let d = new Date(addDays(todayStart, -21)); d < todayStart; d = addDays(d, 1)) {
+          const dateKey = format(d, "yyyy-MM-dd");
+          entry.tasks.forEach((task) => {
+            if (!isBotheringTaskDueOnDate(task, dateKey)) return;
+            if (!isBotheringTaskScheduledOnDate(task, dateKey)) return;
+            if (!isBotheringTaskCompletedOnDate(task, dateKey)) pendingBeforeToday += 1;
+          });
+        }
+        if (pendingBeforeToday > 0) highRiskCount += 1;
       });
 
       const stopperIds = new Set<string>();
@@ -701,6 +757,7 @@ export function TodaysScheduleCard({
 
       const completion21 = due21 > 0 ? completed21 / due21 : 0;
       const completion7 = due7 > 0 ? completed7 / due7 : completion21;
+      const stopperRate = stopperEvents7 / Math.max(1, due7);
       const state = buildState({
         botheringCount: botherings.length,
         due21,
@@ -709,7 +766,9 @@ export function TodaysScheduleCard({
         completed7,
         backlog,
         highRiskCount,
-        stopperRate: stopperEvents7 / Math.max(1, due7),
+        stopperEvents7,
+        stopperRate,
+        expansionCompletions21,
       });
 
       return {
@@ -720,7 +779,7 @@ export function TodaysScheduleCard({
         botherings: botherings.length,
       };
     });
-  }, [allBotheringsForCore, date, isBotheringTaskCompletedOnDate, isBotheringTaskDueOnDate, resources]);
+  }, [allBotheringsForCore, date, isBotheringTaskCompletedOnDate, isBotheringTaskDueOnDate, isBotheringTaskScheduledOnDate, resources]);
 
   const loggedTaskIds = useMemo(() => {
     const start = startOfDay(date);
@@ -1509,6 +1568,20 @@ const CORE_KEYWORDS: Record<CoreDomainId, string[]> = {
   contribution: ["contribution", "impact", "give", "help", "community", "value", "useful", "reach", "platform"],
   transcendence: ["transcendence", "death", "identity", "spiritual", "truth", "silence", "unity", "meditation", "awareness"],
 };
+const EXPANSION_KEYWORDS = [
+  "teach",
+  "mentor",
+  "system",
+  "philosophy",
+  "influence",
+  "master",
+  "leverage",
+  "community",
+  "publish",
+  "original",
+  "art",
+  "wisdom",
+];
 const STATE_META: Record<CoreStateId, { label: string; badgeClass: string; cardClass: string }> = {
   S0: { label: "S0", badgeClass: "border-slate-400/40 text-slate-200 bg-slate-500/10", cardClass: "border-slate-500/30" },
   S1: { label: "S1", badgeClass: "border-red-400/40 text-red-200 bg-red-500/10", cardClass: "border-red-500/35" },
