@@ -3884,7 +3884,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       });
       return;
     }
-    isGitHubSyncInFlightRef.current = true;
     const token = settings.githubToken;
     const owner = settings.githubOwner;
     const repo = settings.githubRepo;
@@ -3903,6 +3902,57 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
       return;
     }
+
+    const prefixedPath = withUserGitHubPrefix(path, username);
+    const { dir } = getGitHubBaseDir(prefixedPath);
+    const syncStatusPath = dir ? `${dir}/sync-status.json` : 'sync-status.json';
+    try {
+      const remoteStatus = await getGitHubJson<{ status?: string; startedAt?: string; updatedAt?: string }>(
+        token,
+        owner,
+        repo,
+        syncStatusPath
+      );
+      const localLastSyncTs = settings.lastSync?.timestamp || 0;
+      const remoteUpdatedAtTs = remoteStatus?.updatedAt ? Date.parse(remoteStatus.updatedAt) : NaN;
+      const remoteAhead = Number.isFinite(remoteUpdatedAtTs) && remoteUpdatedAtTs > (localLastSyncTs + 1000);
+      if (remoteAhead) {
+        const remoteIso = new Date(remoteUpdatedAtTs).toISOString();
+        const localIso = localLastSyncTs ? new Date(localLastSyncTs).toISOString() : 'never';
+        const shouldPullFirst = window.confirm(
+          `Remote backup is newer.\nRemote: ${remoteIso}\nLocal: ${localIso}\n\nPull delta and import now before push?`
+        );
+        if (!shouldPullFirst) {
+          publishGitHubSyncNotification({
+            mode: 'push',
+            status: 'error',
+            title: "Push Cancelled",
+            details: "Remote is ahead. Pull first, then push.",
+          });
+          return;
+        }
+        const imported = await pullAndImportFromGitHubForPushGuard();
+        if (!imported) {
+          publishGitHubSyncNotification({
+            mode: 'push',
+            status: 'error',
+            title: "Push Cancelled",
+            details: "Pull/import before push failed.",
+          });
+          return;
+        }
+      }
+    } catch (guardError) {
+      publishGitHubSyncNotification({
+        mode: 'push',
+        status: 'error',
+        title: "Push Guard Failed",
+        details: guardError instanceof Error ? guardError.message : "Could not verify remote sync status.",
+      });
+      return;
+    }
+
+    isGitHubSyncInFlightRef.current = true;
 
     const moduleTotals = { total: 0, processed: 0, pushed: 0, skipped: 0 };
     const assetProgress: Record<'images' | 'audio' | 'pdfs', GitHubAssetSyncProgress> = {
@@ -3927,9 +3977,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       });
     };
 
-    const prefixedPath = withUserGitHubPrefix(path, username);
-    const { dir } = getGitHubBaseDir(prefixedPath);
-    const syncStatusPath = dir ? `${dir}/sync-status.json` : 'sync-status.json';
     const syncId = `sync_${Date.now()}`;
     const updateSyncStatus = async (
       status: 'in_progress' | 'completed' | 'failed',
@@ -5739,6 +5786,34 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         setImportBackupConfirmationOpen(false);
     }
   };
+
+  async function pullAndImportFromGitHubForPushGuard(): Promise<boolean> {
+    try {
+      await deleteBackup('github_backup');
+      await downloadFromGitHub();
+      const blob = await getBackup('github_backup');
+      if (!blob) {
+        return false;
+      }
+      const text = await blob.text();
+      const importedData = JSON.parse(text);
+      const mainData = importedData.main || importedData;
+      const uiData = importedData.ui || {};
+      loadImportedData(mainData, uiData);
+      await deleteBackup('github_backup');
+      setImportBackupConfirmationOpen(false);
+      publishGitHubSyncNotification({
+        mode: 'pull',
+        status: 'success',
+        title: "GitHub Pull + Import Complete",
+        details: "Remote delta was pulled and imported before push.",
+      });
+      return true;
+    } catch (error) {
+      console.error('Pull/import guard flow failed:', error);
+      return false;
+    }
+  }
 
   useEffect(() => {
     const user = getCurrentLocalUser();
