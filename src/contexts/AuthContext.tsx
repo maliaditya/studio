@@ -4024,8 +4024,14 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       const message = `LifeOS backup: ${new Date().toISOString()}`;
 
       const nextHashes: Record<string, string> = { ...(githubModuleHashesRef.current || {}) };
-      const shouldSkipUnchangedPath = (pathToCheck: string, hashToCheck: string) => {
-        return nextHashes[pathToCheck] === hashToCheck;
+      const remoteExistsCache = new Map<string, boolean>();
+      const shouldSkipUnchangedPath = async (pathToCheck: string, hashToCheck: string) => {
+        if (nextHashes[pathToCheck] !== hashToCheck) return false;
+        if (remoteExistsCache.has(pathToCheck)) return !!remoteExistsCache.get(pathToCheck);
+        const remoteSha = await getGitHubFileSha(token, owner, repo, pathToCheck);
+        const exists = !!remoteSha;
+        remoteExistsCache.set(pathToCheck, exists);
+        return exists;
       };
 
       const modulesBase = dir ? `${dir}/modules` : 'modules';
@@ -4112,7 +4118,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       };
 
       const backupHash = await hashString(content);
-      if (!shouldSkipUnchangedPath(prefixedPath, backupHash)) {
+      if (!(await shouldSkipUnchangedPath(prefixedPath, backupHash))) {
         const sha = await getGitHubFileSha(token, owner, repo, prefixedPath);
         await pushToGitHub(token, owner, repo, prefixedPath, content, message, sha, { suppressToast: true });
         nextHashes[prefixedPath] = backupHash;
@@ -4127,7 +4133,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
       for (const entry of moduleEntries) {
         const moduleHash = await hashString(entry.content);
-        if (shouldSkipUnchangedPath(entry.path, moduleHash)) {
+        if (await shouldSkipUnchangedPath(entry.path, moduleHash)) {
           moduleTotals.skipped += 1;
           moduleTotals.processed += 1;
           updateModuleProgress(`Skipped ${entry.path}`);
@@ -4173,7 +4179,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         const canvasPath = `${canvasFilesBase}/${canvasId}.json`;
         const canvasContent = JSON.stringify({ canvasId, files: filesMeta }, null, 2);
         const canvasHash = await hashString(canvasContent);
-        if (shouldSkipUnchangedPath(canvasPath, canvasHash)) {
+        if (await shouldSkipUnchangedPath(canvasPath, canvasHash)) {
           moduleTotals.skipped += 1;
           moduleTotals.processed += 1;
           updateModuleProgress(`Skipped ${canvasPath}`);
@@ -4213,7 +4219,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
       const manifestContent = JSON.stringify(manifest, null, 2);
       const manifestHash = await hashString(manifestContent);
-      if (!shouldSkipUnchangedPath(manifestPath, manifestHash)) {
+      if (!(await shouldSkipUnchangedPath(manifestPath, manifestHash))) {
         const manifestSha = await getGitHubFileSha(token, owner, repo, manifestPath);
         await pushToGitHub(token, owner, repo, manifestPath, manifestContent, `LifeOS manifest`, manifestSha, { suppressToast: true });
         nextHashes[manifestPath] = manifestHash;
