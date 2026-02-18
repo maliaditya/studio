@@ -4574,6 +4574,112 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     return { core, workouts, resources: resourcesModule, knowledge, ui };
   }
 
+  const reseedGitHubModuleHashesFromImported = useCallback(async (
+    mainData: any,
+    uiData: any,
+    rawBackupText?: string
+  ) => {
+    const username = currentUser?.username?.toLowerCase();
+    const githubPath = settings.githubPath;
+    if (!username || !githubPath) return;
+
+    const allData = { main: mainData, ui: uiData } as ReturnType<typeof getAllUserData>;
+    const modules = buildModuleData(allData);
+    const prefixedPath = withUserGitHubPrefix(githubPath, username);
+    const { dir } = getGitHubBaseDir(prefixedPath);
+    const modulesBase = dir ? `${dir}/modules` : 'modules';
+    const resourcesFoldersBase = `${modulesBase}/resources-folders`;
+    const canvasFilesBase = `${modulesBase}/canvas-files`;
+    const updatedAt = new Date().toISOString();
+
+    const moduleEntries: { name: string; path: string; content: string }[] = [
+      { name: 'core', path: `${modulesBase}/core.json`, content: JSON.stringify(modules.core, null, 2) },
+      { name: 'workouts', path: `${modulesBase}/workouts.json`, content: JSON.stringify(modules.workouts, null, 2) },
+      { name: 'knowledge', path: `${modulesBase}/knowledge.json`, content: JSON.stringify(modules.knowledge, null, 2) },
+      { name: 'ui', path: `${modulesBase}/ui.json`, content: JSON.stringify(modules.ui, null, 2) },
+    ];
+
+    const resourcesByFolder = new Map<string, Resource[]>();
+    (modules.resources?.resources || []).forEach((res: Resource) => {
+      const folderKey = res.folderId || 'unfoldered';
+      const list = resourcesByFolder.get(folderKey) || [];
+      list.push(res);
+      resourcesByFolder.set(folderKey, list);
+    });
+    const resourceFoldersById = new Map<string, ResourceFolder>();
+    (modules.resources?.resourceFolders || []).forEach((folder: ResourceFolder) => {
+      if (folder?.id) resourceFoldersById.set(folder.id, folder);
+    });
+    const resourcesFolderIndex = {
+      version: 1,
+      updatedAt,
+      folders: [] as Array<{ id: string; path: string }>,
+    };
+    for (const [folderId, list] of resourcesByFolder.entries()) {
+      const folder = resourceFoldersById.get(folderId);
+      const folderPath = `${resourcesFoldersBase}/folder_${folderId}.json`;
+      moduleEntries.push({
+        name: `resources-folder-${folderId}`,
+        path: folderPath,
+        content: JSON.stringify({ folderId, folder, resources: list }, null, 2),
+      });
+      resourcesFolderIndex.folders.push({ id: folderId, path: folderPath });
+    }
+    moduleEntries.push({
+      name: 'resources-folders-index',
+      path: `${resourcesFoldersBase}/index.json`,
+      content: JSON.stringify(resourcesFolderIndex, null, 2),
+    });
+
+    const importedCanvasFileIndex = (mainData?.canvasFileIndex && typeof mainData.canvasFileIndex === 'object')
+      ? mainData.canvasFileIndex
+      : {};
+    const importedCanvasIds = Object.keys(importedCanvasFileIndex);
+    const canvasFilesIndex = {
+      version: 1,
+      updatedAt,
+      folder: `images_${username}`,
+      canvases: importedCanvasIds,
+    };
+    moduleEntries.push({
+      name: 'canvas-files-index',
+      path: `${canvasFilesBase}/index.json`,
+      content: JSON.stringify(canvasFilesIndex, null, 2),
+    });
+    importedCanvasIds.forEach((canvasId) => {
+      moduleEntries.push({
+        name: `canvas-file-${canvasId}`,
+        path: `${canvasFilesBase}/${canvasId}.json`,
+        content: JSON.stringify({ canvasId, files: importedCanvasFileIndex[canvasId] || {} }, null, 2),
+      });
+    });
+
+    const manifest = {
+      version: 1,
+      updatedAt,
+      modules: moduleEntries.reduce((acc, entry) => {
+        acc[entry.name] = { path: entry.path, updatedAt };
+        return acc;
+      }, {} as Record<string, { path: string; updatedAt: string }>),
+    };
+    const manifestPath = dir ? `${dir}/manifest.json` : 'manifest.json';
+    moduleEntries.push({
+      name: 'manifest',
+      path: manifestPath,
+      content: JSON.stringify(manifest, null, 2),
+    });
+
+    const nextHashes: Record<string, string> = { ...(githubModuleHashesRef.current || {}) };
+    const backupContent = rawBackupText || JSON.stringify({ main: mainData, ui: uiData }, null, 2);
+    nextHashes[prefixedPath] = await hashString(backupContent);
+    for (const entry of moduleEntries) {
+      nextHashes[entry.path] = await hashString(entry.content);
+    }
+
+    githubModuleHashesRef.current = nextHashes;
+    setSettings(prev => ({ ...prev, githubModuleHashes: nextHashes }));
+  }, [currentUser?.username, settings.githubPath]);
+
   async function pullFromGitHub(token: string, owner: string, repo: string, path: string, sha: string) {
       const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
           headers: { 'Authorization': `token ${token}` }
@@ -5781,6 +5887,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             const mainData = importedData.main || importedData;
             const uiData = importedData.ui || {};
             loadImportedData(mainData, uiData);
+            await reseedGitHubModuleHashesFromImported(mainData, uiData, text);
             await deleteBackup('github_backup');
             toast({ title: 'Import Successful', description: 'Data from GitHub backup has been loaded.' });
         } else {
@@ -5806,6 +5913,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       const mainData = importedData.main || importedData;
       const uiData = importedData.ui || {};
       loadImportedData(mainData, uiData);
+      await reseedGitHubModuleHashesFromImported(mainData, uiData, text);
       await deleteBackup('github_backup');
       setImportBackupConfirmationOpen(false);
       publishGitHubSyncNotification({
