@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github, Download, Paintbrush, UploadCloud, DownloadCloud } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github, Download, Paintbrush, UploadCloud, DownloadCloud, X } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
@@ -20,7 +20,7 @@ import type { Resource, ResourcePoint, MicroSkill, Activity, SlotName, WorkoutEx
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter, subDays, startOfDay, startOfMonth } from 'date-fns';
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuGroup } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuGroup, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from './ui/badge';
@@ -604,6 +604,8 @@ export function Header() {
     pushDemoDataWithToken,
     syncWithGitHub,
     downloadFromGitHub,
+    gitHubSyncNotification,
+    dismissGitHubSyncNotification,
     openMindsetWidget,
     openDrawingCanvasFromHeader,
   } = useAuth();
@@ -658,8 +660,11 @@ export function Header() {
               
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 relative">
                     <Github className="h-4 w-4" />
+                    {gitHubSyncNotification && (
+                      <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-emerald-500" />
+                    )}
                     <span className="sr-only">GitHub Sync</span>
                   </Button>
                 </DropdownMenuTrigger>
@@ -670,6 +675,23 @@ export function Header() {
                   <DropdownMenuItem onSelect={() => downloadFromGitHub()}>
                     <DownloadCloud className="mr-2 h-4 w-4" /> Download from GitHub
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {gitHubSyncNotification ? (
+                    <>
+                      <DropdownMenuLabel className="max-w-[360px] whitespace-pre-wrap text-xs leading-5">
+                        {gitHubSyncNotification.title}
+                        {"\n"}
+                        {gitHubSyncNotification.details}
+                      </DropdownMenuLabel>
+                      <DropdownMenuItem onSelect={() => dismissGitHubSyncNotification()}>
+                        Clear Notification
+                      </DropdownMenuItem>
+                    </>
+                  ) : (
+                    <DropdownMenuLabel className="text-xs text-muted-foreground">
+                      No active GitHub notification
+                    </DropdownMenuLabel>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
 
@@ -703,6 +725,36 @@ export function Header() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+      {gitHubSyncNotification && (
+        <Card className="fixed bottom-4 left-4 z-[120] w-[420px] max-w-[calc(100vw-2rem)] border-border/70 bg-background/95 backdrop-blur">
+          <CardHeader className="pb-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle className="text-sm">
+                  {gitHubSyncNotification.title}
+                </CardTitle>
+                <CardDescription className="text-xs pt-1">
+                  {gitHubSyncNotification.mode === 'push' ? 'GitHub push status' : 'GitHub pull status'} • {gitHubSyncNotification.status}
+                </CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0"
+                onClick={dismissGitHubSyncNotification}
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close GitHub notification</span>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            <pre className="whitespace-pre-wrap break-words text-xs leading-5 font-sans text-foreground/90">
+              {gitHubSyncNotification.details}
+            </pre>
+          </CardContent>
+        </Card>
+      )}
     </>
   );
 }

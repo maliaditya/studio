@@ -813,6 +813,7 @@ export interface UserSettings {
   githubPath?: string;
   lastSync?: { sha: string, timestamp: number };
   githubModuleHashes?: Record<string, string>;
+  githubPulledHashes?: Record<string, string>;
   pinnedCanvasIds?: string[];
   coreStateManualOverrides?: Partial<Record<string, CoreDomainId>>;
   routineRebalanceLearning?: {

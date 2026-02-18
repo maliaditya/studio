@@ -60,6 +60,14 @@ interface ResourcePopupProps {
   popupState: PopupState;
 }
 
+type GitHubSyncNotification = {
+  mode: 'push' | 'pull';
+  status: 'running' | 'success' | 'error';
+  title: string;
+  details: string;
+  updatedAt: number;
+};
+
 interface AuthContextType {
   currentUser: LocalUser | null;
   loading: boolean;
@@ -107,6 +115,8 @@ interface AuthContextType {
   setIsTodaysPredictionModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   syncWithGitHub: () => Promise<void>;
   downloadFromGitHub: () => Promise<void>;
+  gitHubSyncNotification: GitHubSyncNotification | null;
+  dismissGitHubSyncNotification: () => void;
   syncCanvasImagesToGitHub: () => Promise<void>;
   fetchCanvasImagesFromGitHub: () => Promise<void>;
   syncAudioFilesToGitHub: () => Promise<void>;
@@ -538,6 +548,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const { toast } = useToast();
   const [localChangeCount, setLocalChangeCount] = useState(0);
+  const [gitHubSyncNotification, setGitHubSyncNotification] = useState<GitHubSyncNotification | null>(null);
   const cloudRevisionRef = useRef<number | null>(null);
   const [currentSlot, setCurrentSlot] = useState('');
 
@@ -559,6 +570,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     spacedRepetitionSlot: 'Late Night',
     pinnedCanvasIds: [],
     coreStateManualOverrides: {},
+    githubPulledHashes: {},
     routineRebalanceLearning: {
       history: [],
     },
@@ -1736,6 +1748,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           pinnedCanvasIds: [],
           coreStateManualOverrides: {},
           githubModuleHashes: {},
+          githubPulledHashes: {},
           routineRebalanceLearning: {
             history: [],
           },
@@ -3817,6 +3830,15 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const PERSISTENT_TOAST_DURATION_MS = 24 * 60 * 60 * 1000;
+  const dismissGitHubSyncNotification = useCallback(() => {
+    setGitHubSyncNotification(null);
+  }, []);
+  const publishGitHubSyncNotification = useCallback(
+    (notification: Omit<GitHubSyncNotification, 'updatedAt'>) => {
+      setGitHubSyncNotification({ ...notification, updatedAt: Date.now() });
+    },
+    []
+  );
 
   type GitHubAssetSyncProgress = {
     phase: 'preparing' | 'uploading' | 'complete' | 'failed';
@@ -3834,8 +3856,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const syncWithGitHub = async () => {
-    const syncToast = toast({ title: "Syncing...", description: "Preparing upload..." });
-
     const token = settings.githubToken;
     const owner = settings.githubOwner;
     const repo = settings.githubRepo;
@@ -3843,17 +3863,40 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     const path = settings.githubPath;
 
     if (!token || !owner || !repo || !path) {
-        toast({
-            title: "GitHub Sync Not Configured",
-            description: "Please configure your GitHub details in the settings.",
-            variant: "destructive",
-        });
-        return;
+      toast({
+        title: "GitHub Sync Not Configured",
+        description: "Please configure your GitHub details in the settings.",
+        variant: "destructive",
+      });
+      return;
     }
     if (!username) {
-        toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
-        return;
+      toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
+      return;
     }
+
+    const moduleTotals = { total: 0, processed: 0, pushed: 0, skipped: 0 };
+    const assetProgress: Record<'images' | 'audio' | 'pdfs', GitHubAssetSyncProgress> = {
+      images: { phase: 'preparing', total: 0, processed: 0, uploaded: 0, skipped: 0 },
+      audio: { phase: 'preparing', total: 0, processed: 0, uploaded: 0, skipped: 0 },
+      pdfs: { phase: 'preparing', total: 0, processed: 0, uploaded: 0, skipped: 0 },
+    };
+    const formatAssetLine = (label: string, progress: GitHubAssetSyncProgress) =>
+      `${label}: ${progress.uploaded} uploaded | ${progress.skipped} skipped | ${progress.processed}/${progress.total || 0} processed${progress.currentItem ? ` | ${progress.currentItem}` : ''}`;
+    const publishPushProgress = (headline: string, currentAction: string) => {
+      publishGitHubSyncNotification({
+        mode: 'push',
+        status: 'running',
+        title: headline,
+        details: [
+          `Core files: ${moduleTotals.processed}/${moduleTotals.total} processed | ${moduleTotals.pushed} pushed | ${moduleTotals.skipped} skipped`,
+          formatAssetLine('Images', assetProgress.images),
+          formatAssetLine('Audio', assetProgress.audio),
+          formatAssetLine('PDFs', assetProgress.pdfs),
+          `Current: ${currentAction}`,
+        ].join('\n'),
+      });
+    };
 
     const prefixedPath = withUserGitHubPrefix(path, username);
     const { dir } = getGitHubBaseDir(prefixedPath);
@@ -3888,271 +3931,282 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     };
 
     try {
-        await updateSyncStatus('in_progress', { phase: 'modules', startedAt: new Date().toISOString() });
-        const allData = getAllUserData();
-        const content = JSON.stringify(allData, null, 2);
-        const message = `LifeOS backup: ${new Date().toISOString()}`;
+      publishPushProgress("GitHub Push Running", "Preparing upload plan...");
+      await updateSyncStatus('in_progress', { phase: 'modules', startedAt: new Date().toISOString() });
+      const allData = getAllUserData();
+      const content = JSON.stringify(allData, null, 2);
+      const message = `LifeOS backup: ${new Date().toISOString()}`;
 
-        const nextHashes: Record<string, string> = { ...(settings.githubModuleHashes || {}) };
-        const shouldSkipUnchangedPath = async (pathToCheck: string, hashToCheck: string) => {
-          if (nextHashes[pathToCheck] !== hashToCheck) return false;
-          try {
-            const remoteSha = await getGitHubFileSha(token, owner, repo, pathToCheck);
-            return !!remoteSha;
-          } catch {
-            return false;
-          }
-        };
-
-        // Modular sync (writes alongside the single backup)
-        const modulesBase = dir ? `${dir}/modules` : 'modules';
-        const manifestPath = dir ? `${dir}/manifest.json` : 'manifest.json';
-        const modules = buildModuleData(allData);
-        const canvasFilesMetaByCanvasId = getCanvasFilesMetaByCanvasId();
-        const allCanvasIds = Array.from(new Set(
-          (modules.resources?.resources || []).flatMap((resource: Resource) =>
-            (resource.points || [])
-              .filter((point) => point.type === 'paint')
-              .map((point) => `${resource.id}-${point.id}`)
-          )
-        ));
-        const canvasFileIndex = Object.fromEntries(
-          allCanvasIds.map((canvasId) => [canvasId, canvasFilesMetaByCanvasId.get(canvasId) || {}])
-        );
-        const updatedAt = new Date().toISOString();
-
-        const moduleEntries: { name: string; path: string; content: string }[] = [
-          { name: 'core', path: `${modulesBase}/core.json`, content: JSON.stringify(modules.core, null, 2) },
-          { name: 'workouts', path: `${modulesBase}/workouts.json`, content: JSON.stringify(modules.workouts, null, 2) },
-          { name: 'knowledge', path: `${modulesBase}/knowledge.json`, content: JSON.stringify(modules.knowledge, null, 2) },
-          { name: 'ui', path: `${modulesBase}/ui.json`, content: JSON.stringify(modules.ui, null, 2) },
-        ];
-
-        // Per-folder resource modules for incremental updates
-        const resourcesByFolder = new Map<string, Resource[]>();
-        (modules.resources?.resources || []).forEach((res: Resource) => {
-          const folderKey = res.folderId || 'unfoldered';
-          const list = resourcesByFolder.get(folderKey) || [];
-          list.push(res);
-          resourcesByFolder.set(folderKey, list);
-        });
-        const resourceFoldersById = new Map<string, ResourceFolder>();
-        (modules.resources?.resourceFolders || []).forEach((folder: ResourceFolder) => {
-          if (folder?.id) resourceFoldersById.set(folder.id, folder);
-        });
-        const resourcesFoldersBase = `${modulesBase}/resources-folders`;
-        const resourcesFolderIndex = {
-          version: 1,
-          updatedAt,
-          folders: [] as Array<{ id: string; path: string }>,
-        };
-        for (const [folderId, list] of resourcesByFolder.entries()) {
-          const folder = resourceFoldersById.get(folderId);
-          const folderPath = `${resourcesFoldersBase}/folder_${folderId}.json`;
-          moduleEntries.push({
-            name: `resources-folder-${folderId}`,
-            path: folderPath,
-            content: JSON.stringify({ folderId, folder, resources: list }, null, 2),
-          });
-          resourcesFolderIndex.folders.push({ id: folderId, path: folderPath });
-        }
-        moduleEntries.push({
-          name: 'resources-folders-index',
-          path: `${resourcesFoldersBase}/index.json`,
-          content: JSON.stringify(resourcesFolderIndex, null, 2),
-        });
-
-        // Per-canvas image metadata files
-        const canvasFilesBase = `${modulesBase}/canvas-files`;
-        const canvasFilesIndex = {
-          version: 1,
-          updatedAt,
-          folder: `images_${currentUser?.username?.toLowerCase() || 'unknown'}`,
-          canvases: Object.keys(canvasFileIndex),
-        };
-        moduleEntries.push({
-          name: 'canvas-files-index',
-          path: `${canvasFilesBase}/index.json`,
-          content: JSON.stringify(canvasFilesIndex, null, 2),
-        });
-
-        const manifest = {
-          version: 1,
-          updatedAt,
-          modules: moduleEntries.reduce((acc, entry) => {
-            acc[entry.name] = { path: entry.path, updatedAt };
-            return acc;
-          }, {} as Record<string, { path: string; updatedAt: string }>),
-        };
-
-        const totalCandidates = 1 + moduleEntries.length + allCanvasIds.length + 1;
-        let processed = 0;
-        let pushed = 0;
-        let skipped = 0;
-        const updateProgress = (label: string) => {
-          syncToast.update({
-            title: "Syncing...",
-            description: `${processed}/${totalCandidates} processed | ${pushed} pushed | ${skipped} skipped\n${label}`,
-          });
-        };
-
-        const backupHash = await hashString(content);
-        if (!(await shouldSkipUnchangedPath(prefixedPath, backupHash))) {
-          const sha = await getGitHubFileSha(token, owner, repo, prefixedPath);
-          await pushToGitHub(token, owner, repo, prefixedPath, content, message, sha, { suppressToast: true });
-          nextHashes[prefixedPath] = backupHash;
-          pushed += 1;
-          processed += 1;
-          updateProgress(`Pushed ${prefixedPath}`);
-        } else {
-          skipped += 1;
-          processed += 1;
-          updateProgress(`Skipped ${prefixedPath}`);
-        }
-
-        for (const entry of moduleEntries) {
-          const moduleHash = await hashString(entry.content);
-          if (await shouldSkipUnchangedPath(entry.path, moduleHash)) {
-            skipped += 1;
-            processed += 1;
-            updateProgress(`Skipped ${entry.path}`);
-            continue;
-          }
-          const moduleSha = await getGitHubFileSha(token, owner, repo, entry.path);
-          await pushToGitHub(token, owner, repo, entry.path, entry.content, `LifeOS module: ${entry.name}`, moduleSha, { suppressToast: true });
-          nextHashes[entry.path] = moduleHash;
-          pushed += 1;
-          processed += 1;
-          updateProgress(`Pushed ${entry.path}`);
-        }
-
-        // Delete stale resource-folder files that are no longer present locally
+      const nextHashes: Record<string, string> = { ...(settings.githubModuleHashes || {}) };
+      const shouldSkipUnchangedPath = async (pathToCheck: string, hashToCheck: string) => {
+        if (nextHashes[pathToCheck] !== hashToCheck) return false;
         try {
-          const listResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${resourcesFoldersBase}`, {
-            headers: { 'Authorization': `token ${token}` }
-          });
-          if (listResp.ok) {
-            const listData = await listResp.json();
-            const expectedFolderFiles = new Set(
-              moduleEntries
-                .filter(m => m.name.startsWith('resources-folder-'))
-                .map(m => m.path.split('/').pop() as string)
-            );
-            for (const item of listData || []) {
-              if (item?.type !== 'file' || !item?.name || !item?.sha) continue;
-              if (item.name === 'index.json') continue;
-              if (!expectedFolderFiles.has(item.name)) {
-                const delPath = `${resourcesFoldersBase}/${item.name}`;
-                await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${delPath}`, {
-                  method: 'DELETE',
-                  headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ message: `Delete stale resources folder file: ${item.name}`, sha: item.sha }),
-                });
-              }
+          const remoteSha = await getGitHubFileSha(token, owner, repo, pathToCheck);
+          return !!remoteSha;
+        } catch {
+          return false;
+        }
+      };
+
+      const modulesBase = dir ? `${dir}/modules` : 'modules';
+      const manifestPath = dir ? `${dir}/manifest.json` : 'manifest.json';
+      const modules = buildModuleData(allData);
+      const canvasFilesMetaByCanvasId = getCanvasFilesMetaByCanvasId();
+      const allCanvasIds = Array.from(new Set(
+        (modules.resources?.resources || []).flatMap((resource: Resource) =>
+          (resource.points || [])
+            .filter((point) => point.type === 'paint')
+            .map((point) => `${resource.id}-${point.id}`)
+        )
+      ));
+      const canvasFileIndex = Object.fromEntries(
+        allCanvasIds.map((canvasId) => [canvasId, canvasFilesMetaByCanvasId.get(canvasId) || {}])
+      );
+      const updatedAt = new Date().toISOString();
+
+      const moduleEntries: { name: string; path: string; content: string }[] = [
+        { name: 'core', path: `${modulesBase}/core.json`, content: JSON.stringify(modules.core, null, 2) },
+        { name: 'workouts', path: `${modulesBase}/workouts.json`, content: JSON.stringify(modules.workouts, null, 2) },
+        { name: 'knowledge', path: `${modulesBase}/knowledge.json`, content: JSON.stringify(modules.knowledge, null, 2) },
+        { name: 'ui', path: `${modulesBase}/ui.json`, content: JSON.stringify(modules.ui, null, 2) },
+      ];
+
+      const resourcesByFolder = new Map<string, Resource[]>();
+      (modules.resources?.resources || []).forEach((res: Resource) => {
+        const folderKey = res.folderId || 'unfoldered';
+        const list = resourcesByFolder.get(folderKey) || [];
+        list.push(res);
+        resourcesByFolder.set(folderKey, list);
+      });
+      const resourceFoldersById = new Map<string, ResourceFolder>();
+      (modules.resources?.resourceFolders || []).forEach((folder: ResourceFolder) => {
+        if (folder?.id) resourceFoldersById.set(folder.id, folder);
+      });
+      const resourcesFoldersBase = `${modulesBase}/resources-folders`;
+      const resourcesFolderIndex = {
+        version: 1,
+        updatedAt,
+        folders: [] as Array<{ id: string; path: string }>,
+      };
+      for (const [folderId, list] of resourcesByFolder.entries()) {
+        const folder = resourceFoldersById.get(folderId);
+        const folderPath = `${resourcesFoldersBase}/folder_${folderId}.json`;
+        moduleEntries.push({
+          name: `resources-folder-${folderId}`,
+          path: folderPath,
+          content: JSON.stringify({ folderId, folder, resources: list }, null, 2),
+        });
+        resourcesFolderIndex.folders.push({ id: folderId, path: folderPath });
+      }
+      moduleEntries.push({
+        name: 'resources-folders-index',
+        path: `${resourcesFoldersBase}/index.json`,
+        content: JSON.stringify(resourcesFolderIndex, null, 2),
+      });
+
+      const canvasFilesBase = `${modulesBase}/canvas-files`;
+      const canvasFilesIndex = {
+        version: 1,
+        updatedAt,
+        folder: `images_${currentUser?.username?.toLowerCase() || 'unknown'}`,
+        canvases: Object.keys(canvasFileIndex),
+      };
+      moduleEntries.push({
+        name: 'canvas-files-index',
+        path: `${canvasFilesBase}/index.json`,
+        content: JSON.stringify(canvasFilesIndex, null, 2),
+      });
+
+      const manifest = {
+        version: 1,
+        updatedAt,
+        modules: moduleEntries.reduce((acc, entry) => {
+          acc[entry.name] = { path: entry.path, updatedAt };
+          return acc;
+        }, {} as Record<string, { path: string; updatedAt: string }>),
+      };
+
+      moduleTotals.total = 1 + moduleEntries.length + allCanvasIds.length + 1;
+      const updateModuleProgress = (label: string) => {
+        publishPushProgress("GitHub Push Running", label);
+      };
+
+      const backupHash = await hashString(content);
+      if (!(await shouldSkipUnchangedPath(prefixedPath, backupHash))) {
+        const sha = await getGitHubFileSha(token, owner, repo, prefixedPath);
+        await pushToGitHub(token, owner, repo, prefixedPath, content, message, sha, { suppressToast: true });
+        nextHashes[prefixedPath] = backupHash;
+        moduleTotals.pushed += 1;
+        moduleTotals.processed += 1;
+        updateModuleProgress(`Pushed ${prefixedPath}`);
+      } else {
+        moduleTotals.skipped += 1;
+        moduleTotals.processed += 1;
+        updateModuleProgress(`Skipped ${prefixedPath}`);
+      }
+
+      for (const entry of moduleEntries) {
+        const moduleHash = await hashString(entry.content);
+        if (await shouldSkipUnchangedPath(entry.path, moduleHash)) {
+          moduleTotals.skipped += 1;
+          moduleTotals.processed += 1;
+          updateModuleProgress(`Skipped ${entry.path}`);
+          continue;
+        }
+        const moduleSha = await getGitHubFileSha(token, owner, repo, entry.path);
+        await pushToGitHub(token, owner, repo, entry.path, entry.content, `LifeOS module: ${entry.name}`, moduleSha, { suppressToast: true });
+        nextHashes[entry.path] = moduleHash;
+        moduleTotals.pushed += 1;
+        moduleTotals.processed += 1;
+        updateModuleProgress(`Pushed ${entry.path}`);
+      }
+
+      try {
+        const listResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${resourcesFoldersBase}`, {
+          headers: { 'Authorization': `token ${token}` }
+        });
+        if (listResp.ok) {
+          const listData = await listResp.json();
+          const expectedFolderFiles = new Set(
+            moduleEntries
+              .filter(m => m.name.startsWith('resources-folder-'))
+              .map(m => m.path.split('/').pop() as string)
+          );
+          for (const item of listData || []) {
+            if (item?.type !== 'file' || !item?.name || !item?.sha) continue;
+            if (item.name === 'index.json') continue;
+            if (!expectedFolderFiles.has(item.name)) {
+              const delPath = `${resourcesFoldersBase}/${item.name}`;
+              await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${delPath}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: `Delete stale resources folder file: ${item.name}`, sha: item.sha }),
+              });
             }
           }
-        } catch (e) {
-          console.debug('Failed to prune resource folder files', e);
         }
+      } catch (e) {
+        console.debug('Failed to prune resource folder files', e);
+      }
 
-        // Write per-canvas files
-        for (const [canvasId, filesMeta] of Object.entries(canvasFileIndex)) {
-          const canvasPath = `${canvasFilesBase}/${canvasId}.json`;
-          const canvasContent = JSON.stringify({ canvasId, files: filesMeta }, null, 2);
-          const canvasHash = await hashString(canvasContent);
-          if (await shouldSkipUnchangedPath(canvasPath, canvasHash)) {
-            skipped += 1;
-            processed += 1;
-            updateProgress(`Skipped ${canvasPath}`);
-            continue;
-          }
-          const canvasSha = await getGitHubFileSha(token, owner, repo, canvasPath);
-          await pushToGitHub(token, owner, repo, canvasPath, canvasContent, `LifeOS canvas files: ${canvasId}`, canvasSha, { suppressToast: true });
-          nextHashes[canvasPath] = canvasHash;
-          pushed += 1;
-          processed += 1;
-          updateProgress(`Pushed ${canvasPath}`);
+      for (const [canvasId, filesMeta] of Object.entries(canvasFileIndex)) {
+        const canvasPath = `${canvasFilesBase}/${canvasId}.json`;
+        const canvasContent = JSON.stringify({ canvasId, files: filesMeta }, null, 2);
+        const canvasHash = await hashString(canvasContent);
+        if (await shouldSkipUnchangedPath(canvasPath, canvasHash)) {
+          moduleTotals.skipped += 1;
+          moduleTotals.processed += 1;
+          updateModuleProgress(`Skipped ${canvasPath}`);
+          continue;
         }
+        const canvasSha = await getGitHubFileSha(token, owner, repo, canvasPath);
+        await pushToGitHub(token, owner, repo, canvasPath, canvasContent, `LifeOS canvas files: ${canvasId}`, canvasSha, { suppressToast: true });
+        nextHashes[canvasPath] = canvasHash;
+        moduleTotals.pushed += 1;
+        moduleTotals.processed += 1;
+        updateModuleProgress(`Pushed ${canvasPath}`);
+      }
 
-        // Delete stale canvas metadata files that are no longer present locally
-        try {
-          const listResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${canvasFilesBase}`, {
-            headers: { 'Authorization': `token ${token}` }
-          });
-          if (listResp.ok) {
-            const listData = await listResp.json();
-            const expectedCanvasFiles = new Set(allCanvasIds.map((canvasId) => `${canvasId}.json`));
-            for (const item of listData || []) {
-              if (item?.type !== 'file' || !item?.name || !item?.sha) continue;
-              if (item.name === 'index.json') continue;
-              if (!expectedCanvasFiles.has(item.name)) {
-                const delPath = `${canvasFilesBase}/${item.name}`;
-                await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${delPath}`, {
-                  method: 'DELETE',
-                  headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ message: `Delete stale canvas file: ${item.name}`, sha: item.sha }),
-                });
-              }
+      try {
+        const listResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${canvasFilesBase}`, {
+          headers: { 'Authorization': `token ${token}` }
+        });
+        if (listResp.ok) {
+          const listData = await listResp.json();
+          const expectedCanvasFiles = new Set(allCanvasIds.map((canvasId) => `${canvasId}.json`));
+          for (const item of listData || []) {
+            if (item?.type !== 'file' || !item?.name || !item?.sha) continue;
+            if (item.name === 'index.json') continue;
+            if (!expectedCanvasFiles.has(item.name)) {
+              const delPath = `${canvasFilesBase}/${item.name}`;
+              await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${delPath}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: `Delete stale canvas file: ${item.name}`, sha: item.sha }),
+              });
             }
           }
-        } catch (e) {
-          console.debug('Failed to prune canvas files', e);
         }
+      } catch (e) {
+        console.debug('Failed to prune canvas files', e);
+      }
 
-        const manifestContent = JSON.stringify(manifest, null, 2);
-        const manifestHash = await hashString(manifestContent);
-        if (!(await shouldSkipUnchangedPath(manifestPath, manifestHash))) {
-          const manifestSha = await getGitHubFileSha(token, owner, repo, manifestPath);
-          await pushToGitHub(token, owner, repo, manifestPath, manifestContent, `LifeOS manifest`, manifestSha, { suppressToast: true });
-          nextHashes[manifestPath] = manifestHash;
-          pushed += 1;
-          processed += 1;
-          updateProgress(`Pushed ${manifestPath}`);
-        } else {
-          skipped += 1;
-          processed += 1;
-          updateProgress(`Skipped ${manifestPath}`);
-        }
+      const manifestContent = JSON.stringify(manifest, null, 2);
+      const manifestHash = await hashString(manifestContent);
+      if (!(await shouldSkipUnchangedPath(manifestPath, manifestHash))) {
+        const manifestSha = await getGitHubFileSha(token, owner, repo, manifestPath);
+        await pushToGitHub(token, owner, repo, manifestPath, manifestContent, `LifeOS manifest`, manifestSha, { suppressToast: true });
+        nextHashes[manifestPath] = manifestHash;
+        moduleTotals.pushed += 1;
+        moduleTotals.processed += 1;
+        updateModuleProgress(`Pushed ${manifestPath}`);
+      } else {
+        moduleTotals.skipped += 1;
+        moduleTotals.processed += 1;
+        updateModuleProgress(`Skipped ${manifestPath}`);
+      }
 
-        setSettings(prev => ({ ...prev, githubModuleHashes: nextHashes }));
+      setSettings(prev => ({ ...prev, githubModuleHashes: nextHashes }));
 
-        // After pushing modules and metadata, also push binary assets (images, audio, PDFs)
-        syncToast.update({ title: 'Uploading assets', description: 'Uploading images...' });
-        await syncCanvasImagesToGitHub();
-        syncToast.update({ title: 'Uploading assets', description: 'Uploading audio...' });
-        await syncAudioFilesToGitHub();
-        syncToast.update({ title: 'Uploading assets', description: 'Uploading PDFs...' });
-        await syncPdfFilesToGitHub();
+      await syncCanvasImagesToGitHub({
+        silent: true,
+        onProgress: (progress) => {
+          assetProgress.images = progress;
+          publishPushProgress("GitHub Push Running", "Uploading canvas images...");
+        },
+      });
+      await syncAudioFilesToGitHub({
+        silent: true,
+        onProgress: (progress) => {
+          assetProgress.audio = progress;
+          publishPushProgress("GitHub Push Running", "Uploading audio files...");
+        },
+      });
+      await syncPdfFilesToGitHub({
+        silent: true,
+        onProgress: (progress) => {
+          assetProgress.pdfs = progress;
+          publishPushProgress("GitHub Push Running", "Uploading PDF files...");
+        },
+      });
 
-        await updateSyncStatus('completed', {
-          phase: 'done',
-          completedAt: new Date().toISOString(),
-          pushed,
-          skipped,
-          manifestPath,
-        });
+      await updateSyncStatus('completed', {
+        phase: 'done',
+        completedAt: new Date().toISOString(),
+        pushed: moduleTotals.pushed,
+        skipped: moduleTotals.skipped,
+        manifestPath,
+      });
 
-        syncToast.update({
-          title: "Sync Complete",
-          description: `${pushed} pushed | ${skipped} skipped`,
-        });
-
+      publishGitHubSyncNotification({
+        mode: 'push',
+        status: 'success',
+        title: "GitHub Push Complete",
+        details: [
+          `Core files: ${moduleTotals.pushed} pushed | ${moduleTotals.skipped} skipped`,
+          formatAssetLine('Images', assetProgress.images),
+          formatAssetLine('Audio', assetProgress.audio),
+          formatAssetLine('PDFs', assetProgress.pdfs),
+          "Close this notification when reviewed.",
+        ].join('\n'),
+      });
     } catch (error) {
-        try {
-          await updateSyncStatus('failed', {
-            phase: 'error',
-            failedAt: new Date().toISOString(),
-            error: error instanceof Error ? error.message : String(error),
-          });
-        } catch (statusError) {
-          console.error('Failed to write GitHub sync status:', statusError);
-        }
-        console.error("GitHub sync failed:", error);
-        syncToast.update({
-            title: "Sync Failed",
-            description: error instanceof Error ? error.message : "An unknown error occurred.",
-            variant: "destructive",
+      try {
+        await updateSyncStatus('failed', {
+          phase: 'error',
+          failedAt: new Date().toISOString(),
+          error: error instanceof Error ? error.message : String(error),
         });
+      } catch (statusError) {
+        console.error('Failed to write GitHub sync status:', statusError);
+      }
+      console.error("GitHub sync failed:", error);
+      publishGitHubSyncNotification({
+        mode: 'push',
+        status: 'error',
+        title: "GitHub Push Failed",
+        details: error instanceof Error ? error.message : "An unknown error occurred.",
+      });
     }
   };
 
@@ -4432,6 +4486,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   const downloadFromGitHub = async () => {
     const { githubToken, githubOwner, githubRepo, githubPath } = settings;
     const username = currentUser?.username?.toLowerCase();
+    const nextPulledHashes: Record<string, string> = { ...(settings.githubPulledHashes || {}) };
     if (!githubToken || !githubOwner || !githubRepo || !githubPath) {
         toast({ title: 'GitHub settings not configured', variant: 'destructive' });
         return;
@@ -4440,11 +4495,26 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
         return;
     }
-    const downloadToast = toast({ title: "Downloading...", description: "Step 1/7 Preparing GitHub download..." });
-    const setDownloadProgress = (step: number, message: string) => {
-      downloadToast.update({
-        title: "Downloading...",
-        description: `Step ${step}/7 ${message}`,
+    const setDownloadProgress = (
+      step: number,
+      message: string,
+      options?: { modulesFetched?: number; modulesTotal?: number; foldersFetched?: number; foldersTotal?: number }
+    ) => {
+      const details = [
+        `Step ${step}/7`,
+        message,
+      ];
+      if (options?.modulesTotal !== undefined) {
+        details.push(`Modules: ${options.modulesFetched || 0}/${options.modulesTotal}`);
+      }
+      if (options?.foldersTotal !== undefined) {
+        details.push(`Resource folders: ${options.foldersFetched || 0}/${options.foldersTotal}`);
+      }
+      publishGitHubSyncNotification({
+        mode: 'pull',
+        status: 'running',
+        title: 'GitHub Download Running',
+        details: details.join('\n'),
       });
     };
 
@@ -4502,13 +4572,41 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         }
 
         if (effectiveManifest && effectiveManifest.modules) {
-            setDownloadProgress(4, "Fetching modular backup files...");
-            const core = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules.core?.path);
-            const workouts = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules.workouts?.path);
-            let resourcesMod = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules.resources?.path);
-            const knowledge = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules.knowledge?.path);
-            const ui = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules.ui?.path);
-            const canvasFilesIndex = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, effectiveManifest.modules['canvas-files-index']?.path);
+            const localModulesBaseline = buildModuleData(getAllUserData());
+            const modulePathEntries = [
+              ['core', effectiveManifest.modules.core?.path],
+              ['workouts', effectiveManifest.modules.workouts?.path],
+              ['resources', effectiveManifest.modules.resources?.path],
+              ['knowledge', effectiveManifest.modules.knowledge?.path],
+              ['ui', effectiveManifest.modules.ui?.path],
+              ['canvas-files-index', effectiveManifest.modules['canvas-files-index']?.path],
+            ].filter((entry): entry is [string, string] => !!entry[1]);
+            let modulesFetched = 0;
+            let modulesSkipped = 0;
+            const modulesTotal = modulePathEntries.length;
+            const readModule = async <T,>(name: string, modulePath: string | undefined, localFallback: T | null) => {
+              if (!modulePath) return null as T | null;
+              const moduleSha = await getGitHubFileSha(githubToken, githubOwner, githubRepo, modulePath);
+              if (moduleSha && settings.githubPulledHashes?.[modulePath] === moduleSha) {
+                modulesSkipped += 1;
+                setDownloadProgress(4, `Skipped unchanged module "${name}"`, { modulesFetched, modulesTotal });
+                return localFallback;
+              }
+              const value = await getGitHubJson<T>(githubToken, githubOwner, githubRepo, modulePath);
+              modulesFetched += 1;
+              if (moduleSha) nextPulledHashes[modulePath] = moduleSha;
+              setDownloadProgress(4, `Fetched module "${name}"`, { modulesFetched, modulesTotal });
+              return value;
+            };
+
+            let resourcesMod = await readModule<any>('resources', effectiveManifest.modules.resources?.path, localModulesBaseline.resources);
+            const core = await readModule<any>('core', effectiveManifest.modules.core?.path, localModulesBaseline.core);
+            const workouts = await readModule<any>('workouts', effectiveManifest.modules.workouts?.path, localModulesBaseline.workouts);
+            const knowledge = await readModule<any>('knowledge', effectiveManifest.modules.knowledge?.path, localModulesBaseline.knowledge);
+            const ui = await readModule<any>('ui', effectiveManifest.modules.ui?.path, localModulesBaseline.ui);
+            const canvasFilesIndex = await readModule<any>('canvas-files-index', effectiveManifest.modules['canvas-files-index']?.path, null);
+
+            const resourcesFoldersBase = dir ? `${dir}/modules/resources-folders` : 'modules/resources-folders';
 
             // Prefer per-folder resource modules when present
             let folderModuleEntries = Object.entries(effectiveManifest.modules)
@@ -4525,10 +4623,16 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                 }
             }
 
+            const resourcesFolderEntries = await listGitHubDirectory(githubToken, githubOwner, githubRepo, resourcesFoldersBase);
+            const folderShaByPath = new Map<string, string>();
+            (resourcesFolderEntries || []).forEach((entry) => {
+              if (entry.type === 'file' && entry.name.endsWith('.json') && entry.name !== 'index.json' && entry.sha) {
+                folderShaByPath.set(entry.path, entry.sha);
+              }
+            });
+
             // Compatibility fallback: if no index, enumerate modules/resources-folders directly.
             if (folderModuleEntries.length === 0) {
-                const resourcesFoldersBase = dir ? `${dir}/modules/resources-folders` : 'modules/resources-folders';
-                const resourcesFolderEntries = await listGitHubDirectory(githubToken, githubOwner, githubRepo, resourcesFoldersBase);
                 if (resourcesFolderEntries && resourcesFolderEntries.length > 0) {
                     folderModuleEntries = resourcesFolderEntries
                       .filter(entry => entry.type === 'file' && entry.name.endsWith('.json') && entry.name !== 'index.json')
@@ -4537,15 +4641,37 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             }
 
             if (folderModuleEntries.length > 0) {
+                const changedFolderEntries = folderModuleEntries.filter((folderPath) => {
+                  const remoteSha = folderShaByPath.get(folderPath);
+                  if (!remoteSha) return true;
+                  if (settings.githubPulledHashes?.[folderPath] === remoteSha) {
+                    nextPulledHashes[folderPath] = remoteSha;
+                    return false;
+                  }
+                  return true;
+                });
+
+                if (changedFolderEntries.length === 0 && !resourcesMod) {
+                  resourcesMod = localModulesBaseline.resources;
+                }
+
                 const folderResources: Resource[] = [];
                 const folderFolders: ResourceFolder[] = [];
-                for (let index = 0; index < folderModuleEntries.length; index += 1) {
-                    const folderPath = folderModuleEntries[index];
-                    downloadToast.update({
-                      title: "Downloading...",
-                      description: `Step 4/7 Loading modular folder ${index + 1}/${folderModuleEntries.length}...`,
+                let foldersFetched = 0;
+                for (let index = 0; index < changedFolderEntries.length; index += 1) {
+                    const folderPath = changedFolderEntries[index];
+                    setDownloadProgress(4, `Loading changed modular folder ${index + 1}/${changedFolderEntries.length}`, {
+                      modulesFetched,
+                      modulesTotal,
+                      foldersFetched,
+                      foldersTotal: changedFolderEntries.length,
                     });
                     const folderPayload = await getGitHubJson<{ folderId?: string; folder?: ResourceFolder; resources?: Resource[] }>(githubToken, githubOwner, githubRepo, folderPath);
+                    foldersFetched += 1;
+                    const remoteSha = folderShaByPath.get(folderPath);
+                    if (remoteSha) {
+                      nextPulledHashes[folderPath] = remoteSha;
+                    }
                     if (folderPayload?.folder) folderFolders.push(folderPayload.folder);
                     if (folderPayload?.resources && Array.isArray(folderPayload.resources)) {
                         folderResources.push(...folderPayload.resources);
@@ -4584,8 +4710,23 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                 const merged = { main: mergedMain, ui: ui || {} };
                 const blob = new Blob([JSON.stringify(merged)], { type: 'application/json' });
                 await storeBackup('github_backup', blob);
+                setDownloadProgress(7, "Fetching canvas/audio/pdf assets...");
+                const modularAssetFetchResults = await Promise.allSettled([
+                  fetchCanvasImagesFromGitHub(),
+                  fetchAudioFilesFromGitHub(),
+                  fetchPdfFilesFromGitHub(),
+                ]);
+                const modularAssetFailures = modularAssetFetchResults
+                  .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+                  .map((r) => String(r.reason));
                 setImportBackupConfirmationOpen(true);
-                downloadToast.update({ title: "Download Ready", description: "Modular backup has been assembled locally." });
+                setSettings(prev => ({ ...prev, githubPulledHashes: nextPulledHashes }));
+                publishGitHubSyncNotification({
+                  mode: 'pull',
+                  status: 'success',
+                  title: "GitHub Download Ready",
+                  details: `Modular backup has been assembled locally.\nModules: ${modulesFetched} fetched, ${modulesSkipped} skipped.${modularAssetFailures.length > 0 ? `\nAssets partial: ${modularAssetFailures.length} fetch step(s) failed.` : "\nAssets fetched successfully."}\nClose this notification when reviewed.`,
+                });
                 return;
             }
         }
@@ -4609,6 +4750,9 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         if (!response.ok) throw new Error('Failed to fetch file metadata from GitHub.');
         
         const data = await response.json();
+        if (data?.sha) {
+          nextPulledHashes[resolvedBackupPath] = data.sha;
+        }
         let blob: Blob | null = null;
 
         if (data?.content) {
@@ -4626,12 +4770,32 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
         setDownloadProgress(7, "Saving backup locally...");
         await storeBackup('github_backup', blob);
+        setDownloadProgress(7, "Fetching canvas/audio/pdf assets...");
+        const fullAssetFetchResults = await Promise.allSettled([
+          fetchCanvasImagesFromGitHub(),
+          fetchAudioFilesFromGitHub(),
+          fetchPdfFilesFromGitHub(),
+        ]);
+        const fullAssetFailures = fullAssetFetchResults
+          .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+          .map((r) => String(r.reason));
 
         setImportBackupConfirmationOpen(true);
-        downloadToast.update({ title: "Download Ready", description: "Backup has been downloaded and stored locally." });
+        setSettings(prev => ({ ...prev, githubPulledHashes: nextPulledHashes }));
+        publishGitHubSyncNotification({
+          mode: 'pull',
+          status: 'success',
+          title: "GitHub Download Ready",
+          details: `Backup has been downloaded and stored locally.${fullAssetFailures.length > 0 ? `\nAssets partial: ${fullAssetFailures.length} fetch step(s) failed.` : "\nAssets fetched successfully."}\nClose this notification when reviewed.`,
+        });
         
     } catch (error) {
-        downloadToast.update({ title: 'Download Failed', description: error instanceof Error ? error.message : "Unknown error", variant: 'destructive' });
+        publishGitHubSyncNotification({
+          mode: 'pull',
+          status: 'error',
+          title: 'GitHub Download Failed',
+          details: error instanceof Error ? error.message : "Unknown error",
+        });
     }
   };
 
@@ -4684,31 +4848,46 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       return canvasFilesById;
   }, [resources]);
 
-  const syncCanvasImagesToGitHub = async () => {
+  const syncCanvasImagesToGitHub = async (options?: GitHubAssetSyncOptions) => {
+      const silent = !!options?.silent;
+      const emitProgress = (progress: GitHubAssetSyncProgress) => {
+        options?.onProgress?.(progress);
+      };
       const username = currentUser?.username?.toLowerCase();
       const { githubToken, githubOwner, githubRepo } = settings;
 
       if (!username) {
-          toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
+          if (!silent) toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
           return;
       }
 
       if (!githubToken || !githubOwner || !githubRepo) {
-          toast({ title: 'GitHub settings not configured', variant: 'destructive' });
+          if (!silent) toast({ title: 'GitHub settings not configured', variant: 'destructive' });
           return;
       }
 
       const entries = await getAllExcalidrawFiles();
       if (entries.length === 0) {
-          toast({ title: "No images found", description: "No Excalidraw images are stored locally." });
+          emitProgress({ phase: 'complete', total: 0, processed: 0, uploaded: 0, skipped: 0, note: 'No local images found.' });
+          if (!silent) toast({ title: "No images found", description: "No Excalidraw images are stored locally." });
           return;
       }
 
       const folderPath = withUserGitHubPrefix(`images_${username}`, username);
-      toast({ title: "Uploading images...", description: `Pushing ${entries.length} images to GitHub.` });
+      let toastHandle: ReturnType<typeof toast> | null = null;
+      if (!silent) {
+        toastHandle = toast({
+          title: "Uploading images...",
+          description: `Pushing ${entries.length} images to GitHub.`,
+          duration: PERSISTENT_TOAST_DURATION_MS,
+        });
+      }
 
       try {
           let uploaded = 0;
+          let skipped = 0;
+          let processed = 0;
+          emitProgress({ phase: 'preparing', total: entries.length, processed, uploaded, skipped, note: 'Reading local image cache...' });
 
             // Pre-list existing files in the target folder to avoid many 404 GETs
             const existingFilesMap = new Map<string, string>();
@@ -4733,7 +4912,12 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
             for (const { key, record } of entries) {
               const fileId = key.split(':').pop();
-              if (!fileId || !record?.blob) continue;
+              if (!fileId || !record?.blob) {
+                skipped += 1;
+                processed += 1;
+                emitProgress({ phase: 'uploading', total: entries.length, processed, uploaded, skipped, currentItem: key, note: 'Skipped invalid local image record.' });
+                continue;
+              }
 
               const mimeType = record.mimeType || record.blob.type || 'application/octet-stream';
               const ext = mimeType.includes('png') ? 'png'
@@ -4745,6 +4929,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
               const filename = `${fileId}.${ext}`;
               const path = `${folderPath}/${filename}`;
+              emitProgress({ phase: 'uploading', total: entries.length, processed, uploaded, skipped, currentItem: filename, note: 'Uploading image file...' });
 
               // Use pre-fetched sha if available
               const sha = existingFilesMap.get(filename);
@@ -4772,44 +4957,69 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
               }
 
               uploaded += 1;
+              processed += 1;
+              emitProgress({ phase: 'uploading', total: entries.length, processed, uploaded, skipped, currentItem: filename, note: 'Uploaded.' });
             }
 
-          toast({ title: "Images Uploaded", description: `${uploaded} images uploaded to GitHub.` });
+          emitProgress({ phase: 'complete', total: entries.length, processed, uploaded, skipped, note: 'Image upload finished.' });
+          if (toastHandle) {
+            toastHandle.update({ title: "Images Uploaded", description: `${uploaded} uploaded | ${skipped} skipped` });
+          } else if (!silent) {
+            toast({ title: "Images Uploaded", description: `${uploaded} images uploaded to GitHub.` });
+          }
       } catch (error) {
           console.error("GitHub image upload failed:", error);
-          toast({ title: "Upload Failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
+          emitProgress({ phase: 'failed', total: entries.length, processed: 0, uploaded: 0, skipped: 0, note: error instanceof Error ? error.message : "Unknown error" });
+          if (toastHandle) {
+            toastHandle.update({ title: "Upload Failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
+          } else if (!silent) {
+            toast({ title: "Upload Failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
+          }
       }
   };
 
-    const syncAudioFilesToGitHub = async () => {
+    const syncAudioFilesToGitHub = async (options?: GitHubAssetSyncOptions) => {
+        const silent = !!options?.silent;
+        const emitProgress = (progress: GitHubAssetSyncProgress) => {
+          options?.onProgress?.(progress);
+        };
         const username = currentUser?.username?.toLowerCase();
         const { githubToken, githubOwner, githubRepo } = settings;
 
         if (!username) {
-          toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
+          if (!silent) toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
           return;
         }
         if (!githubToken || !githubOwner || !githubRepo) {
-          toast({ title: 'GitHub settings not configured', variant: 'destructive' });
+          if (!silent) toast({ title: 'GitHub settings not configured', variant: 'destructive' });
           return;
         }
 
         const audios = (resources || []).filter(r => r.hasLocalAudio || r.audioFileName);
         if (audios.length === 0) {
-          toast({ title: "No audio files", description: "No local audio files found to upload." });
+          emitProgress({ phase: 'complete', total: 0, processed: 0, uploaded: 0, skipped: 0, note: 'No local audio files found.' });
+          if (!silent) toast({ title: "No audio files", description: "No local audio files found to upload." });
           return;
         }
 
         const folderPath = withUserGitHubPrefix(`audio_${username}`, username);
-        const syncToast = toast({ title: "Uploading audio...", description: `Preparing ${audios.length} files...` });
+        const syncToast = silent ? null : toast({ title: "Uploading audio...", description: `Preparing ${audios.length} files...`, duration: PERSISTENT_TOAST_DURATION_MS });
 
         try {
           let uploaded = 0;
           let skipped = 0;
+          let processed = 0;
+          emitProgress({ phase: 'preparing', total: audios.length, processed, uploaded, skipped, note: 'Preparing audio upload...' });
 
           for (const res of audios) {
             const { blob, key: foundKey } = await getAudioForResource(res.id, res.audioFileName);
-            if (!blob) { skipped += 1; continue; }
+            const rawName = String(res.audioFileName || foundKey || res.id || 'audio');
+            if (!blob) {
+              skipped += 1;
+              processed += 1;
+              emitProgress({ phase: 'uploading', total: audios.length, processed, uploaded, skipped, currentItem: rawName, note: 'Skipped missing local blob.' });
+              continue;
+            }
 
             const buffer = await blob.arrayBuffer();
             const base64Content = arrayBufferToBase64(buffer);
@@ -4817,7 +5027,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
             const mimeType = blob.type || 'audio/mpeg';
             const ext = mimeType.includes('mpeg') || mimeType.includes('mp3') ? 'mp3' : mimeType.split('/').pop() || 'bin';
-            const rawName = String(res.audioFileName || foundKey || res.id || 'audio');
             const safeName = rawName.replace(/\s+/g, '_');
             const hasExt = /\.[a-zA-Z0-9]{1,5}$/.test(safeName);
             const filename = (hasExt ? safeName : `${safeName}.${ext}`);
@@ -4826,7 +5035,9 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             const existingHash = settings.githubModuleHashes?.[path];
             if (existingHash === fileHash) {
               skipped += 1;
-              syncToast.update({ title: 'Skipping', description: `Unchanged: ${filename}` });
+              processed += 1;
+              syncToast?.update({ title: 'Skipping', description: `Unchanged: ${filename}` });
+              emitProgress({ phase: 'uploading', total: audios.length, processed, uploaded, skipped, currentItem: filename, note: 'Unchanged; skipped.' });
               continue;
             }
 
@@ -4860,8 +5071,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                 // update hash store
                 setSettings(prev => ({ ...prev, githubModuleHashes: { ...(prev.githubModuleHashes || {}), [path]: fileHash } }));
                 uploaded += 1;
+                processed += 1;
                 success = true;
-                syncToast.update({ title: 'Uploading', description: `Uploaded ${uploaded} / ${audios.length}` });
+                syncToast?.update({ title: 'Uploading', description: `Uploaded ${uploaded} / ${audios.length}` });
+                emitProgress({ phase: 'uploading', total: audios.length, processed, uploaded, skipped, currentItem: filename, note: 'Uploaded.' });
               } catch (e) {
                 lastError = e;
                 const delay = 500 * Math.pow(2, attempt);
@@ -4870,14 +5083,19 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             }
 
             if (!success) {
+              skipped += 1;
+              processed += 1;
               console.error('Upload audio failed for', res.id, lastError);
+              emitProgress({ phase: 'uploading', total: audios.length, processed, uploaded, skipped, currentItem: filename, note: 'Failed after retries; skipped.' });
             }
           }
 
-          syncToast.update({ title: "Audio Upload Complete", description: `${uploaded} uploaded • ${skipped} skipped` });
+          emitProgress({ phase: 'complete', total: audios.length, processed, uploaded, skipped, note: 'Audio upload finished.' });
+          syncToast?.update({ title: "Audio Upload Complete", description: `${uploaded} uploaded | ${skipped} skipped` });
         } catch (error) {
           console.error('Audio upload failed:', error);
-          syncToast.update({ title: 'Upload Failed', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
+          emitProgress({ phase: 'failed', total: audios.length, processed: 0, uploaded: 0, skipped: 0, note: error instanceof Error ? error.message : 'Unknown error' });
+          syncToast?.update({ title: 'Upload Failed', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
         }
     };
 
@@ -4914,10 +5132,16 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         const listData = await listResponse.json();
         console.info(`Found ${Array.isArray(listData) ? listData.length : 0} items in ${folderPath}`, listData);
         let downloaded = 0;
+        let skippedUnchanged = 0;
+        const nextPulledHashes: Record<string, string> = { ...(settings.githubPulledHashes || {}) };
 
         for (const item of listData || []) {
           if (item.type !== 'file' || !item.name) continue;
           const filePath = `${folderPath}/${item.name}`;
+          if (item.sha && settings.githubPulledHashes?.[filePath] === item.sha) {
+            skippedUnchanged += 1;
+            continue;
+          }
           try {
             // Prefer the provided download_url when available (raw content), fallback to GitHub contents API
             const downloadUrl = item.download_url as string | undefined;
@@ -5009,49 +5233,63 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
               return r;
             }));
             downloaded += 1;
+            if (item.sha) {
+              nextPulledHashes[filePath] = item.sha;
+            }
           } catch (e) {
             console.warn('Error fetching audio item', item.name, e);
             continue;
           }
         }
-
-        toast({ title: "Audio Fetch Complete", description: `Downloaded ${downloaded} audio files.` });
+        setSettings(prev => ({ ...prev, githubPulledHashes: nextPulledHashes }));
+        toast({ title: "Audio Fetch Complete", description: `Downloaded ${downloaded} audio files. ${skippedUnchanged > 0 ? `${skippedUnchanged} unchanged skipped.` : ''}` });
       } catch (error) {
         console.error('Fetch audio failed:', error);
         toast({ title: 'Fetch Failed', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
       }
     };
-
-    const syncPdfFilesToGitHub = async () => {
+    const syncPdfFilesToGitHub = async (options?: GitHubAssetSyncOptions) => {
+        const silent = !!options?.silent;
+        const emitProgress = (progress: GitHubAssetSyncProgress) => {
+          options?.onProgress?.(progress);
+        };
         const username = currentUser?.username?.toLowerCase();
         const { githubToken, githubOwner, githubRepo } = settings;
 
         if (!username) {
-          toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
+          if (!silent) toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
           return;
         }
         if (!githubToken || !githubOwner || !githubRepo) {
-          toast({ title: 'GitHub settings not configured', variant: 'destructive' });
+          if (!silent) toast({ title: 'GitHub settings not configured', variant: 'destructive' });
           return;
         }
 
         const pdfs = (resources || []).filter(r => r.hasLocalPdf || r.pdfFileName);
         if (pdfs.length === 0) {
-          toast({ title: "No PDFs", description: "No local PDFs found to upload." });
+          emitProgress({ phase: 'complete', total: 0, processed: 0, uploaded: 0, skipped: 0, note: 'No local PDFs found.' });
+          if (!silent) toast({ title: "No PDFs", description: "No local PDFs found to upload." });
           return;
         }
 
         const folderPath = withUserGitHubPrefix(`pdfs_${username}`, username);
-        const syncToast = toast({ title: "Uploading PDFs...", description: `Preparing ${pdfs.length} files...` });
+        const syncToast = silent ? null : toast({ title: "Uploading PDFs...", description: `Preparing ${pdfs.length} files...`, duration: PERSISTENT_TOAST_DURATION_MS });
 
         try {
           let uploaded = 0;
           let skipped = 0;
+          let processed = 0;
+          emitProgress({ phase: 'preparing', total: pdfs.length, processed, uploaded, skipped, note: 'Preparing PDF upload...' });
 
           for (const res of pdfs) {
             const key = res.pdfFileName || `${res.id}`;
             const blob = await getPdf(key);
-            if (!blob) { skipped += 1; continue; }
+            if (!blob) {
+              skipped += 1;
+              processed += 1;
+              emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: key, note: 'Skipped missing local PDF.' });
+              continue;
+            }
 
             const buffer = await blob.arrayBuffer();
             const base64Content = arrayBufferToBase64(buffer);
@@ -5063,7 +5301,9 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             const existingHash = settings.githubModuleHashes?.[path];
             if (existingHash === fileHash) {
               skipped += 1;
-              syncToast.update({ title: 'Skipping', description: `Unchanged: ${filename}` });
+              processed += 1;
+              syncToast?.update({ title: 'Skipping', description: `Unchanged: ${filename}` });
+              emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: 'Unchanged; skipped.' });
               continue;
             }
 
@@ -5095,8 +5335,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
                 setSettings(prev => ({ ...prev, githubModuleHashes: { ...(prev.githubModuleHashes || {}), [path]: fileHash } }));
                 uploaded += 1;
+                processed += 1;
                 success = true;
-                syncToast.update({ title: 'Uploading', description: `Uploaded ${uploaded} / ${pdfs.length}` });
+                syncToast?.update({ title: 'Uploading', description: `Uploaded ${uploaded} / ${pdfs.length}` });
+                emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: 'Uploaded.' });
               } catch (e) {
                 lastError = e;
                 const delay = 500 * Math.pow(2, attempt);
@@ -5104,16 +5346,22 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
               }
             }
 
-            if (!success) console.error('Upload pdf failed for', res.id, lastError);
+            if (!success) {
+              skipped += 1;
+              processed += 1;
+              console.error('Upload pdf failed for', res.id, lastError);
+              emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: 'Failed after retries; skipped.' });
+            }
           }
 
-          syncToast.update({ title: "PDF Upload Complete", description: `${uploaded} uploaded • ${skipped} skipped` });
+          emitProgress({ phase: 'complete', total: pdfs.length, processed, uploaded, skipped, note: 'PDF upload finished.' });
+          syncToast?.update({ title: "PDF Upload Complete", description: `${uploaded} uploaded | ${skipped} skipped` });
         } catch (error) {
           console.error('PDF upload failed:', error);
-          syncToast.update({ title: 'Upload Failed', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
+          emitProgress({ phase: 'failed', total: pdfs.length, processed: 0, uploaded: 0, skipped: 0, note: error instanceof Error ? error.message : 'Unknown error' });
+          syncToast?.update({ title: 'Upload Failed', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
         }
     };
-
     const fetchPdfFilesFromGitHub = async () => {
       const username = currentUser?.username?.toLowerCase();
       const { githubToken, githubOwner, githubRepo } = settings;
@@ -5146,10 +5394,16 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
         const listData = await listResponse.json();
         let downloaded = 0;
+        let skippedUnchanged = 0;
+        const nextPulledHashes: Record<string, string> = { ...(settings.githubPulledHashes || {}) };
 
         for (const item of listData || []) {
           if (item.type !== 'file' || !item.name) continue;
           const filePath = `${folderPath}/${item.name}`;
+          if (item.sha && settings.githubPulledHashes?.[filePath] === item.sha) {
+            skippedUnchanged += 1;
+            continue;
+          }
           try {
             const fileResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${filePath}`, {
               headers: { 'Authorization': `token ${githubToken}` }
@@ -5172,12 +5426,15 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
               return r;
             }));
             downloaded += 1;
+            if (item.sha) {
+              nextPulledHashes[filePath] = item.sha;
+            }
           } catch (e) {
             // continue
           }
         }
-
-        toast({ title: "PDF Fetch Complete", description: `Downloaded ${downloaded} PDFs.` });
+        setSettings(prev => ({ ...prev, githubPulledHashes: nextPulledHashes }));
+        toast({ title: "PDF Fetch Complete", description: `Downloaded ${downloaded} PDFs. ${skippedUnchanged > 0 ? `${skippedUnchanged} unchanged skipped.` : ''}` });
       } catch (error) {
         console.error('Fetch pdf failed:', error);
         toast({ title: 'Fetch Failed', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
@@ -5243,15 +5500,17 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             }
 
           const listData = await listResponse.json();
-          const fileMap = new Map<string, { name: string }>();
+          const fileMap = new Map<string, { name: string; sha?: string; path: string }>();
           (listData || []).forEach((item: any) => {
               if (item.type !== 'file' || !item.name) return;
               const fileId = item.name.split('.').slice(0, -1).join('.') || item.name;
-              fileMap.set(fileId, { name: item.name });
+              fileMap.set(fileId, { name: item.name, sha: item.sha, path: `${folderPath}/${item.name}` });
           });
 
           let downloaded = 0;
           let missing = 0;
+          let skippedUnchanged = 0;
+          const nextPulledHashes: Record<string, string> = { ...(settings.githubPulledHashes || {}) };
 
           const base64ToBlob = (base64: string, mimeType: string) => {
               const cleaned = base64.replace(/\n/g, '');
@@ -5286,7 +5545,11 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                   }
 
                   try {
-                      const filePath = `${folderPath}/${entry.name}`;
+                      const filePath = entry.path;
+                      if (entry.sha && settings.githubPulledHashes?.[filePath] === entry.sha) {
+                          skippedUnchanged += 1;
+                          continue;
+                      }
                       const fileResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${filePath}`, {
                           headers: { 'Authorization': `token ${githubToken}` }
                       });
@@ -5304,15 +5567,19 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                       const record: ExcalidrawFileRecord = { blob, mimeType };
                       await storeExcalidrawFile(`${canvasId}:${fileId}`, record);
                       downloaded += 1;
+                      if (entry.sha) {
+                          nextPulledHashes[filePath] = entry.sha;
+                      }
                   } catch (e) {
                       missing += 1;
                   }
               }
           }
+          setSettings(prev => ({ ...prev, githubPulledHashes: nextPulledHashes }));
 
           toast({
               title: "Images Fetched",
-              description: `Downloaded ${downloaded} images. ${missing > 0 ? `${missing} missing.` : ''}`,
+              description: `Downloaded ${downloaded} images. ${skippedUnchanged > 0 ? `${skippedUnchanged} unchanged skipped. ` : ''}${missing > 0 ? `${missing} missing.` : ''}`,
           });
       } catch (error) {
           console.error("GitHub image fetch failed:", error);
@@ -5519,6 +5786,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen,
       syncWithGitHub,
       downloadFromGitHub,
+      gitHubSyncNotification,
+      dismissGitHubSyncNotification,
       syncCanvasImagesToGitHub,
       fetchCanvasImagesFromGitHub,
       syncAudioFilesToGitHub,
@@ -5701,6 +5970,9 @@ export const useAuth = (): AuthContextType => {
     
 
     
+
+
+
 
 
 
