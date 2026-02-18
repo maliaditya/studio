@@ -145,6 +145,10 @@ export function BotheringsCard() {
         value.forEach((act: any) => {
           if (!act?.id) return;
           activityMap.set(act.id, act);
+          (act.taskIds || []).forEach((taskId: string) => {
+            if (!taskId) return;
+            if (!activityMap.has(taskId)) activityMap.set(taskId, act);
+          });
           const baseMatch = act.id.match(/_(\d{4}-\d{2}-\d{2})$/);
           if (baseMatch) {
             const baseId = act.id.slice(0, -11);
@@ -185,7 +189,7 @@ export function BotheringsCard() {
 
   const isTaskCompletedOnDate = (task: NonNullable<MindsetPoint["tasks"]>[number], dateKey: string) => {
     const activityMap = activityMapByDate.get(dateKey);
-    const activity: any = activityMap?.get(task.activityId || task.id);
+    const activity: any = activityMap?.get(task.activityId || task.id) || activityMap?.get(task.id);
     if (activity) {
       if (activity.completed) return true;
       if (activity.duration && activity.duration > 0) return true;
@@ -196,7 +200,9 @@ export function BotheringsCard() {
       return !!task.completionHistory?.[dateKey];
     }
     if (task.dateKey && task.dateKey !== dateKey) return false;
-    return !!task.completed;
+    // For one-off tasks only: prevent stale global completed flag from marking future/shifted tasks as done.
+    if (task.recurrence && task.recurrence !== 'none') return false;
+    return !!task.completed && (!task.dateKey || task.dateKey === dateKey);
   };
   const isTaskScheduledOnDate = (task: NonNullable<MindsetPoint["tasks"]>[number], dateKey: string) => {
     const activityId = task.activityId || task.id;
@@ -249,8 +255,10 @@ export function BotheringsCard() {
     tasks.forEach(t => {
       if (!isTaskDueOnDate(t, todayKey)) return;
       const completedToday = isTaskCompletedOnDate(t, todayKey);
-      const activityId = t.activityId || t.id;
-      const scheduledToday = activityId ? todayActivityIds.has(activityId) : false;
+      const scheduledToday = !!(
+        (t.activityId && todayActivityIds.has(t.activityId)) ||
+        (t.id && todayActivityIds.has(t.id))
+      );
       if (!scheduledToday && !completedToday) return;
       total += 1;
       if (completedToday) completed += 1;
