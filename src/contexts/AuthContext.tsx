@@ -67,6 +67,7 @@ type GitHubSyncNotification = {
   details: string;
   updatedAt: number;
 };
+type RemoteAheadDecision = 'pull' | 'force' | 'cancel';
 
 interface AuthContextType {
   currentUser: LocalUser | null;
@@ -734,6 +735,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isMindsetModalOpen, setIsMindsetModalOpen] = useState(false);
   const [isTodaysPredictionModalOpen, setIsTodaysPredictionModalOpen] = useState(false);
   const [importBackupConfirmationOpen, setImportBackupConfirmationOpen] = useState(false);
+  const [remoteAheadPrompt, setRemoteAheadPrompt] = useState<{ remoteIso: string; localIso: string } | null>(null);
+  const remoteAheadDecisionResolverRef = useRef<((decision: RemoteAheadDecision) => void) | null>(null);
+
+  const resolveRemoteAheadDecision = useCallback((decision: RemoteAheadDecision) => {
+    setRemoteAheadPrompt(null);
+    if (remoteAheadDecisionResolverRef.current) {
+      remoteAheadDecisionResolverRef.current(decision);
+      remoteAheadDecisionResolverRef.current = null;
+    }
+  }, []);
+
+  const requestRemoteAheadDecision = useCallback((remoteIso: string, localIso: string) => {
+    return new Promise<RemoteAheadDecision>((resolve) => {
+      remoteAheadDecisionResolverRef.current = resolve;
+      setRemoteAheadPrompt({ remoteIso, localIso });
+    });
+  }, []);
 
   const getDescendantLeafNodes = useCallback((startNodeId: string, type: 'deepwork' | 'upskill'): ExerciseDefinition[] => {
     const definitions = type === 'deepwork' ? deepWorkDefinitions : upskillDefinitions;
@@ -3919,10 +3937,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       if (remoteAhead) {
         const remoteIso = new Date(remoteUpdatedAtTs).toISOString();
         const localIso = localLastSyncTs ? new Date(localLastSyncTs).toISOString() : 'never';
-        const shouldPullFirst = window.confirm(
-          `Remote backup is newer.\nRemote: ${remoteIso}\nLocal: ${localIso}\n\nPull delta and import now before push?`
-        );
-        if (!shouldPullFirst) {
+        const decision = await requestRemoteAheadDecision(remoteIso, localIso);
+        if (decision === 'cancel') {
           publishGitHubSyncNotification({
             mode: 'push',
             status: 'error',
@@ -3931,15 +3947,17 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           });
           return;
         }
-        const imported = await pullAndImportFromGitHubForPushGuard();
-        if (!imported) {
-          publishGitHubSyncNotification({
-            mode: 'push',
-            status: 'error',
-            title: "Push Cancelled",
-            details: "Pull/import before push failed.",
-          });
-          return;
+        if (decision === 'pull') {
+          const imported = await pullAndImportFromGitHubForPushGuard();
+          if (!imported) {
+            publishGitHubSyncNotification({
+              mode: 'push',
+              status: 'error',
+              title: "Push Cancelled",
+              details: "Pull/import before push failed.",
+            });
+            return;
+          }
         }
       }
     } catch (guardError) {
@@ -6248,6 +6266,28 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                     <AlertDialogAction onClick={handleImportFromLocalBackup}>Import Data</AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
+        </AlertDialog>
+        <AlertDialog
+          open={!!remoteAheadPrompt}
+          onOpenChange={(open) => {
+            if (!open && remoteAheadPrompt) resolveRemoteAheadDecision('cancel');
+          }}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Remote backup is newer</AlertDialogTitle>
+              <AlertDialogDescription>
+                <div>Remote: {remoteAheadPrompt?.remoteIso}</div>
+                <div>Local: {remoteAheadPrompt?.localIso}</div>
+                <div className="pt-2">Choose how to continue before push.</div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <Button variant="outline" onClick={() => resolveRemoteAheadDecision('cancel')}>Cancel</Button>
+              <Button variant="secondary" onClick={() => resolveRemoteAheadDecision('force')}>Force Push</Button>
+              <Button onClick={() => resolveRemoteAheadDecision('pull')}>Pull + Import</Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
         </AlertDialog>
     </AuthContext.Provider>
   );
