@@ -4373,9 +4373,20 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         throw new Error(errorData.message || `Failed to fetch ${path}.`);
     }
     const data = await response.json();
-    if (!data?.content) return null;
-    const content = decodeBase64Utf8(data.content);
-    return JSON.parse(content) as T;
+    // GitHub Contents API may omit inline `content` for larger files; use `download_url` fallback.
+    if (data?.content) {
+      const content = decodeBase64Utf8(data.content);
+      return JSON.parse(content) as T;
+    }
+    if (data?.download_url) {
+      const fileResponse = await fetch(data.download_url);
+      if (!fileResponse.ok) {
+        throw new Error(`Failed to download ${path}.`);
+      }
+      const text = await fileResponse.text();
+      return JSON.parse(text) as T;
+    }
+    return null;
   }
 
   function getGitHubBaseDir(path: string): { dir: string; base: string } {
@@ -4742,7 +4753,9 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
             const hasCore = !!core;
             const hasResources = !!resourcesMod || folderModuleEntries.length > 0;
-            if (!hasCore || !hasResources) {
+            const needsKnowledgeModule = !!effectiveManifest.modules.knowledge?.path;
+            const hasKnowledge = !needsKnowledgeModule || !!knowledge;
+            if (!hasCore || !hasResources || !hasKnowledge) {
                 setDownloadProgress(5, "Modular backup incomplete. Falling back to full backup...");
             } else {
                 setDownloadProgress(6, "Assembling and storing modular backup locally...");
