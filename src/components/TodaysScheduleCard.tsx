@@ -813,7 +813,6 @@ export function TodaysScheduleCard({
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
                  <div className="flex items-center">
                     <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => syncWithGitHub()}><UploadCloud className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}><DownloadCloud className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={onToggleDock} className="h-8 w-8">
                         {isAgendaDocked ? <Move className="h-4 w-4" /> : <Dock className="h-4 w-4" />}
                     </Button>
@@ -917,6 +916,9 @@ export function TodaysScheduleCard({
                 </Button>
             </div>
             <div className="flex items-center">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => downloadFromGitHub()}>
+                    <DownloadCloud className="h-4 w-4" />
+                </Button>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8"><PlusCircle className="h-4 w-4"/></Button>

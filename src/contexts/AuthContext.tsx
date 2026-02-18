@@ -4380,11 +4380,23 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     }
     if (data?.download_url) {
       const fileResponse = await fetch(data.download_url);
-      if (!fileResponse.ok) {
-        throw new Error(`Failed to download ${path}.`);
+      if (fileResponse.ok) {
+        const text = await fileResponse.text();
+        return JSON.parse(text) as T;
       }
-      const text = await fileResponse.text();
-      return JSON.parse(text) as T;
+    }
+    // Mobile/network-safe fallback: fetch blob content directly by SHA.
+    if (data?.sha) {
+      const blobResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/blobs/${data.sha}`, {
+        headers: { 'Authorization': `token ${token}` }
+      });
+      if (blobResponse.ok) {
+        const blobData = await blobResponse.json();
+        if (blobData?.content) {
+          const blobContent = decodeBase64Utf8(String(blobData.content).replace(/\n/g, ""));
+          return JSON.parse(blobContent) as T;
+        }
+      }
     }
     return null;
   }
@@ -4724,12 +4736,25 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                       foldersFetched,
                       foldersTotal: changedFolderEntries.length,
                     });
-                    const folderPayload = await getGitHubJson<{ folderId?: string; folder?: ResourceFolder; resources?: Resource[] }>(githubToken, githubOwner, githubRepo, folderPath);
+                    let folderPayload: { folderId?: string; folder?: ResourceFolder; resources?: Resource[] } | null = null;
+                    try {
+                      folderPayload = await getGitHubJson<{ folderId?: string; folder?: ResourceFolder; resources?: Resource[] }>(
+                        githubToken,
+                        githubOwner,
+                        githubRepo,
+                        folderPath
+                      );
+                    } catch (folderError) {
+                      console.error('Failed to load modular folder file:', folderPath, folderError);
+                      foldersFetched += 1;
+                      continue;
+                    }
                     foldersFetched += 1;
                     const remoteSha = folderShaByPath.get(folderPath);
                     if (remoteSha) {
                       nextPulledHashes[folderPath] = remoteSha;
                     }
+                    if (!folderPayload) continue;
                     if (folderPayload?.folder) folderFolders.push(folderPayload.folder);
                     if (folderPayload?.resources && Array.isArray(folderPayload.resources)) {
                         folderResources.push(...folderPayload.resources);
