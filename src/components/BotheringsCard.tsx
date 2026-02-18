@@ -70,7 +70,7 @@ export function BotheringsCard() {
     ];
   }, [mindsetCards, getEffectiveTasks]);
 
-  const [activeTab, setActiveTab] = React.useState<'External' | 'Mismatch' | 'Constraint' | 'Parked'>('External');
+  const [activeTab, setActiveTab] = React.useState<'All' | 'External' | 'Mismatch' | 'Constraint' | 'Parked'>('All');
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const todayActivityIds = useMemo(() => {
     const ids = new Set<string>();
@@ -272,8 +272,13 @@ export function BotheringsCard() {
       points: group.points.filter(({ point, sourceType }) => getTodayStats(point, sourceType).total > 0),
     };
   });
-  const activeBotherings = visibleBotheringsByType.find(t => t.type === activeTab)?.points || [];
-  const tabCounts = visibleBotheringsByType.reduce<Record<string, number>>((acc, item) => {
+  const allPoints = visibleBotheringsByType.flatMap((group) => group.points);
+  const uniqueAllPoints = Array.from(
+    new Map(allPoints.map((item) => [`${item.sourceType}:${item.point.id}`, item])).values()
+  );
+  const visibleTabs = [{ type: 'All' as const, points: uniqueAllPoints }, ...visibleBotheringsByType];
+  const activeBotherings = visibleTabs.find(t => t.type === activeTab)?.points || [];
+  const tabCounts = visibleTabs.reduce<Record<string, number>>((acc, item) => {
     acc[item.type] = item.points.length;
     return acc;
   }, {});
@@ -291,7 +296,7 @@ export function BotheringsCard() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          {(['External', 'Mismatch', 'Constraint', 'Parked'] as const).map(tab => (
+          {(['All', 'External', 'Mismatch', 'Constraint', 'Parked'] as const).map(tab => (
             <button
               key={tab}
               type="button"

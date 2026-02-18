@@ -890,6 +890,17 @@ export function TimesheetPageContent({
                     }));
             })
             .filter(point => point.tasks.length > 0);
+        const areAllBotheringsCollapsed = botherings.every((b) => collapsedBotherings[b.id] ?? true);
+        const toggleAllBotherings = () => {
+            const targetCollapsed = !areAllBotheringsCollapsed;
+            setCollapsedBotherings(prev => {
+                const next = { ...prev };
+                botherings.forEach((b) => {
+                    next[b.id] = targetCollapsed;
+                });
+                return next;
+            });
+        };
 
         const isTaskDueOnDate = (task: MindsetPoint['tasks'][number], dateKey: string) => {
             const startKey = task.startDate || task.dateKey;
@@ -1154,8 +1165,22 @@ export function TimesheetPageContent({
                                 </div>
                             </div>
                             <div className="h-8 px-2 flex items-center gap-2 font-semibold text-muted-foreground border-b border-muted/30">
-                                <CheckCircle className="h-4 w-4 text-emerald-400" />
-                                {habitDashboardTab === 'daily' ? 'Daily Habits' : 'Botherings'}
+                                {habitDashboardTab === 'botherings' ? (
+                                    <button
+                                        type="button"
+                                        className="flex items-center gap-2 hover:text-foreground transition-colors"
+                                        onClick={toggleAllBotherings}
+                                    >
+                                        <CheckCircle className="h-4 w-4 text-emerald-400" />
+                                        <span>Botherings</span>
+                                        <ChevronDown className={cn("h-4 w-4 transition-transform", areAllBotheringsCollapsed ? "-rotate-90" : "")} />
+                                    </button>
+                                ) : (
+                                    <>
+                                        <CheckCircle className="h-4 w-4 text-emerald-400" />
+                                        <span>Daily Habits</span>
+                                    </>
+                                )}
                             </div>
                             {daysInMonth.map((day, index) => {
                                 const dateKey = format(day, 'yyyy-MM-dd');

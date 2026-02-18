@@ -306,7 +306,7 @@ export function TodaysScheduleCard({
   const [purposeText, setPurposeText] = useState(settings.currentPurpose || '');
   const [purposePopoverOpen, setPurposePopoverOpen] = useState(false);
   const [view, setView] = useState<'list' | 'chart' | 'botherings' | 'core' | 'urges' | 'resistances' | 'rules' | 'milestones'>('list');
-  const [activeBotheringTab, setActiveBotheringTab] = useState<'External' | 'Mismatch' | 'Constraint' | 'Parked' | 'Current'>('External');
+  const [activeBotheringTab, setActiveBotheringTab] = useState<'All' | 'External' | 'Mismatch' | 'Constraint' | 'Parked' | 'Current'>('All');
   const [newEntryText, setNewEntryText] = useState('');
   
   const dragControls = useDragControls()
@@ -546,7 +546,11 @@ export function TodaysScheduleCard({
       .filter((group) => group.type !== "Parked")
       .flatMap((group) => group.points)
       .filter(({ point, sourceType }) => getCurrentSlotBotheringStats(point, sourceType).total > 0);
-    return [...byType, { type: "Current" as const, points: currentPoints }];
+    const allPoints = byType.flatMap((group) => group.points);
+    const uniqueAllPoints = Array.from(
+      new Map(allPoints.map((item) => [`${item.sourceType}:${item.point.id}`, item])).values()
+    );
+    return [{ type: "All" as const, points: uniqueAllPoints }, ...byType, { type: "Current" as const, points: currentPoints }];
   }, [activeBotheringsByType, getCurrentSlotBotheringStats, getTodayBotheringStats]);
 
   const activeBotherings = useMemo(
@@ -1361,7 +1365,7 @@ export function TodaysScheduleCard({
             ) : view === 'botherings' ? (
               <div className={cn("pr-2", isAgendaDocked ? "h-full overflow-y-auto" : "max-h-[70vh] md:max-h-[60vh] overflow-y-auto")}>
                 <div className="flex flex-wrap items-center gap-2 mb-3">
-                  {(['External', 'Mismatch', 'Constraint', 'Current', 'Parked'] as const).map((tab) => (
+                  {(['All', 'External', 'Mismatch', 'Constraint', 'Current', 'Parked'] as const).map((tab) => (
                     <button
                       key={tab}
                       type="button"
