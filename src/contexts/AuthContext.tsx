@@ -550,6 +550,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [localChangeCount, setLocalChangeCount] = useState(0);
   const [gitHubSyncNotification, setGitHubSyncNotification] = useState<GitHubSyncNotification | null>(null);
   const cloudRevisionRef = useRef<number | null>(null);
+  const isGitHubSyncInFlightRef = useRef(false);
+  const githubModuleHashesRef = useRef<Record<string, string>>({});
   const [currentSlot, setCurrentSlot] = useState('');
 
   const [isLoadingState, setIsLoadingState] = useState(true);
@@ -570,11 +572,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     spacedRepetitionSlot: 'Late Night',
     pinnedCanvasIds: [],
     coreStateManualOverrides: {},
+    githubModuleHashes: {},
     githubPulledHashes: {},
     routineRebalanceLearning: {
       history: [],
     },
   });
+  useEffect(() => {
+    githubModuleHashesRef.current = settings.githubModuleHashes || {};
+  }, [settings.githubModuleHashes]);
 
   // Health State
   const [weightLogs, setWeightLogs] = useState<WeightLog[]>([]);
@@ -1753,7 +1759,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             history: [],
           },
       };
-    setSettings({ ...defaultSettings, ...(sanitizedMain.settings || {}) });
+    const incomingSettings = (sanitizedMain.settings || {}) as Partial<UserSettings>;
+    setSettings((prev) => ({
+      ...defaultSettings,
+      ...incomingSettings,
+      // Keep local hash maps if imported payload does not include them.
+      githubModuleHashes:
+        incomingSettings.githubModuleHashes && Object.keys(incomingSettings.githubModuleHashes).length > 0
+          ? incomingSettings.githubModuleHashes
+          : (prev.githubModuleHashes || {}),
+      githubPulledHashes:
+        incomingSettings.githubPulledHashes && Object.keys(incomingSettings.githubPulledHashes).length > 0
+          ? incomingSettings.githubPulledHashes
+          : (prev.githubPulledHashes || {}),
+    }));
 
 
     setTimeout(() => setIsLoadingState(false), 100);
@@ -3856,6 +3875,16 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   };
 
   const syncWithGitHub = async () => {
+    if (isGitHubSyncInFlightRef.current) {
+      publishGitHubSyncNotification({
+        mode: 'push',
+        status: 'running',
+        title: "GitHub Push Already Running",
+        details: "A sync is already in progress. Wait for it to finish.",
+      });
+      return;
+    }
+    isGitHubSyncInFlightRef.current = true;
     const token = settings.githubToken;
     const owner = settings.githubOwner;
     const repo = settings.githubRepo;
@@ -3937,15 +3966,9 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       const content = JSON.stringify(allData, null, 2);
       const message = `LifeOS backup: ${new Date().toISOString()}`;
 
-      const nextHashes: Record<string, string> = { ...(settings.githubModuleHashes || {}) };
-      const shouldSkipUnchangedPath = async (pathToCheck: string, hashToCheck: string) => {
-        if (nextHashes[pathToCheck] !== hashToCheck) return false;
-        try {
-          const remoteSha = await getGitHubFileSha(token, owner, repo, pathToCheck);
-          return !!remoteSha;
-        } catch {
-          return false;
-        }
+      const nextHashes: Record<string, string> = { ...(githubModuleHashesRef.current || {}) };
+      const shouldSkipUnchangedPath = (pathToCheck: string, hashToCheck: string) => {
+        return nextHashes[pathToCheck] === hashToCheck;
       };
 
       const modulesBase = dir ? `${dir}/modules` : 'modules';
@@ -4032,7 +4055,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       };
 
       const backupHash = await hashString(content);
-      if (!(await shouldSkipUnchangedPath(prefixedPath, backupHash))) {
+      if (!shouldSkipUnchangedPath(prefixedPath, backupHash)) {
         const sha = await getGitHubFileSha(token, owner, repo, prefixedPath);
         await pushToGitHub(token, owner, repo, prefixedPath, content, message, sha, { suppressToast: true });
         nextHashes[prefixedPath] = backupHash;
@@ -4047,7 +4070,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
       for (const entry of moduleEntries) {
         const moduleHash = await hashString(entry.content);
-        if (await shouldSkipUnchangedPath(entry.path, moduleHash)) {
+        if (shouldSkipUnchangedPath(entry.path, moduleHash)) {
           moduleTotals.skipped += 1;
           moduleTotals.processed += 1;
           updateModuleProgress(`Skipped ${entry.path}`);
@@ -4093,7 +4116,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         const canvasPath = `${canvasFilesBase}/${canvasId}.json`;
         const canvasContent = JSON.stringify({ canvasId, files: filesMeta }, null, 2);
         const canvasHash = await hashString(canvasContent);
-        if (await shouldSkipUnchangedPath(canvasPath, canvasHash)) {
+        if (shouldSkipUnchangedPath(canvasPath, canvasHash)) {
           moduleTotals.skipped += 1;
           moduleTotals.processed += 1;
           updateModuleProgress(`Skipped ${canvasPath}`);
@@ -4133,7 +4156,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
       const manifestContent = JSON.stringify(manifest, null, 2);
       const manifestHash = await hashString(manifestContent);
-      if (!(await shouldSkipUnchangedPath(manifestPath, manifestHash))) {
+      if (!shouldSkipUnchangedPath(manifestPath, manifestHash)) {
         const manifestSha = await getGitHubFileSha(token, owner, repo, manifestPath);
         await pushToGitHub(token, owner, repo, manifestPath, manifestContent, `LifeOS manifest`, manifestSha, { suppressToast: true });
         nextHashes[manifestPath] = manifestHash;
@@ -4146,6 +4169,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         updateModuleProgress(`Skipped ${manifestPath}`);
       }
 
+      githubModuleHashesRef.current = nextHashes;
       setSettings(prev => ({ ...prev, githubModuleHashes: nextHashes }));
 
       await syncCanvasImagesToGitHub({
@@ -4207,6 +4231,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         title: "GitHub Push Failed",
         details: error instanceof Error ? error.message : "An unknown error occurred.",
       });
+    } finally {
+      isGitHubSyncInFlightRef.current = false;
     }
   };
 
@@ -4887,10 +4913,12 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           let uploaded = 0;
           let skipped = 0;
           let processed = 0;
+          const nextHashes: Record<string, string> = { ...(githubModuleHashesRef.current || {}) };
           emitProgress({ phase: 'preparing', total: entries.length, processed, uploaded, skipped, note: 'Reading local image cache...' });
 
             // Pre-list existing files in the target folder to avoid many 404 GETs
             const existingFilesMap = new Map<string, string>();
+            const uploadedFileNames = new Set<string>();
             try {
             const listResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${folderPath}`, {
               headers: { 'Authorization': `token ${githubToken}` }
@@ -4930,37 +4958,76 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
               const filename = `${fileId}.${ext}`;
               const path = `${folderPath}/${filename}`;
               emitProgress({ phase: 'uploading', total: entries.length, processed, uploaded, skipped, currentItem: filename, note: 'Uploading image file...' });
-
-              // Use pre-fetched sha if available
-              const sha = existingFilesMap.get(filename);
+              if (uploadedFileNames.has(filename)) {
+                skipped += 1;
+                processed += 1;
+                emitProgress({ phase: 'uploading', total: entries.length, processed, uploaded, skipped, currentItem: filename, note: 'Duplicate in current sync; skipped.' });
+                continue;
+              }
 
               const buffer = await record.blob.arrayBuffer();
               const base64Content = arrayBufferToBase64(buffer);
+              const fileHash = await hashString(base64Content);
+              const existingHash = nextHashes[path];
+              if (existingHash === fileHash) {
+                skipped += 1;
+                processed += 1;
+                emitProgress({ phase: 'uploading', total: entries.length, processed, uploaded, skipped, currentItem: filename, note: 'Unchanged; skipped.' });
+                continue;
+              }
+
               const message = `LifeOS canvas image: ${filename}`;
+              let uploadSucceeded = false;
+              let lastUploadError: unknown = null;
+              let sha = existingFilesMap.get(filename);
+              for (let attempt = 1; attempt <= 4 && !uploadSucceeded; attempt += 1) {
+                const pushResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${path}`, {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `token ${githubToken}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    message,
+                    content: base64Content,
+                    ...(sha ? { sha } : {}),
+                  }),
+                });
 
-              const pushResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${path}`, {
-                method: 'PUT',
-                headers: {
-                  'Authorization': `token ${githubToken}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  message,
-                  content: base64Content,
-                  sha,
-                }),
-              });
+                const result = await pushResponse.json();
+                if (pushResponse.ok) {
+                  uploadSucceeded = true;
+                  const nextSha = result?.content?.sha as string | undefined;
+                  if (nextSha) existingFilesMap.set(filename, nextSha);
+                  break;
+                }
 
-              const result = await pushResponse.json();
-              if (!pushResponse.ok) {
-                throw new Error(result.message || `Failed to upload ${filename}.`);
+                const messageText = String(result?.message || '');
+                if (pushResponse.status === 409 || /is at ([0-9a-f]{40})/i.test(messageText)) {
+                  const parsedSha = messageText.match(/is at ([0-9a-f]{40})/i)?.[1];
+                  sha = parsedSha || await getGitHubFileSha(githubToken, githubOwner, githubRepo, path);
+                  lastUploadError = result;
+                  await new Promise(r => setTimeout(r, 250 * attempt));
+                  continue;
+                }
+
+                throw new Error(result?.message || `Failed to upload ${filename}.`);
+              }
+              if (!uploadSucceeded) {
+                throw new Error(lastUploadError && typeof lastUploadError === 'object' && 'message' in (lastUploadError as Record<string, unknown>)
+                  ? String((lastUploadError as Record<string, unknown>).message)
+                  : `Failed to upload ${filename}.`);
               }
 
               uploaded += 1;
               processed += 1;
+              nextHashes[path] = fileHash;
+              uploadedFileNames.add(filename);
               emitProgress({ phase: 'uploading', total: entries.length, processed, uploaded, skipped, currentItem: filename, note: 'Uploaded.' });
             }
 
+          githubModuleHashesRef.current = nextHashes;
+          setSettings(prev => ({ ...prev, githubModuleHashes: nextHashes }));
           emitProgress({ phase: 'complete', total: entries.length, processed, uploaded, skipped, note: 'Image upload finished.' });
           if (toastHandle) {
             toastHandle.update({ title: "Images Uploaded", description: `${uploaded} uploaded | ${skipped} skipped` });
@@ -5032,7 +5099,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             const filename = (hasExt ? safeName : `${safeName}.${ext}`);
             const path = `${folderPath}/${filename}`;
 
-            const existingHash = settings.githubModuleHashes?.[path];
+            const existingHash = githubModuleHashesRef.current?.[path];
             if (existingHash === fileHash) {
               skipped += 1;
               processed += 1;
@@ -5069,6 +5136,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                 if (!pushResponse.ok) throw new Error(result.message || 'Failed to push audio');
 
                 // update hash store
+                githubModuleHashesRef.current = { ...(githubModuleHashesRef.current || {}), [path]: fileHash };
                 setSettings(prev => ({ ...prev, githubModuleHashes: { ...(prev.githubModuleHashes || {}), [path]: fileHash } }));
                 uploaded += 1;
                 processed += 1;
@@ -5298,7 +5366,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             const filename = `${key}.pdf`.replace(/\s+/g, '_');
             const path = `${folderPath}/${filename}`;
 
-            const existingHash = settings.githubModuleHashes?.[path];
+            const existingHash = githubModuleHashesRef.current?.[path];
             if (existingHash === fileHash) {
               skipped += 1;
               processed += 1;
@@ -5333,6 +5401,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                 const result = await pushResponse.json();
                 if (!pushResponse.ok) throw new Error(result.message || 'Failed to push pdf');
 
+                githubModuleHashesRef.current = { ...(githubModuleHashesRef.current || {}), [path]: fileHash };
                 setSettings(prev => ({ ...prev, githubModuleHashes: { ...(prev.githubModuleHashes || {}), [path]: fileHash } }));
                 uploaded += 1;
                 processed += 1;
