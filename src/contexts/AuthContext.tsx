@@ -3958,10 +3958,20 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         { suppressToast: true }
       );
     };
+    const safeUpdateSyncStatus = async (
+      status: 'in_progress' | 'completed' | 'failed',
+      extra?: Record<string, unknown>
+    ) => {
+      try {
+        await updateSyncStatus(status, extra);
+      } catch (statusError) {
+        console.error('Failed to write GitHub sync status:', statusError);
+      }
+    };
 
     try {
       publishPushProgress("GitHub Push Running", "Preparing upload plan...");
-      await updateSyncStatus('in_progress', { phase: 'modules', startedAt: new Date().toISOString() });
+      await safeUpdateSyncStatus('in_progress', { phase: 'modules', startedAt: new Date().toISOString() });
       const allData = getAllUserData();
       const content = JSON.stringify(allData, null, 2);
       const message = `LifeOS backup: ${new Date().toISOString()}`;
@@ -4194,7 +4204,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         },
       });
 
-      await updateSyncStatus('completed', {
+      await safeUpdateSyncStatus('completed', {
         phase: 'done',
         completedAt: new Date().toISOString(),
         pushed: moduleTotals.pushed,
@@ -4215,15 +4225,11 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         ].join('\n'),
       });
     } catch (error) {
-      try {
-        await updateSyncStatus('failed', {
-          phase: 'error',
-          failedAt: new Date().toISOString(),
-          error: error instanceof Error ? error.message : String(error),
-        });
-      } catch (statusError) {
-        console.error('Failed to write GitHub sync status:', statusError);
-      }
+      await safeUpdateSyncStatus('failed', {
+        phase: 'error',
+        failedAt: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+      });
       console.error("GitHub sync failed:", error);
       publishGitHubSyncNotification({
         mode: 'push',
@@ -4243,7 +4249,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     }
     const encoded = btoa(unescape(encodeURIComponent(content)));
     let lastError: any = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    for (let attempt = 1; attempt <= 8; attempt++) {
       try {
         if (!sha) {
           try {
@@ -4274,13 +4280,28 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             const match = messageText.match(/is at ([0-9a-f]{40})/i);
             if (match?.[1]) {
               sha = match[1];
-              lastError = result;
-              continue;
+            } else {
+              const latestSha = await getGitHubFileSha(token, owner, repo, path).catch(() => undefined);
+              sha = latestSha;
             }
-            const latestSha = await getGitHubFileSha(token, owner, repo, path).catch(() => undefined);
-            sha = latestSha;
+            // If remote already has same content, treat as success (idempotent conflict).
+            try {
+              const remoteResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+                headers: { 'Authorization': `token ${token}` }
+              });
+              if (remoteResp.ok) {
+                const remote = await remoteResp.json();
+                const remoteDecoded = remote?.content ? decodeBase64Utf8(remote.content) : '';
+                if (remoteDecoded === content) {
+                  setSettings(prev => ({...prev, lastSync: { sha: remote.sha, timestamp: Date.now() }}));
+                  setLocalChangeCount(0);
+                  return;
+                }
+              }
+            } catch {
+              // best-effort comparison only
+            }
             lastError = result;
-            // retry
             continue;
           }
           throw new Error(result.message || 'Failed to push file to GitHub.');
@@ -4295,7 +4316,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       } catch (e) {
         lastError = e;
         // small backoff before retrying
-        await new Promise(r => setTimeout(r, 300 * attempt));
+        await new Promise(r => setTimeout(r, (250 * attempt) + Math.floor(Math.random() * 200)));
       }
     }
     console.error('pushToGitHub failed after retries for', path, lastError);
