@@ -5,7 +5,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow, Target, Calendar } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow, Target, Calendar, X } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule, Resource, Stopper } from '@/types/workout';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -281,6 +281,8 @@ export function TodaysScheduleCard({
     patterns,
     syncWithGitHub,
     downloadFromGitHub,
+    gitHubSyncNotification,
+    dismissGitHubSyncNotification,
     openMindsetWidget,
     openDrawingCanvasFromHeader,
     dateOfBirth,
@@ -773,6 +775,34 @@ export function TodaysScheduleCard({
   };
 
   const cardHeightClass = isMobile ? 'h-[80vh]' : isAgendaDocked ? 'h-full' : 'h-auto';
+  const gitHubPopup = isMobile && gitHubSyncNotification ? (
+    <Card className="fixed bottom-4 left-4 z-[130] w-[420px] max-w-[calc(100vw-2rem)] border-border/70 bg-background/95 backdrop-blur">
+      <CardHeader className="pb-2">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <CardTitle className="text-sm">{gitHubSyncNotification.title}</CardTitle>
+            <CardDescription className="text-xs pt-1">
+              {gitHubSyncNotification.mode === 'push' ? 'GitHub push status' : 'GitHub pull status'} • {gitHubSyncNotification.status}
+            </CardDescription>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 shrink-0"
+            onClick={dismissGitHubSyncNotification}
+          >
+            <X className="h-4 w-4" />
+            <span className="sr-only">Close GitHub notification</span>
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <pre className="whitespace-pre-wrap break-words text-xs leading-5 font-sans text-foreground/90">
+          {gitHubSyncNotification.details}
+        </pre>
+      </CardContent>
+    </Card>
+  ) : null;
 
   const cardContent = (
     <Card className={cn("shadow-2xl bg-background/80 backdrop-blur-sm", cardHeightClass, "flex flex-col")}>
@@ -900,25 +930,33 @@ export function TodaysScheduleCard({
 
   if (!isAgendaDocked) {
     return (
-      <motion.div
-        drag
-        dragControls={dragControls}
-        className="fixed z-50 w-full max-w-sm"
-        style={{
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-        }}
-        onDragEnd={() => {
-            if (positionKey) {
-                safeSetLocalStorageItem(positionKey, JSON.stringify(position));
-            }
-        }}
-        dragMomentum={false}
-      >
-        {cardContent}
-      </motion.div>
+      <>
+        <motion.div
+          drag
+          dragControls={dragControls}
+          className="fixed z-50 w-full max-w-sm"
+          style={{
+            left: `${position.x}px`,
+            top: `${position.y}px`,
+          }}
+          onDragEnd={() => {
+              if (positionKey) {
+                  safeSetLocalStorageItem(positionKey, JSON.stringify(position));
+              }
+          }}
+          dragMomentum={false}
+        >
+          {cardContent}
+        </motion.div>
+        {gitHubPopup}
+      </>
     );
   }
 
-  return cardContent;
+  return (
+    <>
+      {cardContent}
+      {gitHubPopup}
+    </>
+  );
 }

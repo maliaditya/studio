@@ -17,7 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { addDays, differenceInCalendarDays, differenceInDays, differenceInMonths, format, getDay, parseISO, startOfDay } from "date-fns";
 import type { CoreDomainId, MindsetPoint } from "@/types/workout";
 import { cn } from "@/lib/utils";
-import { Activity, Blocks, Compass, HandHeart, HeartPulse, Palette, Sparkles, Users, Wallet, Wrench } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, Blocks, Compass, HandHeart, HeartPulse, Palette, Sparkles, Target, Users, Wallet, Wrench } from "lucide-react";
 
 interface CoreStatesModalProps {
   isOpen: boolean;
@@ -104,6 +104,32 @@ const EXPANSION_KEYWORDS = [
   "art",
   "wisdom",
 ];
+
+const CORE_PRIORITY_ORDER: CoreDomainId[] = [
+  "health",
+  "wealth",
+  "relations",
+  "competence",
+  "autonomy",
+  "meaning",
+  "creativity",
+  "contribution",
+  "transcendence",
+];
+
+const ENTRY_EFFECT_MAP: Record<CoreDomainId, CoreDomainId[]> = {
+  health: ["competence", "relations", "autonomy"],
+  wealth: ["health", "relations", "autonomy"],
+  relations: [],
+  competence: ["wealth", "autonomy", "meaning", "contribution"],
+  autonomy: ["meaning", "creativity", "contribution"],
+  meaning: ["competence"],
+  creativity: ["meaning", "relations"],
+  contribution: ["meaning"],
+  transcendence: ["meaning"],
+};
+
+const BLOCKING_STATES = new Set<CoreStateId>(["S0", "S1", "S2"]);
 
 const normalizeText = (value?: string) => (value || "").toLowerCase();
 
@@ -476,6 +502,13 @@ export function CoreStatesModal({ isOpen, onOpenChange }: CoreStatesModalProps) 
     });
   }, [allBotherings]);
 
+  const coreCardById = useMemo(() => {
+    return coreCards.reduce((acc, item) => {
+      acc[item.core.id] = item;
+      return acc;
+    }, {} as Record<CoreDomainId, (typeof coreCards)[number]>);
+  }, [coreCards]);
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl h-[86vh] p-0 overflow-hidden flex flex-col">
@@ -501,6 +534,13 @@ export function CoreStatesModal({ isOpen, onOpenChange }: CoreStatesModalProps) 
                 const meta = STATE_META[item.state];
                 const completionPct = Math.round(item.completion21 * 100);
                 const trendPct = Math.round(item.trend * 100);
+                const priorityIndex = CORE_PRIORITY_ORDER.indexOf(item.core.id);
+                const blockers = CORE_PRIORITY_ORDER.slice(0, Math.max(priorityIndex, 0)).filter((coreId) => {
+                  const candidate = coreCardById[coreId];
+                  return candidate ? BLOCKING_STATES.has(candidate.state) : false;
+                });
+                const helps = (ENTRY_EFFECT_MAP[item.core.id] || []).filter((id) => id !== item.core.id);
+                const isFixFirstCore = priorityIndex <= 2 && BLOCKING_STATES.has(item.state);
                 return (
                   <Card key={item.core.id} className={cn("bg-background/40", meta.cardClass)}>
                     <CardHeader className="pb-2">
@@ -520,6 +560,12 @@ export function CoreStatesModal({ isOpen, onOpenChange }: CoreStatesModalProps) 
                         <Badge variant="outline">
                           {item.botherings.length} bothering{item.botherings.length === 1 ? "" : "s"}
                         </Badge>
+                        {isFixFirstCore ? (
+                          <Badge variant="outline" className="border-red-500/40 text-red-200 bg-red-500/10">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            Fix First
+                          </Badge>
+                        ) : null}
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -549,6 +595,53 @@ export function CoreStatesModal({ isOpen, onOpenChange }: CoreStatesModalProps) 
                           <span>{completionPct}%</span>
                         </div>
                         <Progress value={completionPct} />
+                      </div>
+                      <div className="space-y-2">
+                        {blockers.length > 0 ? (
+                          <div className="rounded-md border border-red-500/25 bg-red-500/5 p-2">
+                            <div className="text-[11px] text-red-200 flex items-center gap-1 mb-1">
+                              <AlertTriangle className="h-3.5 w-3.5" />
+                              First fix these lower cores
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {blockers.map((coreId) => {
+                                const core = CORE_DEFS.find((c) => c.id === coreId);
+                                if (!core) return null;
+                                return (
+                                  <Badge key={`${item.core.id}-block-${coreId}`} variant="secondary" className="text-[10px]">
+                                    <span className="mr-1">{core.icon}</span>
+                                    {core.label}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="rounded-md border border-emerald-500/25 bg-emerald-500/5 p-2 text-[11px] text-emerald-200 flex items-center gap-1">
+                            <Target className="h-3.5 w-3.5" />
+                            Entry point ready
+                          </div>
+                        )}
+                        {helps.length > 0 ? (
+                          <div className="rounded-md border border-white/10 p-2">
+                            <div className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
+                              <ArrowRight className="h-3.5 w-3.5" />
+                              Then this can help
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {helps.map((coreId) => {
+                                const core = CORE_DEFS.find((c) => c.id === coreId);
+                                if (!core) return null;
+                                return (
+                                  <Badge key={`${item.core.id}-help-${coreId}`} variant="outline" className="text-[10px]">
+                                    <span className="mr-1">{core.icon}</span>
+                                    {core.label}
+                                  </Badge>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                       <div className="text-xs text-muted-foreground">{item.reason}</div>
                       <div className="flex flex-wrap gap-2">

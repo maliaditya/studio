@@ -9,7 +9,7 @@ import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { addDays, differenceInCalendarDays, differenceInDays, differenceInMonths, format, getDay, parseISO, startOfDay } from "date-fns";
-import type { Activity, MindsetPoint, SlotName, UserSettings } from "@/types/workout";
+import type { Activity, CoreDomainId, MindsetPoint, SlotName, UserSettings } from "@/types/workout";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -77,6 +77,49 @@ const BOTHERING_SOURCES: Array<{ id: string; type: BotheringType }> = [
   { id: "mindset_botherings_mismatch", type: "Mismatch" },
   { id: "mindset_botherings_constraint", type: "Constraint" },
 ];
+const CORE_PRIORITY_ORDER: CoreDomainId[] = [
+  "health",
+  "wealth",
+  "relations",
+  "competence",
+  "autonomy",
+  "meaning",
+  "creativity",
+  "contribution",
+  "transcendence",
+];
+const CORE_GROUP_BY_TYPE: Record<BotheringType, CoreDomainId[]> = {
+  Constraint: ["wealth", "autonomy", "contribution"],
+  Mismatch: ["meaning", "competence", "transcendence"],
+  External: ["health", "relations", "creativity"],
+};
+const TYPE_FALLBACK_CORE: Record<BotheringType, CoreDomainId> = {
+  Constraint: "wealth",
+  Mismatch: "meaning",
+  External: "health",
+};
+const CORE_LABEL_BY_ID: Record<CoreDomainId, string> = {
+  health: "Health",
+  wealth: "Wealth",
+  relations: "Relations",
+  meaning: "Meaning",
+  competence: "Competence",
+  autonomy: "Autonomy",
+  creativity: "Creativity",
+  contribution: "Contribution",
+  transcendence: "Transcendence",
+};
+const CORE_KEYWORDS: Record<CoreDomainId, string[]> = {
+  health: ["health", "sleep", "energy", "fatigue", "food", "diet", "body", "ill", "workout", "weight"],
+  wealth: ["money", "income", "salary", "finance", "job", "cash", "expense", "wealth", "earning", "budget"],
+  relations: ["relation", "relationship", "friend", "family", "lonely", "buddy", "people", "trust", "bond"],
+  meaning: ["meaning", "purpose", "direction", "empty", "confusion", "boredom", "goal", "life direction"],
+  competence: ["skill", "competence", "impostor", "practice", "learn", "performance", "challenge", "ability"],
+  autonomy: ["autonomy", "control", "choice", "trapped", "dependency", "obligation", "freedom", "resentment"],
+  creativity: ["creativity", "creative", "expression", "art", "output", "restless", "design", "write", "draw"],
+  contribution: ["contribution", "impact", "give back", "serve", "help others", "community", "value", "useful"],
+  transcendence: ["transcendence", "death", "identity", "spiritual", "truth", "silence", "unity", "meditation", "awareness"],
+};
 
 const TYPE_META: Record<BotheringType, { icon: LucideIcon; badgeClass: string; trackClass: string; fillClass: string }> = {
   External: {
@@ -217,6 +260,28 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
     const casted = (slot || "Evening") as SlotName;
     return SLOT_ORDER.includes(casted) ? casted : "Evening";
   };
+  const normalizeText = (value?: string) => (value || "").toLowerCase();
+  const detectCoreForPoint = useCallback((point: MindsetPoint, type: BotheringType): CoreDomainId => {
+    const allowedCoreIds = CORE_GROUP_BY_TYPE[type];
+    const manualOverrideCandidate = settings.coreStateManualOverrides?.[point.id];
+    if (manualOverrideCandidate && allowedCoreIds.includes(manualOverrideCandidate)) return manualOverrideCandidate;
+    const savedCoreCandidate = point.coreDomainId;
+    if (savedCoreCandidate && allowedCoreIds.includes(savedCoreCandidate)) return savedCoreCandidate;
+
+    const haystack = normalizeText(
+      [point.text, point.resolution, point.mismatchType, ...(point.tasks || []).map((t) => t.details)].filter(Boolean).join(" ")
+    );
+    let bestCore = allowedCoreIds[0];
+    let bestScore = -1;
+    allowedCoreIds.forEach((coreId) => {
+      const score = (CORE_KEYWORDS[coreId] || []).reduce((sum, keyword) => sum + (haystack.includes(keyword) ? 1 : 0), 0);
+      if (score > bestScore) {
+        bestScore = score;
+        bestCore = coreId;
+      }
+    });
+    return bestScore > 0 ? bestCore : TYPE_FALLBACK_CORE[type];
+  }, [settings.coreStateManualOverrides]);
 
   const botheringsByType = useMemo(() => {
     return BOTHERING_SOURCES.map(({ id, type }) => ({
@@ -1458,10 +1523,12 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
           mechanismName?: string;
         }>;
 
+      const coreId = detectCoreForPoint(point, type);
       return {
         id: point.id,
         text: point.text,
         type,
+        coreId,
         hasDeadline,
         isDeadlineNear,
         mismatch: type === "Mismatch" ? mismatchTypeLabel(point.mismatchType) : type === "External" ? "External friction" : "Constraint bottleneck",
@@ -1484,6 +1551,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
       id: string;
       text: string;
       type: BotheringType;
+      coreId: CoreDomainId;
       hasDeadline: boolean;
       isDeadlineNear: boolean;
       mismatch: string;
@@ -1507,6 +1575,43 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
         mechanismName?: string;
       }>;
     }>;
+  const unstableCoreIds = useMemo(() => {
+    const acc = new Map<CoreDomainId, { maxRisk: number; minRecentRate: number; maxBacklog: number }>();
+    riskCandidates.forEach((risk) => {
+      const prev = acc.get(risk.coreId) || { maxRisk: 0, minRecentRate: 1, maxBacklog: 0 };
+      prev.maxRisk = Math.max(prev.maxRisk, risk.riskScore);
+      prev.minRecentRate = Math.min(prev.minRecentRate, risk.recentRate);
+      prev.maxBacklog = Math.max(prev.maxBacklog, risk.missedBacklog);
+      acc.set(risk.coreId, prev);
+    });
+    const unstable = new Set<CoreDomainId>();
+    acc.forEach((value, coreId) => {
+      if (value.maxRisk >= 0.55 || value.minRecentRate < 0.55 || value.maxBacklog >= 3) unstable.add(coreId);
+    });
+    return unstable;
+  }, [riskCandidates]);
+  const getTaskListFromRisk = (risk: (typeof riskCandidates)[number]) => {
+    const actionableTasks =
+      risk.pendingTodayTaskNames.length > 0
+        ? risk.pendingTodayTaskNames
+        : risk.pendingTaskInstances.map((x) => x.split(" (")[0]);
+    return Array.from(new Set(actionableTasks));
+  };
+  const getSuggestedTasksForRisk = useCallback((risk: (typeof riskCandidates)[number]) => {
+    const priorityIndex = CORE_PRIORITY_ORDER.indexOf(risk.coreId);
+    const blockerCoreIds = CORE_PRIORITY_ORDER.slice(0, Math.max(priorityIndex, 0)).filter((coreId) => unstableCoreIds.has(coreId));
+    const fromBlockers = blockerCoreIds.flatMap((coreId) =>
+      riskCandidates
+        .filter((candidate) => candidate.coreId === coreId)
+        .flatMap((candidate) => getTaskListFromRisk(candidate))
+    );
+    const fromCurrent = getTaskListFromRisk(risk);
+    const merged = Array.from(new Set([...fromBlockers, ...fromCurrent]));
+    return {
+      tasks: merged,
+      blockerCoreIds,
+    };
+  }, [riskCandidates, unstableCoreIds]);
 
   const sortRiskCards = (a: (typeof riskCandidates)[number], b: (typeof riskCandidates)[number]) => {
     if (b.riskScore !== a.riskScore) return b.riskScore - a.riskScore;
@@ -1794,10 +1899,9 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
               ) : (
                 atRiskCards.map((risk) => {
                   const tone = riskTone(risk.riskScore);
-                  const actionableTasks = risk.pendingTodayTaskNames.length > 0 ? risk.pendingTodayTaskNames : risk.pendingTaskInstances.map((x) => x.split(" (")[0]);
-                  const uniqueActionable = Array.from(new Set(actionableTasks));
-                  const visibleTasks = uniqueActionable.slice(0, 6);
-                  const hiddenCount = Math.max(0, uniqueActionable.length - visibleTasks.length);
+                  const suggested = getSuggestedTasksForRisk(risk);
+                  const visibleTasks = suggested.tasks.slice(0, 6);
+                  const hiddenCount = Math.max(0, suggested.tasks.length - visibleTasks.length);
 
                   return (
                     <Card key={risk.id} className={cn("overflow-hidden", tone.cardClass)}>
@@ -1870,6 +1974,12 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                             <ListChecks className="h-3.5 w-3.5" />
                             Focus Tasks
                           </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Entry point core: <span className="font-medium text-foreground">{CORE_LABEL_BY_ID[risk.coreId]}</span>
+                            {suggested.blockerCoreIds.length > 0 ? (
+                              <span> • First fix: {suggested.blockerCoreIds.map((coreId) => CORE_LABEL_BY_ID[coreId]).join(", ")}</span>
+                            ) : null}
+                          </div>
                           {visibleTasks.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                               {visibleTasks.map((task) => (
@@ -1933,10 +2043,9 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                 </Card>
               ) : (
                 potentialRiskCards.map((risk) => {
-                  const actionableTasks = risk.pendingTodayTaskNames.length > 0 ? risk.pendingTodayTaskNames : risk.pendingTaskInstances.map((x) => x.split(" (")[0]);
-                  const uniqueActionable = Array.from(new Set(actionableTasks));
-                  const visibleTasks = uniqueActionable.slice(0, 6);
-                  const hiddenCount = Math.max(0, uniqueActionable.length - visibleTasks.length);
+                  const suggested = getSuggestedTasksForRisk(risk);
+                  const visibleTasks = suggested.tasks.slice(0, 6);
+                  const hiddenCount = Math.max(0, suggested.tasks.length - visibleTasks.length);
 
                   return (
                     <Card key={`${risk.id}-potential`} className="overflow-hidden border-sky-400/35 bg-sky-500/[0.03]">
@@ -2006,6 +2115,12 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                             <ListChecks className="h-3.5 w-3.5" />
                             Focus Tasks
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Entry point core: <span className="font-medium text-foreground">{CORE_LABEL_BY_ID[risk.coreId]}</span>
+                            {suggested.blockerCoreIds.length > 0 ? (
+                              <span> • First fix: {suggested.blockerCoreIds.map((coreId) => CORE_LABEL_BY_ID[coreId]).join(", ")}</span>
+                            ) : null}
                           </div>
                           {visibleTasks.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
