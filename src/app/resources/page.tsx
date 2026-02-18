@@ -170,12 +170,12 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
 
         return (
           <li key={folder.id} className="min-w-0">
-            <DroppableFolder folder={folder} >
-                <DraggableFolder folder={folder} isDragging={activeDragId === folder.id}>
+            <DroppableFolder folder={folder} className="min-w-0 w-full">
+                <DraggableFolder folder={folder} isDragging={activeDragId === folder.id} className="min-w-0 w-full">
                     <div 
                         onContextMenu={(e) => onContextMenu(e, folder)} 
                         onClick={() => onSelect(folder.id)}
-                        className={cn("flex items-center gap-1 p-1 rounded-md hover:bg-muted cursor-pointer group min-w-0", isSelected && "bg-accent")}
+                        className={cn("flex w-full items-start gap-1 p-1 rounded-md hover:bg-muted cursor-pointer group min-w-0 overflow-hidden", isSelected && "bg-accent")}
                     >
                         {children.length > 0 && (
                             <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={(e) => {e.stopPropagation(); toggleFolderCollapse(folder.id); }}>
@@ -194,7 +194,9 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
                                 className="h-7 text-sm min-w-0 flex-1"
                             />
                         ) : (
-                            <span className="block min-w-0 flex-1 truncate" title={folder.name}>{folder.name}</span>
+                            <div className="min-w-0 flex-1 overflow-hidden">
+                                <span className="block w-full whitespace-normal break-words leading-snug" title={folder.name}>{folder.name}</span>
+                            </div>
                         )}
                         
                         <div className="flex items-center flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1107,15 +1109,28 @@ function ResourcesPageContent() {
   const handleShareFolder = async (folder: ResourceFolder) => {
       setContextMenu(null);
       const childFolders = getDescendantFolders(folder.id, resourceFolders);
-      const payload = { folder, allResources: resources, childFolders, username: currentUser?.username || 'anonymous' };
+      const sharedFolderIds = new Set<string>([folder.id, ...childFolders.map((f) => f.id)]);
+      const scopedResources = resources.filter((r) => sharedFolderIds.has(r.folderId));
+      const payload = { folder, allResources: scopedResources, childFolders, username: currentUser?.username || 'anonymous' };
       try {
           const response = await fetch('/api/share/folder', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(payload),
           });
-          const result = await response.json();
-          if (!response.ok) throw new Error(result.error || 'Failed to share folder');
+          const raw = await response.text();
+          let result: any = null;
+          try {
+            result = raw ? JSON.parse(raw) : null;
+          } catch {
+            result = null;
+          }
+          if (!response.ok) {
+            const message = result?.error
+              || (response.status === 413 ? 'Share payload is too large. Try sharing a smaller folder.' : null)
+              || (raw?.trim() || 'Failed to share folder');
+            throw new Error(message);
+          }
           
           setShareUrl(`${window.location.origin}${result.publicUrl}`);
           setShareDialogOpen(true);
@@ -1255,25 +1270,27 @@ function ResourcesPageContent() {
                 </CardHeader>
                 <CardContent className="flex-grow min-h-0 p-2 overflow-hidden">
                     <ScrollArea className="h-full">
-                        <FolderTreeView
-                            folders={rootFolders}
-                            allFolders={resourceFolders}
-                            selectedFolderId={selectedResourceFolderId}
-                            onSelect={setSelectedResourceFolderId}
-                            onEdit={handleEditFolder}
-                            onDelete={(id) => setDeleteConfirmation({ item: resourceFolders.find(f => f.id === id)! })}
-                            onContextMenu={handleContextMenu}
-                            editingFolderId={editingFolderId}
-                            editingFolderName={editingFolderName}
-                            setEditingFolderName={setEditingFolderName}
-                            handleSaveEditFolder={handleSaveEditFolder}
-                            setEditingFolderId={setEditingFolderId}
-                            collapsedFolders={collapsedFolders}
-                            toggleFolderCollapse={toggleFolderCollapse}
-                            onPin={toggleFolderPin}
-                            pinnedFolderIds={pinnedFolderIds}
-                            activeDragId={activeId}
-                        />
+                        <div className="min-w-0 overflow-x-hidden">
+                            <FolderTreeView
+                                folders={rootFolders}
+                                allFolders={resourceFolders}
+                                selectedFolderId={selectedResourceFolderId}
+                                onSelect={setSelectedResourceFolderId}
+                                onEdit={handleEditFolder}
+                                onDelete={(id) => setDeleteConfirmation({ item: resourceFolders.find(f => f.id === id)! })}
+                                onContextMenu={handleContextMenu}
+                                editingFolderId={editingFolderId}
+                                editingFolderName={editingFolderName}
+                                setEditingFolderName={setEditingFolderName}
+                                handleSaveEditFolder={handleSaveEditFolder}
+                                setEditingFolderId={setEditingFolderId}
+                                collapsedFolders={collapsedFolders}
+                                toggleFolderCollapse={toggleFolderCollapse}
+                                onPin={toggleFolderPin}
+                                pinnedFolderIds={pinnedFolderIds}
+                                activeDragId={activeId}
+                            />
+                        </div>
                     </ScrollArea>
                 </CardContent>
             </Card>
@@ -1309,9 +1326,9 @@ function ResourcesPageContent() {
                                         variant={selectedResourceFolderId === id ? "default" : "secondary"}
                                         size="sm"
                                         onClick={() => handleTabSelect(id)}
-                                        className="h-8 group/tab relative"
+                                        className="h-8 group/tab relative min-w-0 max-w-[220px] justify-start pr-5 overflow-hidden"
                                     >
-                                        <span className="truncate max-w-[150px]">{folder.name}</span>
+                                        <span className="block min-w-0 max-w-full truncate" title={folder.name}>{folder.name}</span>
                                         <span
                                             role="button"
                                             tabIndex={0}
@@ -1337,7 +1354,9 @@ function ResourcesPageContent() {
                     )}
                 </CardHeader>
                 <CardContent className="p-4 flex-grow min-h-0 overflow-hidden">
-                    <h2 className="text-2xl font-bold mb-4">
+                    <h2 className="text-2xl font-bold mb-4 truncate" title={selectedResourceFolderId && !searchTerm && resourceFolders?.find(f => f.id === selectedResourceFolderId)?.name
+                        ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
+                        : searchTerm ? `Search results for "${searchTerm}"` : 'Select a folder'}>
                         {selectedResourceFolderId && !searchTerm && resourceFolders?.find(f => f.id === selectedResourceFolderId)?.name
                         ? resourceFolders.find(f => f.id === selectedResourceFolderId)?.name
                         : searchTerm ? `Search results for "${searchTerm}"` : 'Select a folder'}
