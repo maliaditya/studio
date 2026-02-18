@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { ExternalLink, Folder, Link as LinkIcon, Globe, Loader2, AlertTriangle, Youtube, Expand, ChevronDown, BrainCircuit, Library, MessageSquare, Code, ArrowRight, X, PictureInPicture, Play, Pause, GitMerge } from 'lucide-react';
 import type { Resource, ResourceFolder, ResourcePoint } from '@/types/workout';
 import { cn } from '@/lib/utils';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ScrollArea } from '@/components/ui/scroll-area';
