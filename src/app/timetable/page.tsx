@@ -34,13 +34,42 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     mindset: <Brain className="h-4 w-4" />,
 };
 
-const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType, details: string) => void }) => {
+type RestoreRoutineOption = {
+    id: string;
+    type: ActivityType;
+    details: string;
+};
+
+const AddActivityMenu = ({
+    onAddActivity,
+    restoreRoutineOptions = [],
+    onRestoreRoutine,
+}: {
+    onAddActivity: (type: ActivityType, details: string) => void;
+    restoreRoutineOptions?: RestoreRoutineOption[];
+    onRestoreRoutine?: (routineId: string) => void;
+}) => {
     const { coreSkills } = useAuth();
     const specializations = coreSkills.filter(s => s.type === 'Specialization');
 
     return (
         <DropdownMenuContent className="w-56 p-2">
             <p className="font-medium text-sm p-2">Select Activity</p>
+            {restoreRoutineOptions.length > 0 && onRestoreRoutine && (
+                <>
+                    <DropdownMenuSeparator />
+                    <p className="text-xs text-muted-foreground px-2 py-1">Restore deleted routine (this day)</p>
+                    {restoreRoutineOptions.map((routine) => (
+                        <DropdownMenuItem key={routine.id} onClick={() => onRestoreRoutine(routine.id)}>
+                            {activityIcons[routine.type]}
+                            <span className="ml-2 truncate" title={routine.details}>
+                                {routine.details}
+                            </span>
+                        </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                </>
+            )}
             {Object.entries(activityIcons).map(([type, icon]) => {
                 const activityType = type as ActivityType;
                 if (activityType === 'upskill' || activityType === 'deepwork') {
@@ -81,9 +110,11 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
 
 const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine }: { activity: Activity, index: number, onRemove: (activity: Activity) => void, onSetRoutine: (rule: RecurrenceRule | null) => void }) => {
   const [isBrowser, setIsBrowser] = React.useState(false);
+  const [menuPortalContainer, setMenuPortalContainer] = React.useState<HTMLElement | null>(null);
 
   React.useEffect(() => {
     setIsBrowser(true);
+    setMenuPortalContainer(document.getElementById('global-popup-root') ?? document.body);
   }, []);
 
   const [customInterval, setCustomInterval] = React.useState(1);
@@ -99,7 +130,6 @@ const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine 
       <div
         ref={provided.innerRef}
         {...provided.draggableProps}
-        {...provided.dragHandleProps}
         className={cn(
           "bg-card p-1.5 rounded-md shadow-sm group relative",
           snapshot.isDragging && "opacity-80 shadow-lg",
@@ -107,8 +137,11 @@ const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine 
         style={provided.draggableProps.style}
       >
         <div className="flex items-start gap-1.5">
-          {activityIcons[activity.type]}
-          <div className="flex-grow min-w-0">
+          <div
+            {...provided.dragHandleProps}
+            className="flex items-start gap-1.5 flex-grow min-w-0 cursor-grab active:cursor-grabbing"
+          >
+            {activityIcons[activity.type]}
             <p
               className={cn(
                 "font-medium truncate text-[11px]",
@@ -121,45 +154,64 @@ const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine 
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-5 w-5 -mr-1 -mt-1 opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5 -mr-1 -mt-1 opacity-0 group-hover:opacity-100"
+                  onClick={(e) => e.stopPropagation()}
+                >
                     <Repeat className="h-3 w-3" />
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
-                <DropdownMenuItem onSelect={() => onSetRoutine({ type: 'daily' })}>Daily</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => onSetRoutine({ type: 'weekly' })}>Weekly</DropdownMenuItem>
-                <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>Custom…</DropdownMenuSubTrigger>
-                    <DropdownMenuPortal>
-                        <DropdownMenuSubContent className="w-56 p-3 space-y-2">
-                            <div className="text-xs text-muted-foreground">Repeat every</div>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="number"
-                                    min={1}
-                                    value={customInterval}
-                                    onChange={(e) => setCustomInterval(Math.max(1, Number(e.target.value || 1)))}
-                                    className="h-8 w-16 rounded-md border border-white/10 bg-background px-2 text-sm"
-                                />
-                                <select
-                                    value={customUnit}
-                                    onChange={(e) => setCustomUnit(e.target.value as 'day' | 'week' | 'month')}
-                                    className="h-8 flex-1 rounded-md border border-white/10 bg-background px-2 text-sm"
-                                >
-                                    <option value="day">days</option>
-                                    <option value="week">weeks</option>
-                                    <option value="month">months</option>
-                                </select>
-                            </div>
-                            <Button size="sm" className="w-full" onClick={applyCustomRepeat}>
-                                Apply
-                            </Button>
-                        </DropdownMenuSubContent>
-                    </DropdownMenuPortal>
-                </DropdownMenuSub>
-                {activity.routine && <DropdownMenuSeparator />}
-                {activity.routine && <DropdownMenuItem onSelect={() => onSetRoutine(null)} className="text-destructive">No Repeat</DropdownMenuItem>}
-            </DropdownMenuContent>
+            <DropdownMenuPortal container={menuPortalContainer ?? undefined}>
+              <DropdownMenuContent className="z-[220] w-64 p-2" align="end" sideOffset={8} onCloseAutoFocus={(e) => e.preventDefault()}>
+                  <p className="px-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Quick Repeat</p>
+                  <div className="px-2 pb-2">
+                      <div className="grid grid-cols-3 gap-2">
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => onSetRoutine({ type: 'daily' })}>
+                              Daily
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => onSetRoutine({ type: 'weekly' })}>
+                              Weekly
+                          </Button>
+                          <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs text-destructive border-destructive/40 hover:text-destructive"
+                              onClick={() => onSetRoutine(null)}
+                              disabled={!activity.routine}
+                          >
+                              No Repeat
+                          </Button>
+                      </div>
+                  </div>
+                  <DropdownMenuSeparator className="my-1" />
+                  <div className="rounded-md border border-border/70 bg-muted/30 p-2.5 space-y-2">
+                      <div className="text-[11px] font-medium text-muted-foreground">Custom repeat</div>
+                      <div className="flex items-center gap-2">
+                          <input
+                              type="number"
+                              min={1}
+                              value={customInterval}
+                              onChange={(e) => setCustomInterval(Math.max(1, Number(e.target.value || 1)))}
+                              className="h-9 w-16 rounded-md border border-border/70 bg-background px-2 text-xs"
+                          />
+                          <select
+                              value={customUnit}
+                              onChange={(e) => setCustomUnit(e.target.value as 'day' | 'week' | 'month')}
+                              className="h-9 flex-1 rounded-md border border-border/70 bg-background px-2 text-xs"
+                          >
+                              <option value="day">days</option>
+                              <option value="week">weeks</option>
+                              <option value="month">months</option>
+                          </select>
+                      </div>
+                      <Button size="sm" variant="secondary" className="h-8 w-full text-xs" onClick={applyCustomRepeat}>
+                          Apply Custom
+                      </Button>
+                  </div>
+              </DropdownMenuContent>
+            </DropdownMenuPortal>
           </DropdownMenu>
           <Button
             variant="ghost"
@@ -198,7 +250,25 @@ const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine 
 DraggableActivity.displayName = 'DraggableActivity';
 
 
-const DroppableSlot = React.memo(({ date, slot, activities, onAddActivity, onRemoveActivity, onSetRoutine }: { date: Date, slot: SlotName, activities: Activity[], onAddActivity: (type: ActivityType, details: string) => void, onRemoveActivity: (activity: Activity) => void, onSetRoutine: (activity: Activity, rule: RecurrenceRule | null) => void }) => {
+const DroppableSlot = React.memo(({
+    date,
+    slot,
+    activities,
+    onAddActivity,
+    onRemoveActivity,
+    onSetRoutine,
+    onRestoreRoutine,
+    restoreRoutineOptions,
+}: {
+    date: Date,
+    slot: SlotName,
+    activities: Activity[],
+    onAddActivity: (type: ActivityType, details: string) => void,
+    onRemoveActivity: (activity: Activity) => void,
+    onSetRoutine: (activity: Activity, rule: RecurrenceRule | null) => void,
+    onRestoreRoutine: (routineId: string) => void,
+    restoreRoutineOptions: RestoreRoutineOption[],
+}) => {
     const droppableId = `${format(date, 'yyyy-MM-dd')}_${slot}`;
 
     return (
@@ -225,7 +295,11 @@ const DroppableSlot = React.memo(({ date, slot, activities, onAddActivity, onRem
                                 <PlusCircle className="h-4 w-4" />
                             </Button>
                         </DropdownMenuTrigger>
-                        <AddActivityMenu onAddActivity={onAddActivity} />
+                        <AddActivityMenu
+                            onAddActivity={onAddActivity}
+                            restoreRoutineOptions={restoreRoutineOptions}
+                            onRestoreRoutine={onRestoreRoutine}
+                        />
                     </DropdownMenu>
                 </div>
             )}
@@ -341,6 +415,25 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
             return newSchedule;
         });
     };
+
+    const handleRestoreRoutine = (date: Date, routineId: string) => {
+        const dateKey = format(date, 'yyyy-MM-dd');
+        setSettings(prev => {
+            const currentForDate = prev.routineSkipByDate?.[dateKey] || [];
+            const nextForDate = currentForDate.filter(id => id !== routineId);
+            const nextSkipMap = { ...(prev.routineSkipByDate || {}) };
+            if (nextForDate.length === 0) {
+                delete nextSkipMap[dateKey];
+            } else {
+                nextSkipMap[dateKey] = nextForDate;
+            }
+            return {
+                ...prev,
+                routineSkipByDate: nextSkipMap,
+            };
+        });
+        toast({ title: "Routine Restored", description: "Restored for this day." });
+    };
     
     const onDragEnd = (result: DropResult) => {
         const { source, destination } = result;
@@ -407,6 +500,9 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
                         const dateKey = format(date, 'yyyy-MM-dd');
                         const allActivities = (schedule[dateKey]?.[slot] as Activity[] | undefined) || [];
                         const skippedRoutineIdsForDate = new Set(settings.routineSkipByDate?.[dateKey] || []);
+                        const restoreRoutineOptions: RestoreRoutineOption[] = (settings.routines || [])
+                            .filter(r => r.slot === slot && skippedRoutineIdsForDate.has(r.id))
+                            .map(r => ({ id: r.id, type: r.type, details: r.details }));
                         // Build routine instances for this date+slot
                         const routineInstances = (settings.routines || []).flatMap(r => {
                             if (!r || !r.routine) return [] as Activity[];
@@ -480,6 +576,8 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
                                     onAddActivity={handleAddActivity(date, slot)}
                                     onRemoveActivity={(activity) => handleRemoveActivity(date, slot, activity)}
                                     onSetRoutine={(activity, rule) => toggleRoutine(activity, rule, format(date, 'yyyy-MM-dd'))}
+                                    onRestoreRoutine={(routineId) => handleRestoreRoutine(date, routineId)}
+                                    restoreRoutineOptions={restoreRoutineOptions}
                                 />
                             </div>
                         );
