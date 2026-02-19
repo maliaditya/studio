@@ -166,7 +166,7 @@ interface AuthContextType {
   handleToggleComplete: (slotName: string, activityId: string, isCompleted?: boolean) => void;
   onRemoveActivity: (slotName: string, activityId: string, date: Date) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
-  scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string, duration?: number) => void;
+  scheduleTaskFromMindMap: (definitionId: string, activityType: ActivityType, slotName: string, duration?: number, sourceActivityType?: ActivityType) => void;
   
   // Focus Session
   focusSessionModalOpen: boolean;
@@ -972,20 +972,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const itemsDelta = Math.max(0, progress?.itemsCompleted || 0);
     const hoursDelta = Math.max(0, progress?.hoursCompleted || 0);
     const pagesDelta = Math.max(0, progress?.pagesCompleted || 0);
+    const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
     const shouldApplyMicroSkillProgress = !!matchedDefinitionCategory && (itemsDelta > 0 || hoursDelta > 0 || pagesDelta > 0);
-    if (shouldApplyMicroSkillProgress) {
+    const shouldRemoveFromRepetitionQueue = activity.type === 'spaced-repetition' && !!matchedDefinitionCategory;
+    if (shouldApplyMicroSkillProgress || shouldRemoveFromRepetitionQueue) {
       setCoreSkills(prev =>
         prev.map(spec => ({
           ...spec,
           skillAreas: spec.skillAreas.map(area => ({
             ...area,
             microSkills: area.microSkills.map(ms => {
-              if (ms.name !== matchedDefinitionCategory) return ms;
+              if (normalizeText(ms.name) !== normalizeText(matchedDefinitionCategory)) return ms;
               return {
                 ...ms,
                 completedItems: (ms.completedItems || 0) + itemsDelta,
                 completedHours: (ms.completedHours || 0) + hoursDelta,
                 completedPages: (ms.completedPages || 0) + pagesDelta,
+                isReadyForRepetition: shouldRemoveFromRepetitionQueue ? false : ms.isReadyForRepetition,
               };
             }),
           })),
@@ -2495,6 +2498,59 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const shouldBeCompleted = isCompleted !== undefined ? isCompleted : !activityToUpdate.completed;
     const baseMatch = activityToUpdate.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+    if (shouldBeCompleted && !activityToUpdate.completed && activityToUpdate.type === 'spaced-repetition') {
+        const linkedTaskId = activityToUpdate.taskIds?.[0];
+        let definitionId: string | undefined;
+        let matchedDefinitionCategory: string | undefined;
+        let isUpskillLog = false;
+
+        if (linkedTaskId) {
+            const allLogs = [...allUpskillLogs, ...allDeepWorkLogs];
+            const taskLogInstance = allLogs.flatMap(log => log.exercises).find(ex => ex.id === linkedTaskId);
+            if (taskLogInstance) {
+                definitionId = taskLogInstance.definitionId;
+                isUpskillLog = allUpskillLogs.some(log => log.exercises.some(ex => ex.id === linkedTaskId));
+            } else {
+                const allDefs = [...upskillDefinitions, ...deepWorkDefinitions];
+                const def = allDefs.find(d => d.id === linkedTaskId);
+                if (def) {
+                    definitionId = def.id;
+                    isUpskillLog = upskillDefinitions.some(d => d.id === def.id);
+                }
+            }
+        }
+
+        if (definitionId) {
+            const setDefinitions = isUpskillLog ? setUpskillDefinitions : setDeepWorkDefinitions;
+            const matchedDef = [...upskillDefinitions, ...deepWorkDefinitions].find((def) => def.id === definitionId);
+            matchedDefinitionCategory = matchedDef?.category;
+            setDefinitions(prevDefs => prevDefs.map(def => {
+                if (def.id !== definitionId) return def;
+                return {
+                    ...def,
+                    loggedDuration: (def.loggedDuration || 0) + Math.max(1, activityToUpdate.duration || 0),
+                    last_logged_date: todayKey,
+                };
+            }));
+        }
+
+        if (matchedDefinitionCategory) {
+            const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            setCoreSkills(prev =>
+                prev.map(spec => ({
+                    ...spec,
+                    skillAreas: spec.skillAreas.map(area => ({
+                        ...area,
+                        microSkills: area.microSkills.map(ms =>
+                            normalizeText(ms.name) === normalizeText(matchedDefinitionCategory)
+                                ? { ...ms, isReadyForRepetition: false }
+                                : ms
+                        ),
+                    })),
+                }))
+            );
+        }
+    }
     
     if (shouldBeCompleted && !activityToUpdate.completed) {
         if (activityToUpdate.duration) {
@@ -2555,7 +2611,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return changed ? next : prev;
         });
     }
-  }, [schedule, settings.routines, updateActivity, onOpenFocusModal, setSchedule, setMindsetCards]);
+  }, [
+    schedule,
+    settings.routines,
+    updateActivity,
+    onOpenFocusModal,
+    setSchedule,
+    setMindsetCards,
+    allUpskillLogs,
+    allDeepWorkLogs,
+    upskillDefinitions,
+    deepWorkDefinitions,
+    setUpskillDefinitions,
+    setDeepWorkDefinitions,
+    setCoreSkills,
+  ]);
 
   const onRemoveActivity = useCallback((slotName: string, activityId: string, date: Date) => {
     const dateKey = format(date, 'yyyy-MM-dd');
@@ -2594,13 +2664,33 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // This function is now a placeholder as the logic is moved to my-plate
   };
 
-  const scheduleTaskFromMindMap = (definitionId: string, activityType: ActivityType, slotName: string, duration = 0) => {
+  const scheduleTaskFromMindMap = (
+    definitionId: string,
+    activityType: ActivityType,
+    slotName: string,
+    duration = 0,
+    sourceActivityType?: ActivityType
+  ) => {
     const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
     const definition = allDefs.find(d => d.id === definitionId);
     if (!definition) {
         toast({ title: 'Error', description: 'Could not find the task definition.', variant: 'destructive' });
         return;
     }
+    const inferredSourceType: ActivityType | undefined =
+      deepWorkDefinitions.some((d) => d.id === definitionId)
+        ? 'deepwork'
+        : upskillDefinitions.some((d) => d.id === definitionId)
+          ? 'upskill'
+          : undefined;
+    const effectiveSourceType: ActivityType | undefined =
+      activityType === 'spaced-repetition' ? (sourceActivityType || inferredSourceType) : activityType;
+    const linkedEntityType =
+      effectiveSourceType === 'deepwork'
+        ? 'intention'
+        : effectiveSourceType === 'upskill'
+          ? 'curiosity'
+          : undefined;
 
     if (focusActivity) {
       // Update the existing activity that opened the modal
@@ -2609,7 +2699,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         details: definition.name,
         taskIds: [definition.id],
         type: activityType,
-        linkedEntityType: activityType === 'deepwork' ? 'intention' : 'curiosity'
+        linkedEntityType,
+        linkedActivityType: activityType === 'spaced-repetition' ? effectiveSourceType : undefined,
       });
       setFocusActivity(null);
       toast({ title: 'Agenda Updated', description: `Set task to "${definition.name}".`});
@@ -2623,7 +2714,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         completed: false,
         slot: slotName,
         taskIds: [definition.id],
-        linkedEntityType: activityType === 'deepwork' ? 'intention' : 'curiosity'
+        linkedEntityType,
+        linkedActivityType: activityType === 'spaced-repetition' ? effectiveSourceType : undefined,
       };
 
       setSchedule(prev => {

@@ -33,16 +33,20 @@ const calculateRetention = (daysSinceLastReview: number, lastInterval: number): 
 };
 
 export function SpacedRepetitionModal({ modalState, onOpenChange }: SpacedRepetitionModalProps) {
-  const { deepWorkDefinitions, getDescendantLeafNodes } = useAuth();
+  const { deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes } = useAuth();
   const { isOpen, skill } = modalState;
 
   const repetitionData = useMemo(() => {
     if (!skill) return null;
 
     const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
-    const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
+    const curiosities = upskillDefinitions.filter(def => def.category === skill.name);
+    const deepWorkLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
+    const upskillLeafNodes = curiosities.flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'));
+    const allTrackableNodes = [...deepWorkLeafNodes, ...upskillLeafNodes];
+    const fallbackNodes = [...intentions, ...curiosities];
     const completionDates = new Set<string>();
-    allLeafNodes.forEach(node => {
+    (allTrackableNodes.length > 0 ? allTrackableNodes : fallbackNodes).forEach(node => {
       if (node.last_logged_date) completionDates.add(node.last_logged_date);
     });
     
@@ -100,7 +104,7 @@ export function SpacedRepetitionModal({ modalState, onOpenChange }: SpacedRepeti
     }
     
     return { retentionCurve, nextReviewDate, nextInterval, reps, milestonePoints };
-  }, [skill, deepWorkDefinitions, getDescendantLeafNodes]);
+  }, [skill, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -145,7 +149,7 @@ export function SpacedRepetitionModal({ modalState, onOpenChange }: SpacedRepeti
              </ChartContainer>
           ) : (
             <div className="flex items-center justify-center h-48">
-              <p className="text-muted-foreground text-center">Log an intention for this micro-skill to start tracking its retention.</p>
+              <p className="text-muted-foreground text-center">Log a deep work or upskill session for this micro-skill to start tracking retention.</p>
             </div>
           )}
         </div>

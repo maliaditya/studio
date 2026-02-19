@@ -166,7 +166,7 @@ export interface EditableMealPlan {
 
 export type UserDietPlan = EditableMealPlan[];
 
-export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation' | 'interrupt' | 'essentials' | 'nutrition' | 'mindset' | 'distraction' | 'pomodoro';
+export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation' | 'interrupt' | 'essentials' | 'nutrition' | 'mindset' | 'distraction' | 'spaced-repetition' | 'pomodoro';
 
 export interface PauseEvent {
   pauseTime: number;
@@ -289,6 +289,15 @@ export interface LearningResourceBook {
 export interface LearningPlan {
   audioVideoResources?: LearningResourceAudio[];
   bookWebpageResources?: LearningResourceBook[];
+  skillTreePaths?: SkillTreePathPlan[];
+}
+
+export interface SkillTreePathPlan {
+  id: string;
+  name: string;
+  skillAreaIds: string[];
+  targetMicroSkills: number | null;
+  completionDate?: string | null;
 }
 
 

@@ -32,6 +32,7 @@ const activityNameMap: Record<ActivityType, string> = {
     interrupt: 'Interrupts',
     distraction: 'Distractions',
     nutrition: 'Nutrition',
+    'spaced-repetition': 'Spaced Repetition',
     pomodoro: 'Pomodoro',
 };
 
@@ -47,6 +48,7 @@ const activityColorMapping: Record<string, string> = {
     'Interrupts': 'hsl(var(--destructive))',
     'Distractions': 'hsl(var(--destructive))',
     'Nutrition': 'hsl(var(--chart-4))',
+    'Spaced Repetition': 'hsl(var(--chart-2))',
     'Untracked Time': 'hsl(var(--muted))',
     'Scheduled': 'hsl(var(--muted))',
     'Free Time': 'hsl(var(--muted))',
@@ -353,7 +355,7 @@ export function ActivityDistributionCard() {
           };
         }).filter(item => item.historicalData.length > 0);
 
-        const order = ['Planning', 'Learning', 'Deep Work', 'Essentials', 'Distractions', 'Workout', 'Interrupts', 'Nutrition', 'Branding', 'Lead Gen', 'Tracking', 'Mindset', 'Pomodoro'];
+        const order = ['Planning', 'Learning', 'Deep Work', 'Spaced Repetition', 'Essentials', 'Distractions', 'Workout', 'Interrupts', 'Nutrition', 'Branding', 'Lead Gen', 'Tracking', 'Mindset', 'Pomodoro'];
 
         return calculatedData.sort((a, b) => {
             const indexA = order.indexOf(a.category);

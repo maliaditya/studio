@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, History, LineChart, Workflow, ChevronLeft, Calendar as CalendarIcon, X, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, AlertCircle, Wind, Timer, Check } from 'lucide-react';
+import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, History, LineChart, Workflow, ChevronLeft, Calendar as CalendarIcon, X, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, AlertCircle, Wind, Timer, Check, Repeat } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -155,6 +155,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     interrupt: <AlertCircle className="h-4 w-4 text-red-500" />,
     distraction: <Wind className="h-4 w-4 text-yellow-500" />,
     mindset: <Brain className="h-4 w-4" />,
+    'spaced-repetition': <Repeat className="h-4 w-4 text-blue-500" />,
     pomodoro: <Timer className="h-4 w-4" />,
 };
 
@@ -570,6 +571,17 @@ export function MindsetCategoriesCard() {
                     dailyHourTarget: number | null;
                     audioCount: number;
                     bookCount: number;
+                    skillTreePathCount: number;
+                    skillTreePathSummaries: Array<{
+                        id: string;
+                        name: string;
+                        completedMicroSkills: number;
+                        targetMicroSkills: number;
+                        completionDate: string | null;
+                        daysRemaining: number | null;
+                        remainingMicroSkills: number;
+                        dailyTarget: number | null;
+                    }>;
                     latestAudioEndDate: string | null;
                     latestBookEndDate: string | null;
                     audioDaysRemaining: number | null;
@@ -592,6 +604,17 @@ export function MindsetCategoriesCard() {
                     dailyHourTarget: number | null;
                     audioCount: number;
                     bookCount: number;
+                    skillTreePathCount: number;
+                    skillTreePathSummaries: Array<{
+                        id: string;
+                        name: string;
+                        completedMicroSkills: number;
+                        targetMicroSkills: number;
+                        completionDate: string | null;
+                        daysRemaining: number | null;
+                        remainingMicroSkills: number;
+                        dailyTarget: number | null;
+                    }>;
                     latestAudioEndDate: string | null;
                     latestBookEndDate: string | null;
                     audioDaysRemaining: number | null;
@@ -717,6 +740,8 @@ export function MindsetCategoriesCard() {
             const learningPlan = offerizationPlans?.[spec.specializationId]?.learningPlan;
             const audioCount = learningPlan?.audioVideoResources?.length || 0;
             const bookCount = learningPlan?.bookWebpageResources?.length || 0;
+            const skillTreePaths = learningPlan?.skillTreePaths || [];
+            const skillTreePathCount = skillTreePaths.length;
             const totalPages = (learningPlan?.bookWebpageResources || []).reduce((sum, resource) => sum + (resource.totalPages || 0), 0);
             const totalHours = (learningPlan?.audioVideoResources || []).reduce((sum, resource) => sum + (resource.totalHours || 0), 0);
             const completedPages = (specialization?.skillAreas || []).reduce(
@@ -729,7 +754,6 @@ export function MindsetCategoriesCard() {
             );
             const remainingPages = Math.max(0, totalPages - completedPages);
             const remainingHours = Math.max(0, totalHours - completedHours);
-            const hasLearningPlan = audioCount > 0 || bookCount > 0;
             const projectPlans = (offerizationPlans?.[spec.specializationId]?.releases || []).map((release) => ({
                 id: release.id,
                 name: release.name,
@@ -793,8 +817,44 @@ export function MindsetCategoriesCard() {
                 audioCount > 0 && remainingHours > 0 && audioDaysRemaining != null
                     ? Math.max(0.1, Number((remainingHours / Math.max(1, audioDaysRemaining || 1)).toFixed(1)))
                     : null;
+            const skillTreePathSummaries = skillTreePaths.map((path) => {
+                const selectedAreas = (specialization?.skillAreas || []).filter((area) => (path.skillAreaIds || []).includes(area.id));
+                const totalMicroSkills = selectedAreas.reduce((sum, area) => sum + area.microSkills.length, 0);
+                const completedMicroSkills = selectedAreas.reduce(
+                    (sum, area) =>
+                        sum +
+                        area.microSkills.filter((micro) =>
+                            !!micro.isReadyForRepetition ||
+                            (micro.completedItems || 0) > 0 ||
+                            (micro.completedHours || 0) > 0 ||
+                            (micro.completedPages || 0) > 0
+                        ).length,
+                    0
+                );
+                const targetMicroSkills = path.targetMicroSkills ?? totalMicroSkills;
+                const completionDate = normalizeDateKey(path.completionDate);
+                const daysRemaining = completionDate
+                    ? Math.max(0, differenceInDays(startOfDay(parseISO(completionDate)), today))
+                    : null;
+                const boundedCompleted = Math.min(completedMicroSkills, targetMicroSkills || completedMicroSkills);
+                const remainingMicroSkills = Math.max(0, (targetMicroSkills || 0) - boundedCompleted);
+                const dailyTarget = remainingMicroSkills > 0 && daysRemaining != null
+                    ? (daysRemaining > 0 ? Math.max(1, Math.ceil(remainingMicroSkills / daysRemaining)) : remainingMicroSkills)
+                    : null;
+                return {
+                    id: path.id,
+                    name: path.name,
+                    completedMicroSkills: boundedCompleted,
+                    targetMicroSkills,
+                    completionDate,
+                    daysRemaining,
+                    remainingMicroSkills,
+                    dailyTarget,
+                };
+            });
+            const hasLearningPlan = audioCount > 0 || bookCount > 0 || skillTreePathCount > 0;
             const learningPlanSummary = hasLearningPlan
-                ? `${audioCount} audio/video, ${bookCount} books/webpages`
+                ? `${skillTreePathCount} skill path${skillTreePathCount !== 1 ? 's' : ''}, ${audioCount} audio/video, ${bookCount} books/webpages`
                 : 'No learning plan yet';
 
             return {
@@ -813,6 +873,8 @@ export function MindsetCategoriesCard() {
                 dailyHourTarget,
                 audioCount,
                 bookCount,
+                skillTreePathCount,
+                skillTreePathSummaries,
                 latestAudioEndDate,
                 latestBookEndDate,
                 audioDaysRemaining,
@@ -854,6 +916,17 @@ export function MindsetCategoriesCard() {
             dailyHourTarget: number | null;
             audioCount: number;
             bookCount: number;
+            skillTreePathCount: number;
+            skillTreePathSummaries: Array<{
+                id: string;
+                name: string;
+                completedMicroSkills: number;
+                targetMicroSkills: number;
+                completionDate: string | null;
+                daysRemaining: number | null;
+                remainingMicroSkills: number;
+                dailyTarget: number | null;
+            }>;
             latestAudioEndDate: string | null;
             latestBookEndDate: string | null;
             audioDaysRemaining: number | null;
@@ -885,6 +958,8 @@ export function MindsetCategoriesCard() {
                 dailyHourTarget: target.dailyHourTarget,
                 audioCount: target.audioCount,
                 bookCount: target.bookCount,
+                skillTreePathCount: target.skillTreePathCount,
+                skillTreePathSummaries: target.skillTreePathSummaries,
                 latestAudioEndDate: target.latestAudioEndDate,
                 latestBookEndDate: target.latestBookEndDate,
                 audioDaysRemaining: target.audioDaysRemaining,
@@ -2342,6 +2417,27 @@ export function MindsetCategoriesCard() {
                         ) : learningPlanMeta.hasLearningPlan ? (
                             <div className="mt-2 space-y-1 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-2">
                                 <div className="grid grid-cols-1 gap-2 text-[11px]">
+                                    {learningPlanMeta.skillTreePathCount > 0 && (
+                                    <div className="rounded border border-white/10 bg-black/20 p-2">
+                                        <p className="font-medium text-emerald-300">Skill Tree Path Plan ({learningPlanMeta.skillTreePathCount})</p>
+                                        <div className="mt-1 space-y-2 text-muted-foreground">
+                                            {learningPlanMeta.skillTreePathSummaries.map((path) => (
+                                                <div key={path.id} className="rounded border border-white/10 bg-black/30 p-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="truncate font-medium text-foreground/90">{path.name}</span>
+                                                        <span>{path.completedMicroSkills}/{path.targetMicroSkills || 0}</span>
+                                                    </div>
+                                                    <div className="mt-1 grid grid-cols-2 gap-1 text-[10px]">
+                                                        <span>End: {path.completionDate ? format(parseISO(path.completionDate), 'PPP') : 'Not set'}</span>
+                                                        <span>Days left: {path.daysRemaining != null ? path.daysRemaining : 'N/A'}</span>
+                                                        <span>Remaining: {path.remainingMicroSkills}</span>
+                                                        <span>Daily target: {path.dailyTarget != null ? `${path.dailyTarget}/day` : (path.remainingMicroSkills === 0 ? 'Done' : 'N/A')}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    )}
                                     {learningPlanMeta.audioCount > 0 && (
                                     <div className="rounded border border-white/10 bg-black/20 p-2">
                                         <p className="font-medium text-emerald-300">Audio/Video ({learningPlanMeta.audioCount})</p>

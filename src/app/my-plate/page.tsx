@@ -468,6 +468,7 @@ function MyPlatePageContent() {
           distraction: 'Distractions', 
           nutrition: 'Nutrition',
           mindset: 'Mindset',
+          'spaced-repetition': 'Spaced Repetition',
           pomodoro: 'Pomodoro',
         };
       

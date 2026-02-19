@@ -21,6 +21,7 @@ const activityNameMap: Record<ActivityType, string> = {
     interrupt: 'Interrupts',
     distraction: 'Distractions',
     nutrition: 'Nutrition',
+    'spaced-repetition': 'Spaced Repetition',
     pomodoro: 'Pomodoro',
 };
 
@@ -36,6 +37,7 @@ const isProductive: Record<string, boolean> = {
     'Lead Gen': true,
     'Nutrition': true,
     'Pomodoro': true,
+    'Spaced Repetition': true,
     'Interrupts': false,
     'Distractions': false,
 };

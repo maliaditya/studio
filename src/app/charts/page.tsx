@@ -54,6 +54,7 @@ const activityNameMap: Record<ActivityType, string> = {
     interrupt: 'Interrupts',
     distraction: 'Distractions',
     nutrition: 'Nutrition',
+    'spaced-repetition': 'Spaced Repetition',
     pomodoro: 'Pomodoro',
 };
 
@@ -69,6 +70,7 @@ const activityColorMapping: Record<string, string> = {
     'Interrupts': 'hsl(var(--destructive))',
     'Distractions': 'hsl(var(--destructive))',
     'Nutrition': 'hsl(var(--chart-4))',
+    'Spaced Repetition': 'hsl(var(--chart-2))',
 };
 
 

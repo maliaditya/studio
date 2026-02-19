@@ -230,7 +230,10 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
     const { 
         coreSkills, 
         deepWorkDefinitions, 
+        upskillDefinitions,
         getDescendantLeafNodes, 
+        getDeepWorkNodeType,
+        getUpskillNodeType,
         scheduleTaskFromMindMap, 
         currentSlot, 
         offerizationPlans,
@@ -259,10 +262,18 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
 
         return repetitionSkills.map(skill => {
             const intentions = deepWorkDefinitions.filter(def => def.category === skill.name);
+            const curiosities = upskillDefinitions.filter(def => def.category === skill.name);
             const mainIntention = intentions.find(i => !deepWorkDefinitions.some(d => d.linkedDeepWorkIds?.includes(i.id)));
-            const allLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
+            const deepworkFallback = intentions.find((def) => getDeepWorkNodeType(def) === 'Intention') || intentions[0];
+            const upskillFallback = curiosities.find((def) => getUpskillNodeType(def) === 'Curiosity') || curiosities[0];
+            const fallbackDefinition = deepworkFallback || upskillFallback;
+            const fallbackActivityType = deepworkFallback ? 'deepwork' : (upskillFallback ? 'upskill' : null);
+            const deepWorkLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
+            const upskillLeafNodes = curiosities.flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'));
+            const allTrackableNodes = [...deepWorkLeafNodes, ...upskillLeafNodes];
+            const fallbackNodes = [...intentions, ...curiosities];
             const completionDates = new Set<string>();
-            allLeafNodes.forEach(node => {
+            (allTrackableNodes.length > 0 ? allTrackableNodes : fallbackNodes).forEach(node => {
                 if (node.last_logged_date) completionDates.add(node.last_logged_date);
             });
             const sortedDates = Array.from(completionDates).map(d => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
@@ -289,11 +300,13 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
             return {
                 ...skill,
                 mainIntentionId: mainIntention?.id,
+                fallbackDefinitionId: fallbackDefinition?.id,
+                fallbackActivityType,
                 nextReviewDate: sortedDates.length > 0 ? nextReviewDate : new Date(),
                 isOverdue: sortedDates.length > 0 && isBefore(nextReviewDate, startOfToday()),
             };
         });
-    }, [coreSkills, deepWorkDefinitions, getDescendantLeafNodes]);
+    }, [coreSkills, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, getDeepWorkNodeType, getUpskillNodeType]);
 
     const { todaysReviewTasks, pendingReviewTasks } = useMemo(() => {
         const today = startOfToday();
@@ -317,13 +330,15 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
     }, [repetitionTasks]);
 
 
-    const handleScheduleClick = (skill: { mainIntentionId?: string, name: string }) => {
+    const handleScheduleClick = (skill: { mainIntentionId?: string; fallbackDefinitionId?: string; fallbackActivityType?: 'deepwork' | 'upskill' | null; name: string }) => {
         if (skill.mainIntentionId) {
-            scheduleTaskFromMindMap(skill.mainIntentionId, 'deepwork', currentSlot);
+            scheduleTaskFromMindMap(skill.mainIntentionId, 'spaced-repetition', currentSlot, 0, 'deepwork');
+        } else if (skill.fallbackDefinitionId && skill.fallbackActivityType) {
+            scheduleTaskFromMindMap(skill.fallbackDefinitionId, 'spaced-repetition', currentSlot, 0, skill.fallbackActivityType);
         } else {
             toast({
                 title: "Cannot Schedule",
-                description: `No main intention found for "${skill.name}".`,
+                description: `No schedulable task found for "${skill.name}".`,
                 variant: "destructive",
             });
         }
@@ -639,6 +654,10 @@ export function Header() {
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsSearchOpen(true)}>
                 <Search className="h-4 w-4" />
                 <span className="sr-only">Search</span>
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsUpcomingTasksModalOpen(true)}>
+                <Repeat className="h-4 w-4" />
+                <span className="sr-only">Spaced Repetition</span>
               </Button>
 
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsHabitDashboardOpen(true)}>

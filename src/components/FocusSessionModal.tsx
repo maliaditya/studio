@@ -60,6 +60,7 @@ export function FocusSessionModal({
     allDeepWorkLogs,
     getDeepWorkNodeType,
     getUpskillNodeType,
+    handleToggleMicroSkillRepetition,
   } = useAuth();
   const [duration, setDuration] = useState(30);
   const [skipBreaks, setSkipBreaks] = useState(false);
@@ -112,7 +113,17 @@ export function FocusSessionModal({
 
   const learningContext = useMemo(() => {
     if (!activity || (activity.type !== 'upskill' && activity.type !== 'deepwork')) {
-      return { microSkillName: null as string | null, hasAudio: false, hasBooks: false };
+      return {
+        microSkillName: null as string | null,
+        hasAudio: false,
+        hasBooks: false,
+        hasSkillTreePath: false,
+        skillTreePathNames: [] as string[],
+        matchedSpecId: null as string | null,
+        matchedSkillAreaId: null as string | null,
+        matchedMicroSkillId: null as string | null,
+        matchedMicroSkillReady: false,
+      };
     }
 
     const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -135,7 +146,17 @@ export function FocusSessionModal({
 
     const microSkillName = matchedDefinition?.category || null;
     if (!microSkillName) {
-      return { microSkillName: null as string | null, hasAudio: false, hasBooks: false };
+      return {
+        microSkillName: null as string | null,
+        hasAudio: false,
+        hasBooks: false,
+        hasSkillTreePath: false,
+        skillTreePathNames: [] as string[],
+        matchedSpecId: null as string | null,
+        matchedSkillAreaId: null as string | null,
+        matchedMicroSkillId: null as string | null,
+        matchedMicroSkillReady: false,
+      };
     }
 
     const candidateSpecs = coreSkills
@@ -155,12 +176,33 @@ export function FocusSessionModal({
     }
 
     if (!matchedSpec) {
-      return { microSkillName, hasAudio: false, hasBooks: false };
+      return {
+        microSkillName,
+        hasAudio: false,
+        hasBooks: false,
+        hasSkillTreePath: false,
+        skillTreePathNames: [] as string[],
+        matchedSpecId: null as string | null,
+        matchedSkillAreaId: null as string | null,
+        matchedMicroSkillId: null as string | null,
+        matchedMicroSkillReady: false,
+      };
     }
 
     const learningPlan = offerizationPlans?.[matchedSpec.id]?.learningPlan;
     const audioResources = learningPlan?.audioVideoResources || [];
     const bookResources = learningPlan?.bookWebpageResources || [];
+    const skillTreePaths = learningPlan?.skillTreePaths || [];
+    const matchedArea = matchedSpec.skillAreas.find((area) =>
+      area.microSkills.some((ms) => normalizeText(ms.name) === normalizeText(microSkillName))
+    );
+    const matchedMicro = matchedArea?.microSkills.find((ms) => normalizeText(ms.name) === normalizeText(microSkillName)) || null;
+    const matchingSkillTreePaths = skillTreePaths.filter((path) => {
+      if (!matchedArea?.id) return true;
+      const areaIds = path.skillAreaIds || [];
+      if (areaIds.length === 0) return true;
+      return areaIds.includes(matchedArea.id);
+    });
     const hasAudio = audioResources.some((resource) =>
       !!(resource.name || '').trim() ||
       !!(resource.tutor || '').trim() ||
@@ -172,7 +214,17 @@ export function FocusSessionModal({
       !!(resource.author || '').trim() ||
       (resource.totalPages || 0) > 0
     );
-    return { microSkillName, hasAudio, hasBooks };
+    return {
+      microSkillName,
+      hasAudio,
+      hasBooks,
+      hasSkillTreePath: matchingSkillTreePaths.length > 0,
+      skillTreePathNames: matchingSkillTreePaths.map((path) => path.name).filter((name) => !!name?.trim()),
+      matchedSpecId: matchedSpec.id,
+      matchedSkillAreaId: matchedArea?.id || null,
+      matchedMicroSkillId: matchedMicro?.id || null,
+      matchedMicroSkillReady: !!matchedMicro?.isReadyForRepetition,
+    };
   }, [activity, allDeepWorkLogs, allUpskillLogs, coreSkills, deepWorkDefinitions, offerizationPlans, upskillDefinitions]);
 
   const deepworkStageContext = useMemo(() => {
@@ -623,11 +675,39 @@ export function FocusSessionModal({
                 )}
               </div>
             )}
-            {(activity.type === 'upskill' || activity.type === 'deepwork') && learningContext.microSkillName && (learningContext.hasAudio || learningContext.hasBooks) && (
+            {(activity.type === 'upskill' || activity.type === 'deepwork') &&
+              learningContext.microSkillName &&
+              (learningContext.hasAudio || learningContext.hasBooks || learningContext.hasSkillTreePath) && (
               <div className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-3">
                 <p className="text-xs font-medium text-muted-foreground">
                   Progress for micro-skill: <span className="text-foreground">{learningContext.microSkillName}</span>
                 </p>
+                {learningContext.hasSkillTreePath && learningContext.matchedSpecId && learningContext.matchedSkillAreaId && learningContext.matchedMicroSkillId && (
+                  <div className="space-y-2 rounded border border-emerald-500/20 bg-emerald-500/5 p-2">
+                    {learningContext.skillTreePathNames.length > 0 && (
+                      <p className="text-[11px] text-emerald-300">
+                        Skill Tree Path Plan: {learningContext.skillTreePathNames.join(', ')}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="focus-log-micro-ready"
+                        checked={learningContext.matchedMicroSkillReady}
+                        onCheckedChange={(checked) =>
+                          handleToggleMicroSkillRepetition(
+                            learningContext.matchedSpecId!,
+                            learningContext.matchedSkillAreaId!,
+                            learningContext.matchedMicroSkillId!,
+                            !!checked
+                          )
+                        }
+                      />
+                      <Label htmlFor="focus-log-micro-ready" className="text-xs text-muted-foreground">
+                        Mark this micro-skill completed in Skill Tree
+                      </Label>
+                    </div>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
                     <Label htmlFor="focus-log-items">Items Completed</Label>

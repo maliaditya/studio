@@ -41,6 +41,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     interrupt: <AlertCircle className="h-4 w-4 text-red-500" />,
     distraction: <Wind className="h-4 w-4 text-yellow-500" />,
     mindset: <Brain className="h-4 w-4" />,
+    'spaced-repetition': <Repeat className="h-4 w-4 text-blue-500" />,
     pomodoro: <Timer className="h-4 w-4" />,
 };
 
@@ -140,7 +141,7 @@ export const AgendaWidgetItem = React.memo(({
     } = useAuth();
     const router = useRouter();
 
-    const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition'].includes(activity.type);
+    const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition', 'spaced-repetition'].includes(activity.type);
     const isAgendaContext = context === 'agenda';
 
     const handleItemClick = (e: React.MouseEvent) => {
@@ -1084,6 +1085,7 @@ export function TodaysScheduleCard({
       distraction: 'Distractions', 
       nutrition: 'Nutrition',
       mindset: 'Mindset',
+      'spaced-repetition': 'Spaced Repetition',
       pomodoro: 'Pomodoro',
     };
   

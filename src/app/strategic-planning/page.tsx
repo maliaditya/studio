@@ -10,7 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
-import { format, parseISO, isAfter } from 'date-fns';
+import { format, parseISO, isAfter, differenceInDays, startOfDay } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue, SelectLabel } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import type { SkillAcquisitionPlan, HabitEquation, Project, ProjectPlan, GapAnalysis, Release, Offer, ExerciseCategory, ExerciseDefinition, MicroSkill, CoreSkill, SkillArea, LearningPlan, LearningResourceAudio, LearningResourceBook } from '@/types/workout';
+import type { SkillAcquisitionPlan, HabitEquation, Project, ProjectPlan, GapAnalysis, Release, Offer, ExerciseCategory, ExerciseDefinition, MicroSkill, CoreSkill, SkillArea, LearningPlan, LearningResourceAudio, LearningResourceBook, SkillTreePathPlan } from '@/types/workout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { offerTypes, GAP_TYPES, productTypes } from '@/lib/constants';
@@ -1039,6 +1039,75 @@ function OfferizationContent() {
     });
   };
 
+  const handleAddSkillTreePathPlan = (specId: string, spec: CoreSkill) => {
+    setOfferizationPlans(prev => {
+      const plans = { ...prev };
+      const specPlan = { ...(plans[specId] || {}) };
+      const learningPlan = { ...(specPlan.learningPlan || {}) };
+      const firstSkillAreaId = spec.skillAreas[0]?.id;
+      const nextPath: SkillTreePathPlan = {
+        id: `path_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: `Path ${(learningPlan.skillTreePaths?.length || 0) + 1}`,
+        skillAreaIds: firstSkillAreaId ? [firstSkillAreaId] : [],
+        targetMicroSkills: null,
+        completionDate: null,
+      };
+      learningPlan.skillTreePaths = [...(learningPlan.skillTreePaths || []), nextPath];
+      specPlan.learningPlan = learningPlan;
+      plans[specId] = specPlan;
+      return plans;
+    });
+  };
+
+  const handleUpdateSkillTreePathPlan = (
+    specId: string,
+    pathId: string,
+    updates: Partial<SkillTreePathPlan>
+  ) => {
+    setOfferizationPlans(prev => {
+      const plans = { ...prev };
+      const specPlan = { ...(plans[specId] || {}) };
+      const learningPlan = { ...(specPlan.learningPlan || {}) };
+      learningPlan.skillTreePaths = (learningPlan.skillTreePaths || []).map((path) =>
+        path.id === pathId ? { ...path, ...updates } : path
+      );
+      specPlan.learningPlan = learningPlan;
+      plans[specId] = specPlan;
+      return plans;
+    });
+  };
+
+  const handleToggleSkillAreaInPath = (specId: string, pathId: string, areaId: string) => {
+    setOfferizationPlans(prev => {
+      const plans = { ...prev };
+      const specPlan = { ...(plans[specId] || {}) };
+      const learningPlan = { ...(specPlan.learningPlan || {}) };
+      learningPlan.skillTreePaths = (learningPlan.skillTreePaths || []).map((path) => {
+        if (path.id !== pathId) return path;
+        const exists = (path.skillAreaIds || []).includes(areaId);
+        const nextSkillAreaIds = exists
+          ? (path.skillAreaIds || []).filter((id) => id !== areaId)
+          : [...(path.skillAreaIds || []), areaId];
+        return { ...path, skillAreaIds: nextSkillAreaIds };
+      });
+      specPlan.learningPlan = learningPlan;
+      plans[specId] = specPlan;
+      return plans;
+    });
+  };
+
+  const handleDeleteSkillTreePathPlan = (specId: string, pathId: string) => {
+    setOfferizationPlans(prev => {
+      const plans = { ...prev };
+      const specPlan = { ...(plans[specId] || {}) };
+      const learningPlan = { ...(specPlan.learningPlan || {}) };
+      learningPlan.skillTreePaths = (learningPlan.skillTreePaths || []).filter((path) => path.id !== pathId);
+      specPlan.learningPlan = learningPlan;
+      plans[specId] = specPlan;
+      return plans;
+    });
+  };
+
 
   return (
     <>
@@ -1177,6 +1246,111 @@ function OfferizationContent() {
                       <AccordionItem value="item-learning">
                           <AccordionTrigger>Learning Planner</AccordionTrigger>
                           <AccordionContent className="space-y-4">
+                              <div className="space-y-3">
+                                  <h4 className="font-medium text-sm flex items-center gap-2">
+                                      <PlusCircle className="h-4 w-4 cursor-pointer hover:text-primary" onClick={() => handleAddSkillTreePathPlan(spec.id, spec)} />
+                                      Skill Tree Path Plan
+                                  </h4>
+                                  {(learningPlan.skillTreePaths || []).length === 0 && (
+                                      <div className="rounded-md border border-white/10 bg-muted/20 p-3 text-xs text-muted-foreground">
+                                          No custom paths yet. Click + to create a path from skill areas.
+                                      </div>
+                                  )}
+                                  {(learningPlan.skillTreePaths || []).map((path, index) => {
+                                      const selectedAreas = spec.skillAreas.filter((area) => (path.skillAreaIds || []).includes(area.id));
+                                      const totalMicroSkills = selectedAreas.reduce((sum, area) => sum + area.microSkills.length, 0);
+                                      const completedMicroSkills = selectedAreas.reduce(
+                                          (sum, area) =>
+                                              sum +
+                                              area.microSkills.filter((micro) =>
+                                                  !!micro.isReadyForRepetition ||
+                                                  (micro.completedItems || 0) > 0 ||
+                                                  (micro.completedHours || 0) > 0 ||
+                                                  (micro.completedPages || 0) > 0
+                                              ).length,
+                                          0
+                                      );
+                                      const targetCount = path.targetMicroSkills ?? totalMicroSkills;
+                                      const remainingCount = Math.max(0, (targetCount || 0) - Math.min(completedMicroSkills, targetCount || completedMicroSkills));
+                                      const today = startOfDay(new Date());
+                                      const daysLeft = path.completionDate
+                                          ? Math.max(0, differenceInDays(startOfDay(parseISO(path.completionDate)), today))
+                                          : null;
+                                      const dailyTarget = remainingCount > 0 && daysLeft != null
+                                          ? (daysLeft > 0 ? Math.max(1, Math.ceil(remainingCount / daysLeft)) : remainingCount)
+                                          : null;
+                                      return (
+                                          <div key={path.id} className="space-y-2 rounded-md border p-3">
+                                              <div className="flex items-center gap-2">
+                                                  <Input
+                                                      value={path.name}
+                                                      onChange={(e) =>
+                                                          handleUpdateSkillTreePathPlan(spec.id, path.id, { name: e.target.value })
+                                                      }
+                                                      placeholder={`Path ${index + 1}`}
+                                                      className="font-semibold"
+                                                  />
+                                                  <Button
+                                                      variant="ghost"
+                                                      size="icon"
+                                                      className="h-8 w-8 text-destructive"
+                                                      onClick={() => handleDeleteSkillTreePathPlan(spec.id, path.id)}
+                                                  >
+                                                      <Trash2 className="h-4 w-4" />
+                                                  </Button>
+                                              </div>
+                                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                  <Input
+                                                      type="number"
+                                                      value={path.targetMicroSkills ?? ''}
+                                                      onChange={(e) =>
+                                                          handleUpdateSkillTreePathPlan(spec.id, path.id, {
+                                                              targetMicroSkills: e.target.value === '' ? null : Number(e.target.value),
+                                                          })
+                                                      }
+                                                      placeholder="Target micro-skills to complete"
+                                                  />
+                                                  <div className="rounded-md border border-white/10 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                                                      Progress: {Math.min(completedMicroSkills, targetCount || completedMicroSkills)}/{targetCount || 0} completed
+                                                  </div>
+                                              </div>
+                                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                  <Input
+                                                      type="date"
+                                                      value={path.completionDate || ''}
+                                                      onChange={(e) =>
+                                                          handleUpdateSkillTreePathPlan(spec.id, path.id, {
+                                                              completionDate: e.target.value || null,
+                                                          })
+                                                      }
+                                                      placeholder="Path end date"
+                                                  />
+                                                  <div className="rounded-md border border-white/10 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                                                      End: {path.completionDate ? format(parseISO(path.completionDate), 'PPP') : 'Not set'} | Days left: {daysLeft != null ? daysLeft : 'N/A'}
+                                                  </div>
+                                              </div>
+                                              <div className="rounded-md border border-white/10 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                                                  Remaining: {remainingCount} | Daily target: {dailyTarget != null ? `${dailyTarget} micro-skills/day` : (remainingCount === 0 ? 'Done' : 'N/A')}
+                                              </div>
+                                              <div className="space-y-2 rounded-md border border-white/10 bg-muted/20 p-2">
+                                                  <div className="text-xs font-medium text-muted-foreground">Skill Areas in this path</div>
+                                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                      {spec.skillAreas.map((area) => (
+                                                          <label key={area.id} className="flex items-center gap-2 text-xs">
+                                                              <Checkbox
+                                                                  checked={(path.skillAreaIds || []).includes(area.id)}
+                                                                  onCheckedChange={() => handleToggleSkillAreaInPath(spec.id, path.id, area.id)}
+                                                              />
+                                                              <span className="truncate">{area.name}</span>
+                                                              <span className="text-muted-foreground">({area.microSkills.length})</span>
+                                                          </label>
+                                                      ))}
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      );
+                                  })}
+                              </div>
                               {(() => {
                                   const completedPages = spec.skillAreas.reduce(
                                       (sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedPages || 0), 0),

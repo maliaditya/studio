@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfDay, isAfter, getDay, differenceInMonths, differenceInDays } from 'date-fns';
-import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide, Check, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide, Check, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronDown, Repeat } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
@@ -94,6 +94,7 @@ const activityNameMap: Record<ActivityTypeType, string> = {
     interrupt: 'Interrupts',
     distraction: 'Distractions',
     nutrition: 'Nutrition',
+    'spaced-repetition': 'Spaced Repetition',
     pomodoro: 'Pomodoro',
 };
 
@@ -110,6 +111,7 @@ const activityTypeIcons: Record<ActivityTypeType, React.ReactNode> = {
     interrupt: <XCircle className="h-4 w-4" />,
     distraction: <XCircle className="h-4 w-4" />,
     nutrition: <Coffee className="h-4 w-4" />,
+    'spaced-repetition': <Repeat className="h-4 w-4" />,
     pomodoro: <Timer className="h-4 w-4" />,
 };
 
@@ -126,6 +128,7 @@ const activityColorMapping: Record<string, string> = {
     'Interrupts': 'hsl(var(--destructive))',
     'Distractions': 'hsl(var(--destructive))',
     'Nutrition': 'hsl(var(--chart-4))',
+    'Spaced Repetition': 'hsl(var(--chart-2))',
     'Untracked Time': 'hsl(var(--muted))',
     'Scheduled': 'hsl(var(--muted))',
     'Free Time': 'hsl(var(--muted))',
