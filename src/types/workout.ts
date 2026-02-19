@@ -838,6 +838,7 @@ export interface UserSettings {
       source: 'guarded_apply';
     }>;
   };
+  routineSkipByDate?: Record<string, string[]>;
 }
 
 export interface ActiveFocusSession {

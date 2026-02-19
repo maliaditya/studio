@@ -584,6 +584,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     routineRebalanceLearning: {
       history: [],
     },
+    routineSkipByDate: {},
   });
   useEffect(() => {
     githubModuleHashesRef.current = settings.githubModuleHashes || {};
@@ -815,6 +816,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const dateKey = format(date, 'yyyy-MM-dd');
     const routines = settings.routines || [];
     if (routines.length === 0) return;
+    const skippedRoutineIdsForDate = new Set(settings.routineSkipByDate?.[dateKey] || []);
 
     const isDue = (routine: Activity) => {
       if (!routine.routine) return false;
@@ -855,6 +857,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const next = { ...prev };
       const day = { ...(next[dateKey] || {}) };
       let changed = false;
+      const existingIdsForDay = new Set(
+        Object.values(day)
+          .flatMap(slotActivities => (slotActivities as Activity[]) || [])
+          .map(activity => activity.id)
+      );
 
       const isGenericPlaceholder = (activity: Activity, routine: Activity) => {
         if (activity.type !== routine.type) return false;
@@ -867,10 +874,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       routines.forEach(r => {
         if (!isDue(r)) return;
+        if (skippedRoutineIdsForDate.has(r.id)) return;
         const instanceId = `${r.id}_${dateKey}`;
+        if (existingIdsForDay.has(instanceId)) return;
         const slot = (r.slot || 'Evening') as SlotName;
         const slotActivities = [...((day[slot] as Activity[]) || [])];
-        if (slotActivities.some(a => a.id === instanceId)) return;
 
         const existingIndex = slotActivities.findIndex(a =>
           (a.type === r.type && a.details === r.details) || isGenericPlaceholder(a, r)
@@ -889,6 +897,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else {
           slotActivities.push(instance);
         }
+        existingIdsForDay.add(instanceId);
 
         day[slot] = slotActivities;
         changed = true;
@@ -898,7 +907,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       next[dateKey] = day;
       return next;
     });
-  }, [settings.routines, setSchedule]);
+  }, [settings.routines, settings.routineSkipByDate, setSchedule]);
   
   const onLogDuration = useCallback((
     activity: Activity,
@@ -1858,6 +1867,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           routineRebalanceLearning: {
             history: [],
           },
+          routineSkipByDate: {},
       };
     const incomingSettings = (sanitizedMain.settings || {}) as Partial<UserSettings>;
     setSettings((prev) => ({
@@ -2549,6 +2559,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const onRemoveActivity = useCallback((slotName: string, activityId: string, date: Date) => {
     const dateKey = format(date, 'yyyy-MM-dd');
+    const baseMatch = activityId.match(/_(\d{4}-\d{2}-\d{2})$/);
+    const baseRoutineId = baseMatch ? activityId.slice(0, -11) : activityId;
+    const isRoutineInstance = (settings.routines || []).some(r => r.id === baseRoutineId);
+
+    if (isRoutineInstance) {
+      setSettings(prev => {
+        const existingForDate = new Set(prev.routineSkipByDate?.[dateKey] || []);
+        existingForDate.add(baseRoutineId);
+        return {
+          ...prev,
+          routineSkipByDate: {
+            ...(prev.routineSkipByDate || {}),
+            [dateKey]: Array.from(existingForDate),
+          },
+        };
+      });
+    }
+
     setSchedule(prev => {
         const newSchedule = { ...prev };
         if (newSchedule[dateKey]) {
@@ -2560,7 +2588,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         return newSchedule;
     });
-  }, [setSchedule]);
+  }, [settings.routines, setSchedule, setSettings]);
   
   const carryForwardTask = (activity: Activity, targetSlot: string) => {
     // This function is now a placeholder as the logic is moved to my-plate
