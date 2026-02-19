@@ -403,14 +403,12 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
     const activity = activityMap?.get(task.activityId || task.id) as any;
     if (activity) {
       if (activity.completed) return true;
-      if (activity.duration && activity.duration > 0) return true;
-      if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) return true;
-      if (activity.focusSessionInitialDuration && activity.focusSessionInitialDuration > 0) return true;
     }
     if (task.recurrence && task.recurrence !== "none") {
       return !!task.completionHistory?.[dateKey];
     }
     if (task.dateKey && task.dateKey !== dateKey) return false;
+    if (!task.dateKey) return false;
     return !!task.completed;
   };
 

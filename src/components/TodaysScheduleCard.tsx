@@ -605,15 +605,13 @@ export function TodaysScheduleCard({
     const activity: any = activityMap?.get(task.activityId || task.id) || activityMap?.get(task.id);
     if (activity) {
       if (activity.completed) return true;
-      if (activity.duration && activity.duration > 0) return true;
-      if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) return true;
-      if (activity.focusSessionInitialDuration && activity.focusSessionInitialDuration > 0) return true;
     }
     if (task.recurrence && task.recurrence !== 'none') {
       return !!task.completionHistory?.[dateKey];
     }
     if (task.dateKey && task.dateKey !== dateKey) return false;
-    return !!task.completed && (!task.dateKey || task.dateKey === dateKey);
+    if (!task.dateKey) return false;
+    return !!task.completed;
   }, [activityMapByDate]);
 
   const activeBotheringsByType = useMemo(() => {

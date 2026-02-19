@@ -192,17 +192,14 @@ export function BotheringsCard() {
     const activity: any = activityMap?.get(task.activityId || task.id) || activityMap?.get(task.id);
     if (activity) {
       if (activity.completed) return true;
-      if (activity.duration && activity.duration > 0) return true;
-      if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) return true;
-      if (activity.focusSessionInitialDuration && activity.focusSessionInitialDuration > 0) return true;
     }
     if (task.recurrence && task.recurrence !== 'none') {
       return !!task.completionHistory?.[dateKey];
     }
     if (task.dateKey && task.dateKey !== dateKey) return false;
-    // For one-off tasks only: prevent stale global completed flag from marking future/shifted tasks as done.
-    if (task.recurrence && task.recurrence !== 'none') return false;
-    return !!task.completed && (!task.dateKey || task.dateKey === dateKey);
+    // For one-off tasks only: require date-bound completion; ignore stale global completed flags.
+    if (!task.dateKey) return false;
+    return !!task.completed;
   };
   const isTaskScheduledOnDate = (task: NonNullable<MindsetPoint["tasks"]>[number], dateKey: string) => {
     const activityId = task.activityId || task.id;
