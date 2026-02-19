@@ -79,7 +79,7 @@ const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType
     );
 };
 
-const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine }: { activity: Activity, index: number, onRemove: (id: string) => void, onSetRoutine: (rule: RecurrenceRule | null) => void }) => {
+const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine }: { activity: Activity, index: number, onRemove: (activity: Activity) => void, onSetRoutine: (rule: RecurrenceRule | null) => void }) => {
   const [isBrowser, setIsBrowser] = React.useState(false);
 
   React.useEffect(() => {
@@ -167,7 +167,7 @@ const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine 
             className="h-5 w-5 -mr-1 -mt-1 opacity-0 group-hover:opacity-100"
             onClick={(e) => {
               e.stopPropagation();
-              onRemove(activity.id);
+              onRemove(activity);
             }}
           >
             <Trash2 className="h-3 w-3 text-destructive" />
@@ -198,7 +198,7 @@ const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine 
 DraggableActivity.displayName = 'DraggableActivity';
 
 
-const DroppableSlot = React.memo(({ date, slot, activities, onAddActivity, onRemoveActivity, onSetRoutine }: { date: Date, slot: SlotName, activities: Activity[], onAddActivity: (type: ActivityType, details: string) => void, onRemoveActivity: (id: string) => void, onSetRoutine: (activity: Activity, rule: RecurrenceRule | null) => void }) => {
+const DroppableSlot = React.memo(({ date, slot, activities, onAddActivity, onRemoveActivity, onSetRoutine }: { date: Date, slot: SlotName, activities: Activity[], onAddActivity: (type: ActivityType, details: string) => void, onRemoveActivity: (activity: Activity) => void, onSetRoutine: (activity: Activity, rule: RecurrenceRule | null) => void }) => {
     const droppableId = `${format(date, 'yyyy-MM-dd')}_${slot}`;
 
     return (
@@ -241,7 +241,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
 }) {
     const { 
         schedule, setSchedule, 
-        settings, toggleRoutine, 
+        settings, setSettings, toggleRoutine, 
         currentSlot, 
         coreSkills,
     } = useAuth();
@@ -296,14 +296,35 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
     };
 
 
-    const handleRemoveActivity = (date: Date, slot: SlotName, activityId: string) => {
+    const handleRemoveActivity = (date: Date, slot: SlotName, activity: Activity) => {
         const dateKey = format(date, 'yyyy-MM-dd');
+        const rawId = activity.id || '';
+        const normalizedId = rawId.replace(/_(\d{4}-\d{2}-\d{2})$/, '');
+        const isRoutineInstance =
+            !!activity.routine ||
+            (settings.routines || []).some(r => r.id === normalizedId);
+
+        // Deleting a routine instance should only skip it for this date, not remove future recurrences.
+        if (isRoutineInstance) {
+            setSettings(prev => {
+                const existingForDate = new Set(prev.routineSkipByDate?.[dateKey] || []);
+                existingForDate.add(normalizedId);
+                return {
+                    ...prev,
+                    routineSkipByDate: {
+                        ...(prev.routineSkipByDate || {}),
+                        [dateKey]: Array.from(existingForDate),
+                    },
+                };
+            });
+        }
+
         setSchedule(prev => {
             const newSchedule = { ...prev };
             if (!newSchedule[dateKey] || !newSchedule[dateKey][slot]) return prev;
 
             const daySchedule = { ...newSchedule[dateKey] };
-            const slotActivities = ((daySchedule[slot] as Activity[] | undefined) || []).filter(act => act.id !== activityId);
+            const slotActivities = ((daySchedule[slot] as Activity[] | undefined) || []).filter(act => act.id !== activity.id);
             
             if (slotActivities.length > 0) {
                 daySchedule[slot] = slotActivities;
@@ -385,10 +406,12 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
                     {weekDates.map(date => {
                         const dateKey = format(date, 'yyyy-MM-dd');
                         const allActivities = (schedule[dateKey]?.[slot] as Activity[] | undefined) || [];
+                        const skippedRoutineIdsForDate = new Set(settings.routineSkipByDate?.[dateKey] || []);
                         // Build routine instances for this date+slot
                         const routineInstances = (settings.routines || []).flatMap(r => {
                             if (!r || !r.routine) return [] as Activity[];
                             if (r.slot !== slot) return [] as Activity[];
+                            if (skippedRoutineIdsForDate.has(r.id)) return [] as Activity[];
                             const rule = r.routine;
                             // determine base date for recurrence calculations
                             const base = r.baseDate || r.createdAt;
@@ -455,7 +478,7 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
                                     slot={slot}
                                     activities={activitiesToDisplay}
                                     onAddActivity={handleAddActivity(date, slot)}
-                                    onRemoveActivity={(id) => handleRemoveActivity(date, slot, id)}
+                                    onRemoveActivity={(activity) => handleRemoveActivity(date, slot, activity)}
                                     onSetRoutine={(activity, rule) => toggleRoutine(activity, rule, format(date, 'yyyy-MM-dd'))}
                                 />
                             </div>
