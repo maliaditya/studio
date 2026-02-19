@@ -108,6 +108,7 @@ interface AgendaWidgetItemProps {
     onOpenHabitPopup: (habitId: string, event: React.MouseEvent) => void;
     context: 'agenda' | 'timeslot';
     loggedDuration?: string;
+    expectedDuration?: string;
     hasLoggedStopper?: boolean;
 }
 
@@ -123,6 +124,7 @@ export const AgendaWidgetItem = React.memo(({
     onOpenHabitPopup, 
     context,
     loggedDuration,
+    expectedDuration,
     hasLoggedStopper,
 }: AgendaWidgetItemProps) => {
     const { 
@@ -240,6 +242,11 @@ export const AgendaWidgetItem = React.memo(({
                         </Badge>
                     )}
                     {isPlanningTask && <Badge variant="outline">Planning</Badge>}
+                    {!activity.completed && expectedDuration && (
+                        <Badge className="bg-yellow-500/20 text-yellow-300 border border-yellow-400/40 hover:bg-yellow-500/25">
+                            {expectedDuration}
+                        </Badge>
+                    )}
                     {activity.completed && loggedDuration && (
                         <Badge variant="secondary">{loggedDuration}</Badge>
                     )}
@@ -282,6 +289,7 @@ export function TodaysScheduleCard({
     handleToggleComplete, 
     toggleRoutine, 
     setSchedule: setGlobalSchedule,
+    expectedActivityDurations,
     resources,
     setResources,
     mindsetCards,
@@ -1345,6 +1353,7 @@ export function TodaysScheduleCard({
                                         onOpenHabitPopup={onOpenHabitPopup}
                                         context="agenda"
                                         loggedDuration={activityDurations[activity.id]}
+                                        expectedDuration={expectedActivityDurations[activity.id]}
                                         hasLoggedStopper={isTaskLogged(activity)}
                                     />
                                 ))}

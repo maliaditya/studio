@@ -162,6 +162,7 @@ interface AuthContextType {
   isAgendaDocked: boolean;
   setIsAgendaDocked: React.Dispatch<React.SetStateAction<boolean>>;
   activityDurations: Record<string, string>;
+  expectedActivityDurations: Record<string, string>;
   handleToggleComplete: (slotName: string, activityId: string, isCompleted?: boolean) => void;
   onRemoveActivity: (slotName: string, activityId: string, date: Date) => void;
   carryForwardTask: (activity: Activity, targetSlot: string) => void;
@@ -175,7 +176,7 @@ interface AuthContextType {
   focusDuration: number;
   onOpenFocusModal: (activity: Activity) => boolean;
   handleStartFocusSession: (activity: Activity, duration: number) => void;
-  onLogDuration: (activity: Activity, duration: number) => void;
+  onLogDuration: (activity: Activity, duration: number, moveToSlot?: SlotName) => void;
   activeFocusSession: ActiveFocusSession | null;
   setActiveFocusSession: React.Dispatch<React.SetStateAction<ActiveFocusSession | null>>;
   
@@ -894,7 +895,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [settings.routines, setSchedule]);
   
-  const onLogDuration = useCallback((activity: Activity, duration: number) => {
+  const onLogDuration = useCallback((activity: Activity, duration: number, moveToSlot?: SlotName) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const taskInstanceId = activity.taskIds?.[0];
   
@@ -941,15 +942,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     }
   
-    updateActivity({
+    const completedActivity: Activity = {
       ...activity,
       duration: (activity.duration || 0) + duration,
       completed: true,
       completedAt: Date.now(),
+    };
+
+    setSchedule(prevSchedule => {
+      const newSchedule = { ...prevSchedule };
+      let found = false;
+
+      for (const dateKey in newSchedule) {
+        const daySchedule = newSchedule[dateKey];
+        for (const slotName in daySchedule) {
+          const activities = (daySchedule[slotName as SlotName] as Activity[]) || [];
+          const activityIndex = activities.findIndex(a => a.id === activity.id);
+          if (activityIndex === -1) continue;
+
+          const sourceActivities = [...activities];
+          const targetSlot = moveToSlot && moveToSlot !== slotName ? moveToSlot : (slotName as SlotName);
+          const updatedDaySchedule = { ...daySchedule };
+
+          if (targetSlot === slotName) {
+            sourceActivities[activityIndex] = { ...completedActivity, slot: targetSlot };
+            updatedDaySchedule[slotName as SlotName] = sourceActivities;
+          } else {
+            sourceActivities.splice(activityIndex, 1);
+            updatedDaySchedule[slotName as SlotName] = sourceActivities;
+            const targetActivities = [...((updatedDaySchedule[targetSlot] as Activity[]) || [])];
+            targetActivities.push({ ...completedActivity, slot: targetSlot });
+            updatedDaySchedule[targetSlot] = targetActivities;
+          }
+
+          newSchedule[dateKey] = updatedDaySchedule;
+          found = true;
+          break;
+        }
+        if (found) break;
+      }
+
+      return found ? newSchedule : prevSchedule;
     });
   
-    toast({ title: 'Task Completed!', description: `Logged ${duration} minutes.` });
-  }, [updateActivity, toast, allUpskillLogs, allDeepWorkLogs, setUpskillDefinitions, setDeepWorkDefinitions, upskillDefinitions, deepWorkDefinitions]);
+    const completionDescription = moveToSlot && moveToSlot !== activity.slot
+      ? `Logged ${duration} minutes and moved to ${moveToSlot}.`
+      : `Logged ${duration} minutes.`;
+    toast({ title: 'Task Completed!', description: completionDescription });
+  }, [toast, allUpskillLogs, allDeepWorkLogs, setUpskillDefinitions, setDeepWorkDefinitions, upskillDefinitions, deepWorkDefinitions, setSchedule]);
   
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'> & { size?: 'normal' | 'compact' }) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
@@ -2215,6 +2255,149 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     return durations;
   }, [schedule, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs]);
+
+  const expectedActivityDurations = useMemo(() => {
+    const formatDuration = (minutes: number) => {
+      const hours = Math.floor(minutes / 60);
+      const mins = minutes % 60;
+      return hours > 0 ? `${hours}h ${mins}m` : `${mins} min`;
+    };
+    const normalizeText = (value: string | undefined) => {
+      const raw = (value || '').toLowerCase().trim();
+      if (!raw) return '';
+      return raw
+        .replace(/&/g, ' and ')
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
+    const routineIds = new Set((settings.routines || []).map((routine) => routine.id));
+
+    const upskillByDate = new Map(allUpskillLogs.map((log) => [log.date, log.exercises || []]));
+    const deepWorkByDate = new Map(allDeepWorkLogs.map((log) => [log.date, log.exercises || []]));
+    const workoutByDate = new Map(allWorkoutLogs.map((log) => [log.date, log.exercises || []]));
+    const brandingByDate = new Map(brandingLogs.map((log) => [log.date, log.exercises || []]));
+    const leadGenByDate = new Map(allLeadGenLogs.map((log) => [log.date, log.exercises || []]));
+    const mindsetByDate = new Map(allMindProgrammingLogs.map((log) => [log.date, log.exercises || []]));
+
+    const getHistoryKey = (activity: Activity): string | null => {
+      const baseMatch = activity.id.match(/_(\d{4}-\d{2}-\d{2})$/);
+      const baseId = baseMatch ? activity.id.slice(0, -11) : activity.id;
+      if (routineIds.has(baseId)) return `routine:${baseId}`;
+      if (routineIds.has(activity.id)) return `routine:${activity.id}`;
+      for (const taskId of activity.taskIds || []) {
+        if (routineIds.has(taskId)) return `routine:${taskId}`;
+      }
+
+      const normalizedDetails = normalizeText(activity.details);
+      if (!normalizedDetails) return null;
+      return `signature:${activity.type}:${normalizedDetails}`;
+    };
+
+    const getNetMinutes = (activity: Activity, dateKey: string): number => {
+      if (!activity.completed) return 0;
+      if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+        const durationMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
+        const pauseMs = (activity.focusSessionPauses || []).reduce((sum, pause) => {
+          return sum + (pause.resumeTime ? pause.resumeTime - pause.pauseTime : 0);
+        }, 0);
+        return Math.max(0, Math.round((durationMs - pauseMs) / 60000));
+      }
+      if (activity.duration) {
+        return Math.max(0, activity.duration);
+      }
+      if (activity.focusSessionInitialDuration) {
+        return Math.max(0, activity.focusSessionInitialDuration);
+      }
+
+      const logsForDay = [
+        ...(upskillByDate.get(dateKey) || []),
+        ...(deepWorkByDate.get(dateKey) || []),
+        ...(workoutByDate.get(dateKey) || []),
+        ...(brandingByDate.get(dateKey) || []),
+        ...(leadGenByDate.get(dateKey) || []),
+        ...(mindsetByDate.get(dateKey) || []),
+      ];
+      const relevantLogs = logsForDay.filter((exercise) => activity.taskIds?.includes(exercise.id));
+      return relevantLogs.reduce((total, exercise) => {
+        const durationPerSet = (activity.type === 'upskill' || activity.type === 'workout')
+          ? exercise.loggedSets.reduce((sum, set) => sum + (set.reps || 0), 0)
+          : exercise.loggedSets.reduce((sum, set) => sum + (set.weight || 0), 0);
+        return total + durationPerSet;
+      }, 0);
+    };
+
+    const historyByKey = new Map<string, { dateKey: string; timestamp: number; minutes: number }[]>();
+    Object.entries(schedule).forEach(([dateKey, daySchedule]) => {
+      const timestamp = parseISO(dateKey).getTime();
+      if (Number.isNaN(timestamp)) return;
+      Object.values(daySchedule).flat().forEach((activity: Activity) => {
+        if (!activity || !activity.completed) return;
+        const historyKey = getHistoryKey(activity);
+        if (!historyKey) return;
+        const minutes = getNetMinutes(activity, dateKey);
+        if (minutes <= 0) return;
+        if (!historyByKey.has(historyKey)) {
+          historyByKey.set(historyKey, []);
+        }
+        historyByKey.get(historyKey)!.push({ dateKey, timestamp, minutes });
+      });
+    });
+
+    historyByKey.forEach((entries) => {
+      entries.sort((a, b) => a.timestamp - b.timestamp);
+    });
+
+    const MIN_LOGGED_DAYS = 7;
+    const MAX_LOGGED_DAYS = 30;
+    const estimateCache = new Map<string, string>();
+    const expectedDurations: Record<string, string> = {};
+
+    Object.entries(schedule).forEach(([dateKey, daySchedule]) => {
+      const targetTimestamp = parseISO(dateKey).getTime();
+      if (Number.isNaN(targetTimestamp)) return;
+      Object.values(daySchedule).flat().forEach((activity: Activity) => {
+        if (!activity || activity.completed) return;
+        const historyKey = getHistoryKey(activity);
+        if (!historyKey) return;
+        const cacheKey = `${historyKey}|${dateKey}`;
+        if (estimateCache.has(cacheKey)) {
+          const cached = estimateCache.get(cacheKey);
+          if (cached) expectedDurations[activity.id] = cached;
+          return;
+        }
+
+        const history = (historyByKey.get(historyKey) || []).filter((entry) => entry.timestamp <= targetTimestamp);
+        const recentHistory = history.slice(-MAX_LOGGED_DAYS);
+        if (recentHistory.length < MIN_LOGGED_DAYS) {
+          estimateCache.set(cacheKey, '');
+          return;
+        }
+
+        let weightedMinutes = 0;
+        let totalWeight = 0;
+        recentHistory.forEach((entry, index) => {
+          const weight = index + 1;
+          weightedMinutes += entry.minutes * weight;
+          totalWeight += weight;
+        });
+        if (totalWeight <= 0) {
+          estimateCache.set(cacheKey, '');
+          return;
+        }
+        const estimate = Math.round(weightedMinutes / totalWeight);
+        if (estimate <= 0) {
+          estimateCache.set(cacheKey, '');
+          return;
+        }
+        const formatted = formatDuration(estimate);
+        estimateCache.set(cacheKey, formatted);
+        expectedDurations[activity.id] = formatted;
+      });
+    });
+
+    return expectedDurations;
+  }, [schedule, settings.routines, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, allMindProgrammingLogs]);
 
   const handleToggleComplete = useCallback((slotName: string, activityId: string, isCompleted?: boolean) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
@@ -6174,7 +6357,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     handleCreateTask,
     settings, setSettings,
     weightLogs, setWeightLogs, goalWeight, setGoalWeight, height, setHeight, dateOfBirth, setDateOfBirth, gender, setGender, dietPlan, setDietPlan,
-    schedule, setSchedule, activityDurations, handleToggleComplete, onRemoveActivity, carryForwardTask, scheduleTaskFromMindMap,
+    schedule, setSchedule, activityDurations, expectedActivityDurations, handleToggleComplete, onRemoveActivity, carryForwardTask, scheduleTaskFromMindMap,
     allUpskillLogs, setAllUpskillLogs,
     allDeepWorkLogs, setAllDeepWorkLogs,
     allWorkoutLogs, setAllWorkoutLogs,

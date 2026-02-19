@@ -119,6 +119,7 @@ const formatMinutes = (minutes: number) => {
 export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData: { name: string; time: number; activities: { name: string, duration: number }[] }[] }) => {
     const [allocationDetailModalData, setAllocationDetailModalData] = useState<{ category: string; tasks: { name: string; duration: number }[] } | null>(null);
     const themeColors = useThemeColors();
+    const daySlots = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
     
     const handlePieClick = (data: any) => {
         if (data && data.name) {
@@ -133,6 +134,16 @@ export const TimeAllocationChart = ({ timeAllocationData }: { timeAllocationData
       const totalMinutesInDay = 24 * 60;
       const totalAllocatedMinutes = timeAllocationData.reduce((sum, act) => sum + act.time, 0);
       const freeTimeMinutes = totalMinutesInDay - totalAllocatedMinutes;
+
+      if (totalAllocatedMinutes <= 0) {
+        const perSlotMinutes = totalMinutesInDay / daySlots.length;
+        return daySlots.map((slotName, index) => ({
+          name: slotName,
+          value: perSlotMinutes,
+          activities: [],
+          fill: themeColors[index % themeColors.length] || `hsl(var(--chart-${(index % 5) + 1}))`,
+        }));
+      }
 
       const data = timeAllocationData.map((entry, index) => ({
         name: entry.name,

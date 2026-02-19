@@ -103,6 +103,7 @@ export function TimeSlots({
         handleToggleComplete, 
         toggleRoutine, 
         activityDurations,
+        expectedActivityDurations,
         workoutMode,
         workoutPlans,
         exerciseDefinitions,
@@ -410,6 +411,7 @@ export function TimeSlots({
                                             onOpenHabitPopup={onOpenHabitPopup}
                                             context="timeslot"
                                             loggedDuration={activityDurations[activity.id]}
+                                            expectedDuration={expectedActivityDurations[activity.id]}
                                             hasLoggedStopper={isTaskLogged(activity)}
                                         />
                                       </div>

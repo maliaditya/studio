@@ -16,7 +16,7 @@ import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle, ArrowRight, Minus, Save, ChevronRight as ChevronRightIcon } from 'lucide-react';
-import type { Activity, HabitEquation, Resource, ActivityType, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, WorkoutExercise } from '@/types/workout';
+import type { Activity, HabitEquation, Resource, ActivityType, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, WorkoutExercise, SlotName } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -26,7 +26,7 @@ interface FocusSessionModalProps {
   onOpenChange: (isOpen: boolean) => void;
   activity: Activity | null;
   onStartSession: (activity: Activity, duration: number) => void;
-  onLogDuration: (activity: Activity, duration: number) => void;
+  onLogDuration: (activity: Activity, duration: number, moveToSlot?: SlotName) => void;
   initialDuration: number;
 }
 
@@ -45,6 +45,8 @@ export function FocusSessionModal({
     skillDomains, 
     coreSkills,
     handleCreateTask,
+    currentSlot,
+    expectedActivityDurations,
   } = useAuth();
   const [duration, setDuration] = useState(30);
   const [skipBreaks, setSkipBreaks] = useState(false);
@@ -94,8 +96,28 @@ export function FocusSessionModal({
     return [];
   }, [selectedMicroSkillId, linkedActivityType, microSkills, useAuth]);
 
+  const parseDurationLabelToMinutes = (value?: string): number => {
+    if (!value) return 0;
+    const text = value.toLowerCase().trim();
+    if (!text) return 0;
+
+    const hourMatch = text.match(/(\d+(?:\.\d+)?)\s*h/);
+    const minMatch = text.match(/(\d+)\s*m(?:in)?/);
+
+    const hours = hourMatch ? Math.round(parseFloat(hourMatch[1]) * 60) : 0;
+    const mins = minMatch ? parseInt(minMatch[1], 10) : 0;
+
+    if (!hourMatch && !minMatch && /^\d+$/.test(text)) {
+      return parseInt(text, 10);
+    }
+    return Math.max(0, hours + mins);
+  };
+
   useEffect(() => {
-    setDuration(initialDuration > 0 ? initialDuration : 30);
+    const expectedLabel = activity ? expectedActivityDurations[activity.id] : undefined;
+    const expectedMinutes = parseDurationLabelToMinutes(expectedLabel);
+    const fallbackMinutes = initialDuration > 0 ? initialDuration : 30;
+    setDuration(expectedMinutes > 0 ? expectedMinutes : fallbackMinutes);
     setLinkedActivityType(activity?.linkedActivityType || '');
     // Reset selections when modal opens
     setSelectedDomainId(null);
@@ -104,7 +126,7 @@ export function FocusSessionModal({
     setSelectedMicroSkillId(null);
     setSelectedParentTaskId('new');
     setCreatedTaskInfo(null);
-  }, [initialDuration, isOpen, activity]);
+  }, [initialDuration, isOpen, activity, expectedActivityDurations]);
 
   const handleDomainChange = (domainId: string) => {
     setSelectedDomainId(domainId);
@@ -196,12 +218,25 @@ export function FocusSessionModal({
   };
   
   const canCreateTask = selectedMicroSkillId && linkedActivityType;
+  const shouldShowLogAndMove = !!currentSlot && !!activity?.slot && activity.slot !== currentSlot;
+  const dialogMaxWidthClass = activity?.type === 'pomodoro' ? 'lg:max-w-3xl' : 'sm:max-w-xl';
+
+  const handleLogAndMoveClick = () => {
+    if (activity && currentSlot) {
+      const activityToLog: Activity = {
+        ...activity,
+        linkedActivityType: activity.type === 'pomodoro' ? (linkedActivityType as ActivityType) : undefined,
+      };
+      onLogDuration(activityToLog, duration, currentSlot as SlotName);
+      onOpenChange(false);
+    }
+  };
 
   if (!activity) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="lg:max-w-3xl max-h-[85dvh] flex flex-col">
+      <DialogContent className={`${dialogMaxWidthClass} max-h-[85dvh] flex flex-col`}>
         <DialogHeader>
           <DialogTitle>Start Focus Session</DialogTitle>
           <DialogDescription>
@@ -315,18 +350,27 @@ export function FocusSessionModal({
             </div>
           </div>
         </ScrollArea>
-        <DialogFooter className="grid grid-cols-3 gap-2">
-            <Button variant="outline" className="w-full" onClick={handleLogDurationClick}>
-                <Save className="mr-2 h-4 w-4" /> Log & Complete
-            </Button>
-            {activity.type === 'pomodoro' ? (
-                <Button variant="secondary" onClick={doCreateTask} disabled={!canCreateTask}>
+        <DialogFooter className="border-t pt-3">
+            <div className="w-full flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    <Button variant="outline" className="w-full sm:w-auto" onClick={handleLogDurationClick}>
+                    <Save className="mr-2 h-4 w-4" /> Log & Complete
+                    </Button>
+                    {shouldShowLogAndMove && (
+                    <Button variant="outline" className="w-full sm:w-auto" onClick={handleLogAndMoveClick}>
+                        <ArrowRight className="mr-2 h-4 w-4" /> Log & Move
+                    </Button>
+                    )}
+                </div>
+                <Button className="w-full sm:w-44" onClick={handleStartClick}>
+                    <Play className="mr-2 h-4 w-4" /> Start Session
+                </Button>
+            </div>
+            {activity.type === 'pomodoro' && (
+                <Button variant="secondary" className="w-full sm:w-auto" onClick={doCreateTask} disabled={!canCreateTask}>
                     Create Task
                 </Button>
-            ) : <div/>}
-            <Button className="w-full" onClick={handleStartClick}>
-                <Play className="mr-2 h-4 w-4" /> Start Session
-            </Button>
+            )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
