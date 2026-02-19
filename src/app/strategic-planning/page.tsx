@@ -41,6 +41,9 @@ function PlanningContent() {
     projects,
     setProjects,
     coreSkills,
+    mindsetCards,
+    deepWorkDefinitions,
+    upskillDefinitions,
     pillarEquations,
     metaRules,
   } = useAuth();
@@ -59,6 +62,71 @@ function PlanningContent() {
     return coreSkills.filter(skill => skill.type === 'Specialization');
   }, [coreSkills]);
 
+  const botheringLinkedSpecializationIds = useMemo(() => {
+    const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const microSkillToSpecIds = new Map<string, Set<string>>();
+
+    specializations.forEach((spec) => {
+      spec.skillAreas.forEach((area) => {
+        area.microSkills.forEach((microSkill) => {
+          const key = normalizeText(microSkill.name);
+          if (!key) return;
+          if (!microSkillToSpecIds.has(key)) {
+            microSkillToSpecIds.set(key, new Set<string>());
+          }
+          microSkillToSpecIds.get(key)!.add(spec.id);
+        });
+      });
+    });
+
+    const linkedTaskIds = new Set<string>();
+    const linkedTaskNames = new Set<string>();
+
+    (mindsetCards || [])
+      .filter((card) => card.id.startsWith('mindset_botherings_'))
+      .forEach((card) => {
+        (card.points || []).forEach((point) => {
+          (point.tasks || []).forEach((task) => {
+            if (task.type !== 'deepwork' && task.type !== 'upskill') return;
+            if (task.activityId) linkedTaskIds.add(task.activityId);
+            if (task.id) linkedTaskIds.add(task.id);
+            const normalizedDetails = normalizeText(task.details);
+            if (normalizedDetails) linkedTaskNames.add(normalizedDetails);
+          });
+        });
+      });
+
+    const matchedSpecializationIds = new Set<string>();
+    specializations.forEach((spec) => {
+      if (linkedTaskNames.has(normalizeText(spec.name))) {
+        matchedSpecializationIds.add(spec.id);
+      }
+    });
+
+    [...(deepWorkDefinitions || []), ...(upskillDefinitions || [])].forEach((definition) => {
+      const isMatchedById = linkedTaskIds.has(definition.id);
+      const isMatchedByName = linkedTaskNames.has(normalizeText(definition.name));
+      if (!isMatchedById && !isMatchedByName) return;
+
+      const specIds = microSkillToSpecIds.get(normalizeText(definition.category));
+      specIds?.forEach((specId) => matchedSpecializationIds.add(specId));
+    });
+
+    return matchedSpecializationIds;
+  }, [specializations, mindsetCards, deepWorkDefinitions, upskillDefinitions]);
+
+  const linkedSpecializations = useMemo(() => {
+    return specializations.filter((spec) => botheringLinkedSpecializationIds.has(spec.id));
+  }, [specializations, botheringLinkedSpecializationIds]);
+
+  const normalizeDateValue = useCallback((value?: string | null) => {
+    if (!value) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return format(parsed, 'yyyy-MM-dd');
+  }, []);
+
   const salesSystemItems = React.useMemo(() => [
     "Auto-reply template for inbound DMs",
     "Pricing sheet or calendar link",
@@ -72,7 +140,10 @@ function PlanningContent() {
   const handleOpenSkillPlanModal = (plan?: SkillAcquisitionPlan) => {
     if (plan) {
       setSelectedSpecId(plan.specializationId);
-      setCurrentSkillPlan(plan);
+      setCurrentSkillPlan({
+        ...plan,
+        targetDate: normalizeDateValue(plan.targetDate),
+      });
     } else {
       setSelectedSpecId(null);
       setCurrentSkillPlan({ linkedRuleEquationIds: [] });
@@ -103,6 +174,24 @@ function PlanningContent() {
     setIsSkillPlanModalOpen(false);
   };
 
+  const handleSelectSpecializationForPlan = useCallback((specId: string) => {
+    setSelectedSpecId(specId);
+    const existingPlan = skillAcquisitionPlans.find(p => p.specializationId === specId);
+    if (existingPlan) {
+      setCurrentSkillPlan({
+        ...existingPlan,
+        targetDate: normalizeDateValue(existingPlan.targetDate),
+      });
+      return;
+    }
+    setCurrentSkillPlan({
+      linkedRuleEquationIds: [],
+      targetDate: '',
+      requiredMoney: null,
+      requiredHours: null,
+    });
+  }, [normalizeDateValue, skillAcquisitionPlans]);
+
   const handleDeleteSkillPlan = (specializationId: string) => {
     setSkillAcquisitionPlans(prev => prev.filter(p => p.specializationId !== specializationId));
     toast({
@@ -128,7 +217,14 @@ function PlanningContent() {
 
   const handleOpenProductPlanModal = (project: Project) => {
     setSelectedProjectId(project.id);
-    setCurrentProductPlan(project.productPlan || { linkedRuleEquationIds: [] });
+    if (project.productPlan) {
+      setCurrentProductPlan({
+        ...project.productPlan,
+        targetDate: normalizeDateValue(project.productPlan.targetDate),
+      });
+    } else {
+      setCurrentProductPlan({ linkedRuleEquationIds: [] });
+    }
     setIsProductPlanModalOpen(true);
   };
   
@@ -456,14 +552,19 @@ function PlanningContent() {
                   <div className="space-y-6">
                       <div>
                           <Label>Select Specialization to Plan</Label>
-                          <Select value={selectedSpecId || ''} onValueChange={setSelectedSpecId}>
+                          <Select value={selectedSpecId || ''} onValueChange={handleSelectSpecializationForPlan}>
                               <SelectTrigger><SelectValue placeholder="Choose a specialization..." /></SelectTrigger>
                               <SelectContent>
-                                  {specializations.map(spec => (
+                                  {linkedSpecializations.map(spec => (
                                       <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
                                   ))}
                               </SelectContent>
                           </Select>
+                          {linkedSpecializations.length === 0 && (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              No bothering-linked specializations found yet.
+                            </p>
+                          )}
                       </div>
 
                       {selectedSpecId && (
@@ -497,22 +598,11 @@ function PlanningContent() {
                                   <h3 className="font-semibold flex items-center gap-2"><Package className="h-5 w-5"/> Required Resources</h3>
                                   <div className="space-y-1">
                                       <Label className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarIcon className="h-4 w-4"/> Target Date:</Label>
-                                      <Popover>
-                                          <PopoverTrigger asChild>
-                                          <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !currentSkillPlan.targetDate && "text-muted-foreground")}>
-                                              <CalendarIcon className="mr-2 h-4 w-4" />
-                                              {currentSkillPlan.targetDate ? format(parseISO(currentSkillPlan.targetDate), 'PPP') : <span>Pick a date</span>}
-                                          </Button>
-                                          </PopoverTrigger>
-                                          <PopoverContent className="w-auto p-0">
-                                          <Calendar
-                                              mode="single"
-                                              selected={currentSkillPlan.targetDate ? parseISO(currentSkillPlan.targetDate) : undefined}
-                                              onSelect={(date) => handleSkillPlanFieldChange('targetDate', date ? format(date, 'yyyy-MM-dd') : '')}
-                                              initialFocus
-                                          />
-                                          </PopoverContent>
-                                      </Popover>
+                                      <Input
+                                        type="date"
+                                        value={currentSkillPlan.targetDate || ''}
+                                        onChange={(e) => handleSkillPlanFieldChange('targetDate', e.target.value)}
+                                      />
                                   </div>
                                   <div className="space-y-1">
                                       <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Banknote className="h-4 w-4"/> Money Needed:</Label>
@@ -573,22 +663,11 @@ function PlanningContent() {
                           <h3 className="font-semibold flex items-center gap-2"><Package className="h-5 w-5"/> Required Resources</h3>
                           <div className="space-y-1">
                               <Label className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarIcon className="h-4 w-4"/> Target Date</Label>
-                              <Popover>
-                                  <PopoverTrigger asChild>
-                                  <Button variant={"outline"} className={cn("w-full justify-start text-left font-normal", !currentProductPlan.targetDate && "text-muted-foreground")}>
-                                      <CalendarIcon className="mr-2 h-4 w-4" />
-                                      {currentProductPlan.targetDate ? format(parseISO(currentProductPlan.targetDate), 'PPP') : <span>Pick a date</span>}
-                                  </Button>
-                                  </PopoverTrigger>
-                                  <PopoverContent className="w-auto p-0">
-                                  <Calendar
-                                      mode="single"
-                                      selected={currentProductPlan.targetDate ? parseISO(currentProductPlan.targetDate) : undefined}
-                                      onSelect={(date) => handleProductPlanFieldChange('targetDate', date ? format(date, 'yyyy-MM-dd') : '')}
-                                      initialFocus
-                                  />
-                                  </PopoverContent>
-                              </Popover>
+                              <Input
+                                type="date"
+                                value={currentProductPlan.targetDate || ''}
+                                onChange={(e) => handleProductPlanFieldChange('targetDate', e.target.value)}
+                              />
                           </div>
                           <div className="space-y-1">
                               <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Banknote className="h-4 w-4"/> Money (Total Amount)</Label>
@@ -633,6 +712,15 @@ function OfferizationContent() {
   // New state for hierarchical selection in the modal
   const [selectedSpecForMicro, setSelectedSpecForMicro] = useState<CoreSkill | null>(null);
   const [selectedSkillAreaForMicro, setSelectedSkillAreaForMicro] = useState<SkillArea | null>(null);
+
+  const defaultWorkflowStages = useCallback(() => ({
+    botheringPointId: null as string | null,
+    botheringText: '',
+    ideaItems: [] as string[],
+    codeItems: [] as string[],
+    breakItems: [] as string[],
+    fixItems: [] as string[],
+  }), []);
 
   const specializations = useMemo(() => {
     const plannedSpecializationIds = new Set((skillAcquisitionPlans || []).map(p => p.specializationId));
@@ -726,7 +814,17 @@ function OfferizationContent() {
     const spec = coreSkills.find(s => s.id === specializationId);
     setEditingRelease({
         specializationId,
-        release: release ? { ...release } : { id: `release_${Date.now()}_${Math.random()}`, name: '', description: '', launchDate: format(new Date(), 'yyyy-MM-dd'), focusAreaIds: [], addToPortfolio: true }
+        release: release
+          ? { ...release, workflowStages: { ...defaultWorkflowStages(), ...(release.workflowStages || {}) } }
+          : {
+              id: `release_${Date.now()}_${Math.random()}`,
+              name: '',
+              description: '',
+              launchDate: format(new Date(), 'yyyy-MM-dd'),
+              focusAreaIds: [],
+              addToPortfolio: true,
+              workflowStages: defaultWorkflowStages(),
+            }
     });
     setSelectedSpecForMicro(spec || null);
     setSelectedSkillAreaForMicro(null);
@@ -1079,6 +1177,36 @@ function OfferizationContent() {
                       <AccordionItem value="item-learning">
                           <AccordionTrigger>Learning Planner</AccordionTrigger>
                           <AccordionContent className="space-y-4">
+                              {(() => {
+                                  const completedPages = spec.skillAreas.reduce(
+                                      (sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedPages || 0), 0),
+                                      0
+                                  );
+                                  const completedHours = spec.skillAreas.reduce(
+                                      (sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedHours || 0), 0),
+                                      0
+                                  );
+                                  const totalPages = (learningPlan.bookWebpageResources || []).reduce((sum, resource) => sum + (resource.totalPages || 0), 0);
+                                  const totalHours = (learningPlan.audioVideoResources || []).reduce((sum, resource) => sum + (resource.totalHours || 0), 0);
+                                  const hasBooks = (learningPlan.bookWebpageResources || []).length > 0;
+                                  const hasAudio = (learningPlan.audioVideoResources || []).length > 0;
+                                  return (
+                                      <div className="rounded-md border border-white/10 bg-muted/20 p-3 text-xs">
+                                          <div className="font-medium mb-2">Progress Reflected From Skill Tree</div>
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-muted-foreground">
+                                              {hasBooks && (
+                                                  <span>Books/Webpages: {completedPages}/{totalPages} pages completed</span>
+                                              )}
+                                              {hasAudio && (
+                                                  <span>Audio/Video: {completedHours}/{totalHours} hours completed</span>
+                                              )}
+                                              {!hasBooks && !hasAudio && (
+                                                  <span>No learning resources added yet.</span>
+                                              )}
+                                          </div>
+                                      </div>
+                                  );
+                              })()}
                               <div className="space-y-3">
                                   <h4 className="font-medium text-sm flex items-center gap-2">
                                       <PlusCircle className="h-4 w-4 cursor-pointer hover:text-primary" onClick={() => handleAddLearningResource(spec.id, 'audio')} />
@@ -1297,13 +1425,71 @@ const ProjectForm = ({ specialization, editingRelease, handleUpdateEditingReleas
     handleSaveRelease: () => void,
     setEditingRelease: React.Dispatch<React.SetStateAction<{ specializationId: string; release: Partial<Release> } | null>>,
 }) => {
-    const { projects, coreSkills } = useAuth();
+    const { projects, coreSkills, mindsetCards } = useAuth();
     const [selectedSpecForMicro, setSelectedSpecForMicro] = useState<CoreSkill | null>(specialization);
     const [selectedSkillAreaForMicro, setSelectedSkillAreaForMicro] = useState<SkillArea | null>(null);
+    const [newStageItems, setNewStageItems] = useState<Record<'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems', string>>({
+        ideaItems: '',
+        codeItems: '',
+        breakItems: '',
+        fixItems: '',
+    });
 
     const { release } = editingRelease;
+    const workflowStages = useMemo(() => ({
+        botheringPointId: release.workflowStages?.botheringPointId || null,
+        botheringText: release.workflowStages?.botheringText || '',
+        ideaItems: release.workflowStages?.ideaItems || [],
+        codeItems: release.workflowStages?.codeItems || [],
+        breakItems: release.workflowStages?.breakItems || [],
+        fixItems: release.workflowStages?.fixItems || [],
+    }), [release.workflowStages]);
+    const normalizeStageItem = (item: string | { text: string; completed?: boolean }) =>
+        typeof item === 'string' ? { text: item, completed: false } : { text: item.text || '', completed: !!item.completed };
+    const allBotherings = useMemo(() => {
+        return (mindsetCards || [])
+            .filter(card => card.id.startsWith('mindset_botherings_'))
+            .flatMap(card => (card.points || []).map(point => ({
+                id: point.id,
+                text: point.text,
+                type: card.id.replace('mindset_botherings_', ''),
+            })));
+    }, [mindsetCards]);
     const allMicroSkills = useMemo(() => selectedSkillAreaForMicro?.microSkills || [], [selectedSkillAreaForMicro]);
     const projectsInDomain = useMemo(() => projects.filter(p => p.domainId === specialization.domainId), [specialization.domainId, projects]);
+
+    const updateWorkflowStages = (next: typeof workflowStages) => {
+        handleUpdateEditingRelease('workflowStages' as keyof Release, next);
+    };
+
+    const addStageItem = (stageKey: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems') => {
+        const value = (newStageItems[stageKey] || '').trim();
+        if (!value) return;
+        updateWorkflowStages({
+            ...workflowStages,
+            [stageKey]: [...workflowStages[stageKey], { text: value, completed: false }],
+        });
+        setNewStageItems(prev => ({ ...prev, [stageKey]: '' }));
+    };
+
+    const updateStageItem = (stageKey: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems', index: number, value: string) => {
+        const items = [...workflowStages[stageKey]];
+        const normalized = normalizeStageItem(items[index]);
+        items[index] = { ...normalized, text: value };
+        updateWorkflowStages({ ...workflowStages, [stageKey]: items });
+    };
+
+    const toggleStageItemCompleted = (stageKey: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems', index: number, completed: boolean) => {
+        const items = [...workflowStages[stageKey]];
+        const normalized = normalizeStageItem(items[index]);
+        items[index] = { ...normalized, completed };
+        updateWorkflowStages({ ...workflowStages, [stageKey]: items });
+    };
+
+    const removeStageItem = (stageKey: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems', index: number) => {
+        const items = workflowStages[stageKey].filter((_, i) => i !== index);
+        updateWorkflowStages({ ...workflowStages, [stageKey]: items });
+    };
     
     return (
         <Card className="mt-4 bg-muted/50">
@@ -1341,6 +1527,89 @@ const ProjectForm = ({ specialization, editingRelease, handleUpdateEditingReleas
                 <div>
                     <Label htmlFor="release-desc">Description</Label>
                     <Textarea id="release-desc" value={release.description || ''} onChange={(e) => handleUpdateEditingRelease('description', e.target.value)} placeholder="What is the goal of this project?" />
+                </div>
+                <div className="space-y-3 rounded-md border p-3">
+                    <div className="font-medium">Project Stages</div>
+                    <div className="space-y-2">
+                        <Label>Bothering -&gt; define pain</Label>
+                        <Select
+                            value={workflowStages.botheringPointId || ''}
+                            onValueChange={(pointId) => {
+                                const selected = allBotherings.find(b => b.id === pointId);
+                                updateWorkflowStages({
+                                    ...workflowStages,
+                                    botheringPointId: pointId,
+                                    botheringText: selected?.text || '',
+                                });
+                            }}
+                        >
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select from botherings list..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {allBotherings.map(b => (
+                                    <SelectItem key={b.id} value={b.id}>
+                                        [{b.type}] {b.text}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {workflowStages.botheringText && (
+                            <p className="text-xs text-muted-foreground">{workflowStages.botheringText}</p>
+                        )}
+                    </div>
+                    {[
+                        { key: 'ideaItems', label: 'Idea -> pick simplest solution' },
+                        { key: 'codeItems', label: 'Code -> make it run' },
+                        { key: 'breakItems', label: 'Break -> observe failure' },
+                        { key: 'fixItems', label: 'Fix -> improve system' },
+                    ].map(stage => (
+                        <div key={stage.key} className="space-y-2">
+                            <Label>{stage.label}</Label>
+                            <div className="flex gap-2">
+                                <Input
+                                    value={newStageItems[stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems']}
+                                    onChange={(e) =>
+                                        setNewStageItems(prev => ({
+                                            ...prev,
+                                            [stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems']: e.target.value,
+                                        }))
+                                    }
+                                    placeholder="Add item..."
+                                />
+                                <Button type="button" variant="outline" onClick={() => addStageItem(stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems')}>
+                                    Add
+                                </Button>
+                            </div>
+                            <div className="space-y-2">
+                                {workflowStages[stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems'].map((item, index) => (
+                                    <div key={`${stage.key}-${index}`} className="flex items-center gap-2">
+                                        <Checkbox
+                                            checked={normalizeStageItem(item).completed}
+                                            onCheckedChange={(checked) =>
+                                                toggleStageItemCompleted(
+                                                    stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems',
+                                                    index,
+                                                    !!checked
+                                                )
+                                            }
+                                        />
+                                        <Input
+                                            value={normalizeStageItem(item).text}
+                                            className={cn(normalizeStageItem(item).completed && "line-through text-muted-foreground")}
+                                            onChange={(e) => updateStageItem(stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems', index, e.target.value)}
+                                        />
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => removeStageItem(stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems', index)}>
+                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                    <div className="rounded-md border border-dashed p-2 text-xs text-muted-foreground">
+                        Done -&gt; stop & ship (no items)
+                    </div>
                 </div>
                  <div>
                     <Label htmlFor="github-link">GitHub Link</Label>

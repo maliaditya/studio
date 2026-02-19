@@ -5,7 +5,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from './ui/button';
 import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save, Menu, PlusCircle, Briefcase, BookCopy, ChevronLeft, Flag, Bolt, Focus, Frame, Lightbulb, Badge } from 'lucide-react';
-import type { Activity, PauseEvent, ExerciseDefinition, PostSessionReview, SubTask, ActivityType } from '@/types/workout';
+import type { Activity, PauseEvent, ExerciseDefinition, PostSessionReview, SubTask, ActivityType, SlotName } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDraggable } from '@dnd-kit/core';
 import { ScrollArea } from './ui/scroll-area';
@@ -24,7 +24,12 @@ interface FocusTimerPopupProps {
   duration: number; // in minutes
   initialSecondsLeft: number;
   onClose: () => void;
-  onLogDuration: (activity: Activity, minutes: number) => void;
+  onLogDuration: (
+    activity: Activity,
+    minutes: number,
+    moveToSlot?: SlotName,
+    progress?: { itemsCompleted?: number; hoursCompleted?: number; pagesCompleted?: number; microSkillName?: string }
+  ) => void;
   onToggleMicroSkillRepetition: (coreSkillId: string, areaId: string, microSkillId: string, isReady: boolean) => void;
 }
 

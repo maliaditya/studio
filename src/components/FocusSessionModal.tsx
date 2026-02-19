@@ -26,7 +26,12 @@ interface FocusSessionModalProps {
   onOpenChange: (isOpen: boolean) => void;
   activity: Activity | null;
   onStartSession: (activity: Activity, duration: number) => void;
-  onLogDuration: (activity: Activity, duration: number, moveToSlot?: SlotName) => void;
+  onLogDuration: (
+    activity: Activity,
+    duration: number,
+    moveToSlot?: SlotName,
+    progress?: { itemsCompleted?: number; hoursCompleted?: number; pagesCompleted?: number; microSkillName?: string }
+  ) => void;
   initialDuration: number;
 }
 
@@ -47,9 +52,20 @@ export function FocusSessionModal({
     handleCreateTask,
     currentSlot,
     expectedActivityDurations,
+    offerizationPlans,
+    setOfferizationPlans,
+    upskillDefinitions,
+    deepWorkDefinitions,
+    allUpskillLogs,
+    allDeepWorkLogs,
+    getDeepWorkNodeType,
+    getUpskillNodeType,
   } = useAuth();
   const [duration, setDuration] = useState(30);
   const [skipBreaks, setSkipBreaks] = useState(false);
+  const [itemsCompletedInput, setItemsCompletedInput] = useState('');
+  const [hoursCompletedInput, setHoursCompletedInput] = useState('');
+  const [pagesCompletedInput, setPagesCompletedInput] = useState('');
   
   const [linkedActivityType, setLinkedActivityType] = useState<ActivityType | ''>(activity?.linkedActivityType || '');
 
@@ -84,9 +100,7 @@ export function FocusSessionModal({
     if (!selectedMicroSkillId || !linkedActivityType) return [];
     const microSkill = microSkills.find(ms => ms.id === selectedMicroSkillId);
     if (!microSkill) return [];
-    
-    const { deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType } = useAuth();
-    
+
     if (linkedActivityType === 'deepwork') {
         return deepWorkDefinitions.filter(def => def.category === microSkill.name && getDeepWorkNodeType(def) === 'Intention');
     }
@@ -94,7 +108,216 @@ export function FocusSessionModal({
         return upskillDefinitions.filter(def => def.category === microSkill.name && getUpskillNodeType(def) === 'Curiosity');
     }
     return [];
-  }, [selectedMicroSkillId, linkedActivityType, microSkills, useAuth]);
+  }, [selectedMicroSkillId, linkedActivityType, microSkills, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType]);
+
+  const learningContext = useMemo(() => {
+    if (!activity || (activity.type !== 'upskill' && activity.type !== 'deepwork')) {
+      return { microSkillName: null as string | null, hasAudio: false, hasBooks: false };
+    }
+
+    const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const logInstanceMap = new Map(
+      [...allUpskillLogs, ...allDeepWorkLogs].flatMap(log => (log.exercises || []).map(ex => [ex.id, ex.definitionId] as const))
+    );
+
+    const candidateIds = new Set<string>([activity.id, ...(activity.taskIds || [])]);
+    let matchedDefinition: ExerciseDefinition | undefined;
+    candidateIds.forEach((id) => {
+      if (matchedDefinition) return;
+      const definitionId = logInstanceMap.get(id) || id;
+      const found = allDefs.find(def => def.id === definitionId);
+      if (found) matchedDefinition = found;
+    });
+    if (!matchedDefinition) {
+      matchedDefinition = allDefs.find(def => normalizeText(def.name) === normalizeText(activity.details));
+    }
+
+    const microSkillName = matchedDefinition?.category || null;
+    if (!microSkillName) {
+      return { microSkillName: null as string | null, hasAudio: false, hasBooks: false };
+    }
+
+    const candidateSpecs = coreSkills
+      .filter(spec => spec.type === 'Specialization')
+      .filter(spec =>
+        spec.skillAreas.some(area => area.microSkills.some(ms => normalizeText(ms.name) === normalizeText(microSkillName)))
+      );
+
+    let matchedSpec = candidateSpecs[0];
+    if (candidateSpecs.length > 1) {
+      const byActivitySpecName = candidateSpecs.find(
+        spec => normalizeText(spec.name) === normalizeText(activity.details)
+      );
+      if (byActivitySpecName) {
+        matchedSpec = byActivitySpecName;
+      }
+    }
+
+    if (!matchedSpec) {
+      return { microSkillName, hasAudio: false, hasBooks: false };
+    }
+
+    const learningPlan = offerizationPlans?.[matchedSpec.id]?.learningPlan;
+    const audioResources = learningPlan?.audioVideoResources || [];
+    const bookResources = learningPlan?.bookWebpageResources || [];
+    const hasAudio = audioResources.some((resource) =>
+      !!(resource.name || '').trim() ||
+      !!(resource.tutor || '').trim() ||
+      (resource.totalHours || 0) > 0 ||
+      (resource.totalItems || 0) > 0
+    );
+    const hasBooks = bookResources.some((resource) =>
+      !!(resource.name || '').trim() ||
+      !!(resource.author || '').trim() ||
+      (resource.totalPages || 0) > 0
+    );
+    return { microSkillName, hasAudio, hasBooks };
+  }, [activity, allDeepWorkLogs, allUpskillLogs, coreSkills, deepWorkDefinitions, offerizationPlans, upskillDefinitions]);
+
+  const deepworkStageContext = useMemo(() => {
+    if (!activity || activity.type !== 'deepwork') {
+      return null as {
+        specializationId: string;
+        specializationName: string;
+        releaseId: string;
+        releaseName: string;
+        stageKey: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems';
+        stageLabel: string;
+        pendingItems: Array<{ index: number; text: string }>;
+        hasAnyPending: boolean;
+      } | null;
+    }
+
+    const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
+    const logInstanceMap = new Map(
+      [...allUpskillLogs, ...allDeepWorkLogs].flatMap(log => (log.exercises || []).map(ex => [ex.id, ex.definitionId] as const))
+    );
+
+    const candidateIds = new Set<string>([activity.id, ...(activity.taskIds || [])]);
+    let matchedDefinition: ExerciseDefinition | undefined;
+    candidateIds.forEach((id) => {
+      if (matchedDefinition) return;
+      const definitionId = logInstanceMap.get(id) || id;
+      const found = allDefs.find(def => def.id === definitionId);
+      if (found) matchedDefinition = found;
+    });
+    if (!matchedDefinition) {
+      matchedDefinition = allDefs.find(def => normalizeText(def.name) === normalizeText(activity.details));
+    }
+
+    const specs = coreSkills.filter((skill) => skill.type === 'Specialization');
+    let matchedSpec = specs.find((spec) => spec.id === activity.id || normalizeText(spec.name) === normalizeText(activity.details));
+
+    if (!matchedSpec && matchedDefinition?.category) {
+      const microSkillKey = normalizeText(matchedDefinition.category);
+      matchedSpec = specs.find((spec) =>
+        spec.skillAreas.some((area) => area.microSkills.some((micro) => normalizeText(micro.name) === microSkillKey))
+      );
+    }
+
+    if (!matchedSpec) return null;
+
+    const releases = offerizationPlans?.[matchedSpec.id]?.releases || [];
+    if (releases.length === 0) return null;
+
+    const stageDefs: Array<{ key: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems'; label: string }> = [
+      { key: 'ideaItems', label: 'Idea' },
+      { key: 'codeItems', label: 'Code' },
+      { key: 'breakItems', label: 'Break' },
+      { key: 'fixItems', label: 'Fix' },
+    ];
+
+    const normalizeStageItem = (item: string | { text: string; completed?: boolean }) =>
+      typeof item === 'string' ? { text: item || '', completed: false } : { text: item.text || '', completed: !!item.completed };
+
+    const releaseWithPending = releases.find((release) => {
+      return stageDefs.some((stage) => {
+        const items = (release.workflowStages?.[stage.key] || []).map(normalizeStageItem);
+        return items.some((item) => item.text.trim() && !item.completed);
+      });
+    }) || releases[0];
+
+    let activeStageKey: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems' = 'ideaItems';
+    let activeStageLabel = 'Idea';
+    let pendingItems: Array<{ index: number; text: string }> = [];
+    let hasAnyPending = false;
+
+    stageDefs.forEach((stage) => {
+      if (hasAnyPending) return;
+      const stageItems = (releaseWithPending.workflowStages?.[stage.key] || [])
+        .map(normalizeStageItem)
+        .map((item, index) => ({ ...item, index }))
+        .filter((item) => item.text.trim());
+      const stagePendingItems = stageItems
+        .filter((item) => !item.completed)
+        .map((item) => ({ index: item.index, text: item.text }));
+      if (stagePendingItems.length > 0) {
+        hasAnyPending = true;
+        activeStageKey = stage.key;
+        activeStageLabel = stage.label;
+        pendingItems = stagePendingItems;
+      }
+    });
+
+    return {
+      specializationId: matchedSpec.id,
+      specializationName: matchedSpec.name,
+      releaseId: releaseWithPending.id,
+      releaseName: releaseWithPending.name || 'Project',
+      stageKey: activeStageKey,
+      stageLabel: activeStageLabel,
+      pendingItems,
+      hasAnyPending,
+    };
+  }, [activity, allDeepWorkLogs, allUpskillLogs, coreSkills, deepWorkDefinitions, offerizationPlans, upskillDefinitions]);
+
+  const toggleDeepworkStageItem = (
+    specializationId: string,
+    releaseId: string,
+    stageKey: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems',
+    itemIndex: number,
+    completed: boolean
+  ) => {
+    setOfferizationPlans(prev => {
+      const plan = prev[specializationId];
+      if (!plan) return prev;
+      const releases = (plan.releases || []).map((release) => {
+        if (release.id !== releaseId) return release;
+        const workflowStages = release.workflowStages || {
+          botheringPointId: null,
+          botheringText: '',
+          ideaItems: [],
+          codeItems: [],
+          breakItems: [],
+          fixItems: [],
+        };
+        const existingItems = workflowStages[stageKey] || [];
+        const updatedItems = existingItems.map((item, index) => {
+          if (index !== itemIndex) return item;
+          if (typeof item === 'string') {
+            return { text: item, completed };
+          }
+          return { ...item, completed };
+        });
+        return {
+          ...release,
+          workflowStages: {
+            ...workflowStages,
+            [stageKey]: updatedItems,
+          },
+        };
+      });
+      return {
+        ...prev,
+        [specializationId]: {
+          ...plan,
+          releases,
+        },
+      };
+    });
+  };
 
   const parseDurationLabelToMinutes = (value?: string): number => {
     if (!value) return 0;
@@ -126,6 +349,9 @@ export function FocusSessionModal({
     setSelectedMicroSkillId(null);
     setSelectedParentTaskId('new');
     setCreatedTaskInfo(null);
+    setItemsCompletedInput('');
+    setHoursCompletedInput('');
+    setPagesCompletedInput('');
   }, [initialDuration, isOpen, activity, expectedActivityDurations]);
 
   const handleDomainChange = (domainId: string) => {
@@ -212,7 +438,12 @@ export function FocusSessionModal({
         ...activity,
         linkedActivityType: activity.type === 'pomodoro' ? (linkedActivityType as ActivityType) : undefined,
       };
-      onLogDuration(activityToLog, duration);
+      onLogDuration(activityToLog, duration, undefined, {
+        itemsCompleted: parseInt(itemsCompletedInput || '0', 10) || 0,
+        hoursCompleted: parseFloat(hoursCompletedInput || '0') || 0,
+        pagesCompleted: parseInt(pagesCompletedInput || '0', 10) || 0,
+        microSkillName: learningContext.microSkillName || undefined,
+      });
       onOpenChange(false);
     }
   };
@@ -227,7 +458,12 @@ export function FocusSessionModal({
         ...activity,
         linkedActivityType: activity.type === 'pomodoro' ? (linkedActivityType as ActivityType) : undefined,
       };
-      onLogDuration(activityToLog, duration, currentSlot as SlotName);
+      onLogDuration(activityToLog, duration, currentSlot as SlotName, {
+        itemsCompleted: parseInt(itemsCompletedInput || '0', 10) || 0,
+        hoursCompleted: parseFloat(hoursCompletedInput || '0') || 0,
+        pagesCompleted: parseInt(pagesCompletedInput || '0', 10) || 0,
+        microSkillName: learningContext.microSkillName || undefined,
+      });
       onOpenChange(false);
     }
   };
@@ -348,6 +584,94 @@ export function FocusSessionModal({
                 <Checkbox id="skip-breaks-modal" checked={skipBreaks} onCheckedChange={(checked) => setSkipBreaks(!!checked)} />
                 <Label htmlFor="skip-breaks-modal">Skip breaks</Label>
             </div>
+            {activity.type === 'deepwork' && deepworkStageContext && (
+              <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Project flow: <span className="text-foreground">{deepworkStageContext.releaseName}</span>
+                </p>
+                {deepworkStageContext.hasAnyPending ? (
+                  <>
+                    <p className="text-xs text-muted-foreground">
+                      Current stage: <span className="text-foreground">{deepworkStageContext.stageLabel}</span>
+                    </p>
+                    <div className="space-y-2">
+                      {deepworkStageContext.pendingItems.map((item) => {
+                        const id = `focus-stage-${deepworkStageContext.releaseId}-${deepworkStageContext.stageKey}-${item.index}`;
+                        return (
+                          <div key={id} className="flex items-center gap-2 rounded border border-white/10 bg-background/40 px-2 py-1.5">
+                            <Checkbox
+                              id={id}
+                              checked={false}
+                              onCheckedChange={(checked) =>
+                                toggleDeepworkStageItem(
+                                  deepworkStageContext.specializationId,
+                                  deepworkStageContext.releaseId,
+                                  deepworkStageContext.stageKey,
+                                  item.index,
+                                  !!checked
+                                )
+                              }
+                            />
+                            <Label htmlFor={id} className="text-sm leading-snug">{item.text}</Label>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-emerald-400">All workflow stage items are completed.</p>
+                )}
+              </div>
+            )}
+            {(activity.type === 'upskill' || activity.type === 'deepwork') && learningContext.microSkillName && (learningContext.hasAudio || learningContext.hasBooks) && (
+              <div className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Progress for micro-skill: <span className="text-foreground">{learningContext.microSkillName}</span>
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="focus-log-items">Items Completed</Label>
+                    <Input
+                      id="focus-log-items"
+                      type="number"
+                      min={0}
+                      step={1}
+                      placeholder="e.g., 5"
+                      value={itemsCompletedInput}
+                      onChange={(e) => setItemsCompletedInput(e.target.value)}
+                    />
+                  </div>
+                  {learningContext.hasAudio && (
+                    <div className="space-y-1">
+                      <Label htmlFor="focus-log-hours">Hours Watched/Listened</Label>
+                      <Input
+                        id="focus-log-hours"
+                        type="number"
+                        min={0}
+                        step={0.1}
+                        placeholder="e.g., 2.5"
+                        value={hoursCompletedInput}
+                        onChange={(e) => setHoursCompletedInput(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {learningContext.hasBooks && (
+                    <div className="space-y-1 sm:col-span-2">
+                      <Label htmlFor="focus-log-pages">Pages Read</Label>
+                      <Input
+                        id="focus-log-pages"
+                        type="number"
+                        min={0}
+                        step={1}
+                        placeholder="e.g., 50"
+                        value={pagesCompletedInput}
+                        onChange={(e) => setPagesCompletedInput(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </ScrollArea>
         <DialogFooter className="border-t pt-3">

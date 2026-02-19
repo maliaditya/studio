@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -69,6 +69,10 @@ export const AgendaWidgetItem = React.memo(({
         findRootTask,
         highlightedTaskIds,
         currentSlot,
+        coreSkills,
+        offerizationPlans,
+        upskillDefinitions,
+        deepWorkDefinitions,
     } = useAuth();
     const router = useRouter();
 
@@ -110,6 +114,132 @@ export const AgendaWidgetItem = React.memo(({
         highlightedTaskIds?.has(baseId) ||
         (activity.taskIds || []).some(id => highlightedTaskIds?.has(id));
     const shouldStrike = activity.completed || !!hasLoggedStopper;
+    const learningTargetLabel = useMemo(() => {
+        if (!(activity.type === 'upskill' || activity.type === 'deepwork')) return null;
+
+        const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        const specs = (coreSkills || []).filter((skill) => skill.type === 'Specialization');
+        const allDefs = [...(upskillDefinitions || []), ...(deepWorkDefinitions || [])];
+
+        let matchedSpec = specs.find((spec) => spec.id === activity.id || normalizeText(spec.name) === normalizeText(activity.details));
+
+        if (!matchedSpec) {
+            const matchedDef =
+                allDefs.find((def) => def.id === activity.id) ||
+                allDefs.find((def) => normalizeText(def.name) === normalizeText(activity.details));
+            if (matchedDef) {
+                const categoryKey = normalizeText(matchedDef.category);
+                matchedSpec = specs.find((spec) => {
+                    if (normalizeText(spec.name) === categoryKey) return true;
+                    if (spec.skillAreas.some((area) => normalizeText(area.name) === categoryKey)) return true;
+                    return spec.skillAreas.some((area) => area.microSkills.some((micro) => normalizeText(micro.name) === categoryKey));
+                });
+            }
+        }
+
+        if (!matchedSpec) return null;
+        if (activity.type === 'deepwork') {
+            const releases = offerizationPlans?.[matchedSpec.id]?.releases || [];
+            const normalizeStageItem = (item: string | { text: string; completed?: boolean }) =>
+                typeof item === 'string'
+                    ? { text: item, completed: false }
+                    : { text: item.text || '', completed: !!item.completed };
+            const toDateKey = (value?: string | null) => {
+                if (!value) return null;
+                if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+                const parsed = new Date(value);
+                if (Number.isNaN(parsed.getTime())) return null;
+                return parsed.toISOString().slice(0, 10);
+            };
+            const today = new Date();
+            const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const msPerDay = 24 * 60 * 60 * 1000;
+
+            const candidatePlans = releases
+                .map((release) => {
+                    const stages = release.workflowStages;
+                    const allItems = [
+                        ...(stages?.ideaItems || []),
+                        ...(stages?.codeItems || []),
+                        ...(stages?.breakItems || []),
+                        ...(stages?.fixItems || []),
+                    ].map(normalizeStageItem);
+                    const remainingItems = allItems.filter((item) => item.text.trim() && !item.completed).length;
+                    const launchDateKey = toDateKey(release.launchDate);
+                    const daysLeft = launchDateKey
+                        ? Math.max(0, Math.floor((new Date(launchDateKey).getTime() - startOfToday.getTime()) / msPerDay))
+                        : null;
+                    return { remainingItems, daysLeft };
+                })
+                .filter((plan) => plan.remainingItems > 0);
+
+            if (candidatePlans.length === 0) return null;
+            const withDate = candidatePlans
+                .filter((plan) => plan.daysLeft != null)
+                .sort((a, b) => (a.daysLeft as number) - (b.daysLeft as number));
+            const chosen = withDate[0] || candidatePlans[0];
+            const daysWindow = chosen.daysLeft == null ? null : Math.max(1, chosen.daysLeft);
+            const itemTarget = daysWindow == null
+                ? null
+                : chosen.daysLeft === 0
+                    ? chosen.remainingItems
+                    : Math.max(1, Math.ceil(chosen.remainingItems / daysWindow));
+            return itemTarget != null ? `${itemTarget} items/day` : null;
+        }
+
+        const learningPlan = offerizationPlans?.[matchedSpec.id]?.learningPlan;
+        const audioResources = learningPlan?.audioVideoResources || [];
+        const bookResources = learningPlan?.bookWebpageResources || [];
+        const hasAudio = audioResources.length > 0;
+        const hasBooks = bookResources.length > 0;
+        if (!hasAudio && !hasBooks) return null;
+
+        const totalHours = audioResources.reduce((sum, resource) => sum + (resource.totalHours || 0), 0);
+        const totalPages = bookResources.reduce((sum, resource) => sum + (resource.totalPages || 0), 0);
+        const completedHours = matchedSpec.skillAreas.reduce((sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedHours || 0), 0), 0);
+        const completedPages = matchedSpec.skillAreas.reduce((sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedPages || 0), 0), 0);
+        const remainingHours = Math.max(0, totalHours - completedHours);
+        const remainingPages = Math.max(0, totalPages - completedPages);
+
+        const normalizeDateKey = (value?: string | null) => {
+            if (!value) return null;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) return null;
+            return parsed.toISOString().slice(0, 10);
+        };
+        const today = new Date();
+        const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const latestAudioEndDate = audioResources
+            .map((resource) => normalizeDateKey(resource.completionDate))
+            .filter((date): date is string => !!date)
+            .reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+        const latestBookEndDate = bookResources
+            .map((resource) => normalizeDateKey(resource.completionDate))
+            .filter((date): date is string => !!date)
+            .reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+
+        const audioDaysLeft = latestAudioEndDate
+            ? Math.max(0, Math.floor((new Date(latestAudioEndDate).getTime() - startOfToday.getTime()) / msPerDay))
+            : null;
+        const bookDaysLeft = latestBookEndDate
+            ? Math.max(0, Math.floor((new Date(latestBookEndDate).getTime() - startOfToday.getTime()) / msPerDay))
+            : null;
+
+        const hourTarget = hasAudio && remainingHours > 0 && audioDaysLeft != null
+            ? Math.max(0.1, Number((remainingHours / Math.max(1, audioDaysLeft || 1)).toFixed(1)))
+            : null;
+        const pageTarget = hasBooks && remainingPages > 0 && bookDaysLeft != null
+            ? Math.max(1, Math.ceil(remainingPages / Math.max(1, bookDaysLeft || 1)))
+            : null;
+
+        const pieces: string[] = [];
+        if (pageTarget != null) pieces.push(`${pageTarget}p/day`);
+        if (hourTarget != null) pieces.push(`${hourTarget}h/day`);
+        if (pieces.length === 0) return null;
+        return pieces.join(' / ');
+    }, [activity.details, activity.id, activity.type, coreSkills, deepWorkDefinitions, offerizationPlans, upskillDefinitions]);
 
     const slotOrder = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
     const isPastSlot =
@@ -189,6 +319,11 @@ export const AgendaWidgetItem = React.memo(({
                     {!activity.completed && expectedDuration && (
                         <Badge className="bg-yellow-500/20 text-yellow-300 border border-yellow-400/40 hover:bg-yellow-500/25">
                             {expectedDuration}
+                        </Badge>
+                    )}
+                    {!activity.completed && learningTargetLabel && (
+                        <Badge className="bg-cyan-500/15 text-cyan-300 border border-cyan-400/40 hover:bg-cyan-500/20">
+                            {learningTargetLabel}
                         </Badge>
                     )}
                     {activity.completed && loggedDuration && (

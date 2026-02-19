@@ -10,7 +10,7 @@ import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, Hi
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
-import { BrainHack, Stopper, MindsetCard, MindsetPoint, Activity, SlotName, CoreDomainId } from '@/types/workout';
+import { BrainHack, Stopper, MindsetCard, MindsetPoint, Activity, SlotName, CoreDomainId, ActivityType } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -26,6 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { useRouter } from 'next/navigation';
 
 
 const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
@@ -365,6 +366,10 @@ const HourlyResistanceLogDialog = ({ isOpen, onOpenChange, allLinkedResistances 
 export function MindsetCategoriesCard() {
     const { 
         mindProgrammingDefinitions,
+        coreSkills,
+        upskillDefinitions,
+        deepWorkDefinitions,
+        offerizationPlans,
         habitCards,
         mechanismCards,
         logStopperEncounter,
@@ -381,6 +386,7 @@ export function MindsetCategoriesCard() {
         settings,
         setSettings,
     } = useAuth();
+    const router = useRouter();
     const { toast } = useToast();
     
     const [hotResistances, setHotResistances] = useState<Set<string>>(new Set());
@@ -528,6 +534,382 @@ export function MindsetCategoriesCard() {
             });
         return ids;
     }, [mindsetCards]);
+
+    const linkedUpskillLearningInsight = useMemo(() => {
+        if (!activeBotheringPoint) {
+            return {
+                linkedUpskillTaskCount: 0,
+                suggestedEndDate: null as string | null,
+                taskLearningPlanByTaskId: new Map<string, {
+                    specializationId: string;
+                    specializationName: string;
+                    taskType: ActivityType;
+                    hasLearningPlan: boolean;
+                    learningPlanSummary: string;
+                    hasProjectPlan: boolean;
+                    projectPlanSummary: string;
+                    projectPlans: Array<{
+                        id: string;
+                        name: string;
+                        launchDate: string;
+                        description?: string;
+                        focusAreaCount: number;
+                        workflowStages?: {
+                            botheringText?: string;
+                            ideaItems: Array<string | { text: string; completed?: boolean }>;
+                            codeItems: Array<string | { text: string; completed?: boolean }>;
+                            breakItems: Array<string | { text: string; completed?: boolean }>;
+                            fixItems: Array<string | { text: string; completed?: boolean }>;
+                        };
+                    }>;
+                    latestLearningPlanEndDate: string | null;
+                    totalPages: number;
+                    totalHours: number;
+                    daysRemaining: number | null;
+                    dailyPageTarget: number | null;
+                    dailyHourTarget: number | null;
+                    audioCount: number;
+                    bookCount: number;
+                    latestAudioEndDate: string | null;
+                    latestBookEndDate: string | null;
+                    audioDaysRemaining: number | null;
+                    bookDaysRemaining: number | null;
+                    completedPages: number;
+                    completedHours: number;
+                    remainingPages: number;
+                    remainingHours: number;
+                }>(),
+                targets: [] as Array<{
+                    specializationId: string;
+                    specializationName: string;
+                    hasLearningPlan: boolean;
+                    learningPlanSummary: string;
+                    latestLearningPlanEndDate: string | null;
+                    totalPages: number;
+                    totalHours: number;
+                    daysRemaining: number | null;
+                    dailyPageTarget: number | null;
+                    dailyHourTarget: number | null;
+                    audioCount: number;
+                    bookCount: number;
+                    latestAudioEndDate: string | null;
+                    latestBookEndDate: string | null;
+                    audioDaysRemaining: number | null;
+                    bookDaysRemaining: number | null;
+                    completedPages: number;
+                    completedHours: number;
+                    remainingPages: number;
+                    remainingHours: number;
+                }>,
+            };
+        }
+
+        const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        const normalizeDateKey = (value?: string | null) => {
+            if (!value) return null;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) return null;
+            return format(parsed, 'yyyy-MM-dd');
+        };
+        const microSkillToSpec = new Map<string, Array<{ id: string; name: string }>>();
+        const skillAreaToSpec = new Map<string, Array<{ id: string; name: string }>>();
+        const specializationByName = new Map<string, { id: string; name: string }>();
+        const specializationList = coreSkills.filter((skill) => skill.type === 'Specialization');
+
+        specializationList.forEach((spec) => {
+                specializationByName.set(normalizeText(spec.name), { id: spec.id, name: spec.name });
+                spec.skillAreas.forEach((area) => {
+                    const areaKey = normalizeText(area.name);
+                    if (areaKey) {
+                        const areaCurrent = skillAreaToSpec.get(areaKey) || [];
+                        areaCurrent.push({ id: spec.id, name: spec.name });
+                        skillAreaToSpec.set(areaKey, areaCurrent);
+                    }
+                    area.microSkills.forEach((microSkill) => {
+                        const key = normalizeText(microSkill.name);
+                        if (!key) return;
+                        const current = microSkillToSpec.get(key) || [];
+                        current.push({ id: spec.id, name: spec.name });
+                        microSkillToSpec.set(key, current);
+                    });
+                });
+            });
+
+        const upskillById = new Map((upskillDefinitions || []).map((def) => [def.id, def]));
+        const deepWorkById = new Map((deepWorkDefinitions || []).map((def) => [def.id, def]));
+        const today = startOfDay(new Date());
+        const effectiveTasks = getEffectiveBotheringTasks(activeBotheringPoint);
+        const found = new Map<string, { specializationId: string; specializationName: string }>();
+        const taskToSpecIds = new Map<string, Set<string>>();
+        const taskTypeByTaskId = new Map<string, ActivityType>();
+        let linkedUpskillTaskCount = 0;
+        let suggestedEndDate: string | null = null;
+
+        const trackTaskSpec = (task: NonNullable<MindsetPoint['tasks']>[number], spec: { id: string; name: string }) => {
+            const key = task.id;
+            if (!taskToSpecIds.has(key)) {
+                taskToSpecIds.set(key, new Set<string>());
+            }
+            taskToSpecIds.get(key)!.add(spec.id);
+        };
+
+        effectiveTasks.forEach((task) => {
+            taskTypeByTaskId.set(task.id, task.type);
+            let resolvedForThisTask = false;
+
+            // Routine task may already point to specialization id directly.
+            const byDirectSpecId =
+                specializationList.find((spec) => spec.id === task.activityId) ||
+                specializationList.find((spec) => spec.id === task.id);
+            if (byDirectSpecId) {
+                found.set(byDirectSpecId.id, { specializationId: byDirectSpecId.id, specializationName: byDirectSpecId.name });
+                trackTaskSpec(task, byDirectSpecId);
+                resolvedForThisTask = true;
+            }
+
+            // Routine details can be specialization name directly (e.g. "Graphics Rendering").
+            const taskDetailSpec = specializationByName.get(normalizeText(task.details));
+            if (taskDetailSpec) {
+                found.set(taskDetailSpec.id, { specializationId: taskDetailSpec.id, specializationName: taskDetailSpec.name });
+                trackTaskSpec(task, taskDetailSpec);
+                resolvedForThisTask = true;
+            }
+
+            const byId = upskillById.get(task.activityId || '') || upskillById.get(task.id || '');
+            const byName = (upskillDefinitions || []).find((def) => normalizeText(def.name) === normalizeText(task.details));
+            const byDeepId = deepWorkById.get(task.activityId || '') || deepWorkById.get(task.id || '');
+            const byDeepName = (deepWorkDefinitions || []).find((def) => normalizeText(def.name) === normalizeText(task.details));
+            const definition = byId || byName || byDeepId || byDeepName;
+
+            if (!definition) {
+                if (resolvedForThisTask) linkedUpskillTaskCount += 1;
+                return;
+            }
+
+            const categoryKey = normalizeText(definition.category);
+            const directCategorySpec = specializationByName.get(categoryKey);
+            if (directCategorySpec) {
+                found.set(directCategorySpec.id, {
+                    specializationId: directCategorySpec.id,
+                    specializationName: directCategorySpec.name,
+                });
+                trackTaskSpec(task, directCategorySpec);
+                resolvedForThisTask = true;
+            }
+            const specCandidates = [
+                ...(skillAreaToSpec.get(categoryKey) || []),
+                ...(microSkillToSpec.get(categoryKey) || []),
+            ];
+            specCandidates.forEach((spec) => {
+                if (!found.has(spec.id)) {
+                    found.set(spec.id, { specializationId: spec.id, specializationName: spec.name });
+                }
+                trackTaskSpec(task, spec);
+                resolvedForThisTask = true;
+            });
+
+            if (resolvedForThisTask) linkedUpskillTaskCount += 1;
+        });
+
+        const targets = Array.from(found.values()).map((spec) => {
+            const specialization = specializationList.find((s) => s.id === spec.specializationId);
+            const learningPlan = offerizationPlans?.[spec.specializationId]?.learningPlan;
+            const audioCount = learningPlan?.audioVideoResources?.length || 0;
+            const bookCount = learningPlan?.bookWebpageResources?.length || 0;
+            const totalPages = (learningPlan?.bookWebpageResources || []).reduce((sum, resource) => sum + (resource.totalPages || 0), 0);
+            const totalHours = (learningPlan?.audioVideoResources || []).reduce((sum, resource) => sum + (resource.totalHours || 0), 0);
+            const completedPages = (specialization?.skillAreas || []).reduce(
+                (sum, area) => sum + area.microSkills.reduce((inner, ms) => inner + (ms.completedPages || 0), 0),
+                0
+            );
+            const completedHours = (specialization?.skillAreas || []).reduce(
+                (sum, area) => sum + area.microSkills.reduce((inner, ms) => inner + (ms.completedHours || 0), 0),
+                0
+            );
+            const remainingPages = Math.max(0, totalPages - completedPages);
+            const remainingHours = Math.max(0, totalHours - completedHours);
+            const hasLearningPlan = audioCount > 0 || bookCount > 0;
+            const projectPlans = (offerizationPlans?.[spec.specializationId]?.releases || []).map((release) => ({
+                id: release.id,
+                name: release.name,
+                launchDate: release.launchDate,
+                description: release.description,
+                focusAreaCount: (release.focusAreaIds || []).length,
+                workflowStages: release.workflowStages
+                    ? {
+                        botheringText: release.workflowStages.botheringText,
+                        ideaItems: release.workflowStages.ideaItems || [],
+                        codeItems: release.workflowStages.codeItems || [],
+                        breakItems: release.workflowStages.breakItems || [],
+                        fixItems: release.workflowStages.fixItems || [],
+                    }
+                    : undefined,
+            }));
+            const projectPlanCount = projectPlans.length;
+            const hasProjectPlan = projectPlanCount > 0;
+            const projectPlanSummary = hasProjectPlan
+                ? `${projectPlanCount} project plan${projectPlanCount > 1 ? 's' : ''}`
+                : 'No project plan yet';
+            const resourceCompletionDates = [
+                ...(learningPlan?.audioVideoResources || []).map((resource) => normalizeDateKey(resource.completionDate)),
+                ...(learningPlan?.bookWebpageResources || []).map((resource) => normalizeDateKey(resource.completionDate)),
+            ].filter((date): date is string => !!date);
+            const audioCompletionDates = (learningPlan?.audioVideoResources || [])
+                .map((resource) => normalizeDateKey(resource.completionDate))
+                .filter((date): date is string => !!date);
+            const bookCompletionDates = (learningPlan?.bookWebpageResources || [])
+                .map((resource) => normalizeDateKey(resource.completionDate))
+                .filter((date): date is string => !!date);
+            const latestLearningPlanEndDate = resourceCompletionDates.reduce<string | null>(
+                (latest, date) => (!latest || date > latest ? date : latest),
+                null
+            );
+            const latestAudioEndDate = audioCompletionDates.reduce<string | null>(
+                (latest, date) => (!latest || date > latest ? date : latest),
+                null
+            );
+            const latestBookEndDate = bookCompletionDates.reduce<string | null>(
+                (latest, date) => (!latest || date > latest ? date : latest),
+                null
+            );
+            if (latestLearningPlanEndDate && (!suggestedEndDate || latestLearningPlanEndDate > suggestedEndDate)) {
+                suggestedEndDate = latestLearningPlanEndDate;
+            }
+            const daysRemaining = latestLearningPlanEndDate
+                ? Math.max(0, differenceInDays(startOfDay(parseISO(latestLearningPlanEndDate)), today))
+                : null;
+            const audioDaysRemaining = latestAudioEndDate
+                ? Math.max(0, differenceInDays(startOfDay(parseISO(latestAudioEndDate)), today))
+                : null;
+            const bookDaysRemaining = latestBookEndDate
+                ? Math.max(0, differenceInDays(startOfDay(parseISO(latestBookEndDate)), today))
+                : null;
+            const dailyPageTarget =
+                bookCount > 0 && remainingPages > 0 && bookDaysRemaining != null
+                    ? Math.max(1, Math.ceil(remainingPages / Math.max(1, bookDaysRemaining || 1)))
+                    : null;
+            const dailyHourTarget =
+                audioCount > 0 && remainingHours > 0 && audioDaysRemaining != null
+                    ? Math.max(0.1, Number((remainingHours / Math.max(1, audioDaysRemaining || 1)).toFixed(1)))
+                    : null;
+            const learningPlanSummary = hasLearningPlan
+                ? `${audioCount} audio/video, ${bookCount} books/webpages`
+                : 'No learning plan yet';
+
+            return {
+                specializationId: spec.specializationId,
+                specializationName: spec.specializationName,
+                hasLearningPlan,
+                learningPlanSummary,
+                hasProjectPlan,
+                projectPlanSummary,
+                projectPlans,
+                latestLearningPlanEndDate,
+                totalPages,
+                totalHours,
+                daysRemaining,
+                dailyPageTarget,
+                dailyHourTarget,
+                audioCount,
+                bookCount,
+                latestAudioEndDate,
+                latestBookEndDate,
+                audioDaysRemaining,
+                bookDaysRemaining,
+                completedPages,
+                completedHours,
+                remainingPages,
+                remainingHours,
+            };
+        });
+        const targetBySpecId = new Map(targets.map((target) => [target.specializationId, target] as const));
+        const taskLearningPlanByTaskId = new Map<string, {
+            specializationId: string;
+            specializationName: string;
+            taskType: ActivityType;
+            hasLearningPlan: boolean;
+            learningPlanSummary: string;
+            hasProjectPlan: boolean;
+            projectPlanSummary: string;
+            projectPlans: Array<{
+                id: string;
+                name: string;
+                launchDate: string;
+                description?: string;
+                focusAreaCount: number;
+                workflowStages?: {
+                    botheringText?: string;
+                    ideaItems: Array<string | { text: string; completed?: boolean }>;
+                    codeItems: Array<string | { text: string; completed?: boolean }>;
+                    breakItems: Array<string | { text: string; completed?: boolean }>;
+                    fixItems: Array<string | { text: string; completed?: boolean }>;
+                };
+            }>;
+            latestLearningPlanEndDate: string | null;
+            totalPages: number;
+            totalHours: number;
+            daysRemaining: number | null;
+            dailyPageTarget: number | null;
+            dailyHourTarget: number | null;
+            audioCount: number;
+            bookCount: number;
+            latestAudioEndDate: string | null;
+            latestBookEndDate: string | null;
+            audioDaysRemaining: number | null;
+            bookDaysRemaining: number | null;
+            completedPages: number;
+            completedHours: number;
+            remainingPages: number;
+            remainingHours: number;
+        }>();
+        taskToSpecIds.forEach((specIds, taskId) => {
+            const firstSpecId = Array.from(specIds)[0];
+            if (!firstSpecId) return;
+            const target = targetBySpecId.get(firstSpecId);
+            if (!target) return;
+            taskLearningPlanByTaskId.set(taskId, {
+                specializationId: target.specializationId,
+                specializationName: target.specializationName,
+                taskType: taskTypeByTaskId.get(taskId) || 'upskill',
+                hasLearningPlan: target.hasLearningPlan,
+                learningPlanSummary: target.learningPlanSummary,
+                hasProjectPlan: target.hasProjectPlan,
+                projectPlanSummary: target.projectPlanSummary,
+                projectPlans: target.projectPlans,
+                latestLearningPlanEndDate: target.latestLearningPlanEndDate,
+                totalPages: target.totalPages,
+                totalHours: target.totalHours,
+                daysRemaining: target.daysRemaining,
+                dailyPageTarget: target.dailyPageTarget,
+                dailyHourTarget: target.dailyHourTarget,
+                audioCount: target.audioCount,
+                bookCount: target.bookCount,
+                latestAudioEndDate: target.latestAudioEndDate,
+                latestBookEndDate: target.latestBookEndDate,
+                audioDaysRemaining: target.audioDaysRemaining,
+                bookDaysRemaining: target.bookDaysRemaining,
+                completedPages: target.completedPages,
+                completedHours: target.completedHours,
+                remainingPages: target.remainingPages,
+                remainingHours: target.remainingHours,
+            });
+        });
+        return {
+            linkedUpskillTaskCount,
+            suggestedEndDate,
+            taskLearningPlanByTaskId,
+            targets,
+        };
+    }, [activeBotheringPoint, coreSkills, deepWorkDefinitions, getEffectiveBotheringTasks, offerizationPlans, upskillDefinitions]);
+
+    const shouldShowCompletionResolutionInput = useMemo(() => {
+        if (!activeBotheringPoint) return true;
+        const effectiveTasks = getEffectiveBotheringTasks(activeBotheringPoint);
+        if (effectiveTasks.length === 0) return true;
+        return !effectiveTasks.every((task) => task.type === 'upskill');
+    }, [activeBotheringPoint, getEffectiveBotheringTasks]);
+
     const globallyLinkedMismatchIds = useMemo(() => {
         const ids = new Set<string>();
         (constraintCard?.points || []).forEach(point => {
@@ -749,6 +1131,25 @@ export function MindsetCategoriesCard() {
             (point) => ({ ...point, coreDomainId: point.coreDomainId || fallbackCore })
         );
     }, [botheringPopup?.type, activeBotheringPoint?.id, activeBotheringPoint?.coreDomainId, updateBotheringPoint]);
+
+    useEffect(() => {
+        if (!botheringPopup || !activeBotheringPoint) return;
+        if (linkedUpskillLearningInsight.linkedUpskillTaskCount === 0) return;
+        const suggestedEndDate = linkedUpskillLearningInsight.suggestedEndDate;
+        if (!suggestedEndDate) return;
+        if (activeBotheringPoint.endDate === suggestedEndDate) return;
+
+        updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({
+            ...point,
+            endDate: suggestedEndDate,
+        }));
+    }, [
+        botheringPopup,
+        activeBotheringPoint,
+        linkedUpskillLearningInsight.linkedUpskillTaskCount,
+        linkedUpskillLearningInsight.suggestedEndDate,
+        updateBotheringPoint,
+    ]);
 
     const addStopperToBothering = useCallback((link: { stopper: Stopper; isUrge: boolean }) => {
         if (!botheringPopup || !activeBotheringPoint) return;
@@ -1517,13 +1918,13 @@ export function MindsetCategoriesCard() {
             {botheringPopup && activeBotheringPoint && (
                 <div className="fixed inset-0 z-[170] pointer-events-none">
                     <div className="pointer-events-auto fixed inset-0 flex items-center justify-center">
-                        <div className="w-[700px] max-w-[95vw] bg-[#151517]/95 border border-white/10 rounded-2xl shadow-2xl">
-                            <div className="p-4 border-b border-white/10 flex items-start justify-between gap-2">
+                        <div className="w-[960px] max-w-[96vw] max-h-[88vh] overflow-hidden rounded-2xl border border-white/10 bg-[#121216]/95 shadow-[0_30px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+                            <div className="px-5 py-4 border-b border-white/10 bg-black/20 flex items-start justify-between gap-3">
                                 <div className="space-y-2 flex-1 min-w-0">
-                                    <div className="text-base font-semibold">
+                                    <div className="text-lg font-semibold">
                                         {botheringPopup.type === 'mismatch' ? 'Mismatch Bothering' : botheringPopup.type === 'constraint' ? 'Constraint Bothering' : 'External Bothering'}
                                     </div>
-                                    <div className="pt-1 space-y-1">
+                                    <div className="pt-1 space-y-2 rounded-xl border border-white/10 bg-black/25 p-3">
                                         <div className="flex items-center justify-between gap-2">
                                             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Title</Label>
                                             {isEditingBotheringTitle ? (
@@ -1580,59 +1981,62 @@ export function MindsetCategoriesCard() {
                                                 className="!min-h-0 resize-none overflow-hidden leading-snug border-none bg-transparent px-0 py-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                                             />
                                         ) : (
-                                            <div className="text-sm text-foreground/90 whitespace-pre-wrap break-words">
+                                            <div className="text-base font-medium text-foreground/95 whitespace-pre-wrap break-words">
                                                 {activeBotheringPoint.text}
                                             </div>
                                         )}
                                     </div>
-                                    {botheringPopup.type === 'mismatch' && (
-                                        <div className="pt-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                        {botheringPopup.type === 'mismatch' && (
+                                            <div>
+                                                <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Mismatch Type</div>
+                                                <Select
+                                                    value={activeBotheringPoint.mismatchType ?? 'mental-model'}
+                                                    onValueChange={(v) => updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({ ...point, mismatchType: v as MindsetPoint['mismatchType'] }))}
+                                                >
+                                                    <SelectTrigger className="h-9 w-full">
+                                                        <SelectValue placeholder="Mismatch type" />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="z-[200]">
+                                                        <SelectItem value="mental-model">Mental model mismatch</SelectItem>
+                                                        <SelectItem value="cognitive-load">Cognitive load mismatch</SelectItem>
+                                                        <SelectItem value="threat-prediction">Threat prediction mismatch</SelectItem>
+                                                        <SelectItem value="action-sequencing">Action sequencing mismatch</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
+                                        <div>
+                                            <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Core Type</div>
                                             <Select
-                                                value={activeBotheringPoint.mismatchType ?? 'mental-model'}
-                                                onValueChange={(v) => updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({ ...point, mismatchType: v as MindsetPoint['mismatchType'] }))}
+                                                value={activeSelectedCore}
+                                                onValueChange={(value) =>
+                                                    updateBotheringPoint(
+                                                        botheringPopup.type,
+                                                        activeBotheringPoint.id,
+                                                        (point) => ({ ...point, coreDomainId: value as CoreDomainId })
+                                                    )
+                                                }
                                             >
-                                                <SelectTrigger className="h-8 w-[240px]">
-                                                    <SelectValue placeholder="Mismatch type" />
+                                                <SelectTrigger className="h-9 w-full">
+                                                    <SelectValue placeholder="Select core type" />
                                                 </SelectTrigger>
                                                 <SelectContent className="z-[200]">
-                                                    <SelectItem value="mental-model">Mental model mismatch</SelectItem>
-                                                    <SelectItem value="cognitive-load">Cognitive load mismatch</SelectItem>
-                                                    <SelectItem value="threat-prediction">Threat prediction mismatch</SelectItem>
-                                                    <SelectItem value="action-sequencing">Action sequencing mismatch</SelectItem>
+                                                    {activeCoreOptions.map(option => (
+                                                        <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
+                                                    ))}
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                    )}
-                                    <div className="pt-2">
-                                        <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Core Type</div>
-                                        <Select
-                                            value={activeSelectedCore}
-                                            onValueChange={(value) =>
-                                                updateBotheringPoint(
-                                                    botheringPopup.type,
-                                                    activeBotheringPoint.id,
-                                                    (point) => ({ ...point, coreDomainId: value as CoreDomainId })
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger className="h-8 w-[240px]">
-                                                <SelectValue placeholder="Select core type" />
-                                            </SelectTrigger>
-                                            <SelectContent className="z-[200]">
-                                                {activeCoreOptions.map(option => (
-                                                    <SelectItem key={option.id} value={option.id}>{option.label}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
                                     </div>
                                 </div>
                                 <Button variant="ghost" size="icon" className="shrink-0" onClick={() => setBotheringPopup(null)}>
                                     <X className="h-4 w-4" />
                                 </Button>
                             </div>
-                            <div className="p-4 grid grid-cols-2 gap-4">
-                                <div className="space-y-4">
-                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
+                            <div className="p-5 grid grid-cols-1 lg:grid-cols-12 gap-4">
+                                <div className="lg:col-span-5 space-y-4 max-h-[calc(88vh-240px)] overflow-y-auto pr-1">
+                                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
                                         <div className="text-xs uppercase tracking-wide text-muted-foreground">Helping Habits</div>
                                         <div className="flex gap-2">
                                             <Select value={selectedBotheringHabitId} onValueChange={setSelectedBotheringHabitId}>
@@ -1682,7 +2086,7 @@ export function MindsetCategoriesCard() {
                                         </div>
                                     </div>
 
-                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
+                                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-2">
                                         <div className="text-xs uppercase tracking-wide text-muted-foreground">Resistances &amp; Urges</div>
                                         {linkedStoppers.length === 0 ? (
                                             <div className="text-xs text-muted-foreground">No urges or resistances linked yet.</div>
@@ -1719,23 +2123,25 @@ export function MindsetCategoriesCard() {
                                         )}
                                     </div>
 
-                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-2">
+                                    <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3 space-y-3">
                                         <div className="text-xs uppercase tracking-wide text-muted-foreground">Completion</div>
-                                        <Textarea
-                                            value={activeBotheringPoint.resolution || ''}
-                                            onChange={(e) => updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({ ...point, resolution: e.target.value }))}
-                                            placeholder="What ends this bothering? (clear resolution)"
-                                        />
+                                        {shouldShowCompletionResolutionInput && (
+                                            <Textarea
+                                                value={activeBotheringPoint.resolution || ''}
+                                                onChange={(e) => updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({ ...point, resolution: e.target.value }))}
+                                                placeholder="What ends this bothering? (clear resolution)"
+                                            />
+                                        )}
                                         <div className="flex items-center gap-2">
                                             <Label className="text-xs text-muted-foreground">End date</Label>
                                             <Input
                                                 type="date"
                                                 value={activeBotheringPoint.endDate || ''}
                                                 onChange={(e) => updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({ ...point, endDate: e.target.value }))}
-                                                className="h-8 w-auto"
+                                                className="h-9 w-auto"
                                             />
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex flex-wrap items-center gap-2">
                                             {(!activeBotheringPoint.endDate || activeBotheringPoint.endDate.trim() === "") && (
                                                 <span className="text-xs text-muted-foreground">No end date</span>
                                             )}
@@ -1746,6 +2152,7 @@ export function MindsetCategoriesCard() {
                                                     !!activeBotheringPoint.endDate &&
                                                     (activeBotheringPoint.tasks?.some(t => !t.completed) ?? false)
                                                 }
+                                                className="h-9"
                                                 onClick={() => updateBotheringPoint(botheringPopup.type, activeBotheringPoint.id, (point) => ({ ...point, completed: !point.completed }))}
                                             >
                                                 {activeBotheringPoint.completed ? 'Mark Active' : 'Mark Complete'}
@@ -1760,7 +2167,7 @@ export function MindsetCategoriesCard() {
                                     </div>
                                 </div>
                                 {botheringPopup.type !== 'constraint' && (
-                                <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
+                                <div className="lg:col-span-7 rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3 max-h-[calc(88vh-240px)] overflow-y-auto pr-2">
                                         <div className="text-xs uppercase tracking-wide text-muted-foreground">Tasks</div>
                                         {botheringPopup.type !== 'constraint' && (
                                             <>
@@ -1828,14 +2235,150 @@ export function MindsetCategoriesCard() {
     <ul className="space-y-2">
         {(activeBotheringPoint.tasks || []).map((task) => {
             const counts = getRecurringTaskCounts(task);
+            const learningPlanMeta = linkedUpskillLearningInsight.taskLearningPlanByTaskId.get(task.id);
             return (
-            <li key={task.id} className="relative overflow-hidden text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
+            <li key={task.id} className="relative overflow-hidden text-sm p-3 rounded-lg bg-muted/30 border border-white/5">
                 <div className="min-w-0 pr-8">
                     <p className="break-words leading-snug">{task.details}</p>
                     {counts && (
                         <p className="text-[11px] text-muted-foreground">
                             {counts.completed} done | {counts.missed} missed
                         </p>
+                    )}
+                    {learningPlanMeta && (
+                        learningPlanMeta.taskType === 'deepwork' ? (
+                            learningPlanMeta.hasProjectPlan ? (
+                                <div className="mt-2 space-y-1 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-2">
+                                    <p className="text-[11px] text-emerald-400">{learningPlanMeta.projectPlanSummary}</p>
+                                    <div className="grid grid-cols-1 gap-2 text-[11px]">
+                                        {learningPlanMeta.projectPlans.map((plan) => {
+                                            const daysLeft = plan.launchDate
+                                                ? Math.max(0, differenceInDays(startOfDay(parseISO(plan.launchDate)), startOfDay(new Date())))
+                                                : null;
+                                            const stages = plan.workflowStages;
+                                            const stageRows = [
+                                                { label: 'Idea', items: stages?.ideaItems || [] },
+                                                { label: 'Code', items: stages?.codeItems || [] },
+                                                { label: 'Break', items: stages?.breakItems || [] },
+                                                { label: 'Fix', items: stages?.fixItems || [] },
+                                            ];
+                                            const normalizeStageItem = (item: string | { text: string; completed?: boolean }) =>
+                                                typeof item === 'string'
+                                                    ? { text: item, completed: false }
+                                                    : { text: item.text || '', completed: !!item.completed };
+                                            const allStageItems = stageRows.flatMap((stage) => stage.items.map(normalizeStageItem));
+                                            const totalItems = allStageItems.length;
+                                            const completedItems = allStageItems.filter((item) => item.completed).length;
+                                            const remainingItems = Math.max(0, totalItems - completedItems);
+                                            const itemsPerDay = daysLeft == null
+                                                ? null
+                                                : daysLeft <= 0
+                                                    ? remainingItems
+                                                    : Number((remainingItems / daysLeft).toFixed(1));
+                                            return (
+                                                <div key={plan.id} className="rounded border border-white/10 bg-black/20 p-2">
+                                                    <p className="font-medium text-emerald-300">{plan.name || 'Untitled Project'}</p>
+                                                    <div className="mt-1 grid grid-cols-2 gap-1 text-muted-foreground">
+                                                        <span>End: {plan.launchDate ? format(parseISO(plan.launchDate), 'PPP') : 'Not set'}</span>
+                                                        <span>Days left: {daysLeft != null ? daysLeft : 'N/A'}</span>
+                                                        <span>Micro-skills: {plan.focusAreaCount}</span>
+                                                        <span>Status: {daysLeft === 0 ? 'Due' : 'In progress'}</span>
+                                                        <span>Items: {completedItems}/{totalItems}</span>
+                                                        <span>Items/day: {itemsPerDay != null ? itemsPerDay : 'N/A'}</span>
+                                                    </div>
+                                                    {plan.description && (
+                                                        <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">{plan.description}</p>
+                                                    )}
+                                                    <div className="mt-2 space-y-1 rounded border border-white/10 bg-black/30 p-2 text-[11px]">
+                                                        <p className="font-medium text-emerald-300">Stages</p>
+                                                        <div className="text-muted-foreground">
+                                                            <span className="font-medium text-foreground/90">Bothering:</span>{' '}
+                                                            {stages?.botheringText || 'Not linked'}
+                                                        </div>
+                                                        {stageRows.map((stage) => (
+                                                            <div key={stage.label} className="text-muted-foreground">
+                                                                <span className="font-medium text-foreground/90">{stage.label}:</span>
+                                                                {stage.items.length > 0 ? (
+                                                                    <div className="mt-1 space-y-1">
+                                                                        {stage.items.map((item, itemIndex) => {
+                                                                            const normalizedItem = normalizeStageItem(item);
+                                                                            return (
+                                                                                <div key={`${stage.label}-${itemIndex}`} className="flex items-center gap-1">
+                                                                                    {normalizedItem.completed ? (
+                                                                                        <Check className="h-3 w-3 text-emerald-400" />
+                                                                                    ) : (
+                                                                                        <div className="h-3 w-3 rounded-sm border border-white/30" />
+                                                                                    )}
+                                                                                    <span className={cn(normalizedItem.completed && "line-through text-muted-foreground")}>
+                                                                                        {normalizedItem.text}
+                                                                                    </span>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="ml-1">No items</span>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                        <div className="text-muted-foreground">
+                                                            <span className="font-medium text-foreground/90">Done:</span> Stop & ship
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ) : (
+                                <Button
+                                    variant="link"
+                                    className="mt-1 h-auto p-0 text-[11px] text-yellow-300"
+                                    onClick={() => router.push('/strategic-planning?tab=offerization')}
+                                >
+                                    Add project plan for {learningPlanMeta.specializationName}
+                                </Button>
+                            )
+                        ) : learningPlanMeta.hasLearningPlan ? (
+                            <div className="mt-2 space-y-1 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-2">
+                                <div className="grid grid-cols-1 gap-2 text-[11px]">
+                                    {learningPlanMeta.audioCount > 0 && (
+                                    <div className="rounded border border-white/10 bg-black/20 p-2">
+                                        <p className="font-medium text-emerald-300">Audio/Video ({learningPlanMeta.audioCount})</p>
+                                        <div className="mt-1 grid grid-cols-2 gap-1 text-muted-foreground">
+                                            <span>Hours: {learningPlanMeta.totalHours}</span>
+                                            <span>Completed: {learningPlanMeta.completedHours}</span>
+                                            <span>End: {learningPlanMeta.latestAudioEndDate ? format(parseISO(learningPlanMeta.latestAudioEndDate), 'PPP') : 'Not set'}</span>
+                                            <span>Days left: {learningPlanMeta.audioDaysRemaining != null ? learningPlanMeta.audioDaysRemaining : 'N/A'}</span>
+                                            <span>Remaining: {learningPlanMeta.remainingHours}</span>
+                                            <span>Daily target: {learningPlanMeta.dailyHourTarget != null ? `${learningPlanMeta.dailyHourTarget} hrs/day` : 'Done'}</span>
+                                        </div>
+                                    </div>
+                                    )}
+                                    {learningPlanMeta.bookCount > 0 && (
+                                    <div className="rounded border border-white/10 bg-black/20 p-2">
+                                        <p className="font-medium text-emerald-300">Books/Webpages ({learningPlanMeta.bookCount})</p>
+                                        <div className="mt-1 grid grid-cols-2 gap-1 text-muted-foreground">
+                                            <span>Pages: {learningPlanMeta.totalPages}</span>
+                                            <span>Completed: {learningPlanMeta.completedPages}</span>
+                                            <span>End: {learningPlanMeta.latestBookEndDate ? format(parseISO(learningPlanMeta.latestBookEndDate), 'PPP') : 'Not set'}</span>
+                                            <span>Days left: {learningPlanMeta.bookDaysRemaining != null ? learningPlanMeta.bookDaysRemaining : 'N/A'}</span>
+                                            <span>Remaining: {learningPlanMeta.remainingPages}</span>
+                                            <span>Daily target: {learningPlanMeta.dailyPageTarget != null ? `${learningPlanMeta.dailyPageTarget} pages/day` : 'Done'}</span>
+                                        </div>
+                                    </div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <Button
+                                variant="link"
+                                className="mt-1 h-auto p-0 text-[11px] text-yellow-300"
+                                onClick={() => router.push('/strategic-planning?tab=offerization')}
+                            >
+                                Add learning plan for {learningPlanMeta.specializationName}
+                            </Button>
+                        )
                     )}
                 </div>
                 <Button
@@ -1870,7 +2413,7 @@ export function MindsetCategoriesCard() {
                                 </div>
                                 )}
                                 {botheringPopup.type === 'constraint' && (
-                                    <div className="rounded-xl border border-white/10 bg-black/20 p-3 space-y-3">
+                                    <div className="lg:col-span-7 rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3 max-h-[calc(88vh-240px)] overflow-y-auto pr-2">
                                         <div className="text-xs uppercase tracking-wide text-muted-foreground">Linked mismatches</div>
                                         <div className="rounded-lg border border-white/10 bg-black/20 p-2 space-y-2">
                                             <div className="text-xs uppercase tracking-wide text-muted-foreground">Link mismatch bothering</div>

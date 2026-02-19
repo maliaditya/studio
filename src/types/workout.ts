@@ -236,6 +236,14 @@ export interface Release {
   description: string;
   launchDate: string; // yyyy-MM-dd format
   focusAreaIds: string[];
+  workflowStages?: {
+    botheringPointId?: string | null;
+    botheringText?: string;
+    ideaItems: Array<string | { text: string; completed?: boolean }>;
+    codeItems: Array<string | { text: string; completed?: boolean }>;
+    breakItems: Array<string | { text: string; completed?: boolean }>;
+    fixItems: Array<string | { text: string; completed?: boolean }>;
+  };
   features?: string[];
   daysRemaining?: number;
   availableHours?: number;

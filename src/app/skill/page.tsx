@@ -93,32 +93,38 @@ const SpecializationItem: React.FC<{
 
     return (
         <div style={{ marginLeft: `${level * 20}px` }}>
-            <Droppable id={spec.id} className="group rounded-md hover:bg-muted">
-                <div ref={setNodeRef} style={style} className="flex items-center justify-between p-2">
-                    <button className="flex items-center gap-2 flex-grow min-w-0" onClick={() => onSelect(spec.id)}>
+            <Droppable id={spec.id} className="group rounded-lg border border-transparent hover:border-border/60 hover:bg-muted/40 transition-colors min-w-0">
+                <div ref={setNodeRef} style={style} className="grid grid-cols-[minmax(0,1fr)_112px] items-center p-2.5 min-w-0 gap-1">
+                    <button className="flex items-start gap-2 min-w-0" onClick={() => onSelect(spec.id)}>
                         <span {...listeners} {...attributes} className="cursor-grab p-1 -ml-1">
                             <GripVertical className="h-4 w-4 text-muted-foreground" />
                         </span>
-                        <BrainCircuit className="h-4 w-4 flex-shrink-0" />
-                        <span className={cn("text-sm truncate", selectedSkillId === spec.id && 'font-semibold text-primary')} title={spec.name}>
-                            {spec.name}
-                        </span>
+                        <BrainCircuit className={cn("h-4 w-4 flex-shrink-0 mt-0.5", selectedSkillId === spec.id && "text-primary")} />
+                        <div className="min-w-0 flex-1 text-left">
+                            <span className={cn("text-sm block truncate", selectedSkillId === spec.id ? 'font-semibold text-primary' : 'text-foreground/90')} title={spec.name}>
+                                {spec.name}
+                            </span>
+                            {totalEst > 0 && (
+                                <span className="text-[11px] text-muted-foreground block truncate">
+                                    {formatMinutes(totalEst)} est / {formatMinutes(totalLogged)} log
+                                </span>
+                            )}
+                        </div>
                     </button>
-                    <div className="flex items-center opacity-0 group-hover:opacity-100">
-                        {totalEst > 0 && <Badge variant="secondary" className="mr-2 text-xs">{formatMinutes(totalEst)} est / {formatMinutes(totalLogged)} log</Badge>}
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDownload(spec.id)}>
-                            <Download className="h-4 w-4 text-blue-500" />
+                    <div className={cn("flex items-center justify-end gap-0.5 w-[112px] shrink-0 transition-opacity", selectedSkillId === spec.id ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDownload(spec.id)}>
+                            <Download className="h-3.5 w-3.5 text-blue-500" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddSub(spec.id)}>
-                            <Plus className="h-4 w-4 text-green-500" />
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onAddSub(spec.id)}>
+                            <Plus className="h-3.5 w-3.5 text-green-500" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEdit(spec)}><Edit className="h-4 w-4"/></Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onDelete(spec.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onEdit(spec)}><Edit className="h-3.5 w-3.5"/></Button>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDelete(spec.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                     </div>
                 </div>
             </Droppable>
             {childSpecs.length > 0 && (
-                <div className="pl-4 border-l-2 ml-4">
+                <div className="pl-3 border-l border-border/50 ml-4 mt-1 space-y-1">
                     {childSpecs.map(child => {
                         return (
                             <SpecializationItem
@@ -180,6 +186,7 @@ function SkillPageContent() {
     setSelectedMicroSkill,
     offerizationPlans,
     logSubTaskTime,
+    mindsetCards,
   } = useAuth();
   
   const router = useRouter();
@@ -225,6 +232,7 @@ function SkillPageContent() {
   const [progressInput, setProgressInput] = useState<{ items: string, hours: string, pages: string }>({ items: '', hours: '', pages: '' });
 
   const [isDeepWorkModalOpen, setIsDeepWorkModalOpen] = useState(false);
+  const [specializationFilter, setSpecializationFilter] = useState<'all' | 'linked'>('all');
 
 
   useEffect(() => {
@@ -354,6 +362,62 @@ function SkillPageContent() {
 
     return totalsMap;
   }, [coreSkills, microSkillTotals]);
+
+  const linkedSpecializationIdsFromBotherings = useMemo(() => {
+    const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const microSkillToSpecIds = new Map<string, Set<string>>();
+
+    coreSkills
+      .filter((skill) => skill.type === 'Specialization')
+      .forEach((spec) => {
+        spec.skillAreas.forEach((area) => {
+          area.microSkills.forEach((microSkill) => {
+            const key = normalizeText(microSkill.name);
+            if (!key) return;
+            if (!microSkillToSpecIds.has(key)) {
+              microSkillToSpecIds.set(key, new Set<string>());
+            }
+            microSkillToSpecIds.get(key)!.add(spec.id);
+          });
+        });
+      });
+
+    const linkedTaskIds = new Set<string>();
+    const linkedTaskNames = new Set<string>();
+    (mindsetCards || [])
+      .filter((card) => card.id.startsWith('mindset_botherings_'))
+      .forEach((card) => {
+        card.points.forEach((point) => {
+          (point.tasks || []).forEach((task) => {
+            if (task.type !== 'deepwork' && task.type !== 'upskill') return;
+            if (task.activityId) linkedTaskIds.add(task.activityId);
+            if (task.id) linkedTaskIds.add(task.id);
+            const normalizedDetails = normalizeText(task.details);
+            if (normalizedDetails) linkedTaskNames.add(normalizedDetails);
+          });
+        });
+      });
+
+    const matchedSpecializationIds = new Set<string>();
+    coreSkills
+      .filter((skill) => skill.type === 'Specialization')
+      .forEach((spec) => {
+        if (linkedTaskNames.has(normalizeText(spec.name))) {
+          matchedSpecializationIds.add(spec.id);
+        }
+      });
+
+    [...deepWorkDefinitions, ...upskillDefinitions].forEach((definition) => {
+      const isMatchedById = linkedTaskIds.has(definition.id);
+      const isMatchedByName = linkedTaskNames.has(normalizeText(definition.name));
+      if (!isMatchedById && !isMatchedByName) return;
+
+      const specIds = microSkillToSpecIds.get(normalizeText(definition.category));
+      specIds?.forEach((specId) => matchedSpecializationIds.add(specId));
+    });
+
+    return matchedSpecializationIds;
+  }, [mindsetCards, coreSkills, deepWorkDefinitions, upskillDefinitions]);
   
   const domainTotals = useMemo(() => {
     const totalsMap = new Map<string, { totalEst: number, totalLogged: number }>();
@@ -1049,14 +1113,14 @@ function SkillPageContent() {
             </CardHeader>
             <CardContent className="flex-1 min-h-0 p-0 overflow-hidden">
               <ScrollArea className="h-full w-full">
-                <div className="p-6">
+                <div className="p-6 pr-8">
                   <Accordion type="multiple" className="w-full" value={expandedItems} onValueChange={handleExpansionChange}>
                 <AccordionItem value="skills-domains">
-                  <AccordionTrigger>Skills & Projects</AccordionTrigger>
+                  <AccordionTrigger className="text-base font-semibold">Skills & Projects</AccordionTrigger>
                   <AccordionContent>
                       <form onSubmit={handleAddDomain} className="flex gap-2 my-2">
-                        <Input value={newDomainName} onChange={e => setNewDomainName(e.target.value)} placeholder="New Domain" />
-                        <Button size="icon" type="submit"><PlusCircle className="h-4 w-4" /></Button>
+                        <Input className="h-9" value={newDomainName} onChange={e => setNewDomainName(e.target.value)} placeholder="New Domain" />
+                        <Button size="icon" type="submit" className="h-9 w-9 shrink-0"><PlusCircle className="h-4 w-4" /></Button>
                       </form>
                       <Accordion type="single" collapsible className="w-full" value={selectedDomainId || ''} onValueChange={handleSelectDomain}>
                         {skillDomains.map(domain => {
@@ -1067,12 +1131,16 @@ function SkillPageContent() {
                             const { totalEst, totalLogged } = domainTotals.get(domain.id) || { totalEst: 0, totalLogged: 0 };
                             
                             return (
-                                <AccordionItem value={domain.id} key={domain.id}>
-                                    <div className="flex items-center justify-between w-full group">
-                                        <AccordionTrigger className="flex-grow">
-                                          <div className="flex items-center gap-2">
-                                            <span>{domain.name}</span>
-                                            {totalEst > 0 && <Badge variant="outline" className="text-xs">{formatMinutes(totalEst)} est / {formatMinutes(totalLogged)} log</Badge>}
+                                <AccordionItem value={domain.id} key={domain.id} className="rounded-xl border border-border/60 bg-card/40 px-1 mb-3">
+                                    <div className="flex items-center justify-between w-full group min-w-0">
+                                        <AccordionTrigger className="flex-grow py-2.5 min-w-0">
+                                          <div className="flex flex-col items-start min-w-0 pr-2">
+                                            <span className="font-medium truncate max-w-full">{domain.name}</span>
+                                            {totalEst > 0 && (
+                                              <span className="text-[11px] text-muted-foreground truncate max-w-full">
+                                                {formatMinutes(totalEst)} est / {formatMinutes(totalLogged)} log
+                                              </span>
+                                            )}
                                           </div>
                                         </AccordionTrigger>
                                         <div className="flex items-center opacity-0 group-hover:opacity-100 ml-2">
@@ -1094,17 +1162,51 @@ function SkillPageContent() {
                                           </AlertDialog>
                                         </div>
                                     </div>
-                                    <AccordionContent>
-                                        <div className="space-y-2">
-                                            <h4 className="font-semibold text-xs text-muted-foreground px-2">Core Pillars</h4>
+                                    <AccordionContent className="pb-3">
+                                        <div className="space-y-3">
+                                            <div className="rounded-lg border border-border/50 bg-muted/20 p-2">
+                                            <h4 className="font-semibold text-[11px] uppercase tracking-wide text-muted-foreground px-1 pb-1">Core Pillars</h4>
                                             {domainCoreSkills.filter(s => s.type !== 'Specialization').map(skill => (
                                               <Button key={skill.id} variant="ghost" size="sm" className={cn("w-full justify-start", selectedSkillId === skill.id && "bg-accent font-semibold")} onClick={() => handleSelectCoreSkill(skill.id)}>
                                                   {skill.type === 'Foundation' ? <Blocks className="mr-2 h-4 w-4"/> : <Sprout className="mr-2 h-4 w-4"/>}
                                                   {skill.name}
                                               </Button>
                                             ))}
-                                            <h4 className="font-semibold text-xs text-muted-foreground px-2 pt-2">Specializations</h4>
-                                            {topLevelSpecializations.map(spec => {
+                                            </div>
+                                            <div className="rounded-lg border border-border/50 bg-muted/20 p-2 pr-3">
+                                            <div className="flex items-center justify-between px-1 pb-1 gap-2 min-w-0">
+                                              <h4 className="font-semibold text-[11px] uppercase tracking-wide text-muted-foreground truncate">Specializations</h4>
+                                              <div className="inline-flex items-center rounded-md bg-background border border-border/70 p-0.5 gap-0.5 shrink-0">
+                                                <Button
+                                                  type="button"
+                                                  size="sm"
+                                                  variant={specializationFilter === 'all' ? 'secondary' : 'ghost'}
+                                                  className="h-6 px-2 text-[11px]"
+                                                  onClick={() => setSpecializationFilter('all')}
+                                                >
+                                                  All
+                                                </Button>
+                                                <Button
+                                                  type="button"
+                                                  size="sm"
+                                                  variant={specializationFilter === 'linked' ? 'secondary' : 'ghost'}
+                                                  className="h-6 px-2 text-[11px]"
+                                                  onClick={() => setSpecializationFilter('linked')}
+                                                >
+                                                  Linked
+                                                </Button>
+                                              </div>
+                                            </div>
+                                            {topLevelSpecializations.filter(spec => {
+                                                if (specializationFilter === 'all') return true;
+                                                const hasLinkedInTree = (specId: string): boolean => {
+                                                    if (linkedSpecializationIdsFromBotherings.has(specId)) return true;
+                                                    const children = domainCoreSkills
+                                                        .filter(s => s.type === 'Specialization' && s.parentId === specId);
+                                                    return children.some(child => hasLinkedInTree(child.id));
+                                                };
+                                                return hasLinkedInTree(spec.id);
+                                            }).map(spec => {
                                                 const { totalEst, totalLogged } = specializationTotals.get(spec.id) || { totalEst: 0, totalLogged: 0 };
                                                 return (
                                                     <SpecializationItem
@@ -1123,12 +1225,14 @@ function SkillPageContent() {
                                                 );
                                             })}
                                             <div className="flex gap-2 pt-2">
-                                              <Input placeholder="New Specialization" value={newSpecializationNames[domain.id] || ''} onChange={e => setNewSpecializationNames(prev => ({...prev, [domain.id]: e.target.value}))}/>
-                                              <Button size="icon" onClick={() => handleAddSpecialization(domain.id)}><PlusCircle className="h-4 w-4"/></Button>
+                                              <Input className="h-9" placeholder="New Specialization" value={newSpecializationNames[domain.id] || ''} onChange={e => setNewSpecializationNames(prev => ({...prev, [domain.id]: e.target.value}))}/>
+                                              <Button size="icon" className="h-9 w-9 shrink-0" onClick={() => handleAddSpecialization(domain.id)}><PlusCircle className="h-4 w-4"/></Button>
                                             </div>
-                                            <h4 className="font-semibold text-xs text-muted-foreground px-2 pt-4">Projects</h4>
+                                            </div>
+                                            <div className="rounded-lg border border-border/50 bg-muted/20 p-2">
+                                            <h4 className="font-semibold text-[11px] uppercase tracking-wide text-muted-foreground px-1 pb-1">Projects</h4>
                                             {domainProjects.map(p => (
-                                                <div key={p.id} className="group flex items-center justify-between pl-2 rounded-md hover:bg-muted">
+                                                <div key={p.id} className="group flex items-center justify-between pl-2 rounded-md hover:bg-muted/60">
                                                     <Button variant="ghost" size="sm" className={cn("flex-grow justify-start", selectedProjectId === p.id && "bg-accent font-semibold")} onClick={() => handleSelectProject(p.id)}>
                                                         <Briefcase className="mr-2 h-4 w-4"/>
                                                         {p.name}
@@ -1153,8 +1257,9 @@ function SkillPageContent() {
                                                 </div>
                                             ))}
                                              <div className="flex gap-2 pt-2">
-                                              <Input placeholder="New Project" value={newProjectName} onChange={e => setNewProjectName(e.target.value)}/>
-                                              <Button size="icon" onClick={handleAddProject}><PlusCircle className="h-4 w-4"/></Button>
+                                              <Input className="h-9" placeholder="New Project" value={newProjectName} onChange={e => setNewProjectName(e.target.value)}/>
+                                              <Button size="icon" className="h-9 w-9 shrink-0" onClick={handleAddProject}><PlusCircle className="h-4 w-4"/></Button>
+                                            </div>
                                             </div>
                                         </div>
                                     </AccordionContent>
@@ -1165,11 +1270,11 @@ function SkillPageContent() {
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="professional-experience">
-                    <AccordionTrigger>Professional Experience</AccordionTrigger>
+                    <AccordionTrigger className="text-base font-semibold">Professional Experience</AccordionTrigger>
                     <AccordionContent>
                         <form onSubmit={handleAddCompany} className="flex gap-2 my-2">
-                            <Input value={newCompanyName} onChange={e => setNewCompanyName(e.target.value)} placeholder="New Company"/>
-                            <Button size="icon" type="submit"><PlusCircle className="h-4 w-4"/></Button>
+                            <Input className="h-9" value={newCompanyName} onChange={e => setNewCompanyName(e.target.value)} placeholder="New Company"/>
+                            <Button size="icon" className="h-9 w-9 shrink-0" type="submit"><PlusCircle className="h-4 w-4"/></Button>
                         </form>
                         <div className="space-y-2">
                             {companies.map(company => (
@@ -1259,6 +1364,7 @@ function SkillPageContent() {
               ) : selectedCoreSkill?.type === 'Foundation' ? (
                   <div className="space-y-4">
                       {coreSkills.filter(spec => {
+                          if (spec.domainId !== selectedCoreSkill.domainId) return false;
                           const specTotals = specializationTotals.get(spec.id);
                           return spec.type === 'Specialization' && specTotals && specTotals.totalLogged >= 1200; // 20 hours
                       }).sort((a,b) => (specializationTotals.get(b.id)?.totalLogged || 0) - (specializationTotals.get(a.id)?.totalLogged || 0))
@@ -1266,21 +1372,41 @@ function SkillPageContent() {
                           const allIntentions = spec.skillAreas.flatMap(area => 
                               area.microSkills.flatMap(ms => microSkillIntentions.get(ms.name) || [])
                           );
+                          const uniqueIntentions = Array.from(
+                              new Map(allIntentions.map((intention) => [intention.id, intention])).values()
+                          );
+                          const totalLogged = specializationTotals.get(spec.id)?.totalLogged || 0;
                           return (
                               <Card key={spec.id}>
                                   <CardHeader className="py-3">
                                       <CardTitle className="text-base">{spec.name}</CardTitle>
-                                      <CardDescription>
-                                          Total Logged: {formatMinutes((specializationTotals.get(spec.id)?.totalLogged || 0))}
-                                      </CardDescription>
+                                      <div className="flex flex-wrap items-center gap-2">
+                                          <Badge variant="secondary" className="text-xs">
+                                              {formatMinutes(totalLogged)} logged
+                                          </Badge>
+                                          <Badge variant="outline" className="text-xs">
+                                              {uniqueIntentions.length} intentions
+                                          </Badge>
+                                      </div>
                                   </CardHeader>
                                   <CardContent className="p-3 pt-0">
-                                      <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
-                                      {allIntentions.length > 0 ? (
-                                        <ul className="space-y-1 text-xs">
-                                          {allIntentions.map(intention => (
+                                      <div className="flex items-center justify-between mb-2">
+                                          <h4 className="font-semibold text-xs flex items-center gap-1">
+                                              <Lightbulb className="h-3 w-3 text-green-500" />
+                                              Intentions
+                                          </h4>
+                                      </div>
+                                      {uniqueIntentions.length > 0 ? (
+                                        <ul className="space-y-2">
+                                          {uniqueIntentions.map((intention, index) => (
                                             <li key={intention.id}>
-                                              <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
+                                              <button
+                                                onClick={() => openIntentionPopup(intention.id)}
+                                                className="w-full rounded-md border border-border/60 bg-muted/20 px-2 py-1.5 text-left text-sm text-foreground/90 hover:bg-accent hover:text-primary transition-colors"
+                                              >
+                                                <span className="text-[11px] text-muted-foreground mr-2">{index + 1}.</span>
+                                                <span className="break-words">{intention.name}</span>
+                                              </button>
                                             </li>
                                           ))}
                                         </ul>

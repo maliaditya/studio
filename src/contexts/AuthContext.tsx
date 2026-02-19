@@ -176,7 +176,12 @@ interface AuthContextType {
   focusDuration: number;
   onOpenFocusModal: (activity: Activity) => boolean;
   handleStartFocusSession: (activity: Activity, duration: number) => void;
-  onLogDuration: (activity: Activity, duration: number, moveToSlot?: SlotName) => void;
+  onLogDuration: (
+    activity: Activity,
+    duration: number,
+    moveToSlot?: SlotName,
+    progress?: { itemsCompleted?: number; hoursCompleted?: number; pagesCompleted?: number; microSkillName?: string }
+  ) => void;
   activeFocusSession: ActiveFocusSession | null;
   setActiveFocusSession: React.Dispatch<React.SetStateAction<ActiveFocusSession | null>>;
   
@@ -895,12 +900,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, [settings.routines, setSchedule]);
   
-  const onLogDuration = useCallback((activity: Activity, duration: number, moveToSlot?: SlotName) => {
+  const onLogDuration = useCallback((
+    activity: Activity,
+    duration: number,
+    moveToSlot?: SlotName,
+    progress?: { itemsCompleted?: number; hoursCompleted?: number; pagesCompleted?: number; microSkillName?: string }
+  ) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const taskInstanceId = activity.taskIds?.[0];
   
     // Find the master definition ID from the daily log instance
     let definitionId: string | undefined;
+    let matchedDefinitionCategory: string | undefined;
     let isUpskillLog = false;
     let taskLog;
 
@@ -916,13 +927,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const def = allDefs.find(d => d.id === taskInstanceId);
             if (def) {
                 definitionId = def.id;
+                matchedDefinitionCategory = def.category;
                 isUpskillLog = upskillDefinitions.some(d => d.id === def.id);
             }
         }
         
         if (taskLog) {
             definitionId = taskLog.definitionId;
+            const matchingDef = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.id === taskLog.definitionId);
+            matchedDefinitionCategory = matchingDef?.category;
         }
+    }
+
+    if (!matchedDefinitionCategory && progress?.microSkillName) {
+      matchedDefinitionCategory = progress.microSkillName;
     }
   
     if (definitionId) {
@@ -940,6 +958,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return def;
         }));
 
+    }
+
+    const itemsDelta = Math.max(0, progress?.itemsCompleted || 0);
+    const hoursDelta = Math.max(0, progress?.hoursCompleted || 0);
+    const pagesDelta = Math.max(0, progress?.pagesCompleted || 0);
+    const shouldApplyMicroSkillProgress = !!matchedDefinitionCategory && (itemsDelta > 0 || hoursDelta > 0 || pagesDelta > 0);
+    if (shouldApplyMicroSkillProgress) {
+      setCoreSkills(prev =>
+        prev.map(spec => ({
+          ...spec,
+          skillAreas: spec.skillAreas.map(area => ({
+            ...area,
+            microSkills: area.microSkills.map(ms => {
+              if (ms.name !== matchedDefinitionCategory) return ms;
+              return {
+                ...ms,
+                completedItems: (ms.completedItems || 0) + itemsDelta,
+                completedHours: (ms.completedHours || 0) + hoursDelta,
+                completedPages: (ms.completedPages || 0) + pagesDelta,
+              };
+            }),
+          })),
+        }))
+      );
     }
   
     const completedActivity: Activity = {
@@ -989,7 +1031,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       ? `Logged ${duration} minutes and moved to ${moveToSlot}.`
       : `Logged ${duration} minutes.`;
     toast({ title: 'Task Completed!', description: completionDescription });
-  }, [toast, allUpskillLogs, allDeepWorkLogs, setUpskillDefinitions, setDeepWorkDefinitions, upskillDefinitions, deepWorkDefinitions, setSchedule]);
+  }, [toast, allUpskillLogs, allDeepWorkLogs, setUpskillDefinitions, setDeepWorkDefinitions, upskillDefinitions, deepWorkDefinitions, setCoreSkills, setSchedule]);
   
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'> & { size?: 'normal' | 'compact' }) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
@@ -3117,12 +3159,23 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       ...intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork')),
       ...curiosities.flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'))
     ];
-    
-    setPermanentlyLoggedTaskIds(prev => {
-        const newSet = new Set(prev);
-        allLeafNodes.forEach(node => newSet.add(node.id));
-        return newSet;
-    });
+
+    const leafIds = new Set(allLeafNodes.map(node => node.id));
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    setDeepWorkDefinitions(prev =>
+      prev.map(def => {
+        if (!leafIds.has(def.id)) return def;
+        if ((def.loggedDuration || 0) > 0) return def;
+        return { ...def, loggedDuration: 1, last_logged_date: todayKey };
+      })
+    );
+    setUpskillDefinitions(prev =>
+      prev.map(def => {
+        if (!leafIds.has(def.id)) return def;
+        if ((def.loggedDuration || 0) > 0) return def;
+        return { ...def, loggedDuration: 1, last_logged_date: todayKey };
+      })
+    );
     
     toast({
         title: "Micro-skill Completed!",
@@ -3130,7 +3183,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     });
   }
 
-}, [setCoreSkills, toast, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes]);
+}, [setCoreSkills, toast, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, setDeepWorkDefinitions, setUpskillDefinitions]);
   
   const handleExpansionChange = useCallback((value: string[]) => {
     setExpandedItems(value);
