@@ -4188,7 +4188,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     const prefixedPath = withUserGitHubPrefix(path, username);
     const { dir } = getGitHubBaseDir(prefixedPath);
     const syncStatusPath = dir ? `${dir}/sync-status.json` : 'sync-status.json';
-    let forcePushDirtyOnly = false;
+    // Default to incremental push mode: only changed files are considered for upload.
+    let forcePushDirtyOnly = true;
     try {
       const remoteStatus = await getGitHubJson<{ status?: string; startedAt?: string; updatedAt?: string }>(
         token,

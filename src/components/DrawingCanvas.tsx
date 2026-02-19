@@ -31,6 +31,14 @@ const randomId = () => Math.random().toString(36).slice(2, 11);
 
 const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
   const { resources } = useAuth();
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+      const frame = requestAnimationFrame(() => {
+          inputRef.current?.focus();
+      });
+      return () => cancelAnimationFrame(frame);
+  }, []);
   
   const searchResults = useMemo(() => {
       return resources.flatMap(resource =>
@@ -42,7 +50,7 @@ const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource,
 
   return (
     <Command shouldFilter={true}>
-        <CommandInput placeholder="Search all canvases..." />
+        <CommandInput ref={inputRef} autoFocus placeholder="Search all canvases..." />
         <CommandList>
             <CommandEmpty>No canvases found.</CommandEmpty>
             <CommandGroup>
