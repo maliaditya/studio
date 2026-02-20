@@ -6,9 +6,11 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
 import { Loader2, ZoomIn, ZoomOut } from "lucide-react";
-import { getPdf } from "@/lib/audioDB";
+import { getPdfForResource, storePdf } from "@/lib/audioDB";
 import type { Resource } from "@/types/workout";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
+import { downloadPdfFromSupabase } from "@/lib/supabasePdfStorage";
+import { useAuth } from "@/contexts/AuthContext";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
@@ -18,6 +20,7 @@ interface PdfViewerProps {
 }
 
 export default function PdfViewer({ resource }: PdfViewerProps) {
+  const { currentUser, settings } = useAuth();
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
   const [file, setFile] = useState<Blob | null>(null);
@@ -26,28 +29,42 @@ export default function PdfViewer({ resource }: PdfViewerProps) {
 
   useEffect(() => {
     async function loadPdf() {
-      if (resource?.hasLocalPdf && resource.id) {
-        setIsLoading(true);
-        try {
-          const pdfBlob = await getPdf(resource.id);
-          setFile(pdfBlob);
-        } catch (error) {
-          console.error("Failed to load PDF from IndexedDB", error);
-          setFile(null);
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
+      if (!resource?.id) {
         setFile(null);
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const local = await getPdfForResource(resource.id, resource.pdfFileName);
+        if (local.blob) {
+          setFile(local.blob);
+        } else if (currentUser?.username) {
+          const remote = await downloadPdfFromSupabase(currentUser.username, resource.id, {
+            url: settings.supabaseUrl,
+            anonKey: settings.supabaseAnonKey,
+            bucket: settings.supabasePdfBucket,
+          });
+          if (remote) {
+            await storePdf(resource.id, remote);
+          }
+          setFile(remote);
+        } else {
+          setFile(null);
+        }
+      } catch (error) {
+        console.error("Failed to load PDF", error);
+        setFile(null);
+      } finally {
         setIsLoading(false);
       }
     }
-    loadPdf();
+    void loadPdf();
     // Reset state when resource changes
     setNumPages(null);
     setPageNumber(1);
     setScale(2);
-  }, [resource]);
+  }, [resource, currentUser?.username, settings.supabaseUrl, settings.supabaseAnonKey, settings.supabasePdfBucket]);
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);

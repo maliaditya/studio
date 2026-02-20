@@ -39,6 +39,7 @@ import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { HabitDetailPopup } from '@/components/HabitDetailPopup';
 import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, storeExcalidrawFile, type ExcalidrawFileRecord, storeAudio, getAudioForResource, storePdf, getPdfForResource } from '@/lib/audioDB';
+import { uploadPdfToSupabase, downloadPdfFromSupabase } from '@/lib/supabasePdfStorage';
 
 // Helper: convert ArrayBuffer to base64 in safe chunks to avoid "call stack size exceeded"
 const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
@@ -586,6 +587,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     },
     routineSkipByDate: {},
     pdfLastOpenedPageByResourceId: {},
+    supabasePdfBucket: 'pdfs',
   });
   useEffect(() => {
     githubModuleHashesRef.current = settings.githubModuleHashes || {};
@@ -1873,6 +1875,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           },
           routineSkipByDate: {},
           pdfLastOpenedPageByResourceId: {},
+          supabasePdfBucket: 'pdfs',
       };
     const incomingSettings = (sanitizedMain.settings || {}) as Partial<UserSettings>;
     setSettings((prev) => ({
@@ -5970,14 +5973,13 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           options?.onProgress?.(progress);
         };
         const username = currentUser?.username?.toLowerCase();
-        const { githubToken, githubOwner, githubRepo } = settings;
 
         if (!username) {
           if (!silent) toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
           return;
         }
-        if (!githubToken || !githubOwner || !githubRepo) {
-          if (!silent) toast({ title: 'GitHub settings not configured', variant: 'destructive' });
+        if (!settings.supabaseUrl || !settings.supabaseAnonKey) {
+          if (!silent) toast({ title: "Supabase not configured", description: "Save Supabase URL and Anon Key in Settings.", variant: "destructive" });
           return;
         }
 
@@ -5988,34 +5990,13 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           return;
         }
 
-        const folderPath = `${username}/pdf_${username}`;
-        const syncToast = silent ? null : toast({ title: "Uploading PDFs...", description: `Preparing ${pdfs.length} files...`, duration: PERSISTENT_TOAST_DURATION_MS });
+        const syncToast = silent ? null : toast({ title: "Uploading PDFs...", description: `Preparing ${pdfs.length} files to Supabase...`, duration: PERSISTENT_TOAST_DURATION_MS });
 
         try {
           let uploaded = 0;
           let skipped = 0;
           let processed = 0;
-          emitProgress({ phase: 'preparing', total: pdfs.length, processed, uploaded, skipped, note: 'Preparing PDF upload...' });
-
-          const existingFilesMap = new Map<string, string>();
-          try {
-            const listResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${folderPath}`, {
-              headers: { 'Authorization': `token ${githubToken}` }
-            });
-            if (listResponse.ok) {
-              const listData = await listResponse.json();
-              for (const item of listData || []) {
-                if (item && item.type === 'file' && item.name && item.sha) {
-                  existingFilesMap.set(item.name, item.sha);
-                }
-              }
-            } else if (listResponse.status !== 404) {
-              const err = await listResponse.json();
-              throw new Error(err.message || 'Failed to list PDFs on GitHub');
-            }
-          } catch (e) {
-            console.debug('Could not list existing GitHub PDF folder, continuing with per-file upload', e);
-          }
+          emitProgress({ phase: 'preparing', total: pdfs.length, processed, uploaded, skipped, note: 'Preparing PDF upload to Supabase...' });
 
           for (const res of pdfs) {
             const primaryKey = `${res.id}`;
@@ -6027,75 +6008,35 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
               continue;
             }
 
-            const buffer = await blob.arrayBuffer();
-            const base64Content = arrayBufferToBase64(buffer);
-            const fileHash = await hashString(base64Content);
-
-            const filename = `${primaryKey}.pdf`.replace(/\s+/g, '_');
-            const path = `${folderPath}/${filename}`;
-
-            const existingHash = githubModuleHashesRef.current?.[path];
-            if (existingHash === fileHash) {
-              skipped += 1;
-              processed += 1;
-              syncToast?.update({ title: 'Skipping', description: `Unchanged: ${filename}` });
-              emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: 'Unchanged; skipped.' });
-              continue;
-            }
-
-            const message = `LifeOS pdf: ${filename}`;
             let uploadSucceeded = false;
             let lastUploadError: unknown = null;
-            let sha = existingFilesMap.get(filename);
-            for (let attempt = 1; attempt <= 4 && !uploadSucceeded; attempt += 1) {
-              const pushResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${path}`, {
-                method: 'PUT',
-                headers: {
-                  'Authorization': `token ${githubToken}`,
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  message,
-                  content: base64Content,
-                  ...(sha ? { sha } : {}),
-                }),
-              });
-
-              const result = await pushResponse.json();
-              if (pushResponse.ok) {
+            for (let attempt = 1; attempt <= 3 && !uploadSucceeded; attempt += 1) {
+              try {
+                await uploadPdfToSupabase(username, primaryKey, blob, {
+                  url: settings.supabaseUrl,
+                  anonKey: settings.supabaseAnonKey,
+                  bucket: settings.supabasePdfBucket,
+                });
                 uploadSucceeded = true;
-                const nextSha = result?.content?.sha as string | undefined;
-                if (nextSha) existingFilesMap.set(filename, nextSha);
-                break;
-              }
-
-              const messageText = String(result?.message || '');
-              if (pushResponse.status === 409 || /is at ([0-9a-f]{40})/i.test(messageText)) {
-                const parsedSha = messageText.match(/is at ([0-9a-f]{40})/i)?.[1];
-                sha = parsedSha || await getGitHubFileSha(githubToken, githubOwner, githubRepo, path);
-                lastUploadError = result;
+              } catch (e) {
+                lastUploadError = e;
                 await new Promise(r => setTimeout(r, 250 * attempt));
-                continue;
               }
-
-              throw new Error(result?.message || `Failed to upload ${filename}.`);
             }
-
             if (!uploadSucceeded) {
               skipped += 1;
               processed += 1;
+              const filename = `${primaryKey}.pdf`.replace(/\s+/g, '_');
               const msg = lastUploadError && typeof lastUploadError === 'object' && 'message' in (lastUploadError as Record<string, unknown>)
                 ? String((lastUploadError as Record<string, unknown>).message)
-                : `Failed to upload ${filename}.`;
+                : `Failed to upload ${filename} to Supabase.`;
               console.error('Upload pdf failed for', res.id, msg);
               emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: 'Failed after retries; skipped.' });
               continue;
             }
-
-            githubModuleHashesRef.current = { ...(githubModuleHashesRef.current || {}), [path]: fileHash };
-            setSettings(prev => ({ ...prev, githubModuleHashes: { ...(prev.githubModuleHashes || {}), [path]: fileHash } }));
             uploaded += 1;
             processed += 1;
+            const filename = `${primaryKey}.pdf`.replace(/\s+/g, '_');
             syncToast?.update({ title: 'Uploading', description: `Uploaded ${uploaded} / ${pdfs.length}` });
             emitProgress({
               phase: 'uploading',
@@ -6108,8 +6049,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             });
           }
 
-          emitProgress({ phase: 'complete', total: pdfs.length, processed, uploaded, skipped, note: 'PDF upload finished.' });
-          syncToast?.update({ title: "PDF Upload Complete", description: `${uploaded} uploaded | ${skipped} skipped` });
+          emitProgress({ phase: 'complete', total: pdfs.length, processed, uploaded, skipped, note: 'PDF upload to Supabase finished.' });
+          syncToast?.update({ title: "PDF Upload Complete", description: `${uploaded} uploaded to Supabase | ${skipped} skipped` });
         } catch (error) {
           console.error('PDF upload failed:', error);
           emitProgress({ phase: 'failed', total: pdfs.length, processed: 0, uploaded: 0, skipped: 0, note: error instanceof Error ? error.message : 'Unknown error' });
@@ -6118,91 +6059,47 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     };
     const fetchPdfFilesFromGitHub = async () => {
       const username = currentUser?.username?.toLowerCase();
-      const { githubToken, githubOwner, githubRepo } = settings;
 
       if (!username) {
         toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
         return;
       }
-      if (!githubToken || !githubOwner || !githubRepo) {
-        toast({ title: 'GitHub settings not configured', variant: 'destructive' });
+      if (!settings.supabaseUrl || !settings.supabaseAnonKey) {
+        toast({ title: "Supabase not configured", description: "Save Supabase URL and Anon Key in Settings.", variant: "destructive" });
         return;
       }
 
-      const folderCandidates = [
-        `${username}/pdf_${username}`,
-        `${username}/pdfs_${username}`,
-      ];
-      toast({ title: "Fetching PDFs...", description: "Downloading PDFs from GitHub to this browser." });
+      toast({ title: "Fetching PDFs...", description: "Downloading PDFs from Supabase to this browser." });
 
       try {
-        let folderPath = folderCandidates[0];
-        let listResponse: Response | null = null;
-        for (const candidate of folderCandidates) {
-          const response = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${candidate}`, {
-            headers: { 'Authorization': `token ${githubToken}` }
-          });
-          if (response.ok) {
-            folderPath = candidate;
-            listResponse = response;
-            break;
-          }
-          if (response.status !== 404) {
-            const err = await response.json().catch(() => ({ message: 'Failed to list pdfs on GitHub' }));
-            throw new Error(err.message || 'Failed to list pdfs on GitHub');
-          }
-        }
-        if (!listResponse) {
-          console.info(`GitHub PDF folders not found; checked: ${folderCandidates.join(', ')}`);
-          toast({ title: 'No PDF folder', description: `No folder "${folderCandidates[0]}" found on GitHub. Nothing to fetch.` });
+        const pdfResources = (resources || []).filter(r => r.type === 'pdf');
+        if (pdfResources.length === 0) {
+          toast({ title: "No PDFs", description: "No PDF resources found." });
           return;
         }
 
-        const listData = await listResponse.json();
         let downloaded = 0;
-        let skippedUnchanged = 0;
-        const nextPulledHashes: Record<string, string> = { ...(settings.githubPulledHashes || {}) };
-
-        for (const item of listData || []) {
-          if (item.type !== 'file' || !item.name) continue;
-          const filePath = `${folderPath}/${item.name}`;
-          if (item.sha && settings.githubPulledHashes?.[filePath] === item.sha) {
-            skippedUnchanged += 1;
-            continue;
-          }
+        for (const res of pdfResources) {
           try {
-            const fileResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${filePath}`, {
-              headers: { 'Authorization': `token ${githubToken}` }
+            const blob = await downloadPdfFromSupabase(username, res.id, {
+              url: settings.supabaseUrl,
+              anonKey: settings.supabaseAnonKey,
+              bucket: settings.supabasePdfBucket,
             });
-            if (!fileResponse.ok) continue;
-            const fileData = await fileResponse.json();
-            if (!fileData?.content) continue;
-            const cleaned = String(fileData.content).replace(/\n/g, '');
-            const binary = atob(cleaned);
-            const bytes = new Uint8Array(binary.length);
-            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-            const blob = new Blob([bytes], { type: 'application/pdf' });
-            const key = item.name.split('.').slice(0, -1).join('.') || item.name;
-            await storePdf(key, blob);
-
-            setResources(prev => prev.map(r => {
-              if (r.pdfFileName === key || r.id === key) {
-                return { ...r, hasLocalPdf: true, pdfFileName: key };
-              }
-              return r;
-            }));
+            if (!blob) continue;
+            await storePdf(res.id, blob);
             downloaded += 1;
-            if (item.sha) {
-              nextPulledHashes[filePath] = item.sha;
-            }
           } catch (e) {
-            // continue
+            // continue per-resource
           }
         }
-        setSettings(prev => ({ ...prev, githubPulledHashes: nextPulledHashes }));
-        toast({ title: "PDF Fetch Complete", description: `Downloaded ${downloaded} PDFs. ${skippedUnchanged > 0 ? `${skippedUnchanged} unchanged skipped.` : ''}` });
+
+        if (downloaded > 0) {
+          setResources(prev => prev.map(r => r.type === 'pdf' ? { ...r, hasLocalPdf: true } : r));
+        }
+        toast({ title: "PDF Fetch Complete", description: `Downloaded ${downloaded} PDFs from Supabase.` });
       } catch (error) {
-        console.error('Fetch pdf failed:', error);
+        console.error('Fetch pdf from Supabase failed:', error);
         toast({ title: 'Fetch Failed', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
       }
     };

@@ -329,6 +329,9 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
         githubOwner: localSettings.githubOwner,
         githubRepo: localSettings.githubRepo,
         githubPath: localSettings.githubPath,
+        supabaseUrl: localSettings.supabaseUrl,
+        supabaseAnonKey: localSettings.supabaseAnonKey,
+        supabasePdfBucket: localSettings.supabasePdfBucket,
     }));
 
     if (!currentUser?.username) {
@@ -347,13 +350,16 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                 githubOwner: localSettings.githubOwner,
                 githubRepo: localSettings.githubRepo,
                 githubPath: localSettings.githubPath,
+                supabaseUrl: localSettings.supabaseUrl,
+                supabaseAnonKey: localSettings.supabaseAnonKey,
+                supabasePdfBucket: localSettings.supabasePdfBucket,
             }),
         });
         const result = await response.json();
         if (!response.ok) {
             throw new Error(result.error || 'Failed to save settings.');
         }
-        toast({ title: "GitHub Settings Saved", description: "Your sync configuration has been updated and saved to the cloud." });
+        toast({ title: "Sync Settings Saved", description: "GitHub + Supabase settings were saved for this user." });
     } catch (error) {
         console.error("Failed to save GitHub settings to cloud:", error);
         toast({ title: "Save Failed", description: error instanceof Error ? error.message : "Could not save settings to the cloud.", variant: "destructive" });
@@ -683,8 +689,21 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                             <Label htmlFor="github-path">File Path in Repo</Label>
                             <Input id="github-path" placeholder="e.g., backup.json" value={localSettings.githubPath || ''} onChange={(e) => handleLocalSettingChange('githubPath', e.target.value)} />
                           </div>
+                          <Separator />
+                          <div className="space-y-1">
+                            <Label htmlFor="supabase-url">Supabase URL</Label>
+                            <Input id="supabase-url" placeholder="https://YOUR_PROJECT.supabase.co" value={localSettings.supabaseUrl || ''} onChange={(e) => handleLocalSettingChange('supabaseUrl', e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="supabase-anon-key">Supabase Anon Key</Label>
+                            <Input id="supabase-anon-key" type="password" placeholder="sb_publishable_..." value={localSettings.supabaseAnonKey || ''} onChange={(e) => handleLocalSettingChange('supabaseAnonKey', e.target.value)} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="supabase-bucket">Supabase PDF Bucket</Label>
+                            <Input id="supabase-bucket" placeholder="pdfs" value={localSettings.supabasePdfBucket || ''} onChange={(e) => handleLocalSettingChange('supabasePdfBucket', e.target.value)} />
+                          </div>
                           <div className="flex flex-wrap gap-2">
-                            <Button onClick={handleGithubSettingsSave}>Save GitHub Settings</Button>
+                            <Button onClick={handleGithubSettingsSave}>Save Sync Settings</Button>
                             <Button variant="secondary" onClick={syncCanvasImagesToGitHub}>Upload Canvas Images</Button>
                             <Button variant="outline" onClick={fetchCanvasImagesFromGitHub}>Fetch Canvas Images</Button>
                             <Button variant="secondary" onClick={syncAudioFilesToGitHub}>Upload Audio</Button>

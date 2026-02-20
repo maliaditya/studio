@@ -6,7 +6,8 @@ import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
 import { Loader2, ZoomIn, ZoomOut, GripVertical, X, Upload } from "lucide-react";
-import { getPdf, storePdf } from "@/lib/audioDB";
+import { getPdfForResource, storePdf } from "@/lib/audioDB";
+import { downloadPdfFromSupabase, uploadPdfToSupabase } from "@/lib/supabasePdfStorage";
 import type { Resource } from "@/types/workout";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
@@ -19,7 +20,7 @@ import { useAuth } from "@/contexts/AuthContext";
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
 export default function PdfViewerPopup() {
-    const { pdfViewerState, setPdfViewerState, settings, setSettings, setResources } = useAuth();
+    const { pdfViewerState, setPdfViewerState, settings, setSettings, setResources, currentUser } = useAuth();
     const [numPages, setNumPages] = useState<number | null>(null);
     const [pageNumber, setPageNumber] = useState(1);
     const [file, setFile] = useState<Blob | null>(null);
@@ -36,27 +37,48 @@ export default function PdfViewerPopup() {
     });
 
     useEffect(() => {
-        if (pdfViewerState?.resource?.hasLocalPdf && pdfViewerState.resource.id) {
+        const load = async () => {
+            const resource = pdfViewerState?.resource;
+            if (!resource?.id) {
+                setFile(null);
+                setIsLoading(false);
+                return;
+            }
             setIsLoading(true);
-            getPdf(pdfViewerState.resource.id)
-                .then(blob => {
-                    setFile(blob);
-                })
-                .catch(err => {
-                    console.error("Failed to load PDF:", err);
+            try {
+                const local = await getPdfForResource(resource.id, resource.pdfFileName);
+                if (local.blob) {
+                    setFile(local.blob);
+                } else if (currentUser?.username) {
+                    const remote = await downloadPdfFromSupabase(currentUser.username, resource.id, {
+                        url: settings.supabaseUrl,
+                        anonKey: settings.supabaseAnonKey,
+                        bucket: settings.supabasePdfBucket,
+                    });
+                    if (remote) {
+                        await storePdf(resource.id, remote);
+                        setResources(prev => prev.map(r => r.id === resource.id ? { ...r, hasLocalPdf: true } : r));
+                        setFile(remote);
+                    } else {
+                        setFile(null);
+                    }
+                } else {
                     setFile(null);
-                })
-                .finally(() => setIsLoading(false));
-            
+                }
+            } catch (err) {
+                console.error("Failed to load PDF:", err);
+                setFile(null);
+            } finally {
+                setIsLoading(false);
+            }
+
             setNumPages(null);
-            const lastOpenedPage = settings.pdfLastOpenedPageByResourceId?.[pdfViewerState.resource.id] || 1;
+            const lastOpenedPage = settings.pdfLastOpenedPageByResourceId?.[resource.id] || 1;
             setPageNumber(Math.max(1, lastOpenedPage));
             setScale(1.5);
-        } else {
-            setFile(null);
-            setIsLoading(false);
-        }
-    }, [pdfViewerState?.resource, settings.pdfLastOpenedPageByResourceId]);
+        };
+        void load();
+    }, [pdfViewerState?.resource, settings.pdfLastOpenedPageByResourceId, currentUser?.username, setResources]);
 
     useEffect(() => {
         const resourceId = pdfViewerState?.resource?.id;
@@ -121,6 +143,13 @@ export default function PdfViewerPopup() {
 
         try {
             await storePdf(resource.id, file);
+            if (currentUser?.username) {
+                await uploadPdfToSupabase(currentUser.username, resource.id, file, {
+                    url: settings.supabaseUrl,
+                    anonKey: settings.supabaseAnonKey,
+                    bucket: settings.supabasePdfBucket,
+                });
+            }
             setResources(prev => prev.map(r => 
                 r.id === resource.id ? { ...r, hasLocalPdf: true, pdfFileName: file.name } : r
             ));

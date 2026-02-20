@@ -11,7 +11,16 @@ const normalizeUsername = (username: string) => username.trim().toLowerCase();
  * Uploads a user's GitHub sync settings to Vercel Blob storage.
  */
 export async function POST(request: Request) {
-  const { username, githubToken, githubOwner, githubRepo, githubPath } = await request.json();
+  const {
+    username,
+    githubToken,
+    githubOwner,
+    githubRepo,
+    githubPath,
+    supabaseUrl,
+    supabaseAnonKey,
+    supabasePdfBucket,
+  } = await request.json();
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return NextResponse.json(
@@ -36,7 +45,15 @@ export async function POST(request: Request) {
   const blobPathname = `github-settings/${requestedUsername}.json`;
 
   try {
-    const settingsData = { githubToken, githubOwner, githubRepo, githubPath };
+    const settingsData = {
+      githubToken,
+      githubOwner,
+      githubRepo,
+      githubPath,
+      supabaseUrl,
+      supabaseAnonKey,
+      supabasePdfBucket,
+    };
     const blob = await put(blobPathname, JSON.stringify(settingsData, null, 2), {
       access: 'public',
       contentType: 'application/json',
