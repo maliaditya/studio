@@ -31,10 +31,18 @@ function buildObjectPath(username: string, resourceId: string) {
 async function getSupabaseAdmin(username: string, requestedUrl?: string | null) {
   const settings = await readUserSyncSettings(username);
   const url = requestedUrl || settings?.supabaseUrl || '';
-  if (!url) throw new Error('Supabase URL is not configured.');
+  if (!url) {
+    const err = new Error('Supabase URL is not configured. Save Sync Settings first.');
+    (err as any).status = 400;
+    throw err;
+  }
 
   const serviceRoleKey = await decryptSupabaseServiceKeyForUser(username);
-  if (!serviceRoleKey) throw new Error('Supabase service role key is not configured for this user.');
+  if (!serviceRoleKey) {
+    const err = new Error('Supabase service role key is not configured for this user. Use "Save Service Key" in Settings.');
+    (err as any).status = 400;
+    throw err;
+  }
 
   return {
     client: createClient(url, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } }),
@@ -43,6 +51,9 @@ async function getSupabaseAdmin(username: string, requestedUrl?: string | null) 
 }
 
 export async function GET(request: Request) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return NextResponse.json({ error: 'Server is missing BLOB_READ_WRITE_TOKEN.' }, { status: 500 });
+  }
   const { searchParams } = new URL(request.url);
   const usernameRaw = searchParams.get('username');
   const resourceId = searchParams.get('resourceId');
@@ -71,11 +82,15 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+    const status = (error as any)?.status || 500;
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status });
   }
 }
 
 export async function POST(request: Request) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    return NextResponse.json({ error: 'Server is missing BLOB_READ_WRITE_TOKEN.' }, { status: 500 });
+  }
   const contentType = request.headers.get('content-type') || '';
   const isMultipart = contentType.includes('multipart/form-data');
   const body = isMultipart ? await request.formData() : await request.json();
@@ -102,7 +117,6 @@ export async function POST(request: Request) {
       if (!exists) {
         const { error: createErr } = await client.storage.createBucket(finalBucket, {
           public: false,
-          fileSizeLimit: '500MB',
           allowedMimeTypes: ['application/pdf'],
         });
         if (createErr && !String(createErr.message || '').toLowerCase().includes('already')) {
@@ -131,6 +145,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: 'Unsupported action.' }, { status: 400 });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
+    const status = (error as any)?.status || 500;
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status });
   }
 }

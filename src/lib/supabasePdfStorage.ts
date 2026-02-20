@@ -28,7 +28,7 @@ export async function uploadPdfToSupabase(username: string, resourceId: string, 
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(String(result?.error || "Failed to upload PDF."));
+    throw new Error(`Upload failed (${response.status}): ${String(result?.error || "Failed to upload PDF.")}`);
   }
   return buildPdfObjectPath(username, resourceId);
 }
@@ -62,6 +62,6 @@ export async function initSupabasePdfStorage(username: string, cfg?: SupabasePdf
   });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(String(result?.error || "Failed to initialize Supabase PDF storage."));
+    throw new Error(`Init failed (${response.status}): ${String(result?.error || "Failed to initialize Supabase PDF storage.")}`);
   }
 }
