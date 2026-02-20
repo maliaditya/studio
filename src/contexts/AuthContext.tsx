@@ -5978,8 +5978,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           if (!silent) toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
           return;
         }
-        if (!settings.supabaseUrl || !settings.supabaseAnonKey) {
-          if (!silent) toast({ title: "Supabase not configured", description: "Save Supabase URL and Anon Key in Settings.", variant: "destructive" });
+        if (!settings.supabaseUrl) {
+          if (!silent) toast({ title: "Supabase not configured", description: "Save Supabase URL in Settings.", variant: "destructive" });
           return;
         }
 
@@ -6031,7 +6031,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                 ? String((lastUploadError as Record<string, unknown>).message)
                 : `Failed to upload ${filename} to Supabase.`;
               console.error('Upload pdf failed for', res.id, msg);
-              emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: 'Failed after retries; skipped.' });
+              emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: `Failed: ${msg}` });
               continue;
             }
             uploaded += 1;
@@ -6064,8 +6064,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
         return;
       }
-      if (!settings.supabaseUrl || !settings.supabaseAnonKey) {
-        toast({ title: "Supabase not configured", description: "Save Supabase URL and Anon Key in Settings.", variant: "destructive" });
+      if (!settings.supabaseUrl) {
+        toast({ title: "Supabase not configured", description: "Save Supabase URL in Settings.", variant: "destructive" });
         return;
       }
 

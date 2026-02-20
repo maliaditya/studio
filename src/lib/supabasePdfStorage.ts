@@ -1,42 +1,67 @@
 "use client";
 
-import { getSupabaseClient } from "@/lib/supabaseClient";
-
 type SupabasePdfConfig = {
   url?: string;
   anonKey?: string;
   bucket?: string;
 };
 
-const resolveBucket = (cfg?: SupabasePdfConfig) => cfg?.bucket || process.env.NEXT_PUBLIC_SUPABASE_PDF_BUCKET || "pdfs";
+const resolveBucket = (cfg?: SupabasePdfConfig) => cfg?.bucket || "pdfs";
 
 export function buildPdfObjectPath(username: string, resourceId: string): string {
   return `${username.toLowerCase()}/${resourceId}.pdf`;
 }
 
 export async function uploadPdfToSupabase(username: string, resourceId: string, blob: Blob, cfg?: SupabasePdfConfig): Promise<string> {
-  const client = getSupabaseClient(cfg?.url, cfg?.anonKey);
-  const bucketName = resolveBucket(cfg);
-  const objectPath = buildPdfObjectPath(username, resourceId);
+  const formData = new FormData();
+  formData.append("action", "upload");
+  formData.append("username", username.toLowerCase());
+  formData.append("resourceId", resourceId);
+  formData.append("bucket", resolveBucket(cfg));
+  if (cfg?.url) formData.append("supabaseUrl", cfg.url);
+  formData.append("file", blob, `${resourceId}.pdf`);
 
-  const { error } = await client.storage
-    .from(bucketName)
-    .upload(objectPath, blob, {
-      upsert: true,
-      contentType: blob.type || "application/pdf",
-      cacheControl: "3600",
-    });
-  if (error) throw error;
-
-  const { data } = client.storage.from(bucketName).getPublicUrl(objectPath);
-  return data.publicUrl;
+  const response = await fetch("/api/pdf-storage", {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(String(result?.error || "Failed to upload PDF."));
+  }
+  return buildPdfObjectPath(username, resourceId);
 }
 
 export async function downloadPdfFromSupabase(username: string, resourceId: string, cfg?: SupabasePdfConfig): Promise<Blob | null> {
-  const client = getSupabaseClient(cfg?.url, cfg?.anonKey);
-  const bucketName = resolveBucket(cfg);
-  const objectPath = buildPdfObjectPath(username, resourceId);
-  const { data, error } = await client.storage.from(bucketName).download(objectPath);
-  if (error) return null;
-  return data || null;
+  const params = new URLSearchParams({
+    username: username.toLowerCase(),
+    resourceId,
+    bucket: resolveBucket(cfg),
+  });
+  if (cfg?.url) params.set("supabaseUrl", cfg.url);
+  const response = await fetch(`/api/pdf-storage?${params.toString()}`, {
+    method: "GET",
+    credentials: "include",
+  });
+  if (!response.ok) return null;
+  return await response.blob();
+}
+
+export async function initSupabasePdfStorage(username: string, cfg?: SupabasePdfConfig): Promise<void> {
+  const response = await fetch("/api/pdf-storage", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({
+      action: "init",
+      username: username.toLowerCase(),
+      bucket: resolveBucket(cfg),
+      supabaseUrl: cfg?.url,
+    }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(String(result?.error || "Failed to initialize Supabase PDF storage."));
+  }
 }

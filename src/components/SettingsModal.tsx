@@ -31,6 +31,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Copy, Trash2, RefreshCw, Github, HardDrive } from 'lucide-react';
 import type { Activity, ActivityType, WorkoutSchedulingMode, WidgetVisibility, SlotName } from '@/types/workout';
+import { initSupabasePdfStorage } from '@/lib/supabasePdfStorage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
@@ -87,6 +88,9 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const [copyType, setCopyType] = useState<'specialization' | 'micro-skills'>('specialization');
   const [storageHealth, setStorageHealth] = useState<StorageHealthSnapshot | null>(null);
   const [isRefreshingStorage, setIsRefreshingStorage] = useState(false);
+  const [supabaseServiceRoleKey, setSupabaseServiceRoleKey] = useState('');
+  const [isSupabaseSecretConfigured, setIsSupabaseSecretConfigured] = useState(false);
+  const [isInitializingSupabase, setIsInitializingSupabase] = useState(false);
 
   // State for GitHub settings inputs
   const [localSettings, setLocalSettings] = useState(settings);
@@ -146,8 +150,16 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
           ...settings,
           githubPath: settings.githubPath || defaultFileName,
       });
+      if (currentUser?.username) {
+        fetch(`/api/supabase-secret?username=${currentUser.username.toLowerCase()}`, { credentials: 'include' })
+          .then(async (res) => {
+            const json = await res.json().catch(() => ({}));
+            if (res.ok) setIsSupabaseSecretConfigured(!!json?.configured);
+          })
+          .catch(() => setIsSupabaseSecretConfigured(false));
+      }
     }
-  }, [isOpen, settings, defaultFileName]);
+  }, [isOpen, settings, defaultFileName, currentUser?.username]);
 
   const handleModalOpenChange = (open: boolean) => {
     onOpenChange(open);
@@ -363,6 +375,58 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     } catch (error) {
         console.error("Failed to save GitHub settings to cloud:", error);
         toast({ title: "Save Failed", description: error instanceof Error ? error.message : "Could not save settings to the cloud.", variant: "destructive" });
+    }
+  };
+
+  const handleSaveSupabaseServiceKey = async () => {
+    if (!currentUser?.username) {
+      toast({ title: "Error", description: "You must be logged in to save the service key.", variant: "destructive" });
+      return;
+    }
+    if (!supabaseServiceRoleKey.trim()) {
+      toast({ title: "Error", description: "Enter Supabase service role key.", variant: "destructive" });
+      return;
+    }
+    try {
+      const response = await fetch('/api/supabase-secret', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          username: currentUser.username,
+          supabaseServiceRoleKey: supabaseServiceRoleKey.trim(),
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to save service key.');
+      setSupabaseServiceRoleKey('');
+      setIsSupabaseSecretConfigured(true);
+      toast({ title: "Saved", description: "Supabase service key saved securely on server." });
+    } catch (error) {
+      toast({ title: "Save Failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
+    }
+  };
+
+  const handleInitSupabaseStorage = async () => {
+    if (!currentUser?.username) {
+      toast({ title: "Error", description: "You must be logged in.", variant: "destructive" });
+      return;
+    }
+    if (!localSettings.supabaseUrl?.trim()) {
+      toast({ title: "Missing URL", description: "Enter and save Supabase URL first.", variant: "destructive" });
+      return;
+    }
+    try {
+      setIsInitializingSupabase(true);
+      await initSupabasePdfStorage(currentUser.username, {
+        url: localSettings.supabaseUrl,
+        bucket: localSettings.supabasePdfBucket || 'pdfs',
+      });
+      toast({ title: "Initialized", description: "Supabase PDF bucket is ready." });
+    } catch (error) {
+      toast({ title: "Init Failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
+    } finally {
+      setIsInitializingSupabase(false);
     }
   };
 
@@ -702,8 +766,15 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                             <Label htmlFor="supabase-bucket">Supabase PDF Bucket</Label>
                             <Input id="supabase-bucket" placeholder="pdfs" value={localSettings.supabasePdfBucket || ''} onChange={(e) => handleLocalSettingChange('supabasePdfBucket', e.target.value)} />
                           </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="supabase-service-role">Supabase Service Role Key (Server-only)</Label>
+                            <Input id="supabase-service-role" type="password" placeholder="sb_secret_..." value={supabaseServiceRoleKey} onChange={(e) => setSupabaseServiceRoleKey(e.target.value)} />
+                            <p className="text-xs text-muted-foreground">{isSupabaseSecretConfigured ? 'Service key configured on server.' : 'No service key saved yet.'}</p>
+                          </div>
                           <div className="flex flex-wrap gap-2">
                             <Button onClick={handleGithubSettingsSave}>Save Sync Settings</Button>
+                            <Button variant="secondary" onClick={handleSaveSupabaseServiceKey}>Save Service Key</Button>
+                            <Button variant="outline" onClick={handleInitSupabaseStorage} disabled={isInitializingSupabase}>{isInitializingSupabase ? 'Initializing...' : 'Init Supabase Storage'}</Button>
                             <Button variant="secondary" onClick={syncCanvasImagesToGitHub}>Upload Canvas Images</Button>
                             <Button variant="outline" onClick={fetchCanvasImagesFromGitHub}>Fetch Canvas Images</Button>
                             <Button variant="secondary" onClick={syncAudioFilesToGitHub}>Upload Audio</Button>
