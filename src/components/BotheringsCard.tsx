@@ -70,7 +70,7 @@ export function BotheringsCard() {
     ];
   }, [mindsetCards, getEffectiveTasks]);
 
-  const [activeTab, setActiveTab] = React.useState<'All' | 'External' | 'Mismatch' | 'Constraint' | 'Parked'>('All');
+  const [activeTab, setActiveTab] = React.useState<'All' | 'External' | 'Mismatch' | 'Constraint' | 'Parked'>('External');
   const todayKey = format(new Date(), 'yyyy-MM-dd');
   const todayActivityIds = useMemo(() => {
     const ids = new Set<string>();
@@ -250,7 +250,6 @@ export function BotheringsCard() {
     let total = 0;
     let completed = 0;
     tasks.forEach(t => {
-      if (!isTaskDueOnDate(t, todayKey)) return;
       const completedToday = isTaskCompletedOnDate(t, todayKey);
       const scheduledToday = !!(
         (t.activityId && todayActivityIds.has(t.activityId)) ||
@@ -378,7 +377,7 @@ export function BotheringsCard() {
                       {stats.completed}/{stats.total} done
                     </span>
                   ) : (
-                    <span>No tasks due today</span>
+                    <span>No tasks scheduled today</span>
                   )}
                 </div>
               </li>

@@ -47,13 +47,113 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 
-const AddActivityMenu = ({ onAddActivity }: { onAddActivity: (type: ActivityType, details: string) => void }) => {
-    const { coreSkills } = useAuth();
+const AddActivityMenu = ({
+    onAddActivity,
+    onAddRoutineToday,
+    selectedSlotName,
+}: {
+    onAddActivity: (type: ActivityType, details: string) => void;
+    onAddRoutineToday: (routine: Activity) => void;
+    selectedSlotName: string;
+}) => {
+    const { coreSkills, settings } = useAuth();
     const specializations = coreSkills.filter(s => s.type === 'Specialization');
+    const groupedRoutines = useMemo(() => {
+        const bySlot = new Map<string, Activity[]>();
+        (settings.routines || []).forEach((routine) => {
+            if (!routine?.id) return;
+            const slotName = slotOrder.includes(routine.slot as keyof DailySchedule) ? routine.slot : 'Unassigned';
+            const existing = bySlot.get(slotName) || [];
+            existing.push(routine);
+            bySlot.set(slotName, existing);
+        });
+        bySlot.forEach((list, key) => {
+            bySlot.set(
+                key,
+                [...list].sort((a, b) => (a.details || '').localeCompare(b.details || ''))
+            );
+        });
+        const currentSlot = slotOrder.includes(selectedSlotName as keyof DailySchedule) ? selectedSlotName : undefined;
+        const currentSlotRoutines = currentSlot ? (bySlot.get(currentSlot) || []) : [];
+        const otherSlotGroups = slotOrder
+            .filter((slotName) => slotName !== currentSlot)
+            .map((slotName) => ({
+                slot: slotName,
+                routines: bySlot.get(slotName as string) || [],
+            }))
+            .filter((group) => group.routines.length > 0);
+        const unassignedRoutines = bySlot.get('Unassigned') || [];
+
+        return {
+            total: (settings.routines || []).length,
+            currentSlot,
+            currentSlotRoutines,
+            otherSlotGroups,
+            unassignedRoutines,
+        };
+    }, [selectedSlotName, settings.routines]);
 
     return (
         <DropdownMenuContent className="w-56 p-2">
             <p className="font-medium text-sm p-2">Select Activity</p>
+            <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="w-full justify-start">
+                    <Repeat className="h-4 w-4" />
+                    <span className="ml-2">Routine</span>
+                    <span className="ml-auto text-[10px] text-muted-foreground">{groupedRoutines.total}</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                    <DropdownMenuSubContent className="w-72 p-1">
+                        {groupedRoutines.total > 0 ? (
+                            <ScrollArea className="h-64">
+                                <div className="space-y-1 p-1">
+                                    {groupedRoutines.currentSlot && groupedRoutines.currentSlotRoutines.length > 0 && (
+                                        <>
+                                            <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                {groupedRoutines.currentSlot}
+                                            </p>
+                                            {groupedRoutines.currentSlotRoutines.map((routine) => (
+                                                <DropdownMenuItem key={routine.id} onClick={() => onAddRoutineToday(routine)}>
+                                                    <span className="truncate">{routine.details || 'Routine task'}</span>
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </>
+                                    )}
+                                    {groupedRoutines.otherSlotGroups.map((group) => (
+                                        <React.Fragment key={group.slot as string}>
+                                            <DropdownMenuSeparator />
+                                            <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                {group.slot}
+                                            </p>
+                                            {group.routines.map((routine) => (
+                                                <DropdownMenuItem key={routine.id} onClick={() => onAddRoutineToday(routine)}>
+                                                    <span className="truncate">{routine.details || 'Routine task'}</span>
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </React.Fragment>
+                                    ))}
+                                    {groupedRoutines.unassignedRoutines.length > 0 && (
+                                        <>
+                                            <DropdownMenuSeparator />
+                                            <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                Unassigned
+                                            </p>
+                                            {groupedRoutines.unassignedRoutines.map((routine) => (
+                                                <DropdownMenuItem key={routine.id} onClick={() => onAddRoutineToday(routine)}>
+                                                    <span className="truncate">{routine.details || 'Routine task'}</span>
+                                                </DropdownMenuItem>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+                            </ScrollArea>
+                        ) : (
+                            <DropdownMenuItem disabled>No routines available</DropdownMenuItem>
+                        )}
+                    </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
             <DropdownMenuItem key="pomodoro" onClick={() => onAddActivity('pomodoro', '')}>
                 <Timer className="h-4 w-4" />
                 <span className="ml-2 capitalize">Pomodoro</span>
@@ -421,6 +521,7 @@ export function TodaysScheduleCard({
     settings,
     setSettings,
     handleToggleComplete, 
+    onRemoveActivity: removeActivityFromSchedule,
     toggleRoutine, 
     setSchedule: setGlobalSchedule,
     expectedActivityDurations,
@@ -645,7 +746,6 @@ export function TodaysScheduleCard({
     let total = 0;
     let completed = 0;
     tasks.forEach((t) => {
-      if (!isBotheringTaskDueOnDate(t, dayKey)) return;
       const completedToday = isBotheringTaskCompletedOnDate(t, dayKey);
       const scheduledToday = !!(
         (t.activityId && todayActivityIds.has(t.activityId)) ||
@@ -656,7 +756,7 @@ export function TodaysScheduleCard({
       if (completedToday) completed += 1;
     });
     return { total, completed };
-  }, [dayKey, getEffectiveBotheringTasks, isBotheringTaskCompletedOnDate, isBotheringTaskDueOnDate, todayActivityIds]);
+  }, [dayKey, getEffectiveBotheringTasks, isBotheringTaskCompletedOnDate, todayActivityIds]);
   const getCurrentSlotBotheringStats = useCallback((point: MindsetPoint, sourceType: BotheringSourceType) => {
     const tasks = getEffectiveBotheringTasks(point, sourceType);
     let total = 0;
@@ -966,6 +1066,7 @@ export function TodaysScheduleCard({
 
   const scheduledActivities = useMemo(() => {
     const todaysSchedule = schedule[dayKey] || {};
+    const skippedRoutineIdsForDay = new Set(settings.routineSkipByDate?.[dayKey] || []);
     const explicitActivityIdsForDay = new Set<string>();
     Object.values(todaysSchedule).forEach((value) => {
       if (!Array.isArray(value)) return;
@@ -976,9 +1077,12 @@ export function TodaysScheduleCard({
     let allActivities = slotOrder.flatMap(slot => {
         const activities = todaysSchedule[slot];
         const explicit = (activities && Array.isArray(activities)) ? activities : [];
+        const shouldMaterializeVirtualRoutines = isToday(date);
 
         const routineInstances = (settings.routines || []).flatMap(r => {
+            if (!shouldMaterializeVirtualRoutines) return [] as Activity[];
             if (!r || !r.routine) return [] as Activity[];
+            if (skippedRoutineIdsForDay.has(r.id)) return [] as Activity[];
             if (r.slot !== slot) return [] as Activity[];
             const rule = r.routine;
             const base = r.baseDate || r.createdAt;
@@ -1043,7 +1147,7 @@ export function TodaysScheduleCard({
         }
         return slotOrder.indexOf(a.slot as SlotName) - slotOrder.indexOf(b.slot as SlotName);
     });
-  }, [schedule, dayKey, settings.agendaShowCurrentSlotOnly, currentSlot, settings.routines, date]);
+  }, [schedule, dayKey, settings.agendaShowCurrentSlotOnly, currentSlot, settings.routines, settings.routineSkipByDate, date]);
 
   useEffect(() => {
     if (listRef.current) {
@@ -1142,19 +1246,9 @@ export function TodaysScheduleCard({
     }
   }, [isAgendaDocked, positionKey]);
 
-  const onRemoveActivity = (slotName: string, activityId: string) => {
-    setGlobalSchedule(prev => {
-        const newSchedule = { ...prev };
-        if (newSchedule[dayKey]) {
-            const daySchedule = { ...newSchedule[dayKey] };
-            if (daySchedule[slotName]) {
-                daySchedule[slotName] = (daySchedule[slotName] as any[]).filter(act => act.id !== activityId);
-                newSchedule[dayKey] = daySchedule;
-            }
-        }
-        return newSchedule;
-    });
-  };
+  const onRemoveActivity = useCallback((slotName: string, activityId: string) => {
+    removeActivityFromSchedule(slotName, activityId, date);
+  }, [removeActivityFromSchedule, date]);
 
   const handleUpdateActivity = (activityId: string, newDetails: string) => {
     setGlobalSchedule(prev => {
@@ -1206,6 +1300,37 @@ export function TodaysScheduleCard({
         }
     }));
     toast({ title: "Activity Added", description: `Added a new task to ${format(date, 'MMM d')}, ${currentSlot}.` });
+  };
+
+  const handleAddRoutineToday = (routine: Activity) => {
+    const routineInstanceId = `${routine.id}_${dayKey}`;
+    let added = false;
+    setGlobalSchedule(prev => {
+        const nextDay = { ...(prev[dayKey] || {}) };
+        const existsForDay = Object.values(nextDay).some((value) =>
+            Array.isArray(value) && value.some((act: any) => act?.id === routineInstanceId)
+        );
+        if (existsForDay) return prev;
+
+        const nextRoutine: Activity = {
+            ...routine,
+            id: routineInstanceId,
+            completed: false,
+            slot: currentSlot,
+            isRoutine: false,
+            routine: null,
+            taskIds: routine.taskIds && routine.taskIds.length > 0 ? routine.taskIds : [routine.id],
+        };
+        nextDay[currentSlot as SlotName] = [...((nextDay[currentSlot as SlotName] as Activity[]) || []), nextRoutine];
+        added = true;
+        return { ...prev, [dayKey]: nextDay };
+    });
+
+    if (added) {
+      toast({ title: "Activity Added", description: `Routine added to ${format(date, 'MMM d')}, ${currentSlot}.` });
+    } else {
+      toast({ title: "Already Scheduled", description: "This routine is already scheduled for today.", variant: "destructive" });
+    }
   };
   
   const handleAddPomodoro = () => {
@@ -1566,7 +1691,7 @@ export function TodaysScheduleCard({
                                 {stats.completed}/{stats.total} done
                               </span>
                             ) : (
-                              <span>No tasks due today</span>
+                              <span>No tasks scheduled today</span>
                             )}
                           </div>
                         </li>
@@ -1637,7 +1762,11 @@ export function TodaysScheduleCard({
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8"><PlusCircle className="h-4 w-4"/></Button>
                     </DropdownMenuTrigger>
-                    <AddActivityMenu onAddActivity={(type, details) => handleAddActivity(type, details)} />
+                    <AddActivityMenu
+                      onAddActivity={(type, details) => handleAddActivity(type, details)}
+                      onAddRoutineToday={handleAddRoutineToday}
+                      selectedSlotName={currentSlot}
+                    />
                 </DropdownMenu>
             </div>
         </CardFooter>

@@ -144,40 +144,34 @@ export function FocusSessionModal({
       matchedDefinition = allDefs.find(def => normalizeText(def.name) === normalizeText(activity.details));
     }
 
-    const microSkillName = matchedDefinition?.category || null;
-    if (!microSkillName) {
-      return {
-        microSkillName: null as string | null,
-        hasAudio: false,
-        hasBooks: false,
-        hasSkillTreePath: false,
-        skillTreePathNames: [] as string[],
-        matchedSpecId: null as string | null,
-        matchedSkillAreaId: null as string | null,
-        matchedMicroSkillId: null as string | null,
-        matchedMicroSkillReady: false,
-      };
-    }
+    const microSkillFromDefinition = matchedDefinition?.category || null;
+    const specs = coreSkills.filter((spec) => spec.type === 'Specialization');
 
-    const candidateSpecs = coreSkills
-      .filter(spec => spec.type === 'Specialization')
-      .filter(spec =>
-        spec.skillAreas.some(area => area.microSkills.some(ms => normalizeText(ms.name) === normalizeText(microSkillName)))
+    const findSpecByNameOrId = () =>
+      specs.find((spec) => spec.id === activity.id || normalizeText(spec.name) === normalizeText(activity.details));
+
+    let matchedSpec = findSpecByNameOrId();
+    let matchedArea: SkillArea | undefined;
+    let matchedMicro: MicroSkill | null = null;
+    let microSkillName: string | null = microSkillFromDefinition;
+
+    if (microSkillName) {
+      const candidateSpecs = specs.filter((spec) =>
+        spec.skillAreas.some((area) => area.microSkills.some((ms) => normalizeText(ms.name) === normalizeText(microSkillName!)))
       );
 
-    let matchedSpec = candidateSpecs[0];
-    if (candidateSpecs.length > 1) {
-      const byActivitySpecName = candidateSpecs.find(
-        spec => normalizeText(spec.name) === normalizeText(activity.details)
-      );
-      if (byActivitySpecName) {
-        matchedSpec = byActivitySpecName;
+      matchedSpec = candidateSpecs[0] || matchedSpec;
+      if (candidateSpecs.length > 1) {
+        const byActivitySpecName = candidateSpecs.find(
+          spec => normalizeText(spec.name) === normalizeText(activity.details)
+        );
+        if (byActivitySpecName) matchedSpec = byActivitySpecName;
       }
     }
 
     if (!matchedSpec) {
       return {
-        microSkillName,
+        microSkillName: null as string | null,
         hasAudio: false,
         hasBooks: false,
         hasSkillTreePath: false,
@@ -193,10 +187,27 @@ export function FocusSessionModal({
     const audioResources = learningPlan?.audioVideoResources || [];
     const bookResources = learningPlan?.bookWebpageResources || [];
     const skillTreePaths = learningPlan?.skillTreePaths || [];
-    const matchedArea = matchedSpec.skillAreas.find((area) =>
-      area.microSkills.some((ms) => normalizeText(ms.name) === normalizeText(microSkillName))
-    );
-    const matchedMicro = matchedArea?.microSkills.find((ms) => normalizeText(ms.name) === normalizeText(microSkillName)) || null;
+
+    if (microSkillName) {
+      matchedArea = matchedSpec.skillAreas.find((area) =>
+        area.microSkills.some((ms) => normalizeText(ms.name) === normalizeText(microSkillName!))
+      );
+      matchedMicro = matchedArea?.microSkills.find((ms) => normalizeText(ms.name) === normalizeText(microSkillName!)) || null;
+    }
+
+    // Fallback for specialization-level tasks with learning plan but no linked micro-skill definition.
+    if (!matchedMicro) {
+      const firstAreaWithMicros = matchedSpec.skillAreas.find((area) => area.microSkills.length > 0);
+      const firstIncompleteMicro =
+        matchedSpec.skillAreas.flatMap((area) => area.microSkills).find((ms) => !ms.isReadyForRepetition) ||
+        firstAreaWithMicros?.microSkills[0];
+      if (firstIncompleteMicro && firstAreaWithMicros) {
+        matchedArea = matchedSpec.skillAreas.find((area) => area.microSkills.some((ms) => ms.id === firstIncompleteMicro.id)) || firstAreaWithMicros;
+        matchedMicro = firstIncompleteMicro;
+        microSkillName = firstIncompleteMicro.name;
+      }
+    }
+
     const matchingSkillTreePaths = skillTreePaths.filter((path) => {
       if (!matchedArea?.id) return true;
       const areaIds = path.skillAreaIds || [];
