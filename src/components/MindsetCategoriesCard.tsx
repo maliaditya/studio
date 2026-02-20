@@ -18,7 +18,7 @@ import { Label } from './ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { format, isSameDay, isBefore, subDays, startOfDay, differenceInDays, parseISO, eachDayOfInterval, isAfter, getDay, differenceInMonths, addDays } from 'date-fns';
+import { format, isSameDay, isBefore, subDays, startOfDay, differenceInDays, parseISO, eachDayOfInterval, isAfter, getDay, differenceInMonths, addDays, addMonths } from 'date-fns';
 import { LinkTechniqueModal } from './LinkTechniqueModal';
 import { ChartContainer } from './ui/chart';
 import { LineChart as RechartsLineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Line, ResponsiveContainer } from 'recharts';
@@ -635,6 +635,55 @@ export function MindsetCategoriesCard() {
             if (Number.isNaN(parsed.getTime())) return null;
             return format(parsed, 'yyyy-MM-dd');
         };
+        const countRemainingScheduledSessions = (
+            task: NonNullable<MindsetPoint['tasks']>[number] | undefined,
+            endDateKey: string | null,
+            fromDate: Date
+        ) => {
+            if (!task || !endDateKey) return null;
+            const endDate = startOfDay(parseISO(endDateKey));
+            if (Number.isNaN(endDate.getTime())) return null;
+            if (isBefore(endDate, fromDate)) return 0;
+
+            const recurrence = task.recurrence || 'daily';
+            if (recurrence === 'none') return 1;
+
+            const interval = Math.max(1, task.repeatInterval || 1);
+            const repeatUnit = task.repeatUnit || (recurrence === 'weekly' ? 'week' : 'day');
+            const baseDateKey = normalizeDateKey(task.startDate || task.dateKey) || format(fromDate, 'yyyy-MM-dd');
+            let cursor = startOfDay(parseISO(baseDateKey));
+            if (Number.isNaN(cursor.getTime())) cursor = fromDate;
+
+            if (repeatUnit === 'month') {
+                if (isBefore(cursor, fromDate)) {
+                    const diffMonths = Math.max(0, differenceInMonths(fromDate, cursor));
+                    const jumpCount = Math.floor(diffMonths / interval);
+                    cursor = addMonths(cursor, jumpCount * interval);
+                    while (isBefore(cursor, fromDate)) cursor = addMonths(cursor, interval);
+                }
+
+                let count = 0;
+                while (!isAfter(cursor, endDate)) {
+                    if (!isBefore(cursor, fromDate)) count += 1;
+                    cursor = addMonths(cursor, interval);
+                }
+                return count;
+            }
+
+            const stepDays = repeatUnit === 'week' ? interval * 7 : interval;
+            if (isBefore(cursor, fromDate)) {
+                const diffDays = Math.max(0, differenceInDays(fromDate, cursor));
+                const jumpCount = Math.ceil(diffDays / stepDays);
+                cursor = addDays(cursor, jumpCount * stepDays);
+            }
+
+            let count = 0;
+            while (!isAfter(cursor, endDate)) {
+                if (!isBefore(cursor, fromDate)) count += 1;
+                cursor = addDays(cursor, stepDays);
+            }
+            return count;
+        };
         const microSkillToSpec = new Map<string, Array<{ id: string; name: string }>>();
         const skillAreaToSpec = new Map<string, Array<{ id: string; name: string }>>();
         const specializationByName = new Map<string, { id: string; name: string }>();
@@ -936,11 +985,44 @@ export function MindsetCategoriesCard() {
             remainingPages: number;
             remainingHours: number;
         }>();
+        const taskById = new Map(effectiveTasks.map((task) => [task.id, task] as const));
+
         taskToSpecIds.forEach((specIds, taskId) => {
             const firstSpecId = Array.from(specIds)[0];
             if (!firstSpecId) return;
             const target = targetBySpecId.get(firstSpecId);
             if (!target) return;
+
+            const linkedTask = taskById.get(taskId);
+            const audioSessionsRemaining = countRemainingScheduledSessions(linkedTask, target.latestAudioEndDate, today);
+            const bookSessionsRemaining = countRemainingScheduledSessions(linkedTask, target.latestBookEndDate, today);
+            const adjustedDailyHourTarget =
+                target.audioCount > 0 && target.remainingHours > 0
+                    ? (audioSessionsRemaining != null
+                        ? (audioSessionsRemaining > 0
+                            ? Math.max(0.1, Number((target.remainingHours / audioSessionsRemaining).toFixed(1)))
+                            : target.remainingHours)
+                        : target.dailyHourTarget)
+                    : null;
+            const adjustedDailyPageTarget =
+                target.bookCount > 0 && target.remainingPages > 0
+                    ? (bookSessionsRemaining != null
+                        ? (bookSessionsRemaining > 0
+                            ? Math.max(1, Math.ceil(target.remainingPages / bookSessionsRemaining))
+                            : target.remainingPages)
+                        : target.dailyPageTarget)
+                    : null;
+            const adjustedSkillTreePathSummaries = target.skillTreePathSummaries.map((path) => {
+                if (path.remainingMicroSkills <= 0) return path;
+                const pathSessionsRemaining = countRemainingScheduledSessions(linkedTask, path.completionDate, today);
+                const dailyTarget = pathSessionsRemaining != null
+                    ? (pathSessionsRemaining > 0
+                        ? Math.max(1, Math.ceil(path.remainingMicroSkills / pathSessionsRemaining))
+                        : path.remainingMicroSkills)
+                    : path.dailyTarget;
+                return { ...path, dailyTarget };
+            });
+
             taskLearningPlanByTaskId.set(taskId, {
                 specializationId: target.specializationId,
                 specializationName: target.specializationName,
@@ -954,12 +1036,12 @@ export function MindsetCategoriesCard() {
                 totalPages: target.totalPages,
                 totalHours: target.totalHours,
                 daysRemaining: target.daysRemaining,
-                dailyPageTarget: target.dailyPageTarget,
-                dailyHourTarget: target.dailyHourTarget,
+                dailyPageTarget: adjustedDailyPageTarget,
+                dailyHourTarget: adjustedDailyHourTarget,
                 audioCount: target.audioCount,
                 bookCount: target.bookCount,
                 skillTreePathCount: target.skillTreePathCount,
-                skillTreePathSummaries: target.skillTreePathSummaries,
+                skillTreePathSummaries: adjustedSkillTreePathSummaries,
                 latestAudioEndDate: target.latestAudioEndDate,
                 latestBookEndDate: target.latestBookEndDate,
                 audioDaysRemaining: target.audioDaysRemaining,
