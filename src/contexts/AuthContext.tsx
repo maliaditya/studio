@@ -4826,6 +4826,104 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     throw new Error(errorData.message || `Failed to fetch file details for ${path}.`);
   }
 
+  async function uploadBinaryViaGitDataApi(
+    token: string,
+    owner: string,
+    repo: string,
+    path: string,
+    base64Content: string,
+    message: string
+  ): Promise<void> {
+    const authHeaders = { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' };
+    const parseErrorMessage = async (response: Response, fallback: string) => {
+      try {
+        const data = await response.json();
+        return String(data?.message || fallback);
+      } catch {
+        return fallback;
+      }
+    };
+
+    const repoResp = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: { 'Authorization': `token ${token}` } });
+    if (!repoResp.ok) {
+      throw new Error(await parseErrorMessage(repoResp, 'Failed to resolve repository metadata for PDF upload.'));
+    }
+    const repoData = await repoResp.json();
+    const branch = String(repoData?.default_branch || 'main');
+
+    const refResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    if (!refResp.ok) {
+      throw new Error(await parseErrorMessage(refResp, `Failed to resolve branch ref for "${branch}".`));
+    }
+    const refData = await refResp.json();
+    const parentCommitSha = String(refData?.object?.sha || '');
+    if (!parentCommitSha) throw new Error('Missing parent commit SHA for PDF upload.');
+
+    const parentCommitResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/commits/${parentCommitSha}`, {
+      headers: { 'Authorization': `token ${token}` }
+    });
+    if (!parentCommitResp.ok) {
+      throw new Error(await parseErrorMessage(parentCommitResp, 'Failed to fetch parent commit for PDF upload.'));
+    }
+    const parentCommitData = await parentCommitResp.json();
+    const baseTreeSha = String(parentCommitData?.tree?.sha || '');
+    if (!baseTreeSha) throw new Error('Missing base tree SHA for PDF upload.');
+
+    const blobResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/blobs`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ content: base64Content, encoding: 'base64' }),
+    });
+    if (!blobResp.ok) {
+      throw new Error(await parseErrorMessage(blobResp, 'Failed to create blob for PDF upload.'));
+    }
+    const blobData = await blobResp.json();
+    const blobSha = String(blobData?.sha || '');
+    if (!blobSha) throw new Error('Missing blob SHA for PDF upload.');
+
+    const treeResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        base_tree: baseTreeSha,
+        tree: [{ path, mode: '100644', type: 'blob', sha: blobSha }],
+      }),
+    });
+    if (!treeResp.ok) {
+      throw new Error(await parseErrorMessage(treeResp, 'Failed to create tree for PDF upload.'));
+    }
+    const treeData = await treeResp.json();
+    const treeSha = String(treeData?.sha || '');
+    if (!treeSha) throw new Error('Missing tree SHA for PDF upload.');
+
+    const commitResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/commits`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        message,
+        tree: treeSha,
+        parents: [parentCommitSha],
+      }),
+    });
+    if (!commitResp.ok) {
+      throw new Error(await parseErrorMessage(commitResp, 'Failed to create commit for PDF upload.'));
+    }
+    const commitData = await commitResp.json();
+    const newCommitSha = String(commitData?.sha || '');
+    if (!newCommitSha) throw new Error('Missing commit SHA for PDF upload.');
+
+    const updateRefResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`, {
+      method: 'PATCH',
+      headers: authHeaders,
+      body: JSON.stringify({ sha: newCommitSha, force: false }),
+    });
+    if (!updateRefResp.ok) {
+      throw new Error(await parseErrorMessage(updateRefResp, `Failed to update branch ref "${branch}" for PDF upload.`));
+    }
+  }
+
   const decodeBase64Utf8 = (base64: string) => {
     const cleaned = String(base64).replace(/\n/g, '');
     const binary = atob(cleaned);
@@ -6049,6 +6147,33 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                 emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: matchedPdfKey ? `Uploaded from local key: ${matchedPdfKey}` : 'Uploaded.' });
               } catch (e) {
                 lastError = e;
+                // Fallback for browser/CORS/size-related failures on Contents API.
+                if (attempt === 1) {
+                  try {
+                    const message = `LifeOS pdf (git-data fallback): ${filename}`;
+                    await uploadBinaryViaGitDataApi(githubToken, githubOwner, githubRepo, path, base64Content, message);
+                    githubModuleHashesRef.current = { ...(githubModuleHashesRef.current || {}), [path]: fileHash };
+                    setSettings(prev => ({ ...prev, githubModuleHashes: { ...(prev.githubModuleHashes || {}), [path]: fileHash } }));
+                    uploaded += 1;
+                    processed += 1;
+                    success = true;
+                    syncToast?.update({ title: 'Uploading', description: `Uploaded ${uploaded} / ${pdfs.length}` });
+                    emitProgress({
+                      phase: 'uploading',
+                      total: pdfs.length,
+                      processed,
+                      uploaded,
+                      skipped,
+                      currentItem: filename,
+                      note: matchedPdfKey
+                        ? `Uploaded via fallback from local key: ${matchedPdfKey}`
+                        : 'Uploaded via fallback',
+                    });
+                    break;
+                  } catch (fallbackErr) {
+                    lastError = fallbackErr;
+                  }
+                }
                 const delay = 500 * Math.pow(2, attempt);
                 await new Promise(r => setTimeout(r, delay));
               }
