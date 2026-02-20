@@ -289,6 +289,117 @@ export async function getAudioForResource(id?: string, audioFileName?: string): 
 export const storePdf = (key: string, pdfBlob: Blob) => storeItem(PDF_STORE_NAME, key, pdfBlob);
 export const getPdf = (key: string) => getItem(PDF_STORE_NAME, key);
 export const deletePdf = (key: string) => deleteItem(PDF_STORE_NAME, key);
+export const getAllPdfKeys = () => getAllKeys(PDF_STORE_NAME);
+
+// Resolve PDF blob using robust key matching across id/filename variants.
+export async function getPdfForResource(id?: string, pdfFileName?: string): Promise<{ blob: Blob | null; key?: string }> {
+  const candidates = new Set<string>();
+  if (id) candidates.add(id);
+  if (pdfFileName) candidates.add(pdfFileName);
+
+  const normalize = (s: string) => s?.trim();
+
+  const addVariants = (s?: string) => {
+    if (!s) return;
+    let v = normalize(s);
+    candidates.add(v);
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      candidates.add(v.slice(1, -1));
+      v = v.slice(1, -1);
+    }
+    const dotIndex = v.lastIndexOf('.');
+    if (dotIndex > 0) candidates.add(v.slice(0, dotIndex));
+    candidates.add(v.replace(/\s+/g, '_'));
+    candidates.add(v.replace(/_/g, ' '));
+    try {
+      candidates.add(decodeURIComponent(v));
+    } catch (e) {}
+    candidates.add(v.toLowerCase());
+    candidates.add(v.replace(/\s+/g, ' '));
+    candidates.add(v.replace(/#/g, ''));
+    candidates.add(v.replace(/[^\w.\s\-_]/g, ''));
+    candidates.add(v.replace(/[^\w]/g, '_').replace(/_+/g, '_'));
+    candidates.add(v.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim());
+    if (!/\.[a-zA-Z0-9]{1,4}$/.test(v)) {
+      ['pdf', 'epub'].forEach(ext => candidates.add(`${v}.${ext}`));
+    }
+  };
+
+  addVariants(pdfFileName);
+  if (id) addVariants(id);
+
+  const normalizeForMatch = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    return trimmed
+      .replace(/\[[^\]]*\]/g, ' ')
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(/#[^\s]+/g, ' ')
+      .replace(/[^\w]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .toLowerCase();
+  };
+
+  const expanded = new Set<string>();
+  const addSlugVariants = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const withoutBrackets = trimmed.replace(/\[[^\]]*\]/g, ' ').replace(/\([^)]*\)/g, ' ');
+    const withoutHash = withoutBrackets.replace(/#[^\s]+/g, ' ');
+    const slug = withoutHash
+      .replace(/[^\w]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    if (slug) {
+      expanded.add(slug);
+      expanded.add(slug.toLowerCase());
+    }
+  };
+  for (const c of candidates) {
+    if (!c) continue;
+    const trimmed = c.trim();
+    if (!trimmed) continue;
+    expanded.add(trimmed);
+    expanded.add(trimmed.replace(/\s+/g, ' '));
+    const noExt = trimmed.replace(/\.[a-zA-Z0-9]{1,5}$/, '');
+    expanded.add(noExt);
+    expanded.add(noExt.replace(/\s+/g, ' '));
+    addSlugVariants(trimmed);
+    addSlugVariants(noExt);
+  }
+
+  const tryList = Array.from(expanded).filter(Boolean);
+  tryList.sort((a, b) => b.length - a.length);
+  console.debug('getPdfForResource: trying keys', tryList);
+  for (const k of tryList) {
+    try {
+      const b = await getItem(PDF_STORE_NAME, k);
+      if (b) return { blob: b, key: k };
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  try {
+    const keys = await getAllPdfKeys();
+    const targetNorms = new Set<string>();
+    if (pdfFileName) targetNorms.add(normalizeForMatch(pdfFileName));
+    if (id) targetNorms.add(normalizeForMatch(id));
+    for (const key of keys) {
+      const keyNorm = normalizeForMatch(key);
+      if (targetNorms.has(keyNorm) && keyNorm.length > 0) {
+        const b = await getItem(PDF_STORE_NAME, key);
+        if (b) return { blob: b, key };
+      }
+    }
+  } catch (e) {
+    // ignore fallback errors
+  }
+
+  console.debug('getPdfForResource: no key matched for', id, pdfFileName);
+  return { blob: null };
+}
 
 // Backup functions
 export const storeBackup = (key: string, backupBlob: Blob) => storeItem(BACKUP_STORE_NAME, key, backupBlob);

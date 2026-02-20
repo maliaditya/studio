@@ -38,7 +38,7 @@ import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { HabitDetailPopup } from '@/components/HabitDetailPopup';
-import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, storeExcalidrawFile, type ExcalidrawFileRecord, storeAudio, getAudioForResource, storePdf, getPdf } from '@/lib/audioDB';
+import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, storeExcalidrawFile, type ExcalidrawFileRecord, storeAudio, getAudioForResource, storePdf, getPdfForResource } from '@/lib/audioDB';
 
 // Helper: convert ArrayBuffer to base64 in safe chunks to avoid "call stack size exceeded"
 const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
@@ -5988,8 +5988,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
           for (const res of pdfs) {
             const primaryKey = `${res.id}`;
-            const fallbackKey = res.pdfFileName ? String(res.pdfFileName) : '';
-            const blob = (await getPdf(primaryKey)) || (fallbackKey ? await getPdf(fallbackKey) : null);
+            const { blob, key: matchedPdfKey } = await getPdfForResource(primaryKey, res.pdfFileName ? String(res.pdfFileName) : undefined);
             if (!blob) {
               skipped += 1;
               processed += 1;
@@ -6047,7 +6046,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                 processed += 1;
                 success = true;
                 syncToast?.update({ title: 'Uploading', description: `Uploaded ${uploaded} / ${pdfs.length}` });
-                emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: 'Uploaded.' });
+                emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: matchedPdfKey ? `Uploaded from local key: ${matchedPdfKey}` : 'Uploaded.' });
               } catch (e) {
                 lastError = e;
                 const delay = 500 * Math.pow(2, attempt);
