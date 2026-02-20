@@ -4826,119 +4826,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     throw new Error(errorData.message || `Failed to fetch file details for ${path}.`);
   }
 
-  async function uploadBinaryViaGitDataApi(
-    token: string,
-    owner: string,
-    repo: string,
-    path: string,
-    base64Content: string,
-    message: string
-  ): Promise<void> {
-    const authHeaders = { 'Authorization': `token ${token}`, 'Content-Type': 'application/json' };
-    const parseErrorMessage = async (response: Response, fallback: string) => {
-      try {
-        const data = await response.json();
-        return String(data?.message || fallback);
-      } catch {
-        return fallback;
-      }
-    };
-
-    let lastErr: Error | null = null;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        const repoResp = await fetch(`https://api.github.com/repos/${owner}/${repo}`, { headers: { 'Authorization': `token ${token}` } });
-        if (!repoResp.ok) {
-          throw new Error(await parseErrorMessage(repoResp, 'Failed to resolve repository metadata for PDF upload.'));
-        }
-        const repoData = await repoResp.json();
-        const branch = String(repoData?.default_branch || 'main');
-
-        const refResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`, {
-          headers: { 'Authorization': `token ${token}` }
-        });
-        if (!refResp.ok) {
-          throw new Error(await parseErrorMessage(refResp, `Failed to resolve branch ref for "${branch}".`));
-        }
-        const refData = await refResp.json();
-        const parentCommitSha = String(refData?.object?.sha || '');
-        if (!parentCommitSha) throw new Error('Missing parent commit SHA for PDF upload.');
-
-        const parentCommitResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/commits/${parentCommitSha}`, {
-          headers: { 'Authorization': `token ${token}` }
-        });
-        if (!parentCommitResp.ok) {
-          throw new Error(await parseErrorMessage(parentCommitResp, 'Failed to fetch parent commit for PDF upload.'));
-        }
-        const parentCommitData = await parentCommitResp.json();
-        const baseTreeSha = String(parentCommitData?.tree?.sha || '');
-        if (!baseTreeSha) throw new Error('Missing base tree SHA for PDF upload.');
-
-        const blobResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/blobs`, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({ content: base64Content, encoding: 'base64' }),
-        });
-        if (!blobResp.ok) {
-          throw new Error(await parseErrorMessage(blobResp, 'Failed to create blob for PDF upload.'));
-        }
-        const blobData = await blobResp.json();
-        const blobSha = String(blobData?.sha || '');
-        if (!blobSha) throw new Error('Missing blob SHA for PDF upload.');
-
-        const treeResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees`, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({
-            base_tree: baseTreeSha,
-            tree: [{ path, mode: '100644', type: 'blob', sha: blobSha }],
-          }),
-        });
-        if (!treeResp.ok) {
-          throw new Error(await parseErrorMessage(treeResp, 'Failed to create tree for PDF upload.'));
-        }
-        const treeData = await treeResp.json();
-        const treeSha = String(treeData?.sha || '');
-        if (!treeSha) throw new Error('Missing tree SHA for PDF upload.');
-
-        const commitResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/commits`, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({
-            message,
-            tree: treeSha,
-            parents: [parentCommitSha],
-          }),
-        });
-        if (!commitResp.ok) {
-          throw new Error(await parseErrorMessage(commitResp, 'Failed to create commit for PDF upload.'));
-        }
-        const commitData = await commitResp.json();
-        const newCommitSha = String(commitData?.sha || '');
-        if (!newCommitSha) throw new Error('Missing commit SHA for PDF upload.');
-
-        const updateRefResp = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`, {
-          method: 'PATCH',
-          headers: authHeaders,
-          body: JSON.stringify({ sha: newCommitSha, force: false }),
-        });
-        if (!updateRefResp.ok) {
-          const msg = await parseErrorMessage(updateRefResp, `Failed to update branch ref "${branch}" for PDF upload.`);
-          if (updateRefResp.status === 409 || updateRefResp.status === 422) {
-            throw new Error(`Retryable ref update error: ${msg}`);
-          }
-          throw new Error(msg);
-        }
-        return;
-      } catch (err) {
-        lastErr = err instanceof Error ? err : new Error(String(err));
-        await new Promise(r => setTimeout(r, 300 * attempt));
-      }
-    }
-
-    throw lastErr || new Error('Failed PDF upload through Git Data API.');
-  }
-
   const decodeBase64Utf8 = (base64: string) => {
     const cleaned = String(base64).replace(/\n/g, '');
     const binary = atob(cleaned);
@@ -6083,10 +5970,9 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           options?.onProgress?.(progress);
         };
         const username = currentUser?.username?.toLowerCase();
-        const namespace = resolveGitHubNamespace(username);
         const { githubToken, githubOwner, githubRepo } = settings;
 
-        if (!namespace) {
+        if (!username) {
           if (!silent) toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
           return;
         }
@@ -6102,7 +5988,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           return;
         }
 
-        const folderPath = withUserGitHubPrefix(`pdf_${namespace}`, username);
+        const folderPath = `${username}/pdf_${username}`;
         const syncToast = silent ? null : toast({ title: "Uploading PDFs...", description: `Preparing ${pdfs.length} files...`, duration: PERSISTENT_TOAST_DURATION_MS });
 
         try {
@@ -6110,6 +5996,26 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           let skipped = 0;
           let processed = 0;
           emitProgress({ phase: 'preparing', total: pdfs.length, processed, uploaded, skipped, note: 'Preparing PDF upload...' });
+
+          const existingFilesMap = new Map<string, string>();
+          try {
+            const listResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${folderPath}`, {
+              headers: { 'Authorization': `token ${githubToken}` }
+            });
+            if (listResponse.ok) {
+              const listData = await listResponse.json();
+              for (const item of listData || []) {
+                if (item && item.type === 'file' && item.name && item.sha) {
+                  existingFilesMap.set(item.name, item.sha);
+                }
+              }
+            } else if (listResponse.status !== 404) {
+              const err = await listResponse.json();
+              throw new Error(err.message || 'Failed to list PDFs on GitHub');
+            }
+          } catch (e) {
+            console.debug('Could not list existing GitHub PDF folder, continuing with per-file upload', e);
+          }
 
           for (const res of pdfs) {
             const primaryKey = `${res.id}`;
@@ -6128,52 +6034,78 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             const filename = `${primaryKey}.pdf`.replace(/\s+/g, '_');
             const path = `${folderPath}/${filename}`;
 
-            let success = false;
-            let lastError: any = null;
-
             const existingHash = githubModuleHashesRef.current?.[path];
             if (existingHash === fileHash) {
               skipped += 1;
               processed += 1;
-              success = true;
               syncToast?.update({ title: 'Skipping', description: `Unchanged: ${filename}` });
               emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: 'Unchanged; skipped.' });
-            } else {
-              for (let attempt = 1; attempt <= 3 && !success; attempt++) {
-                try {
-                  const message = `LifeOS pdf (git-data): ${filename}`;
-                  await uploadBinaryViaGitDataApi(githubToken, githubOwner, githubRepo, path, base64Content, message);
-                  githubModuleHashesRef.current = { ...(githubModuleHashesRef.current || {}), [path]: fileHash };
-                  setSettings(prev => ({ ...prev, githubModuleHashes: { ...(prev.githubModuleHashes || {}), [path]: fileHash } }));
-                  uploaded += 1;
-                  processed += 1;
-                  success = true;
-                  syncToast?.update({ title: 'Uploading', description: `Uploaded ${uploaded} / ${pdfs.length}` });
-                  emitProgress({
-                    phase: 'uploading',
-                    total: pdfs.length,
-                    processed,
-                    uploaded,
-                    skipped,
-                    currentItem: filename,
-                    note: matchedPdfKey
-                      ? `Uploaded from local key: ${matchedPdfKey}`
-                      : 'Uploaded',
-                  });
-                } catch (e) {
-                  lastError = e;
-                  const delay = 500 * Math.pow(2, attempt);
-                  await new Promise(r => setTimeout(r, delay));
-                }
-              }
+              continue;
             }
 
-            if (!success) {
+            const message = `LifeOS pdf: ${filename}`;
+            let uploadSucceeded = false;
+            let lastUploadError: unknown = null;
+            let sha = existingFilesMap.get(filename);
+            for (let attempt = 1; attempt <= 4 && !uploadSucceeded; attempt += 1) {
+              const pushResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${path}`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `token ${githubToken}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  message,
+                  content: base64Content,
+                  ...(sha ? { sha } : {}),
+                }),
+              });
+
+              const result = await pushResponse.json();
+              if (pushResponse.ok) {
+                uploadSucceeded = true;
+                const nextSha = result?.content?.sha as string | undefined;
+                if (nextSha) existingFilesMap.set(filename, nextSha);
+                break;
+              }
+
+              const messageText = String(result?.message || '');
+              if (pushResponse.status === 409 || /is at ([0-9a-f]{40})/i.test(messageText)) {
+                const parsedSha = messageText.match(/is at ([0-9a-f]{40})/i)?.[1];
+                sha = parsedSha || await getGitHubFileSha(githubToken, githubOwner, githubRepo, path);
+                lastUploadError = result;
+                await new Promise(r => setTimeout(r, 250 * attempt));
+                continue;
+              }
+
+              throw new Error(result?.message || `Failed to upload ${filename}.`);
+            }
+
+            if (!uploadSucceeded) {
               skipped += 1;
               processed += 1;
-              console.error('Upload pdf failed for', res.id, lastError);
+              const msg = lastUploadError && typeof lastUploadError === 'object' && 'message' in (lastUploadError as Record<string, unknown>)
+                ? String((lastUploadError as Record<string, unknown>).message)
+                : `Failed to upload ${filename}.`;
+              console.error('Upload pdf failed for', res.id, msg);
               emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: 'Failed after retries; skipped.' });
+              continue;
             }
+
+            githubModuleHashesRef.current = { ...(githubModuleHashesRef.current || {}), [path]: fileHash };
+            setSettings(prev => ({ ...prev, githubModuleHashes: { ...(prev.githubModuleHashes || {}), [path]: fileHash } }));
+            uploaded += 1;
+            processed += 1;
+            syncToast?.update({ title: 'Uploading', description: `Uploaded ${uploaded} / ${pdfs.length}` });
+            emitProgress({
+              phase: 'uploading',
+              total: pdfs.length,
+              processed,
+              uploaded,
+              skipped,
+              currentItem: filename,
+              note: matchedPdfKey ? `Uploaded from local key: ${matchedPdfKey}` : 'Uploaded.',
+            });
           }
 
           emitProgress({ phase: 'complete', total: pdfs.length, processed, uploaded, skipped, note: 'PDF upload finished.' });
@@ -6186,10 +6118,9 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     };
     const fetchPdfFilesFromGitHub = async () => {
       const username = currentUser?.username?.toLowerCase();
-      const namespace = resolveGitHubNamespace(username);
       const { githubToken, githubOwner, githubRepo } = settings;
 
-      if (!namespace) {
+      if (!username) {
         toast({ title: "Login required", description: "Please log in first.", variant: "destructive" });
         return;
       }
@@ -6199,8 +6130,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       }
 
       const folderCandidates = [
-        withUserGitHubPrefix(`pdf_${namespace}`, username),
-        withUserGitHubPrefix(`pdfs_${namespace}`, username),
+        `${username}/pdf_${username}`,
+        `${username}/pdfs_${username}`,
       ];
       toast({ title: "Fetching PDFs...", description: "Downloading PDFs from GitHub to this browser." });
 
