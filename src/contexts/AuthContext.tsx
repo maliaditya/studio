@@ -267,7 +267,8 @@ interface AuthContextType {
   // General Popups (New System)
   generalPopups: Map<string, PopupState>;
   openGeneralPopup: (resourceId: string, event: React.MouseEvent | null, parentPopupState?: PopupState, parentRect?: DOMRect) => void;
-  closeGeneralPopup: (resourceId: string) => void;
+  closeGeneralPopup: (popupId: string) => void;
+  navigateGeneralPopupPath: (popupId: string, resourceId: string) => void;
   handleUpdateResource: (resource: Resource) => void;
   handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
   
@@ -1207,7 +1208,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const y = (window.innerHeight - 600) / 2;
 
       newPopups.set(canvasResource!.id, {
+        popupId: canvasResource!.id,
         resourceId: canvasResource!.id,
+        navigationPath: [canvasResource!.id],
         level: 0,
         x,
         y,
@@ -3056,13 +3059,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setOpenPopups(new Map());
   }, []);
   
-  const closeGeneralPopup = useCallback((resourceId: string) => {
+  const closeGeneralPopup = useCallback((popupId: string) => {
     setGeneralPopups(prev => {
         const newPopups = new Map(prev);
-        newPopups.delete(resourceId);
+        newPopups.delete(popupId);
         return newPopups;
     });
   }, []);
+
+  const navigateGeneralPopupPath = useCallback((popupId: string, resourceId: string) => {
+    setGeneralPopups(prev => {
+      const newPopups = new Map(prev);
+      const popup = newPopups.get(popupId);
+      if (!popup) return newPopups;
+      const resource = resources.find(r => r.id === resourceId);
+      if (!resource) return newPopups;
+      const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
+      const popupWidth = hasMarkdown ? 1280 : 768;
+      const existingPath = popup.navigationPath && popup.navigationPath.length > 0
+        ? popup.navigationPath
+        : [popup.resourceId];
+      const idx = existingPath.indexOf(resourceId);
+      const nextPath = idx >= 0 ? existingPath.slice(0, idx + 1) : [...existingPath, resourceId];
+      newPopups.set(popupId, {
+        ...popup,
+        popupId,
+        resourceId,
+        width: popupWidth,
+        navigationPath: nextPath,
+      });
+      return newPopups;
+    });
+  }, [resources]);
   
   const openGeneralPopup = useCallback((resourceId: string, event: React.MouseEvent | null, parentPopupState?: PopupState, parentRect?: DOMRect) => {
     setGeneralPopups(prev => {
@@ -3074,6 +3102,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const popupWidth = hasMarkdown ? 1280 : 768;
         
         let x, y, level, parentId, z;
+        const parentPopupId = parentPopupState?.popupId || parentPopupState?.resourceId;
+
+        if (parentPopupId && newPopups.has(parentPopupId)) {
+            const parentPopup = newPopups.get(parentPopupId)!;
+            const path = parentPopup.navigationPath && parentPopup.navigationPath.length > 0
+              ? parentPopup.navigationPath
+              : [parentPopup.resourceId];
+            const nextPath = path[path.length - 1] === resourceId ? path : [...path, resourceId];
+            newPopups.set(parentPopupId, {
+              ...parentPopup,
+              popupId: parentPopupId,
+              resourceId,
+              width: popupWidth,
+              navigationPath: nextPath,
+            });
+            return newPopups;
+        }
 
         if (parentPopupState && parentRect) {
             level = parentPopupState.level + 1;
@@ -3089,8 +3134,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         } else if (event) { // Check if event is not null
             level = 0;
             parentId = undefined;
-            const screenWidth = window.innerWidth;
-            const screenHeight = window.innerHeight;
             x = event.clientX;
             y = event.clientY;
             z = 80;
@@ -3102,8 +3145,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             z = 80;
         }
         
-        newPopups.set(resourceId, { 
-            resourceId, level, x, y, parentId, width: popupWidth, z
+        const popupId = resourceId;
+        newPopups.set(popupId, { 
+            popupId, resourceId, level, x, y, parentId, width: popupWidth, z, navigationPath: [resourceId]
         });
         return newPopups;
     });
@@ -3121,11 +3165,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       <GeneralResourcePopup 
         popupState={popupState} 
         onClose={closeGeneralPopup}
+        onNavigatePath={navigateGeneralPopupPath}
         onUpdate={handleUpdateResource}
         onOpenNestedPopup={handleOpenNestedPopup}
       />
     )
-  }, [resources, closeGeneralPopup, handleUpdateResource, handleOpenNestedPopup]);
+  }, [resources, closeGeneralPopup, navigateGeneralPopupPath, handleUpdateResource, handleOpenNestedPopup]);
   
   const handlePopupDragEnd = (event: DragEndEvent) => {
     const { active, delta } = event;
@@ -3134,9 +3179,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     setGeneralPopups(prev => {
         const newPopups = new Map(prev);
-        const popup = newPopups.get(activeId.replace('general-popup-', ''));
+        const popupId = activeId.replace('general-popup-', '');
+        const popup = newPopups.get(popupId);
         if (popup) {
-            newPopups.set(popup.resourceId, { ...popup, x: popup.x + x, y: popup.y + y });
+            newPopups.set(popupId, { ...popup, x: popup.x + x, y: popup.y + y });
         }
         return newPopups;
     });
@@ -6528,7 +6574,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     handlePopupDragEnd,
     ResourcePopup,
     intentionPopups, openIntentionPopup, closeIntentionPopup,
-    generalPopups, openGeneralPopup, closeGeneralPopup,
+    generalPopups, openGeneralPopup, closeGeneralPopup, navigateGeneralPopupPath,
     handleUpdateResource, handleOpenNestedPopup,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     pillarPopupState, openPillarPopup, closePillarPopup, handlePillarPopupDragEnd,

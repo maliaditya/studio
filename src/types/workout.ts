@@ -434,7 +434,9 @@ export interface ResourceFolder {
 }
 
 export interface PopupState {
+  popupId?: string;
   resourceId: string;
+  navigationPath?: string[];
   level: number;
   x: number;
   y: number;

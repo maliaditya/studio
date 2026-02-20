@@ -102,7 +102,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     intentionPopups, 
     closeIntentionPopup,
     closeAllResourcePopups, generalPopups, 
-    openGeneralPopup, handleUpdateResource, closeGeneralPopup,
+    openGeneralPopup, handleUpdateResource, closeGeneralPopup, navigateGeneralPopupPath,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     pillarPopupState, closePillarPopup, handlePillarPopupDragEnd,
     habitDetailPopup, openHabitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
@@ -522,11 +522,12 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             {ResourcePopup && Array.from(openPopups.values()).map(popupState => (
               <ResourcePopup key={popupState.resourceId} popupState={popupState} />
             ))}
-            {Array.from(generalPopups.values()).map(popupState => (
+            {Array.from(generalPopups.entries()).map(([popupId, popupState]) => (
               <GeneralResourcePopup 
-                key={popupState.resourceId} 
+                key={popupId}
                 popupState={popupState} 
                 onClose={closeGeneralPopup}
+                onNavigatePath={navigateGeneralPopupPath}
                 onUpdate={handleUpdateResource}
                 onOpenNestedPopup={(resourceId, event, parentPopupState) => openGeneralPopup(resourceId, event, parentPopupState)}
               />

@@ -53,6 +53,7 @@ const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
 interface GeneralResourcePopupProps {
   popupState: PopupState;
   onClose: (id: string) => void;
+  onNavigatePath: (popupId: string, resourceId: string) => void;
   onUpdate: (resource: Resource) => void;
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
 }
@@ -346,7 +347,7 @@ const CanvasPreviewPopup = ({
 };
 
 
-export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
+export function GeneralResourcePopup({ popupState, onClose, onNavigatePath, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
     const { 
       resources, 
       resourceFolders, 
@@ -382,8 +383,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const resource = resources.find(r => r.id === popupState.resourceId);
     const [audioSrc, setAudioSrc] = useState<string | null>(null);
     
+    const popupId = popupState.popupId || popupState.resourceId;
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
-        id: `general-popup-${popupState.resourceId}`,
+        id: `general-popup-${popupId}`,
     });
 
     const baseZ = (drawingCanvasState?.isOpen ? 150 : 65) + (popupState.level || 0);
@@ -527,6 +529,15 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
       return path.join(' / ');
     }, [resource, resourceFolders]);
 
+    const navigationPathResources = useMemo(() => {
+      const ids = popupState.navigationPath && popupState.navigationPath.length > 0
+        ? popupState.navigationPath
+        : [popupState.resourceId];
+      return ids
+        .map(id => resources.find(r => r.id === id))
+        .filter((r): r is Resource => !!r);
+    }, [popupState.navigationPath, popupState.resourceId, resources]);
+
 
     if (!resource) return null;
 
@@ -564,7 +575,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const handleClose = (e: React.MouseEvent | React.PointerEvent) => {
         e.stopPropagation();
         setPlayingAudio(false);
-        onClose(resource.id);
+        onClose(popupId);
     };
 
     const handleSeekTo = (timestamp: number) => {
@@ -719,9 +730,9 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
     const renderContent = () => {
         switch (resource.type) {
             case 'habit':
-                return <HabitResourceCard resource={resource} onUpdate={onUpdate} onDelete={() => {}} onLinkClick={() => {}} linkingFromId={null} onOpenNestedPopup={onOpenNestedPopup} />;
+                return <HabitResourceCard resource={resource} onUpdate={onUpdate} onDelete={() => {}} onLinkClick={() => {}} linkingFromId={null} onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event, popupState)} />;
             case 'mechanism':
-                return <MechanismResourceCard resource={resource} onUpdate={onUpdate} onDelete={() => {}} onLinkClick={() => {}} linkingFromId={null} onOpenNestedPopup={onOpenNestedPopup} />;
+                return <MechanismResourceCard resource={resource} onUpdate={onUpdate} onDelete={() => {}} onLinkClick={() => {}} linkingFromId={null} onOpenNestedPopup={(resourceId, event) => onOpenNestedPopup(resourceId, event, popupState)} />;
             case 'card':
             default:
                 return (
@@ -762,7 +773,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
 
     return (
         <>
-            <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupState.resourceId}>
+            <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupId}>
                 <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
                 <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
                 <Card ref={cardRef} className="shadow-2xl border border-primary/20 bg-gradient-to-b from-card/95 via-card/90 to-card/80 flex flex-col max-h-[80vh] relative group rounded-2xl overflow-hidden">
@@ -835,7 +846,34 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
 	                              <AudioMiniPlayer resource={resource} />
 	                            </div>
 	                          )}
-	                        {folderPath && (
+	                        {navigationPathResources.length > 1 && (
+                            <CardDescription className="text-xs pt-2" title={navigationPathResources.map(r => r.name).join(' / ')}>
+                              <span className="flex items-center gap-1 flex-wrap">
+                                {navigationPathResources.map((pathResource, index, arr) => {
+                                  const isLast = index === arr.length - 1;
+                                  return (
+                                    <React.Fragment key={pathResource.id}>
+                                      <button
+                                        type="button"
+                                        disabled={isLast}
+                                        className={cn(
+                                          "px-2 py-0.5 rounded-full border border-white/10 transition-colors",
+                                          isLast
+                                            ? "bg-muted/40 text-foreground"
+                                            : "bg-muted/20 hover:bg-muted/40"
+                                        )}
+                                        onClick={() => onNavigatePath(popupId, pathResource.id)}
+                                      >
+                                        {pathResource.name || '[Untitled]'}
+                                      </button>
+                                      {index < arr.length - 1 && <ChevronRight className="h-3 w-3 text-muted-foreground/60" />}
+                                    </React.Fragment>
+                                  );
+                                })}
+                              </span>
+                            </CardDescription>
+	                        )}
+	                        {navigationPathResources.length <= 1 && folderPath && (
 	                            <CardDescription className="text-xs pt-2" title={folderPath}>
 	                              <span className="flex items-center gap-1 flex-wrap">
 	                                {folderPath.split(' / ').map((part, index, arr) => (
@@ -918,6 +956,7 @@ export function GeneralResourcePopup({ popupState, onClose, onUpdate, onOpenNest
                         initialDrawing: canvasPreview.drawing ?? undefined,
                         size: 'normal',
                       });
+                      setCanvasPreview(null);
                     }}
                     storageKey={`canvasPreview:${canvasPreview.resourceId}-${canvasPreview.pointId}`}
                 />

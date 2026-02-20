@@ -561,7 +561,17 @@ const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, 
 });
 SortablePoint.displayName = 'SortablePoint';
 
-const SearchResultCard = React.memo(({ resource, onOpen }: { resource: Resource; onOpen: (resourceId: string, event: React.MouseEvent) => void }) => {
+const SearchResultCard = React.memo(({
+    resource,
+    onOpen,
+    onDelete,
+    onOpenFolder,
+}: {
+    resource: Resource;
+    onOpen: (resourceId: string, event: React.MouseEvent) => void;
+    onDelete: (resource: Resource) => void;
+    onOpenFolder: (folderId: string) => void;
+}) => {
     const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
     const icon = resource.type === 'habit' ? <Zap className="h-4 w-4 text-primary" /> :
         resource.type === 'mechanism' ? <Workflow className="h-4 w-4 text-primary" /> :
@@ -575,6 +585,32 @@ const SearchResultCard = React.memo(({ resource, onOpen }: { resource: Resource;
             <CardHeader className="flex-row items-center gap-3 space-y-0">
                 {icon}
                 <CardTitle className="text-base truncate flex-grow" title={resource.name || ""}>{resource.name || "Untitled"}</CardTitle>
+                <div className="flex items-center gap-1">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenFolder(resource.folderId);
+                        }}
+                        title="Open Folder"
+                    >
+                        <Folder className="h-4 w-4" />
+                    </Button>
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(resource);
+                        }}
+                        title="Delete Resource"
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
             </CardHeader>
             <CardContent className="flex-grow flex flex-col pt-0">
                 <p className="text-xs text-muted-foreground line-clamp-2 flex-grow">
@@ -1371,6 +1407,11 @@ function ResourcesPageContent() {
                                             key={res.id}
                                             resource={res}
                                             onOpen={(resourceId, event) => openGeneralPopup(resourceId, event)}
+                                            onDelete={(resource) => setDeleteConfirmation({ item: resource })}
+                                            onOpenFolder={(folderId) => {
+                                                handleTabSelect(folderId);
+                                                setSearchTerm('');
+                                            }}
                                         />
                                     ))}
                                 </div>
