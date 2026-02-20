@@ -49,13 +49,31 @@ export default function PdfViewerPopup() {
                 .finally(() => setIsLoading(false));
             
             setNumPages(null);
-            setPageNumber(1);
+            const lastOpenedPage = settings.pdfLastOpenedPageByResourceId?.[pdfViewerState.resource.id] || 1;
+            setPageNumber(Math.max(1, lastOpenedPage));
             setScale(1.5);
         } else {
             setFile(null);
             setIsLoading(false);
         }
-    }, [pdfViewerState?.resource]);
+    }, [pdfViewerState?.resource, settings.pdfLastOpenedPageByResourceId]);
+
+    useEffect(() => {
+        const resourceId = pdfViewerState?.resource?.id;
+        if (!resourceId || !numPages) return;
+        setSettings((prev) => {
+            const currentMap = prev.pdfLastOpenedPageByResourceId || {};
+            const nextPage = Math.min(Math.max(1, pageNumber), numPages);
+            if (currentMap[resourceId] === nextPage) return prev;
+            return {
+                ...prev,
+                pdfLastOpenedPageByResourceId: {
+                    ...currentMap,
+                    [resourceId]: nextPage,
+                },
+            };
+        });
+    }, [numPages, pageNumber, pdfViewerState?.resource?.id, setSettings]);
 
     const handleResizeMouseDown = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -128,6 +146,7 @@ export default function PdfViewerPopup() {
 
     function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
         setNumPages(numPages);
+        setPageNumber((prev) => Math.min(Math.max(1, prev), numPages));
     }
     
     function zoomIn() {

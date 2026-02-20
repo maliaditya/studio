@@ -284,6 +284,7 @@ export interface LearningResourceBook {
   totalPages: number | null;
   startDate?: string | null;
   completionDate?: string | null;
+  linkedPdfResourceId?: string | null;
 }
 
 export interface LearningPlan {
@@ -298,6 +299,7 @@ export interface SkillTreePathPlan {
   skillAreaIds: string[];
   targetMicroSkills: number | null;
   completionDate?: string | null;
+  linkedPdfResourceId?: string | null;
 }
 
 
@@ -848,6 +850,7 @@ export interface UserSettings {
     }>;
   };
   routineSkipByDate?: Record<string, string[]>;
+  pdfLastOpenedPageByResourceId?: Record<string, number>;
 }
 
 export interface ActiveFocusSession {

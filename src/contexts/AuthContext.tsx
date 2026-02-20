@@ -585,6 +585,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       history: [],
     },
     routineSkipByDate: {},
+    pdfLastOpenedPageByResourceId: {},
   });
   useEffect(() => {
     githubModuleHashesRef.current = settings.githubModuleHashes || {};
@@ -1871,6 +1872,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             history: [],
           },
           routineSkipByDate: {},
+          pdfLastOpenedPageByResourceId: {},
       };
     const incomingSettings = (sanitizedMain.settings || {}) as Partial<UserSettings>;
     setSettings((prev) => ({

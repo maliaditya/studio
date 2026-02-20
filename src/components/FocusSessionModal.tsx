@@ -49,6 +49,7 @@ export function FocusSessionModal({
     updateActivity, 
     skillDomains, 
     coreSkills,
+    settings,
     handleCreateTask,
     currentSlot,
     expectedActivityDurations,
@@ -336,6 +337,51 @@ export function FocusSessionModal({
     };
   }, [activity, allDeepWorkLogs, allUpskillLogs, coreSkills, deepWorkDefinitions, offerizationPlans, upskillDefinitions]);
 
+  const autoPagesReadSuggestion = useMemo(() => {
+    if (!learningContext.matchedSpecId || !learningContext.hasBooks) return 0;
+    const matchedSpec = coreSkills.find((spec) => spec.id === learningContext.matchedSpecId);
+    if (!matchedSpec) return 0;
+
+    const learningPlan = offerizationPlans?.[learningContext.matchedSpecId]?.learningPlan;
+    if (!learningPlan) return 0;
+
+    const pathLinkedPdfIds = (learningPlan.skillTreePaths || [])
+      .filter((path) => {
+        if (!path.linkedPdfResourceId) return false;
+        if (!learningContext.matchedSkillAreaId) return true;
+        const areaIds = path.skillAreaIds || [];
+        if (areaIds.length === 0) return true;
+        return areaIds.includes(learningContext.matchedSkillAreaId);
+      })
+      .map((path) => path.linkedPdfResourceId as string);
+    const bookLinkedPdfIds = (learningPlan.bookWebpageResources || [])
+      .map((book) => book.linkedPdfResourceId)
+      .filter(Boolean) as string[];
+    const linkedPdfIds = [...bookLinkedPdfIds, ...pathLinkedPdfIds];
+    if (linkedPdfIds.length === 0) return 0;
+
+    const lastReadPage = linkedPdfIds.reduce((maxPage, resourceId) => {
+      const page = settings.pdfLastOpenedPageByResourceId?.[resourceId] || 0;
+      return Math.max(maxPage, page);
+    }, 0);
+
+    if (lastReadPage <= 0) return 0;
+
+    const completedPagesTotal = matchedSpec.skillAreas.reduce(
+      (sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedPages || 0), 0),
+      0
+    );
+
+    return Math.max(0, lastReadPage - completedPagesTotal);
+  }, [
+    coreSkills,
+    learningContext.hasBooks,
+    learningContext.matchedSkillAreaId,
+    learningContext.matchedSpecId,
+    offerizationPlans,
+    settings.pdfLastOpenedPageByResourceId,
+  ]);
+
   const toggleDeepworkStageItem = (
     specializationId: string,
     releaseId: string,
@@ -414,8 +460,12 @@ export function FocusSessionModal({
     setCreatedTaskInfo(null);
     setItemsCompletedInput('');
     setHoursCompletedInput('');
-    setPagesCompletedInput('');
-  }, [initialDuration, isOpen, activity, expectedActivityDurations]);
+    const shouldPrefillPages =
+      (activity?.type === 'upskill' || activity?.type === 'deepwork') &&
+      learningContext.hasBooks &&
+      autoPagesReadSuggestion > 0;
+    setPagesCompletedInput(shouldPrefillPages ? String(autoPagesReadSuggestion) : '');
+  }, [initialDuration, isOpen, activity, expectedActivityDurations, learningContext.hasBooks, autoPagesReadSuggestion]);
 
   const handleDomainChange = (domainId: string) => {
     setSelectedDomainId(domainId);

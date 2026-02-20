@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer, PlusCircle } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer, PlusCircle, FileText } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -71,6 +71,8 @@ export const AgendaWidgetItem = React.memo(({
         highlightedTaskIds,
         currentSlot,
         coreSkills,
+        resources,
+        openPdfViewer,
         offerizationPlans,
         upskillDefinitions,
         deepWorkDefinitions,
@@ -115,19 +117,18 @@ export const AgendaWidgetItem = React.memo(({
         highlightedTaskIds?.has(baseId) ||
         (activity.taskIds || []).some(id => highlightedTaskIds?.has(id));
     const shouldStrike = activity.completed || !!hasLoggedStopper;
-    const learningTargetLabel = useMemo(() => {
+    const learningContext = useMemo(() => {
         if (!(activity.type === 'upskill' || activity.type === 'deepwork')) return null;
-
         const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
         const specs = (coreSkills || []).filter((skill) => skill.type === 'Specialization');
         const allDefs = [...(upskillDefinitions || []), ...(deepWorkDefinitions || [])];
 
+        const matchedDef =
+            allDefs.find((def) => def.id === activity.id) ||
+            allDefs.find((def) => normalizeText(def.name) === normalizeText(activity.details));
+        const microSkillName = matchedDef?.category || null;
         let matchedSpec = specs.find((spec) => spec.id === activity.id || normalizeText(spec.name) === normalizeText(activity.details));
-
         if (!matchedSpec) {
-            const matchedDef =
-                allDefs.find((def) => def.id === activity.id) ||
-                allDefs.find((def) => normalizeText(def.name) === normalizeText(activity.details));
             if (matchedDef) {
                 const categoryKey = normalizeText(matchedDef.category);
                 matchedSpec = specs.find((spec) => {
@@ -138,6 +139,19 @@ export const AgendaWidgetItem = React.memo(({
             }
         }
 
+        if (!matchedSpec) return null;
+        const matchedAreaId =
+            microSkillName
+                ? matchedSpec.skillAreas.find((area) =>
+                    area.microSkills.some((micro) => normalizeText(micro.name) === normalizeText(microSkillName))
+                  )?.id || null
+                : null;
+
+        return { spec: matchedSpec, microSkillName, matchedAreaId };
+    }, [activity.details, activity.id, activity.type, coreSkills, deepWorkDefinitions, upskillDefinitions]);
+    const learningTargetLabel = useMemo(() => {
+        if (!(activity.type === 'upskill' || activity.type === 'deepwork')) return null;
+        const matchedSpec = learningContext?.spec;
         if (!matchedSpec) return null;
         if (activity.type === 'deepwork') {
             const releases = offerizationPlans?.[matchedSpec.id]?.releases || [];
@@ -240,7 +254,32 @@ export const AgendaWidgetItem = React.memo(({
         if (hourTarget != null) pieces.push(`${hourTarget}h/day`);
         if (pieces.length === 0) return null;
         return pieces.join(' / ');
-    }, [activity.details, activity.id, activity.type, coreSkills, deepWorkDefinitions, offerizationPlans, upskillDefinitions]);
+    }, [activity.type, learningContext, offerizationPlans]);
+    const linkedLearningPdfResource = useMemo(() => {
+        if (!learningContext?.spec) return null;
+        const learningPlan = offerizationPlans?.[learningContext.spec.id]?.learningPlan;
+        if (!learningPlan) return null;
+        const matchedAreaId = learningContext.matchedAreaId;
+        const pathLinkedPdfIds = (learningPlan.skillTreePaths || [])
+            .filter((path) => {
+                if (!path.linkedPdfResourceId) return false;
+                if (!matchedAreaId) return true;
+                const areaIds = path.skillAreaIds || [];
+                if (areaIds.length === 0) return true;
+                return areaIds.includes(matchedAreaId);
+            })
+            .map((path) => path.linkedPdfResourceId as string);
+        const bookLinkedPdfIds = (learningPlan.bookWebpageResources || [])
+            .map((book) => book.linkedPdfResourceId)
+            .filter(Boolean) as string[];
+        const linkedPdfIds = [
+            ...pathLinkedPdfIds,
+            ...bookLinkedPdfIds,
+        ];
+        if (linkedPdfIds.length === 0) return null;
+        const pdfResources = (resources || []).filter((resource) => resource.type === 'pdf');
+        return pdfResources.find((resource) => linkedPdfIds.includes(resource.id)) || null;
+    }, [learningContext, offerizationPlans, resources]);
 
     const slotOrder = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
     const isPastSlot =
@@ -303,7 +342,7 @@ export const AgendaWidgetItem = React.memo(({
                         {activity.details}
                     </p>
                 )}
-                 <div className="flex flex-wrap items-center gap-2 mt-1">
+                <div className="flex flex-wrap items-center gap-2 mt-1">
                     <div className="flex items-center gap-1 text-xs text-muted-foreground capitalize">
                         {activityIcons[activity.type]} {activity.type.replace('-', ' ')}
                     </div>
@@ -331,6 +370,23 @@ export const AgendaWidgetItem = React.memo(({
                         <Badge variant="secondary">{loggedDuration}</Badge>
                     )}
                 </div>
+                {!activity.completed && linkedLearningPdfResource && (
+                    <div className="mt-1 flex justify-end">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                openPdfViewer(linkedLearningPdfResource);
+                            }}
+                            title={`Open linked PDF: ${linkedLearningPdfResource.name}`}
+                        >
+                            <FileText className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                )}
             </div>
         </li>
     );

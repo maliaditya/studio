@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Check, Magnet, Package, MessageCircle, ArrowRight, Book, Target, Calendar as CalendarIcon, Banknote, Clock, PlusCircle, Briefcase, DraftingCompass, Copy, Download, Edit, Trash2, Github, Globe } from 'lucide-react';
+import { Check, Magnet, Package, MessageCircle, ArrowRight, Book, Target, Calendar as CalendarIcon, Banknote, Clock, PlusCircle, Briefcase, DraftingCompass, Copy, Download, Edit, Trash2, Github, Globe, Link as LinkIcon, Search } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -698,7 +698,7 @@ function ProductizationContent() {
 // OfferizationContent component and others remain unchanged
 // ... Rest of the file
 function OfferizationContent() {
-  const { coreSkills, setCoreSkills, offerizationPlans, setOfferizationPlans, copyOffer, skillAcquisitionPlans, projects, microSkillMap } = useAuth();
+  const { coreSkills, setCoreSkills, offerizationPlans, setOfferizationPlans, copyOffer, skillAcquisitionPlans, projects, microSkillMap, resources, openPdfViewer } = useAuth();
   const { toast } = useToast();
   
   const [newMicroSkillNames, setNewMicroSkillNames] = useState<Record<string, string>>({});
@@ -708,10 +708,87 @@ function OfferizationContent() {
   const [editingSpecialization, setEditingSpecialization] = useState<CoreSkill | null>(null);
 
   const [editingOffer, setEditingOffer] = useState<{ specializationId: string; offer: Partial<Offer> } | null>(null);
+  const [pdfLinkPicker, setPdfLinkPicker] = useState<{
+    isOpen: boolean;
+    specializationId: string | null;
+    target: 'book' | 'path' | null;
+    index: number | null;
+    pathId: string | null;
+  }>({
+    isOpen: false,
+    specializationId: null,
+    target: null,
+    index: null,
+    pathId: null,
+  });
+  const [pdfSearchTerm, setPdfSearchTerm] = useState('');
   
   // New state for hierarchical selection in the modal
   const [selectedSpecForMicro, setSelectedSpecForMicro] = useState<CoreSkill | null>(null);
   const [selectedSkillAreaForMicro, setSelectedSkillAreaForMicro] = useState<SkillArea | null>(null);
+
+  const pdfResources = useMemo(
+    () => (resources || []).filter((resource) => resource.type === 'pdf'),
+    [resources]
+  );
+  const filteredPdfResources = useMemo(() => {
+    const query = pdfSearchTerm.trim().toLowerCase();
+    if (!query) return pdfResources;
+    return pdfResources.filter((resource) => {
+      const name = (resource.name || '').toLowerCase();
+      const description = (resource.description || '').toLowerCase();
+      return name.includes(query) || description.includes(query);
+    });
+  }, [pdfResources, pdfSearchTerm]);
+
+  const openPdfLinkPicker = useCallback((
+    specializationId: string,
+    target: 'book' | 'path',
+    index?: number,
+    pathId?: string
+  ) => {
+    setPdfSearchTerm('');
+    setPdfLinkPicker({
+      isOpen: true,
+      specializationId,
+      target,
+      index: typeof index === 'number' ? index : null,
+      pathId: pathId || null,
+    });
+  }, []);
+
+  const closePdfLinkPicker = useCallback(() => {
+    setPdfLinkPicker({
+      isOpen: false,
+      specializationId: null,
+      target: null,
+      index: null,
+      pathId: null,
+    });
+    setPdfSearchTerm('');
+  }, []);
+
+  const handleSelectPdfResourceForLearningPlan = useCallback((resourceId: string) => {
+    const { specializationId, target, index, pathId } = pdfLinkPicker;
+    if (!specializationId || !target) return;
+
+    if (target === 'book' && index != null) {
+      handleLearningPlanFieldChange(specializationId, 'book', index, 'linkedPdfResourceId', resourceId);
+    } else if (target === 'path' && pathId) {
+      handleUpdateSkillTreePathPlan(specializationId, pathId, { linkedPdfResourceId: resourceId });
+    }
+    closePdfLinkPicker();
+  }, [closePdfLinkPicker, pdfLinkPicker]);
+
+  const handleUnlinkPdfResource = useCallback((specializationId: string, target: 'book' | 'path', index?: number, pathId?: string) => {
+    if (target === 'book' && typeof index === 'number') {
+      handleLearningPlanFieldChange(specializationId, 'book', index, 'linkedPdfResourceId', null);
+      return;
+    }
+    if (target === 'path' && pathId) {
+      handleUpdateSkillTreePathPlan(specializationId, pathId, { linkedPdfResourceId: null });
+    }
+  }, []);
 
   const defaultWorkflowStages = useCallback(() => ({
     botheringPointId: null as string | null,
@@ -1299,6 +1376,41 @@ function OfferizationContent() {
                                                       <Trash2 className="h-4 w-4" />
                                                   </Button>
                                               </div>
+                                              <div className="flex items-center gap-2">
+                                                  <Button
+                                                      variant="outline"
+                                                      size="sm"
+                                                      className="h-8"
+                                                      onClick={() => openPdfLinkPicker(spec.id, 'path', undefined, path.id)}
+                                                  >
+                                                      <Search className="mr-2 h-3.5 w-3.5" />
+                                                      Link PDF Card
+                                                  </Button>
+                                                  {path.linkedPdfResourceId && (
+                                                      <>
+                                                          <Button
+                                                              variant="ghost"
+                                                              size="sm"
+                                                              className="h-8 px-2"
+                                                              onClick={() => {
+                                                                  const linked = pdfResources.find((resource) => resource.id === path.linkedPdfResourceId);
+                                                                  if (linked) openPdfViewer(linked);
+                                                              }}
+                                                          >
+                                                              <LinkIcon className="mr-1.5 h-3.5 w-3.5" />
+                                                              {(pdfResources.find((resource) => resource.id === path.linkedPdfResourceId)?.name || 'Open linked PDF')}
+                                                          </Button>
+                                                          <Button
+                                                              variant="ghost"
+                                                              size="icon"
+                                                              className="h-8 w-8 text-destructive"
+                                                              onClick={() => handleUnlinkPdfResource(spec.id, 'path', undefined, path.id)}
+                                                          >
+                                                              <Trash2 className="h-3.5 w-3.5" />
+                                                          </Button>
+                                                      </>
+                                                  )}
+                                              </div>
                                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                   <Input
                                                       type="number"
@@ -1414,6 +1526,41 @@ function OfferizationContent() {
                                           <div className="flex justify-between items-center">
                                             <Input value={resource.name} onChange={e => handleLearningPlanFieldChange(spec.id, 'book', index, 'name', e.target.value)} placeholder="Name" className="font-semibold"/>
                                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLearningResource(spec.id, 'book', index)}><Trash2 className="h-4 w-4"/></Button>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8"
+                                                onClick={() => openPdfLinkPicker(spec.id, 'book', index)}
+                                            >
+                                                <Search className="mr-2 h-3.5 w-3.5" />
+                                                Link PDF Card
+                                            </Button>
+                                            {resource.linkedPdfResourceId && (
+                                                <>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-8 px-2"
+                                                        onClick={() => {
+                                                            const linked = pdfResources.find((item) => item.id === resource.linkedPdfResourceId);
+                                                            if (linked) openPdfViewer(linked);
+                                                        }}
+                                                    >
+                                                        <LinkIcon className="mr-1.5 h-3.5 w-3.5" />
+                                                        {(pdfResources.find((item) => item.id === resource.linkedPdfResourceId)?.name || 'Open linked PDF')}
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-destructive"
+                                                        onClick={() => handleUnlinkPdfResource(spec.id, 'book', index)}
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </>
+                                            )}
                                           </div>
                                           <Input value={resource.author} onChange={e => handleLearningPlanFieldChange(spec.id, 'book', index, 'author', e.target.value)} placeholder="Author" />
                                           <Input type="number" value={resource.totalPages || ''} onChange={e => handleLearningPlanFieldChange(spec.id, 'book', index, 'totalPages', e.target.value === '' ? null : Number(e.target.value))} placeholder="Total Pages" />
@@ -1587,6 +1734,47 @@ function OfferizationContent() {
             </DialogContent>
         </Dialog>
       )}
+      <Dialog open={pdfLinkPicker.isOpen} onOpenChange={(open) => !open && closePdfLinkPicker()}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Select PDF Resource Card</DialogTitle>
+            <DialogDescription>
+              Search and select a PDF resource card to link with this learning plan item.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              placeholder="Search PDF cards..."
+              value={pdfSearchTerm}
+              onChange={(e) => setPdfSearchTerm(e.target.value)}
+            />
+            <ScrollArea className="h-72 rounded-md border">
+              <div className="p-2 space-y-1">
+                {filteredPdfResources.length === 0 ? (
+                  <p className="px-2 py-4 text-sm text-muted-foreground text-center">No PDF resource cards found.</p>
+                ) : (
+                  filteredPdfResources.map((resource) => (
+                    <button
+                      key={resource.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 rounded-md hover:bg-accent transition"
+                      onClick={() => handleSelectPdfResourceForLearningPlan(resource.id)}
+                    >
+                      <p className="text-sm font-medium truncate">{resource.name}</p>
+                      {resource.description && (
+                        <p className="text-xs text-muted-foreground truncate">{resource.description}</p>
+                      )}
+                    </button>
+                  ))
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={closePdfLinkPicker}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
