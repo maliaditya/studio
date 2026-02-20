@@ -5970,14 +5970,14 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           return;
         }
 
-        const pdfs = (resources || []).filter(r => r.hasLocalPdf || r.pdfFileName);
+        const pdfs = (resources || []).filter(r => r.type === 'pdf');
         if (pdfs.length === 0) {
           emitProgress({ phase: 'complete', total: 0, processed: 0, uploaded: 0, skipped: 0, note: 'No local PDFs found.' });
           if (!silent) toast({ title: "No PDFs", description: "No local PDFs found to upload." });
           return;
         }
 
-        const folderPath = withUserGitHubPrefix(`pdfs_${username}`, username);
+        const folderPath = withUserGitHubPrefix(`pdf_${username}`, username);
         const syncToast = silent ? null : toast({ title: "Uploading PDFs...", description: `Preparing ${pdfs.length} files...`, duration: PERSISTENT_TOAST_DURATION_MS });
 
         try {
@@ -5987,12 +5987,13 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           emitProgress({ phase: 'preparing', total: pdfs.length, processed, uploaded, skipped, note: 'Preparing PDF upload...' });
 
           for (const res of pdfs) {
-            const key = res.pdfFileName || `${res.id}`;
-            const blob = await getPdf(key);
+            const primaryKey = `${res.id}`;
+            const fallbackKey = res.pdfFileName ? String(res.pdfFileName) : '';
+            const blob = (await getPdf(primaryKey)) || (fallbackKey ? await getPdf(fallbackKey) : null);
             if (!blob) {
               skipped += 1;
               processed += 1;
-              emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: key, note: 'Skipped missing local PDF.' });
+              emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: res.name || primaryKey, note: 'Skipped missing local PDF.' });
               continue;
             }
 
@@ -6000,17 +6001,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
             const base64Content = arrayBufferToBase64(buffer);
             const fileHash = await hashString(base64Content);
 
-            const filename = `${key}.pdf`.replace(/\s+/g, '_');
+            const filename = `${primaryKey}.pdf`.replace(/\s+/g, '_');
             const path = `${folderPath}/${filename}`;
-
-            const existingHash = githubModuleHashesRef.current?.[path];
-            if (existingHash === fileHash) {
-              skipped += 1;
-              processed += 1;
-              syncToast?.update({ title: 'Skipping', description: `Unchanged: ${filename}` });
-              emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: 'Unchanged; skipped.' });
-              continue;
-            }
 
             let success = false;
             let lastError: any = null;
@@ -6026,6 +6018,17 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                 } else if (fileResponse.status !== 404) {
                   const err = await fileResponse.json();
                   throw new Error(err.message || 'Failed to check existing file');
+                }
+                const existsOnRemote = !!sha;
+
+                const existingHash = githubModuleHashesRef.current?.[path];
+                if (existsOnRemote && existingHash === fileHash) {
+                  skipped += 1;
+                  processed += 1;
+                  success = true;
+                  syncToast?.update({ title: 'Skipping', description: `Unchanged: ${filename}` });
+                  emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: filename, note: 'Unchanged; skipped.' });
+                  break;
                 }
 
                 const message = `LifeOS pdf: ${filename}`;
@@ -6081,21 +6084,33 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         return;
       }
 
-      const folderPath = withUserGitHubPrefix(`pdfs_${username}`, username);
+      const folderCandidates = [
+        withUserGitHubPrefix(`pdf_${username}`, username),
+        withUserGitHubPrefix(`pdfs_${username}`, username),
+      ];
       toast({ title: "Fetching PDFs...", description: "Downloading PDFs from GitHub to this browser." });
 
       try {
-        const listResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${folderPath}`, {
-          headers: { 'Authorization': `token ${githubToken}` }
-        });
-        if (!listResponse.ok) {
-          if (listResponse.status === 404) {
-            console.info(`GitHub folder ${folderPath} not found; nothing to fetch.`);
-            toast({ title: 'No PDF folder', description: `No folder "${folderPath}" found on GitHub. Nothing to fetch.` });
-            return;
+        let folderPath = folderCandidates[0];
+        let listResponse: Response | null = null;
+        for (const candidate of folderCandidates) {
+          const response = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${candidate}`, {
+            headers: { 'Authorization': `token ${githubToken}` }
+          });
+          if (response.ok) {
+            folderPath = candidate;
+            listResponse = response;
+            break;
           }
-          const err = await listResponse.json().catch(() => ({ message: 'Failed to list pdfs on GitHub' }));
-          throw new Error(err.message || 'Failed to list pdfs on GitHub');
+          if (response.status !== 404) {
+            const err = await response.json().catch(() => ({ message: 'Failed to list pdfs on GitHub' }));
+            throw new Error(err.message || 'Failed to list pdfs on GitHub');
+          }
+        }
+        if (!listResponse) {
+          console.info(`GitHub PDF folders not found; checked: ${folderCandidates.join(', ')}`);
+          toast({ title: 'No PDF folder', description: `No folder "${folderCandidates[0]}" found on GitHub. Nothing to fetch.` });
+          return;
         }
 
         const listData = await listResponse.json();
