@@ -102,7 +102,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     intentionPopups, 
     closeIntentionPopup,
     closeAllResourcePopups, generalPopups, 
-    openGeneralPopup, handleUpdateResource, closeGeneralPopup, navigateGeneralPopupPath,
+    openGeneralPopup, handleUpdateResource, closeGeneralPopup, navigateGeneralPopupPath, updateGeneralPopupSize,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     pillarPopupState, closePillarPopup, handlePillarPopupDragEnd,
     habitDetailPopup, openHabitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
@@ -530,6 +530,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                 onNavigatePath={navigateGeneralPopupPath}
                 onUpdate={handleUpdateResource}
                 onOpenNestedPopup={(resourceId, event, parentPopupState) => openGeneralPopup(resourceId, event, parentPopupState)}
+                onResize={updateGeneralPopupSize}
               />
             ))}
              {ruleDetailPopup && (

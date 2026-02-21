@@ -56,6 +56,7 @@ interface GeneralResourcePopupProps {
   onNavigatePath: (popupId: string, resourceId: string) => void;
   onUpdate: (resource: Resource) => void;
   onOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
+  onResize?: (popupId: string, resourceId: string, width: number, height: number) => void;
 }
 
 const formatTime = (seconds: number): string => {
@@ -347,7 +348,7 @@ const CanvasPreviewPopup = ({
 };
 
 
-export function GeneralResourcePopup({ popupState, onClose, onNavigatePath, onUpdate, onOpenNestedPopup }: GeneralResourcePopupProps) {
+export function GeneralResourcePopup({ popupState, onClose, onNavigatePath, onUpdate, onOpenNestedPopup, onResize }: GeneralResourcePopupProps) {
     const { 
       resources, 
       resourceFolders, 
@@ -387,6 +388,12 @@ export function GeneralResourcePopup({ popupState, onClose, onNavigatePath, onUp
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `general-popup-${popupId}`,
     });
+    const popupContainerRef = useRef<HTMLDivElement | null>(null);
+
+    const setPopupRef = useCallback((node: HTMLDivElement | null) => {
+      popupContainerRef.current = node;
+      setNodeRef(node);
+    }, [setNodeRef]);
 
     const baseZ = (drawingCanvasState?.isOpen ? 150 : 65) + (popupState.level || 0);
     const style: React.CSSProperties = {
@@ -394,6 +401,12 @@ export function GeneralResourcePopup({ popupState, onClose, onNavigatePath, onUp
         top: popupState.y,
         left: popupState.x,
         width: `${popupState.width || 420}px`,
+        height: `${popupState.height || 600}px`,
+        minWidth: 360,
+        minHeight: 260,
+        maxWidth: '95vw',
+        maxHeight: '90vh',
+        overflow: 'hidden',
         willChange: 'transform',
         zIndex: Math.max(popupState.z ?? 0, baseZ),
     };
@@ -401,6 +414,17 @@ export function GeneralResourcePopup({ popupState, onClose, onNavigatePath, onUp
     if (transform) {
         style.transform = `translate3d(${transform.x}px, ${transform.y}px, 0)`;
     }
+
+    useEffect(() => {
+      const node = popupContainerRef.current;
+      if (!node) return;
+      const observer = new ResizeObserver(() => {
+        const rect = node.getBoundingClientRect();
+        onResize?.(popupId, popupState.resourceId, rect.width, rect.height);
+      });
+      observer.observe(node);
+      return () => observer.disconnect();
+    }, [onResize, popupId, popupState.resourceId]);
     
      useEffect(() => {
         const audioEl = audioRef.current;
@@ -773,10 +797,10 @@ export function GeneralResourcePopup({ popupState, onClose, onNavigatePath, onUp
 
     return (
         <>
-            <div ref={setNodeRef} style={style} {...attributes} data-popup-id={popupId}>
+            <div ref={setPopupRef} style={style} {...attributes} data-popup-id={popupId} className="resize both">
                 <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
                 <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
-                <Card ref={cardRef} className="shadow-2xl border border-primary/20 bg-gradient-to-b from-card/95 via-card/90 to-card/80 flex flex-col max-h-[80vh] relative group rounded-2xl overflow-hidden">
+                <Card ref={cardRef} className="shadow-2xl border border-primary/20 bg-gradient-to-b from-card/95 via-card/90 to-card/80 flex h-full flex-col relative group rounded-2xl overflow-hidden">
                     <div className="absolute top-3 right-3 z-20 flex items-center bg-background/60 backdrop-blur-md border border-white/10 rounded-full px-1 py-0.5 shadow-lg">
                         <TooltipProvider delayDuration={200}>
                             <Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleToggleFavorite}>
@@ -957,6 +981,7 @@ export function GeneralResourcePopup({ popupState, onClose, onNavigatePath, onUp
                         size: 'normal',
                       });
                       setCanvasPreview(null);
+                      onClose(popupId);
                     }}
                     storageKey={`canvasPreview:${canvasPreview.resourceId}-${canvasPreview.pointId}`}
                 />

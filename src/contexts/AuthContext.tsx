@@ -269,6 +269,7 @@ interface AuthContextType {
   openGeneralPopup: (resourceId: string, event: React.MouseEvent | null, parentPopupState?: PopupState, parentRect?: DOMRect) => void;
   closeGeneralPopup: (popupId: string) => void;
   navigateGeneralPopupPath: (popupId: string, resourceId: string) => void;
+  updateGeneralPopupSize: (popupId: string, resourceId: string, width: number, height: number) => void;
   handleUpdateResource: (resource: Resource) => void;
   handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
   
@@ -3067,6 +3068,43 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
+  const getStoredGeneralPopupSize = useCallback((resourceId: string): { width: number; height: number } | null => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const raw = localStorage.getItem(`lifeos_general_popup_size_${resourceId}`);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { width?: number; height?: number };
+      if (typeof parsed.width === 'number' && typeof parsed.height === 'number') {
+        return { width: parsed.width, height: parsed.height };
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  }, []);
+
+  const persistGeneralPopupSize = useCallback((resourceId: string, width: number, height: number) => {
+    if (typeof window === 'undefined') return;
+    safeSetLocalStorage(
+      `lifeos_general_popup_size_${resourceId}`,
+      JSON.stringify({ width, height })
+    );
+  }, []);
+
+  const updateGeneralPopupSize = useCallback((popupId: string, resourceId: string, width: number, height: number) => {
+    const normalizedWidth = Math.max(360, Math.round(width));
+    const normalizedHeight = Math.max(260, Math.round(height));
+    setGeneralPopups(prev => {
+      const newPopups = new Map(prev);
+      const popup = newPopups.get(popupId);
+      if (!popup) return newPopups;
+      if (popup.width === normalizedWidth && popup.height === normalizedHeight) return newPopups;
+      newPopups.set(popupId, { ...popup, width: normalizedWidth, height: normalizedHeight });
+      return newPopups;
+    });
+    persistGeneralPopupSize(resourceId, normalizedWidth, normalizedHeight);
+  }, [persistGeneralPopupSize]);
+
   const navigateGeneralPopupPath = useCallback((popupId: string, resourceId: string) => {
     setGeneralPopups(prev => {
       const newPopups = new Map(prev);
@@ -3075,7 +3113,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const resource = resources.find(r => r.id === resourceId);
       if (!resource) return newPopups;
       const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-      const popupWidth = hasMarkdown ? 1280 : 768;
+      const defaultPopupWidth = hasMarkdown ? 1280 : 768;
+      const storedSize = getStoredGeneralPopupSize(resourceId);
       const existingPath = popup.navigationPath && popup.navigationPath.length > 0
         ? popup.navigationPath
         : [popup.resourceId];
@@ -3085,12 +3124,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         ...popup,
         popupId,
         resourceId,
-        width: popupWidth,
+        width: storedSize?.width ?? popup.width ?? defaultPopupWidth,
+        height: storedSize?.height ?? popup.height ?? 600,
         navigationPath: nextPath,
       });
       return newPopups;
     });
-  }, [resources]);
+  }, [resources, getStoredGeneralPopupSize]);
   
   const openGeneralPopup = useCallback((resourceId: string, event: React.MouseEvent | null, parentPopupState?: PopupState, parentRect?: DOMRect) => {
     setGeneralPopups(prev => {
@@ -3099,7 +3139,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (!resource) return newPopups;
         
         const hasMarkdown = (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
-        const popupWidth = hasMarkdown ? 1280 : 768;
+        const defaultPopupWidth = hasMarkdown ? 1280 : 768;
+        const storedSize = getStoredGeneralPopupSize(resourceId);
+        const popupWidth = storedSize?.width ?? defaultPopupWidth;
+        const popupHeight = storedSize?.height ?? 600;
         
         let x, y, level, parentId, z;
         const parentPopupId = parentPopupState?.popupId || parentPopupState?.resourceId;
@@ -3114,7 +3157,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               ...parentPopup,
               popupId: parentPopupId,
               resourceId,
-              width: popupWidth,
+              width: storedSize?.width ?? parentPopup.width ?? popupWidth,
+              height: storedSize?.height ?? parentPopup.height ?? popupHeight,
               navigationPath: nextPath,
             });
             return newPopups;
@@ -3141,17 +3185,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             level = 0;
             parentId = undefined;
             x = (window.innerWidth - popupWidth) / 2;
-            y = (window.innerHeight - 600) / 2; // Assume a default height
+            y = (window.innerHeight - popupHeight) / 2;
             z = 80;
         }
         
         const popupId = resourceId;
         newPopups.set(popupId, { 
-            popupId, resourceId, level, x, y, parentId, width: popupWidth, z, navigationPath: [resourceId]
+            popupId, resourceId, level, x, y, parentId, width: popupWidth, height: popupHeight, z, navigationPath: [resourceId]
         });
         return newPopups;
     });
-  }, [resources]);
+  }, [resources, getStoredGeneralPopupSize]);
 
   const handleOpenNestedPopup = useCallback((resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => {
     const parentRect = (event.currentTarget as HTMLElement).closest('[data-popup-id]')?.getBoundingClientRect();
@@ -3168,9 +3212,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         onNavigatePath={navigateGeneralPopupPath}
         onUpdate={handleUpdateResource}
         onOpenNestedPopup={handleOpenNestedPopup}
+        onResize={updateGeneralPopupSize}
       />
     )
-  }, [resources, closeGeneralPopup, navigateGeneralPopupPath, handleUpdateResource, handleOpenNestedPopup]);
+  }, [resources, closeGeneralPopup, navigateGeneralPopupPath, handleUpdateResource, handleOpenNestedPopup, updateGeneralPopupSize]);
   
   const handlePopupDragEnd = (event: DragEndEvent) => {
     const { active, delta } = event;
@@ -6574,7 +6619,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     handlePopupDragEnd,
     ResourcePopup,
     intentionPopups, openIntentionPopup, closeIntentionPopup,
-    generalPopups, openGeneralPopup, closeGeneralPopup, navigateGeneralPopupPath,
+    generalPopups, openGeneralPopup, closeGeneralPopup, navigateGeneralPopupPath, updateGeneralPopupSize,
     handleUpdateResource, handleOpenNestedPopup,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     pillarPopupState, openPillarPopup, closePillarPopup, handlePillarPopupDragEnd,
