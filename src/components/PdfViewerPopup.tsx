@@ -170,7 +170,8 @@ export default function PdfViewerPopup() {
         width: `${pdfViewerState.size?.width || 1024}px`,
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         willChange: 'transform',
-        zIndex: 100,
+        // Keep PDF above canvas/resource popups (z-[160]).
+        zIndex: 180,
     };
 
     function onDocumentLoadSuccess({ numPages }: { numPages: number }) {

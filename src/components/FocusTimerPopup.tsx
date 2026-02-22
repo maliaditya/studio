@@ -467,7 +467,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
 
   return (
-        <div ref={setNodeRef} style={style} className="fixed z-[100]">
+        <div ref={setNodeRef} style={style} className="fixed z-[90]">
         <Card ref={popupRef} className={cn(
             "shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm transition-[width]",
             showSubTasks && isSubTasksVisible ? "w-[600px]" : "w-[300px]"
