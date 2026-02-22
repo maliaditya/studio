@@ -7,7 +7,6 @@ import { Button } from './ui/button';
 import { Play, Pause, Square, MoreHorizontal, BrainCircuit, X, Link as LinkIcon, RefreshCw, Check, Coffee, Timer, Plus, Minus, Edit2, Edit3, Save, Menu, PlusCircle, Briefcase, BookCopy, ChevronLeft, Flag, Bolt, Focus, Frame, Lightbulb, Badge } from 'lucide-react';
 import type { Activity, PauseEvent, ExerciseDefinition, PostSessionReview, SubTask, ActivityType, SlotName } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
-import { useDraggable } from '@dnd-kit/core';
 import { ScrollArea } from './ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Input } from './ui/input';
@@ -101,6 +100,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   const router = useRouter();
   const { toast } = useToast();
   const popupRef = useRef<HTMLDivElement>(null);
+  const dragStateRef = useRef<{ pointerId: number; startX: number; startY: number; originX: number; originY: number } | null>(null);
   
   const [sessionCompletedSubTaskIds, setSessionCompletedSubTaskIds] = useState<Set<string>>(new Set());
   const [pomodoroStage, setPomodoroStage] = useState(0);
@@ -117,10 +117,6 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
   // State for Pomodoro linking
   const [accumulatedPomodoroTime, setAccumulatedPomodoroTime] = useState(0);
   const [linkedActivityType, setLinkedActivityType] = useState<ActivityType | ''>(activity?.linkedActivityType || '');
-
-  const { attributes, listeners, setNodeRef, transform } = useDraggable({
-    id: `focus-timer-popup-${activity.id}`,
-  });
 
   const allDefinitions = useMemo(() => new Map(
       [...deepWorkDefinitions, ...upskillDefinitions].map(def => [def.id, def])
@@ -210,12 +206,76 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
       return (activity.type === 'deepwork' || activity.type === 'upskill' || activity.type === 'pomodoro' || (activity.subTasks && activity.subTasks.length > 0)) && subTasks.length > 0;
   }, [activity.type, activity.subTasks, subTasks]);
 
+  const [position, setPosition] = useState<{ x: number; y: number }>(() => {
+    if (typeof window === 'undefined') return { x: 24, y: 24 };
+    const defaultWidth = 300;
+    return { x: Math.max(8, window.innerWidth - defaultWidth - 24), y: 24 };
+  });
+
   const style: React.CSSProperties = {
     position: 'fixed',
-    top: '1.5rem',
-    right: '1.5rem',
-    transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
-    willChange: 'transform',
+    top: position.y,
+    left: position.x,
+    willChange: 'left, top',
+  };
+
+  useEffect(() => {
+    const clampToViewport = () => {
+      const cardWidth = popupRef.current?.offsetWidth || 300;
+      const cardHeight = popupRef.current?.offsetHeight || 300;
+      const maxX = Math.max(8, window.innerWidth - cardWidth - 8);
+      const maxY = Math.max(8, window.innerHeight - cardHeight - 8);
+      setPosition((prev) => ({
+        x: Math.min(Math.max(8, prev.x), maxX),
+        y: Math.min(Math.max(8, prev.y), maxY),
+      }));
+    };
+
+    clampToViewport();
+    window.addEventListener('resize', clampToViewport);
+    return () => window.removeEventListener('resize', clampToViewport);
+  }, [isSubTasksVisible, showSubTasks]);
+
+  const handleDragPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+
+    dragStateRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: position.x,
+      originY: position.y,
+    };
+
+    const handlePointerMove = (moveEvent: PointerEvent) => {
+      if (!dragStateRef.current || moveEvent.pointerId !== dragStateRef.current.pointerId) return;
+
+      const dx = moveEvent.clientX - dragStateRef.current.startX;
+      const dy = moveEvent.clientY - dragStateRef.current.startY;
+
+      const cardWidth = popupRef.current?.offsetWidth || 300;
+      const cardHeight = popupRef.current?.offsetHeight || 300;
+      const maxX = Math.max(8, window.innerWidth - cardWidth - 8);
+      const maxY = Math.max(8, window.innerHeight - cardHeight - 8);
+
+      const nextX = Math.min(Math.max(8, dragStateRef.current.originX + dx), maxX);
+      const nextY = Math.min(Math.max(8, dragStateRef.current.originY + dy), maxY);
+
+      setPosition({ x: nextX, y: nextY });
+    };
+
+    const handlePointerUp = (upEvent: PointerEvent) => {
+      if (!dragStateRef.current || upEvent.pointerId !== dragStateRef.current.pointerId) return;
+      dragStateRef.current = null;
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
   };
   
   const handleStartSubTask = useCallback((subTask: SubTask | ExerciseDefinition | {id: string; name: string, estimatedDuration: number}) => {
@@ -467,7 +527,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
 
 
   return (
-        <div ref={setNodeRef} style={style} className="fixed z-[90]">
+        <div style={style} className="fixed z-[100]">
         <Card ref={popupRef} className={cn(
             "shadow-2xl rounded-xl border-border/20 bg-background/80 backdrop-blur-sm transition-[width]",
             showSubTasks && isSubTasksVisible ? "w-[600px]" : "w-[300px]"
@@ -478,7 +538,7 @@ export function FocusTimerPopup({ activity, duration, initialSecondsLeft, onClos
             )}>
             <div className="col-span-1 space-y-2">
               <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2 cursor-grab" {...listeners} {...attributes}>
+                  <div className="flex items-center gap-2 cursor-grab active:cursor-grabbing select-none" onPointerDown={handleDragPointerDown}>
                   <BrainCircuit className="h-5 w-5 text-primary" />
                   <p className="text-sm font-medium">Focus period...</p>
                   </div>
