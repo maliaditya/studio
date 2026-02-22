@@ -590,6 +590,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     routineSkipByDate: {},
     routineSourceOverrides: {},
     pdfLastOpenedPageByResourceId: {},
+    pdfAnnotationsByResourceId: {},
     supabasePdfBucket: 'pdfs',
   });
   useEffect(() => {
@@ -1292,11 +1293,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const openPdfViewer = (resource: Resource) => {
+    const initialWidth = settings.pdfViewerWidth || 1024;
+    const initialHeight = settings.pdfViewerHeight || Math.max(520, Math.floor(window.innerHeight * 0.9));
     setPdfViewerState({
       isOpen: true,
       resource,
-      position: { x: window.innerWidth - (settings.pdfViewerWidth || 1024) - 20, y: 80 },
-      size: { width: settings.pdfViewerWidth || 1024 }
+      position: { x: window.innerWidth - initialWidth - 20, y: 80 },
+      size: { width: initialWidth, height: initialHeight }
     });
   };
 
@@ -1881,6 +1884,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           routineSkipByDate: {},
           routineSourceOverrides: {},
           pdfLastOpenedPageByResourceId: {},
+          pdfAnnotationsByResourceId: {},
           supabasePdfBucket: 'pdfs',
       };
     const incomingSettings = (sanitizedMain.settings || {}) as Partial<UserSettings>;

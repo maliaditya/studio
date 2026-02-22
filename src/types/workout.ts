@@ -826,6 +826,7 @@ export interface UserSettings {
   currentPurpose?: string;
   spacedRepetitionSlot?: SlotName;
   pdfViewerWidth?: number;
+  pdfViewerHeight?: number;
   timestampAnnotationOffset?: number;
   drawingCanvasAutoSaveInterval?: number;
   githubToken?: string;
@@ -857,6 +858,7 @@ export interface UserSettings {
   routineSkipByDate?: Record<string, string[]>;
   routineSourceOverrides?: Record<string, 'external' | 'mismatch'>;
   pdfLastOpenedPageByResourceId?: Record<string, number>;
+  pdfAnnotationsByResourceId?: Record<string, Record<string, PdfAnnotationStroke[]>>;
 }
 
 export interface ActiveFocusSession {
@@ -906,11 +908,22 @@ export interface AudioAnnotation {
     endTime?: number;
 }
 
+export interface PdfAnnotationPoint {
+    x: number;
+    y: number;
+}
+
+export interface PdfAnnotationStroke {
+    color: string;
+    size: number;
+    points: PdfAnnotationPoint[];
+}
+
 export interface PdfViewerPopupState {
   isOpen: boolean;
   resource: Resource | null;
   position: { x: number; y: number };
-  size?: { width: number };
+  size?: { width: number; height?: number };
 }
 
 export type DrawingCanvasData = {
