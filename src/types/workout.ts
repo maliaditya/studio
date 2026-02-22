@@ -855,6 +855,7 @@ export interface UserSettings {
     }>;
   };
   routineSkipByDate?: Record<string, string[]>;
+  routineSourceOverrides?: Record<string, 'external' | 'mismatch'>;
   pdfLastOpenedPageByResourceId?: Record<string, number>;
 }
 

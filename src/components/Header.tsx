@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github, Download, Paintbrush, UploadCloud, DownloadCloud, X } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github, Download, Paintbrush, UploadCloud, DownloadCloud, X, Link2, Plus, Pencil } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
@@ -16,13 +16,13 @@ import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
 import { SaveStatusWidget } from './SaveStatusWidget';
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import type { Resource, ResourcePoint, MicroSkill, Activity, SlotName, WorkoutExercise, ExerciseDefinition, Stopper } from '@/types/workout';
+import type { Resource, ResourcePoint, MicroSkill, Activity, SlotName, WorkoutExercise, ExerciseDefinition, Stopper, ActivityType, RecurrenceRule } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ScrollArea } from './ui/scroll-area';
 import { format, isBefore, isToday, startOfToday, addDays, parseISO, differenceInDays, isAfter, subDays, startOfDay, startOfMonth } from 'date-fns';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuGroup, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -225,8 +225,21 @@ function NavigationMenu() {
 }
 
 const slotOrder: SlotName[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+type OverviewTab = 'scheduled' | 'pending' | 'review' | 'daily' | 'routine';
+type RoutineSourceFilter = 'all' | 'external' | 'mismatch';
+type RoutineSourceType = 'external' | 'mismatch' | 'other';
+type RoutineTaskView = Activity & { routineSource: RoutineSourceType };
+type ManualRoutineSource = 'external' | 'mismatch' | 'none';
 
-function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenChange: (open: boolean) => void }) {
+function UpcomingTasksModal({
+    isOpen,
+    onOpenChange,
+    initialTab = 'scheduled',
+}: {
+    isOpen: boolean,
+    onOpenChange: (open: boolean) => void,
+    initialTab?: OverviewTab,
+}) {
     const { 
         coreSkills, 
         deepWorkDefinitions, 
@@ -238,7 +251,11 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         currentSlot, 
         offerizationPlans,
         settings,
+        setSettings,
+        mindsetCards,
+        setMindsetCards,
         schedule,
+        setSchedule,
         dailyReviewLogs,
         workoutMode,
         workoutPlans,
@@ -250,6 +267,33 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         workoutPlanRotation,
     } = useAuth();
     const { toast } = useToast();
+    const [activeTab, setActiveTab] = useState<OverviewTab>(initialTab);
+    const [routineSourceFilter, setRoutineSourceFilter] = useState<RoutineSourceFilter>('all');
+    const [isCreateRoutineOpen, setIsCreateRoutineOpen] = useState(false);
+    const [newRoutineDetails, setNewRoutineDetails] = useState('');
+    const [newRoutineSlot, setNewRoutineSlot] = useState<SlotName>('Morning');
+    const [newRoutineType, setNewRoutineType] = useState<ActivityType>('essentials');
+    const [newRoutineRuleType, setNewRoutineRuleType] = useState<'daily' | 'weekly' | 'custom'>('daily');
+    const [newRoutineInterval, setNewRoutineInterval] = useState('2');
+    const [newRoutineRepeatUnit, setNewRoutineRepeatUnit] = useState<'day' | 'week' | 'month'>('day');
+    const [newRoutineSource, setNewRoutineSource] = useState<ManualRoutineSource>('none');
+    const [newRoutineBotheringId, setNewRoutineBotheringId] = useState('');
+    const [linkDialogRoutineId, setLinkDialogRoutineId] = useState<string | null>(null);
+    const [linkDialogSource, setLinkDialogSource] = useState<'external' | 'mismatch'>('external');
+    const [linkDialogBotheringId, setLinkDialogBotheringId] = useState('');
+    const [editRoutineId, setEditRoutineId] = useState<string | null>(null);
+    const [editRoutineDetails, setEditRoutineDetails] = useState('');
+    const [editRoutineSlot, setEditRoutineSlot] = useState<SlotName>('Morning');
+    const [editRoutineType, setEditRoutineType] = useState<ActivityType>('essentials');
+    const [editRoutineRuleType, setEditRoutineRuleType] = useState<'daily' | 'weekly' | 'custom'>('daily');
+    const [editRoutineInterval, setEditRoutineInterval] = useState('2');
+    const [editRoutineRepeatUnit, setEditRoutineRepeatUnit] = useState<'day' | 'week' | 'month'>('day');
+    const [editRoutineSource, setEditRoutineSource] = useState<ManualRoutineSource>('none');
+    const [editRoutineBotheringId, setEditRoutineBotheringId] = useState('');
+
+    useEffect(() => {
+        if (isOpen) setActiveTab(initialTab);
+    }, [isOpen, initialTab]);
 
     const DOUBLING_INTERVALS = [1, 2, 4, 8, 16, 32, 64, 128];
 
@@ -421,16 +465,464 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         
         return goals;
     }, [offerizationPlans, coreSkills]);
+
+    const routineSourceIds = useMemo(() => {
+        const collectIdsForCard = (cardId: string) => {
+            const ids = new Set<string>();
+            const points = mindsetCards.find((card) => card.id === cardId)?.points || [];
+            points.forEach((point) => {
+                (point.tasks || []).forEach((task) => {
+                    if (task.id) ids.add(task.id);
+                    if (task.activityId) ids.add(task.activityId);
+                });
+            });
+            return ids;
+        };
+
+        return {
+            external: collectIdsForCard('mindset_botherings_external'),
+            mismatch: collectIdsForCard('mindset_botherings_mismatch'),
+        };
+    }, [mindsetCards]);
+
+    const routineLinkedBotheringByRoutineId = useMemo(() => {
+        const map = new Map<string, { id: string; source: 'external' | 'mismatch'; text: string }>();
+        const ingest = (cardId: string, source: 'external' | 'mismatch') => {
+            const points = mindsetCards.find((card) => card.id === cardId)?.points || [];
+            points.forEach((point) => {
+                const text = (point.text || '').trim();
+                if (!text) return;
+                (point.tasks || []).forEach((task) => {
+                    const rid = task.activityId || task.id;
+                    if (!rid) return;
+                    if (!map.has(rid)) {
+                        map.set(rid, { id: point.id, source, text });
+                    }
+                });
+            });
+        };
+        ingest('mindset_botherings_external', 'external');
+        ingest('mindset_botherings_mismatch', 'mismatch');
+        return map;
+    }, [mindsetCards]);
+
+    const externalBotherings = useMemo(
+        () => (mindsetCards.find((card) => card.id === 'mindset_botherings_external')?.points || []).map((point) => ({ id: point.id, text: point.text || 'Untitled bothering' })),
+        [mindsetCards]
+    );
+    const mismatchBotherings = useMemo(
+        () => (mindsetCards.find((card) => card.id === 'mindset_botherings_mismatch')?.points || []).map((point) => ({ id: point.id, text: point.text || 'Untitled bothering' })),
+        [mindsetCards]
+    );
+    const getBotheringsBySource = useCallback(
+        (source: 'external' | 'mismatch') => (source === 'external' ? externalBotherings : mismatchBotherings),
+        [externalBotherings, mismatchBotherings]
+    );
     
     const routineTasks = useMemo(() => {
         return (settings.routines || []).map(task => {
+            const override = settings.routineSourceOverrides?.[task.id];
+            const routineSource: RoutineSourceType =
+                override === 'external' || override === 'mismatch'
+                    ? override
+                    : routineSourceIds.external.has(task.id) || (task.taskIds || []).some((id) => routineSourceIds.external.has(id))
+                        ? 'external'
+                        : routineSourceIds.mismatch.has(task.id) || (task.taskIds || []).some((id) => routineSourceIds.mismatch.has(id))
+                            ? 'mismatch'
+                            : 'other';
+
             if (task.type === 'workout') {
                 const { description } = getExercisesForDay(new Date(), workoutMode, workoutPlans, exerciseDefinitions, workoutPlanRotation, settings.workoutScheduling, allWorkoutLogs);
-                return { ...task, details: description };
+                return { ...task, details: description, routineSource } as RoutineTaskView;
             }
-            return task;
+            return { ...task, routineSource } as RoutineTaskView;
         });
-    }, [settings.routines, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, workoutPlanRotation, settings.workoutScheduling]);
+    }, [settings.routines, workoutMode, workoutPlans, exerciseDefinitions, allWorkoutLogs, workoutPlanRotation, settings.workoutScheduling, routineSourceIds, settings.routineSourceOverrides]);
+
+    const routineSourceCounts = useMemo(() => {
+        return {
+            external: routineTasks.filter((task) => task.routineSource === 'external').length,
+            mismatch: routineTasks.filter((task) => task.routineSource === 'mismatch').length,
+        };
+    }, [routineTasks]);
+
+    const displayedRoutineTasks = useMemo(() => {
+        const filtered = routineTasks.filter((task) => {
+            if (routineSourceFilter === 'all') return true;
+            return task.routineSource === routineSourceFilter;
+        });
+
+        const sourceRank: Record<RoutineSourceType, number> = {
+            external: 0,
+            mismatch: 1,
+            other: 2,
+        };
+
+        return [...filtered].sort((a, b) => {
+            const rankDiff = sourceRank[a.routineSource] - sourceRank[b.routineSource];
+            if (rankDiff !== 0) return rankDiff;
+            return a.details.localeCompare(b.details);
+        });
+    }, [routineTasks, routineSourceFilter]);
+
+    const displayedRoutineTasksBySlot = useMemo(() => {
+        const bySlot = new Map<string, RoutineTaskView[]>();
+        slotOrder.forEach((slot) => bySlot.set(slot, []));
+        const other: RoutineTaskView[] = [];
+
+        displayedRoutineTasks.forEach((task) => {
+            const slot = String(task.slot || '').trim();
+            if (bySlot.has(slot)) {
+                bySlot.get(slot)!.push(task);
+            } else {
+                other.push(task);
+            }
+        });
+
+        const gridSlots = slotOrder.map((slot) => ({ slot, tasks: bySlot.get(slot) || [] }));
+        return { gridSlots, other };
+    }, [displayedRoutineTasks]);
+
+    const getRoutineCadenceLabel = useCallback((task: Activity) => {
+        const rule = task.routine;
+        if (!rule) return 'One-time';
+        if (rule.type === 'daily') return 'Daily';
+        if (rule.type === 'weekly') return 'Weekly';
+        const unit = rule.repeatUnit || 'day';
+        const interval = Math.max(1, rule.repeatInterval ?? rule.days ?? 1);
+        return `Every ${interval} ${unit}${interval > 1 ? 's' : ''}`;
+    }, []);
+
+    const getMindsetTaskRecurrence = useCallback((rule?: RecurrenceRule | null): 'none' | 'daily' | 'weekly' | 'custom' => {
+        if (!rule) return 'none';
+        if (rule.type === 'daily') return 'daily';
+        if (rule.type === 'weekly') return 'weekly';
+        return 'custom';
+    }, []);
+
+    const detachRoutineFromAllBotherings = useCallback((routineId: string) => {
+        setMindsetCards((prev) =>
+            prev.map((card) => {
+                if (card.id !== 'mindset_botherings_external' && card.id !== 'mindset_botherings_mismatch') return card;
+                return {
+                    ...card,
+                    points: card.points.map((point) => ({
+                        ...point,
+                        tasks: (point.tasks || []).filter((task) => task.id !== routineId && task.activityId !== routineId),
+                    })),
+                };
+            })
+        );
+    }, [setMindsetCards]);
+
+    const attachRoutineToBothering = useCallback((routine: Activity, source: 'external' | 'mismatch', botheringId: string) => {
+        const cardId = source === 'external' ? 'mindset_botherings_external' : 'mindset_botherings_mismatch';
+        const recurrence = getMindsetTaskRecurrence(routine.routine);
+        const taskPayload = {
+            id: routine.id,
+            type: routine.type,
+            details: routine.details,
+            completed: false,
+            activityId: routine.id,
+            slotName: (slotOrder.includes(routine.slot as SlotName) ? routine.slot : undefined) as SlotName | undefined,
+            recurrence,
+            repeatInterval: routine.routine?.repeatInterval ?? routine.routine?.days,
+            repeatUnit: routine.routine?.repeatUnit,
+            startDate: routine.baseDate || format(new Date(), 'yyyy-MM-dd'),
+            completionHistory: {},
+        };
+
+        detachRoutineFromAllBotherings(routine.id);
+        setMindsetCards((prev) =>
+            prev.map((card) => {
+                if (card.id !== cardId) return card;
+                return {
+                    ...card,
+                    points: card.points.map((point) => {
+                        if (point.id !== botheringId) return point;
+                        const existing = (point.tasks || []).find((task) => task.activityId === routine.id || task.id === routine.id);
+                        if (existing) {
+                            return {
+                                ...point,
+                                tasks: (point.tasks || []).map((task) =>
+                                    task.activityId === routine.id || task.id === routine.id ? { ...task, ...taskPayload } : task
+                                ),
+                            };
+                        }
+                        return { ...point, tasks: [...(point.tasks || []), taskPayload] };
+                    }),
+                };
+            })
+        );
+    }, [detachRoutineFromAllBotherings, getMindsetTaskRecurrence, setMindsetCards]);
+
+    const handleSetRoutineSource = useCallback((routineId: string, source: ManualRoutineSource) => {
+        if (source === 'none') {
+            detachRoutineFromAllBotherings(routineId);
+        }
+        setSettings((prev) => {
+            const nextOverrides = { ...(prev.routineSourceOverrides || {}) };
+            if (source === 'none') {
+                delete nextOverrides[routineId];
+            } else {
+                nextOverrides[routineId] = source;
+            }
+            return { ...prev, routineSourceOverrides: nextOverrides };
+        });
+        toast({ title: 'Routine Link Updated', description: source === 'none' ? 'Removed manual source link.' : `Linked routine to ${source}.` });
+    }, [detachRoutineFromAllBotherings, setSettings, toast]);
+
+    const openRoutineLinkDialog = useCallback((routineId: string, source: 'external' | 'mismatch') => {
+        setLinkDialogRoutineId(routineId);
+        setLinkDialogSource(source);
+        const list = getBotheringsBySource(source);
+        setLinkDialogBotheringId(list[0]?.id || '');
+    }, [getBotheringsBySource]);
+
+    const openEditRoutineDialog = useCallback((task: RoutineTaskView) => {
+        const source: ManualRoutineSource =
+            task.routineSource === 'external' || task.routineSource === 'mismatch' ? task.routineSource : 'none';
+        const linked = routineLinkedBotheringByRoutineId.get(task.id);
+        const recurrence = task.routine?.type || 'daily';
+        setEditRoutineId(task.id);
+        setEditRoutineDetails(task.details || '');
+        setEditRoutineSlot((slotOrder.includes(task.slot as SlotName) ? task.slot : 'Morning') as SlotName);
+        setEditRoutineType(task.type);
+        setEditRoutineRuleType(recurrence);
+        setEditRoutineInterval(String(Math.max(1, task.routine?.repeatInterval ?? task.routine?.days ?? 2)));
+        setEditRoutineRepeatUnit((task.routine?.repeatUnit || 'day') as 'day' | 'week' | 'month');
+        setEditRoutineSource(source);
+        setEditRoutineBotheringId(source !== 'none' ? (linked?.id || getBotheringsBySource(source)[0]?.id || '') : '');
+    }, [getBotheringsBySource, routineLinkedBotheringByRoutineId]);
+
+    const confirmRoutineBotheringLink = useCallback(() => {
+        if (!linkDialogRoutineId) return;
+        if (!linkDialogBotheringId) {
+            toast({ title: 'Select Bothering', description: 'Choose a bothering to link this routine.', variant: 'destructive' });
+            return;
+        }
+        const routine = (settings.routines || []).find((r) => r.id === linkDialogRoutineId);
+        if (!routine) {
+            toast({ title: 'Routine Not Found', description: 'Could not locate this routine task.', variant: 'destructive' });
+            return;
+        }
+
+        handleSetRoutineSource(linkDialogRoutineId, linkDialogSource);
+        attachRoutineToBothering(routine, linkDialogSource, linkDialogBotheringId);
+        setLinkDialogRoutineId(null);
+        setLinkDialogBotheringId('');
+    }, [attachRoutineToBothering, handleSetRoutineSource, linkDialogBotheringId, linkDialogRoutineId, linkDialogSource, settings.routines, toast]);
+
+    const handleSaveRoutineEdit = useCallback(() => {
+        if (!editRoutineId) return;
+        const details = editRoutineDetails.trim();
+        if (!details) {
+            toast({ title: 'Missing Name', description: 'Enter a routine task name.', variant: 'destructive' });
+            return;
+        }
+        if (editRoutineSource !== 'none' && !editRoutineBotheringId) {
+            toast({ title: 'Select Bothering', description: 'Choose a bothering for External/Mismatch link.', variant: 'destructive' });
+            return;
+        }
+
+        const updatedRule: RecurrenceRule =
+            editRoutineRuleType === 'custom'
+                ? {
+                    type: 'custom',
+                    repeatInterval: Math.max(1, parseInt(editRoutineInterval || '1', 10) || 1),
+                    repeatUnit: editRoutineRepeatUnit,
+                }
+                : { type: editRoutineRuleType };
+
+        const current = (settings.routines || []).find((r) => r.id === editRoutineId);
+        if (!current) {
+            toast({ title: 'Routine Not Found', description: 'Could not find this routine.', variant: 'destructive' });
+            return;
+        }
+        const updatedRoutine: Activity = {
+            ...current,
+            details,
+            slot: editRoutineSlot,
+            type: editRoutineType,
+            routine: updatedRule,
+        };
+
+        setSettings((prev) => {
+            const nextOverrides = { ...(prev.routineSourceOverrides || {}) };
+            if (editRoutineSource === 'none') {
+                delete nextOverrides[editRoutineId];
+            } else {
+                nextOverrides[editRoutineId] = editRoutineSource;
+            }
+            return {
+                ...prev,
+                routines: (prev.routines || []).map((r) => (r.id === editRoutineId ? updatedRoutine : r)),
+                routineSourceOverrides: nextOverrides,
+            };
+        });
+
+        setSchedule((prev) => {
+            const next = { ...prev };
+            let changed = false;
+            Object.keys(next).forEach((dateKey) => {
+                const day = { ...(next[dateKey] || {}) };
+                const moved: Activity[] = [];
+                Object.keys(day).forEach((slotName) => {
+                    const list = (day[slotName as SlotName] as Activity[]) || [];
+                    const kept: Activity[] = [];
+                    let slotChanged = false;
+                    list.forEach((activity) => {
+                        const isMatch =
+                            activity.id === editRoutineId ||
+                            activity.id.startsWith(`${editRoutineId}_`) ||
+                            (activity.taskIds || []).includes(editRoutineId);
+                        if (!isMatch) {
+                            kept.push(activity);
+                            return;
+                        }
+                        slotChanged = true;
+                        changed = true;
+                        moved.push({
+                            ...activity,
+                            details,
+                            type: editRoutineType,
+                            slot: editRoutineSlot,
+                        });
+                    });
+                    if (slotChanged) day[slotName as SlotName] = kept;
+                });
+                if (moved.length > 0) {
+                    const target = ((day[editRoutineSlot] as Activity[]) || []).concat(moved);
+                    day[editRoutineSlot] = target;
+                }
+                next[dateKey] = day;
+            });
+            return changed ? next : prev;
+        });
+
+        setMindsetCards((prev) =>
+            prev.map((card) => {
+                if (card.id !== 'mindset_botherings_external' && card.id !== 'mindset_botherings_mismatch') return card;
+                return {
+                    ...card,
+                    points: card.points.map((point) => ({
+                        ...point,
+                        tasks: (point.tasks || []).map((task) => {
+                            if (task.id !== editRoutineId && task.activityId !== editRoutineId) return task;
+                            return {
+                                ...task,
+                                details,
+                                type: editRoutineType,
+                                slotName: editRoutineSlot,
+                                recurrence: getMindsetTaskRecurrence(updatedRule),
+                                repeatInterval: updatedRule.repeatInterval ?? updatedRule.days,
+                                repeatUnit: updatedRule.repeatUnit,
+                            };
+                        }),
+                    })),
+                };
+            })
+        );
+
+        if (editRoutineSource === 'none') {
+            detachRoutineFromAllBotherings(editRoutineId);
+        } else {
+            attachRoutineToBothering(updatedRoutine, editRoutineSource, editRoutineBotheringId);
+        }
+
+        setEditRoutineId(null);
+        toast({ title: 'Routine Updated', description: 'Changes applied across routine, schedule, and linked botherings.' });
+    }, [
+        attachRoutineToBothering,
+        editRoutineBotheringId,
+        editRoutineDetails,
+        editRoutineId,
+        editRoutineInterval,
+        editRoutineRepeatUnit,
+        editRoutineRuleType,
+        editRoutineSlot,
+        editRoutineSource,
+        editRoutineType,
+        getMindsetTaskRecurrence,
+        detachRoutineFromAllBotherings,
+        setMindsetCards,
+        setSchedule,
+        setSettings,
+        settings.routines,
+        toast,
+    ]);
+
+    const handleCreateRoutine = useCallback(() => {
+        const details = newRoutineDetails.trim();
+        if (!details) {
+            toast({ title: 'Missing Name', description: 'Enter a routine task name.', variant: 'destructive' });
+            return;
+        }
+        if (newRoutineSource !== 'none' && !newRoutineBotheringId) {
+            toast({ title: 'Select Bothering', description: 'Choose a bothering when linking External/Mismatch.', variant: 'destructive' });
+            return;
+        }
+
+        const rule: RecurrenceRule =
+            newRoutineRuleType === 'custom'
+                ? {
+                    type: 'custom',
+                    repeatInterval: Math.max(1, parseInt(newRoutineInterval || '1', 10) || 1),
+                    repeatUnit: newRoutineRepeatUnit,
+                }
+                : { type: newRoutineRuleType };
+
+        const routineId = `routine-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const newRoutine: Activity = {
+            id: routineId,
+            type: newRoutineType,
+            details,
+            completed: false,
+            slot: newRoutineSlot,
+            routine: rule,
+            isRoutine: true,
+            baseDate: format(new Date(), 'yyyy-MM-dd'),
+            taskIds: [],
+        };
+
+        setSettings((prev) => {
+            const nextOverrides = { ...(prev.routineSourceOverrides || {}) };
+            if (newRoutineSource !== 'none') {
+                nextOverrides[routineId] = newRoutineSource;
+            }
+            return {
+                ...prev,
+                routines: [...(prev.routines || []), newRoutine],
+                routineSourceOverrides: nextOverrides,
+            };
+        });
+        if (newRoutineSource !== 'none' && newRoutineBotheringId) {
+            attachRoutineToBothering(newRoutine, newRoutineSource, newRoutineBotheringId);
+        }
+
+        setNewRoutineDetails('');
+        setNewRoutineInterval('2');
+        setNewRoutineRuleType('daily');
+        setNewRoutineRepeatUnit('day');
+        setNewRoutineType('essentials');
+        setNewRoutineSlot('Morning');
+        setNewRoutineSource('none');
+        setNewRoutineBotheringId('');
+        setIsCreateRoutineOpen(false);
+        toast({ title: 'Routine Created', description: `Added "${details}" to ${newRoutineSlot}.` });
+    }, [
+        attachRoutineToBothering,
+        newRoutineBotheringId,
+        newRoutineDetails,
+        newRoutineInterval,
+        newRoutineRepeatUnit,
+        newRoutineRuleType,
+        newRoutineSlot,
+        newRoutineSource,
+        newRoutineType,
+        setSettings,
+        toast,
+    ]);
     
     const todaysScheduledTasks = useMemo(() => {
         const todaysSchedule = schedule[todayKey] || {};
@@ -464,46 +956,117 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
         }
         return tasks;
     }, [schedule, todayKey, routineTasks, todaysReviewTasks, pendingReviewTasks, allUpskillLogs, allDeepWorkLogs]);
+
+    const pendingDailyGoalsCount = useMemo(
+        () => dailyLearningGoals.filter((goal) => !todaysCompletions.has(goal.resourceId)).length,
+        [dailyLearningGoals, todaysCompletions]
+    );
+
+    const overviewNavItems: Array<{
+        key: OverviewTab;
+        label: string;
+        count: number;
+        icon: React.ComponentType<{ className?: string }>;
+        countVariant?: 'default' | 'secondary' | 'destructive' | 'outline';
+    }> = [
+        { key: 'scheduled', label: 'Scheduled', count: todaysScheduledTasks.length, icon: CalendarIcon, countVariant: 'secondary' },
+        { key: 'pending', label: 'Pending', count: pendingReviewTasks.length, icon: Repeat, countVariant: 'destructive' },
+        { key: 'review', label: 'Review', count: todaysReviewTasks.length, icon: Book, countVariant: 'secondary' },
+        { key: 'daily', label: 'Daily Goals', count: pendingDailyGoalsCount, icon: CheckSquare, countVariant: 'secondary' },
+        { key: 'routine', label: 'Routine', count: routineTasks.length, icon: Workflow, countVariant: 'secondary' },
+    ];
     
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-2xl">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Info className="h-5 w-5 text-blue-500" />
-                        Today's Learning Overview
-                    </DialogTitle>
-                    <DialogDescription>
-                        A summary of your goals and review tasks for the day.
-                    </DialogDescription>
+            <DialogContent className="w-[95vw] max-w-[95vw] h-[95vh] p-0 overflow-hidden flex flex-col">
+                <DialogHeader className="border-b border-border/60 px-6 pb-2 pt-3">
+                    <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                            <DialogTitle className="flex items-center gap-2">
+                                <Info className="h-5 w-5 text-blue-500" />
+                                Today's Learning Overview
+                            </DialogTitle>
+                            <DialogDescription className="mt-1">
+                                A summary of your goals and review tasks for the day.
+                            </DialogDescription>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-1.5">
+                            <div className="flex items-center gap-1 rounded-md border border-border/60 bg-muted/20 p-1">
+                                {overviewNavItems.map((item) => {
+                                    const Icon = item.icon;
+                                    const isActive = activeTab === item.key;
+                                    return (
+                                        <Button
+                                            key={item.key}
+                                            size="icon"
+                                            variant={isActive ? 'secondary' : 'ghost'}
+                                            className="relative h-8 w-8"
+                                            onClick={() => setActiveTab(item.key)}
+                                            title={item.label}
+                                        >
+                                            <Icon className="h-4 w-4" />
+                                            <span className="sr-only">{item.label}</span>
+                                            <Badge
+                                                variant={item.countVariant || 'secondary'}
+                                                className="absolute -right-2 -top-2 h-5 min-w-[20px] px-1 text-[10px]"
+                                            >
+                                                {item.count}
+                                            </Badge>
+                                        </Button>
+                                    );
+                                })}
+                            </div>
+                            {activeTab === 'routine' && (
+                                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                    <Button
+                                        size="sm"
+                                        className="h-6 px-2 text-[11px]"
+                                        variant={routineSourceFilter === 'all' ? 'default' : 'outline'}
+                                        onClick={() => setRoutineSourceFilter('all')}
+                                    >
+                                        All {routineTasks.length}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        className="h-6 px-2 text-[11px]"
+                                        variant={routineSourceFilter === 'external' ? 'default' : 'outline'}
+                                        onClick={() => setRoutineSourceFilter('external')}
+                                    >
+                                        External {routineSourceCounts.external}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        className="h-6 px-2 text-[11px]"
+                                        variant={routineSourceFilter === 'mismatch' ? 'default' : 'outline'}
+                                        onClick={() => setRoutineSourceFilter('mismatch')}
+                                    >
+                                        Mismatch {routineSourceCounts.mismatch}
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        className="h-6 px-2 text-[11px]"
+                                        variant={isCreateRoutineOpen ? 'secondary' : 'outline'}
+                                        onClick={() => setIsCreateRoutineOpen(true)}
+                                    >
+                                        <Plus className="mr-1 h-3 w-3" />
+                                        Routine
+                                    </Button>
+                                    <Badge variant="outline" className="h-6 px-2 text-[11px]">Filtered {displayedRoutineTasks.length}</Badge>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </DialogHeader>
-                 <Tabs defaultValue="scheduled" className="w-full">
-                    <TabsList className="grid w-full grid-cols-5">
-                        <TabsTrigger value="scheduled">
-                            Scheduled <Badge variant="secondary" className="ml-2">{todaysScheduledTasks.length}</Badge>
-                        </TabsTrigger>
-                        <TabsTrigger value="pending">
-                            Pending <Badge variant="destructive" className="ml-2">{pendingReviewTasks.length}</Badge>
-                        </TabsTrigger>
-                        <TabsTrigger value="review">
-                            Review <Badge variant="secondary" className="ml-2">{todaysReviewTasks.length}</Badge>
-                        </TabsTrigger>
-                        <TabsTrigger value="daily">
-                            Daily Goals <Badge variant="secondary" className="ml-2">{dailyLearningGoals.filter(g => !todaysCompletions.has(g.resourceId)).length}</Badge>
-                        </TabsTrigger>
-                        <TabsTrigger value="routine">
-                            Routine <Badge variant="secondary" className="ml-2">{routineTasks.length}</Badge>
-                        </TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="scheduled" className="mt-4">
-                       <ScrollArea className="h-80">
+                <div className="flex-1 min-h-0 px-6 pb-4 pt-2">
+                    {activeTab === 'scheduled' && (
+                       <ScrollArea className="h-full">
                             <ul className="space-y-3 pr-4">
                                 {todaysScheduledTasks.map((task) => (
-                                    <li key={task.id} className="p-3 rounded-md border bg-muted/30">
+                                    <li key={task.id} className="p-4 rounded-lg border bg-muted/30">
                                         <div className="flex items-start">
                                             <div className="flex-grow">
-                                                <p className="font-semibold text-sm">{task.details}</p>
-                                                <p className="text-xs text-muted-foreground">{task.slot}</p>
+                                                <p className="font-semibold text-base">{task.details}</p>
+                                                <p className="text-sm text-muted-foreground mt-1">{task.slot}</p>
                                             </div>
                                         </div>
                                     </li>
@@ -513,15 +1076,15 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                                 )}
                             </ul>
                         </ScrollArea>
-                    </TabsContent>
-                    <TabsContent value="pending" className="mt-4">
-                        <ScrollArea className="h-80">
+                    )}
+                    {activeTab === 'pending' && (
+                        <ScrollArea className="h-full">
                             <ul className="space-y-3 pr-4">
                                 {pendingReviewTasks.map(skill => (
-                                    <li key={skill.id} className="flex items-center justify-between p-2 rounded-md border bg-destructive/10">
+                                    <li key={skill.id} className="flex items-center justify-between p-4 rounded-lg border bg-destructive/10">
                                         <div>
-                                            <p className="font-semibold">{skill.name}</p>
-                                            <p className="text-xs text-destructive">
+                                            <p className="font-semibold text-base">{skill.name}</p>
+                                            <p className="text-sm text-destructive mt-1">
                                                 Due: {format(skill.nextReviewDate, 'PPP')}
                                             </p>
                                         </div>
@@ -533,15 +1096,15 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                                 )}
                             </ul>
                         </ScrollArea>
-                    </TabsContent>
-                    <TabsContent value="review" className="mt-4">
-                        <ScrollArea className="h-80">
+                    )}
+                    {activeTab === 'review' && (
+                        <ScrollArea className="h-full">
                             <ul className="space-y-3 pr-4">
                                 {todaysReviewTasks.map(skill => (
-                                    <li key={skill.id} className="flex items-center justify-between p-2 rounded-md border bg-muted/30">
+                                    <li key={skill.id} className="flex items-center justify-between p-4 rounded-lg border bg-muted/30">
                                         <div>
-                                            <p className="font-semibold">{skill.name}</p>
-                                            <p className="text-xs text-muted-foreground">
+                                            <p className="font-semibold text-base">{skill.name}</p>
+                                            <p className="text-sm text-muted-foreground mt-1">
                                                 Due: {format(skill.nextReviewDate, 'PPP')}
                                             </p>
                                         </div>
@@ -553,14 +1116,14 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                                 )}
                             </ul>
                         </ScrollArea>
-                    </TabsContent>
-                    <TabsContent value="daily" className="mt-4">
-                       <ScrollArea className="h-80">
+                    )}
+                    {activeTab === 'daily' && (
+                       <ScrollArea className="h-full">
                             <ul className="space-y-3 pr-4">
                                 {dailyLearningGoals.map((goal, index) => {
                                     const isCompletedToday = todaysCompletions.has(goal.resourceId);
                                     return (
-                                        <li key={index} className="p-3 rounded-md border bg-muted/30">
+                                        <li key={index} className="p-4 rounded-lg border bg-muted/30">
                                             <div className="flex items-start">
                                                 <Checkbox
                                                     id={`goal-check-modal-${goal.resourceId}`}
@@ -569,9 +1132,9 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                                                     className="mr-2 mt-0.5"
                                                 />
                                                 <div className="flex-grow">
-                                                    <p className={cn("font-semibold text-sm", isCompletedToday && "line-through text-muted-foreground")} title={goal.resourceName}>{goal.resourceName}</p>
-                                                    <p className={cn("text-xs text-muted-foreground", isCompletedToday && "line-through")}>{goal.specName}</p>
-                                                    <div className="flex justify-between items-center mt-1 pt-1 border-t">
+                                                    <p className={cn("font-semibold text-base", isCompletedToday && "line-through text-muted-foreground")} title={goal.resourceName}>{goal.resourceName}</p>
+                                                    <p className={cn("text-sm text-muted-foreground mt-1", isCompletedToday && "line-through")}>{goal.specName}</p>
+                                                    <div className="flex justify-between items-center mt-2 pt-2 border-t">
                                                         <Badge variant="secondary" className={cn("text-xs", isCompletedToday && "line-through")}>{goal.progress}</Badge>
                                                         <Badge variant="default" className={cn("text-xs", isCompletedToday && "line-through")}>{goal.dailyTarget}</Badge>
                                                     </div>
@@ -585,25 +1148,407 @@ function UpcomingTasksModal({ isOpen, onOpenChange }: { isOpen: boolean, onOpenC
                                 )}
                             </ul>
                         </ScrollArea>
-                    </TabsContent>
-                    <TabsContent value="routine" className="mt-4">
-                        <ScrollArea className="h-80">
-                            <ul className="space-y-3 pr-4">
-                                {routineTasks.map((task, index) => (
-                                    <li key={index} className="flex items-center justify-between p-2 rounded-md border bg-muted/30">
-                                        <div>
-                                            <p className="font-semibold text-sm">{task.details}</p>
-                                            <p className="text-xs text-muted-foreground">{task.slot} - {task.routine?.type}</p>
-                                        </div>
-                                    </li>
-                                ))}
-                                {routineTasks.length === 0 && (
-                                    <p className="text-center text-muted-foreground pt-12">No routine tasks configured.</p>
+                    )}
+                    {activeTab === 'routine' && (
+                        <div className="h-full pr-2">
+                            {displayedRoutineTasks.length > 0 ? (
+                                <div className="h-full pr-4">
+                                    <div className="grid h-full grid-cols-3 grid-rows-2 gap-3">
+                                        {displayedRoutineTasksBySlot.gridSlots.map((group) => (
+                                            <div key={group.slot} className="min-h-0 h-full rounded-lg border border-border/60 bg-muted/20 flex flex-col">
+                                                <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
+                                                    <h4 className="text-sm font-semibold">{group.slot}</h4>
+                                                    <Badge variant="secondary" className="text-xs">
+                                                        {(group.slot === 'Night' ? group.tasks.length + displayedRoutineTasksBySlot.other.length : group.tasks.length)}
+                                                    </Badge>
+                                                </div>
+                                                <ScrollArea className="flex-1">
+                                                    <div className="space-y-2 p-3">
+                                                        {(group.slot === 'Night' ? [...group.tasks, ...displayedRoutineTasksBySlot.other] : group.tasks).length > 0 ? (
+                                                            (group.slot === 'Night' ? [...group.tasks, ...displayedRoutineTasksBySlot.other] : group.tasks).map((task, index) => (
+                                                                <div key={`${task.id}-${index}`} className="rounded-md border bg-background/70 p-3">
+                                                                    <div className="space-y-2">
+                                                                        <div className="min-w-0">
+                                                                            <p className="font-semibold text-sm leading-snug break-words">{task.details}</p>
+                                                                        </div>
+                                                                        <div className="flex flex-wrap items-center gap-2">
+                                                                            {(task.routineSource === 'external' || task.routineSource === 'mismatch') && (
+                                                                                <Badge
+                                                                                    variant="default"
+                                                                                    className={cn(
+                                                                                        "text-xs capitalize",
+                                                                                        task.routineSource === 'external'
+                                                                                            ? "bg-sky-500/20 text-sky-300 border border-sky-400/40"
+                                                                                            : "bg-rose-500/20 text-rose-300 border border-rose-400/40"
+                                                                                    )}
+                                                                                >
+                                                                                    {task.routineSource}
+                                                                                </Badge>
+                                                                            )}
+                                                                            <Button size="icon" variant="ghost" className="h-5 w-5" onClick={() => openEditRoutineDialog(task)}>
+                                                                                <Pencil className="h-3 w-3" />
+                                                                                <span className="sr-only">Edit Routine</span>
+                                                                            </Button>
+                                                                            <DropdownMenu>
+                                                                                <DropdownMenuTrigger asChild>
+                                                                                    <Button size="icon" variant="ghost" className="h-5 w-5">
+                                                                                        <Link2 className="h-3 w-3" />
+                                                                                        <span className="sr-only">Link Routine Source</span>
+                                                                                    </Button>
+                                                                                </DropdownMenuTrigger>
+                                                                                <DropdownMenuContent align="end">
+                                                                                    <DropdownMenuItem onSelect={() => openRoutineLinkDialog(task.id, 'external')}>Link External</DropdownMenuItem>
+                                                                                    <DropdownMenuItem onSelect={() => openRoutineLinkDialog(task.id, 'mismatch')}>Link Mismatch</DropdownMenuItem>
+                                                                                    <DropdownMenuSeparator />
+                                                                                    <DropdownMenuItem onSelect={() => handleSetRoutineSource(task.id, 'none')}>Remove Link</DropdownMenuItem>
+                                                                                </DropdownMenuContent>
+                                                                            </DropdownMenu>
+                                                                            <Badge variant="outline" className="text-xs">{task.type}</Badge>
+                                                                            <Badge variant="secondary" className="text-xs">{getRoutineCadenceLabel(task)}</Badge>
+                                                                        </div>
+                                                                        {(() => {
+                                                                            const linked = routineLinkedBotheringByRoutineId.get(task.id);
+                                                                            return linked ? (
+                                                                                <div className="pt-1">
+                                                                                    <Badge variant="outline" className="text-xs leading-normal whitespace-normal break-words">
+                                                                                        {linked.text}
+                                                                                    </Badge>
+                                                                                </div>
+                                                                            ) : null;
+                                                                        })()}
+                                                                    </div>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <div className="rounded-md border border-dashed border-border/60 bg-background/40 px-3 py-10 text-center text-xs text-muted-foreground">
+                                                                No tasks in this slot.
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </ScrollArea>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-center text-muted-foreground pt-12 pr-4">
+                                    {routineTasks.length === 0 ? 'No routine tasks configured.' : 'No routine tasks for this source filter.'}
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </div>
+                <Dialog open={isCreateRoutineOpen} onOpenChange={setIsCreateRoutineOpen}>
+                    <DialogContent className="sm:max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>Create Routine Task</DialogTitle>
+                            <DialogDescription>
+                                Add a recurring task and optionally link it to External or Mismatch.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 pt-2">
+                            <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground">Task</p>
+                                <input
+                                    value={newRoutineDetails}
+                                    onChange={(e) => setNewRoutineDetails(e.target.value)}
+                                    placeholder="e.g., Weekly billing review"
+                                    className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <div className="space-y-1">
+                                    <p className="text-xs font-medium text-muted-foreground">Time Slot</p>
+                                    <select
+                                        value={newRoutineSlot}
+                                        onChange={(e) => setNewRoutineSlot(e.target.value as SlotName)}
+                                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                    >
+                                        {slotOrder.map((slot) => (
+                                            <option key={slot} value={slot}>{slot}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-xs font-medium text-muted-foreground">Task Type</p>
+                                    <select
+                                        value={newRoutineType}
+                                        onChange={(e) => setNewRoutineType(e.target.value as ActivityType)}
+                                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                    >
+                                        {['essentials', 'interrupt', 'planning', 'upskill', 'deepwork', 'branding', 'lead-generation', 'mindset', 'tracking', 'workout', 'nutrition'].map((type) => (
+                                            <option key={type} value={type}>{type}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+                                <p className="text-xs font-medium text-muted-foreground">Recurrence</p>
+                                <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                                    <select
+                                        value={newRoutineRuleType}
+                                        onChange={(e) => setNewRoutineRuleType(e.target.value as 'daily' | 'weekly' | 'custom')}
+                                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                    >
+                                        <option value="daily">Daily</option>
+                                        <option value="weekly">Weekly</option>
+                                        <option value="custom">Custom</option>
+                                    </select>
+                                    {newRoutineRuleType === 'custom' ? (
+                                        <>
+                                            <input
+                                                value={newRoutineInterval}
+                                                onChange={(e) => setNewRoutineInterval(e.target.value)}
+                                                type="number"
+                                                min={1}
+                                                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                                placeholder="Every"
+                                            />
+                                            <select
+                                                value={newRoutineRepeatUnit}
+                                                onChange={(e) => setNewRoutineRepeatUnit(e.target.value as 'day' | 'week' | 'month')}
+                                                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                            >
+                                                <option value="day">day(s)</option>
+                                                <option value="week">week(s)</option>
+                                                <option value="month">month(s)</option>
+                                            </select>
+                                        </>
+                                    ) : (
+                                        <p className="col-span-2 flex items-center text-xs text-muted-foreground">
+                                            {newRoutineRuleType === 'daily' ? 'Runs every day.' : 'Runs once every week.'}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground">Optional Link</p>
+                                <select
+                                    value={newRoutineSource}
+                                    onChange={(e) => {
+                                        const source = e.target.value as ManualRoutineSource;
+                                        setNewRoutineSource(source);
+                                        if (source === 'external' || source === 'mismatch') {
+                                            const list = getBotheringsBySource(source);
+                                            setNewRoutineBotheringId(list[0]?.id || '');
+                                        } else {
+                                            setNewRoutineBotheringId('');
+                                        }
+                                    }}
+                                    className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm md:w-64"
+                                >
+                                    <option value="none">No Link</option>
+                                    <option value="external">Link External</option>
+                                    <option value="mismatch">Link Mismatch</option>
+                                </select>
+                                {newRoutineSource !== 'none' && (
+                                    <div className="space-y-1">
+                                        <p className="text-xs text-muted-foreground">Select Bothering</p>
+                                        <Select value={newRoutineBotheringId || undefined} onValueChange={setNewRoutineBotheringId}>
+                                            <SelectTrigger className="h-10 w-full md:w-[28rem]">
+                                                <SelectValue placeholder={`Select ${newRoutineSource} bothering...`} />
+                                            </SelectTrigger>
+                                            <SelectContent className="max-h-60">
+                                                {getBotheringsBySource(newRoutineSource).length > 0 ? (
+                                                    getBotheringsBySource(newRoutineSource).map((point) => (
+                                                        <SelectItem key={point.id} value={point.id}>{point.text}</SelectItem>
+                                                    ))
+                                                ) : (
+                                                    <SelectItem value="__none__" disabled>No botherings available</SelectItem>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                        {getBotheringsBySource(newRoutineSource).length === 0 && (
+                                            <p className="text-xs text-amber-400">
+                                                No {newRoutineSource} botherings found. Add one in Mindset first.
+                                            </p>
+                                        )}
+                                    </div>
                                 )}
-                            </ul>
-                        </ScrollArea>
-                    </TabsContent>
-                </Tabs>
+                            </div>
+
+                            <div className="flex items-center justify-end gap-2 border-t border-border/60 pt-3">
+                                <Button size="sm" variant="outline" className="h-9" onClick={() => setIsCreateRoutineOpen(false)}>Cancel</Button>
+                                <Button size="sm" className="h-9" onClick={handleCreateRoutine}>
+                                    <Plus className="mr-1 h-3.5 w-3.5" />
+                                    Create Routine
+                                </Button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+                <Dialog open={!!editRoutineId} onOpenChange={(open) => !open && setEditRoutineId(null)}>
+                    <DialogContent className="sm:max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle>Edit Routine Task</DialogTitle>
+                            <DialogDescription>
+                                Update this routine. Changes will reflect in timetable instances and linked bothering tasks.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4 pt-2">
+                            <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground">Task</p>
+                                <input
+                                    value={editRoutineDetails}
+                                    onChange={(e) => setEditRoutineDetails(e.target.value)}
+                                    placeholder="Routine task name..."
+                                    className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                />
+                            </div>
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <div className="space-y-1">
+                                    <p className="text-xs font-medium text-muted-foreground">Time Slot</p>
+                                    <select
+                                        value={editRoutineSlot}
+                                        onChange={(e) => setEditRoutineSlot(e.target.value as SlotName)}
+                                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                    >
+                                        {slotOrder.map((slot) => (
+                                            <option key={slot} value={slot}>{slot}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-xs font-medium text-muted-foreground">Task Type</p>
+                                    <select
+                                        value={editRoutineType}
+                                        onChange={(e) => setEditRoutineType(e.target.value as ActivityType)}
+                                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                    >
+                                        {['essentials', 'interrupt', 'planning', 'upskill', 'deepwork', 'branding', 'lead-generation', 'mindset', 'tracking', 'workout', 'nutrition'].map((type) => (
+                                            <option key={type} value={type}>{type}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+                                <p className="text-xs font-medium text-muted-foreground">Recurrence</p>
+                                <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                                    <select
+                                        value={editRoutineRuleType}
+                                        onChange={(e) => setEditRoutineRuleType(e.target.value as 'daily' | 'weekly' | 'custom')}
+                                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                    >
+                                        <option value="daily">Daily</option>
+                                        <option value="weekly">Weekly</option>
+                                        <option value="custom">Custom</option>
+                                    </select>
+                                    {editRoutineRuleType === 'custom' ? (
+                                        <>
+                                            <input
+                                                value={editRoutineInterval}
+                                                onChange={(e) => setEditRoutineInterval(e.target.value)}
+                                                type="number"
+                                                min={1}
+                                                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                                placeholder="Every"
+                                            />
+                                            <select
+                                                value={editRoutineRepeatUnit}
+                                                onChange={(e) => setEditRoutineRepeatUnit(e.target.value as 'day' | 'week' | 'month')}
+                                                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                            >
+                                                <option value="day">day(s)</option>
+                                                <option value="week">week(s)</option>
+                                                <option value="month">month(s)</option>
+                                            </select>
+                                        </>
+                                    ) : (
+                                        <p className="col-span-2 flex items-center text-xs text-muted-foreground">
+                                            {editRoutineRuleType === 'daily' ? 'Runs every day.' : 'Runs once every week.'}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground">Link</p>
+                                <select
+                                    value={editRoutineSource}
+                                    onChange={(e) => {
+                                        const source = e.target.value as ManualRoutineSource;
+                                        setEditRoutineSource(source);
+                                        if (source === 'external' || source === 'mismatch') {
+                                            const list = getBotheringsBySource(source);
+                                            setEditRoutineBotheringId(list[0]?.id || '');
+                                        } else {
+                                            setEditRoutineBotheringId('');
+                                        }
+                                    }}
+                                    className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm md:w-64"
+                                >
+                                    <option value="none">No Link</option>
+                                    <option value="external">Link External</option>
+                                    <option value="mismatch">Link Mismatch</option>
+                                </select>
+                                {editRoutineSource !== 'none' && (
+                                    <Select value={editRoutineBotheringId || undefined} onValueChange={setEditRoutineBotheringId}>
+                                        <SelectTrigger className="h-10 w-full md:w-[28rem]">
+                                            <SelectValue placeholder={`Select ${editRoutineSource} bothering...`} />
+                                        </SelectTrigger>
+                                        <SelectContent className="max-h-60">
+                                            {getBotheringsBySource(editRoutineSource).length > 0 ? (
+                                                getBotheringsBySource(editRoutineSource).map((point) => (
+                                                    <SelectItem key={point.id} value={point.id}>{point.text}</SelectItem>
+                                                ))
+                                            ) : (
+                                                <SelectItem value="__none__" disabled>No botherings available</SelectItem>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                            </div>
+                            <div className="flex items-center justify-end gap-2 border-t border-border/60 pt-3">
+                                <Button size="sm" variant="outline" className="h-9" onClick={() => setEditRoutineId(null)}>Cancel</Button>
+                                <Button size="sm" className="h-9" onClick={handleSaveRoutineEdit}>
+                                    Save Changes
+                                </Button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+                <Dialog open={!!linkDialogRoutineId} onOpenChange={(open) => !open && setLinkDialogRoutineId(null)}>
+                    <DialogContent className="sm:max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle>Link Routine to Bothering</DialogTitle>
+                            <DialogDescription>
+                                Select a {linkDialogSource} bothering to attach this routine task.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-3">
+                            <div className="space-y-1">
+                                <p className="text-xs font-medium text-muted-foreground">Bothering</p>
+                                <Select value={linkDialogBotheringId || undefined} onValueChange={setLinkDialogBotheringId}>
+                                    <SelectTrigger className="h-10 w-full">
+                                        <SelectValue placeholder={`Select ${linkDialogSource} bothering...`} />
+                                    </SelectTrigger>
+                                    <SelectContent className="max-h-60">
+                                        {getBotheringsBySource(linkDialogSource).length > 0 ? (
+                                            getBotheringsBySource(linkDialogSource).map((point) => (
+                                                <SelectItem key={point.id} value={point.id}>{point.text}</SelectItem>
+                                            ))
+                                        ) : (
+                                            <SelectItem value="__none__" disabled>No botherings available</SelectItem>
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                                {getBotheringsBySource(linkDialogSource).length === 0 && (
+                                    <p className="text-xs text-amber-400">
+                                        No {linkDialogSource} botherings found. Add one in Mindset first.
+                                    </p>
+                                )}
+                            </div>
+                            <div className="flex items-center justify-end gap-2 border-t border-border/60 pt-3">
+                                <Button size="sm" variant="outline" onClick={() => setLinkDialogRoutineId(null)}>Cancel</Button>
+                                <Button size="sm" onClick={confirmRoutineBotheringLink} disabled={getBotheringsBySource(linkDialogSource).length === 0}>
+                                    Link
+                                </Button>
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
             </DialogContent>
         </Dialog>
     );
@@ -629,6 +1574,7 @@ export function Header() {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUpcomingTasksModalOpen, setIsUpcomingTasksModalOpen] = useState(false);
+  const [upcomingTasksInitialTab, setUpcomingTasksInitialTab] = useState<OverviewTab>('scheduled');
   const [isHabitDashboardOpen, setIsHabitDashboardOpen] = useState(false);
   const [habitDashboardMonth, setHabitDashboardMonth] = useState(startOfMonth(new Date()));
   const isMobile = useIsMobile();
@@ -655,9 +1601,29 @@ export function Header() {
                 <Search className="h-4 w-4" />
                 <span className="sr-only">Search</span>
               </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsUpcomingTasksModalOpen(true)}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => {
+                  setUpcomingTasksInitialTab('scheduled');
+                  setIsUpcomingTasksModalOpen(true);
+                }}
+              >
                 <Repeat className="h-4 w-4" />
                 <span className="sr-only">Spaced Repetition</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => {
+                  setUpcomingTasksInitialTab('routine');
+                  setIsUpcomingTasksModalOpen(true);
+                }}
+              >
+                <Workflow className="h-4 w-4" />
+                <span className="sr-only">Routine Tasks</span>
               </Button>
 
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsHabitDashboardOpen(true)}>
@@ -729,7 +1695,11 @@ export function Header() {
       <SupportModal isOpen={isSupportModalOpen} onOpenChange={setIsSupportModalOpen} />
       <DemoTokenModal isOpen={isDemoTokenModalOpen} onOpenChange={setIsDemoTokenModalOpen} onSubmit={pushDemoDataWithToken} />
       <SettingsModal isOpen={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen} />
-      <UpcomingTasksModal isOpen={isUpcomingTasksModalOpen} onOpenChange={setIsUpcomingTasksModalOpen} />
+      <UpcomingTasksModal
+        isOpen={isUpcomingTasksModalOpen}
+        onOpenChange={setIsUpcomingTasksModalOpen}
+        initialTab={upcomingTasksInitialTab}
+      />
       <Dialog open={isHabitDashboardOpen} onOpenChange={setIsHabitDashboardOpen}>
         <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] p-0 overflow-hidden">
           <ScrollArea className="h-full w-full">

@@ -588,6 +588,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       history: [],
     },
     routineSkipByDate: {},
+    routineSourceOverrides: {},
     pdfLastOpenedPageByResourceId: {},
     supabasePdfBucket: 'pdfs',
   });
@@ -1878,6 +1879,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             history: [],
           },
           routineSkipByDate: {},
+          routineSourceOverrides: {},
           pdfLastOpenedPageByResourceId: {},
           supabasePdfBucket: 'pdfs',
       };

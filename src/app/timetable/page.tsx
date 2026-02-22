@@ -499,6 +499,12 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
                     <div className="text-right text-xs font-medium text-muted-foreground pr-2 pt-2">{slot}</div>
                     {weekDates.map(date => {
                         const dateKey = format(date, 'yyyy-MM-dd');
+                        const daySchedule = schedule[dateKey] || {};
+                        const explicitActivityIdsForDay = new Set(
+                            Object.values(daySchedule)
+                                .flatMap((slotActivities) => (slotActivities as Activity[]) || [])
+                                .map((activity) => activity.id)
+                        );
                         const allActivities = (schedule[dateKey]?.[slot] as Activity[] | undefined) || [];
                         const skippedRoutineIdsForDate = new Set(settings.routineSkipByDate?.[dateKey] || []);
                         const restoreRoutineOptions: RestoreRoutineOption[] = (settings.routines || [])
@@ -555,10 +561,10 @@ export function TimetablePageContent({ isModal = false, currentWeek: initialWeek
                             return [] as Activity[];
                         });
 
-                        // Merge routines with explicit schedule, avoiding duplicates by details/type/slot
+                        // De-dupe across the whole day so moved routine instances do not reappear in their original slot.
                         const mergedActivities = [
                             ...allActivities,
-                            ...routineInstances.filter(ri => !allActivities.some(a => a.id === ri.id))
+                            ...routineInstances.filter(ri => !explicitActivityIdsForDay.has(ri.id))
                         ];
                         const isPastDay = isBefore(date, startOfToday());
                         
