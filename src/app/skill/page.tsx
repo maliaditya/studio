@@ -232,7 +232,7 @@ function SkillPageContent() {
   const [progressInput, setProgressInput] = useState<{ items: string, hours: string, pages: string }>({ items: '', hours: '', pages: '' });
 
   const [isDeepWorkModalOpen, setIsDeepWorkModalOpen] = useState(false);
-  const [specializationFilter, setSpecializationFilter] = useState<'all' | 'linked'>('all');
+  const [specializationFilter, setSpecializationFilter] = useState<'all' | 'linked'>('linked');
 
 
   useEffect(() => {

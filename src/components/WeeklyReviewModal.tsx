@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "./ui/scroll-area";
@@ -29,6 +29,7 @@ import {
   ListChecks,
   Loader2,
   ShieldAlert,
+  Sparkles,
   SplitSquareVertical,
   Target,
   TrendingDown,
@@ -36,6 +37,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getAiConfigFromSettings, normalizeAiSettings } from "@/lib/ai/config";
 
 interface WeeklyReviewModalProps {
   isOpen: boolean;
@@ -51,7 +53,7 @@ type RoutineRebalanceSuggestion = {
   action: "move_slot" | "stagger";
   source?: "routine" | "instance";
   dateKey?: string;
-  model?: "pressure" | "utilization";
+  model?: "pressure" | "utilization" | "ai";
   currentSlot: SlotName;
   suggestedSlot?: SlotName;
   missRate: number;
@@ -224,6 +226,32 @@ const getRelaxedCadencePlan = (routine: Activity) => {
 const getSuggestionKey = (suggestion: RoutineRebalanceSuggestion) =>
   `${suggestion.source || "routine"}::${suggestion.dateKey || ""}::${suggestion.id}::${suggestion.action}::${suggestion.suggestedSlot || ""}::${getRuleSignature(suggestion.targetRule)}`;
 
+const getLoggedMinutesFromActivity = (activity: Activity) => {
+  let minutes = 0;
+  if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+    const focusMinutes = Math.max(
+      0,
+      Math.round((activity.focusSessionEndTime - activity.focusSessionInitialStartTime) / 60000)
+    );
+    minutes = Math.max(minutes, focusMinutes);
+  }
+  if (activity.focusSessionInitialDuration && activity.focusSessionInitialDuration > 0) {
+    minutes = Math.max(minutes, activity.focusSessionInitialDuration);
+  }
+  if (activity.duration && activity.duration > 0) {
+    minutes = Math.max(minutes, activity.duration);
+  }
+  return minutes;
+};
+
+const isCompletedActivityState = (activity: Activity) => {
+  if (activity.completed) return true;
+  if (activity.duration && activity.duration > 0) return true;
+  if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) return true;
+  if (activity.focusSessionInitialDuration && activity.focusSessionInitialDuration > 0) return true;
+  return false;
+};
+
 const riskTone = (score: number) => {
   if (score >= 0.75) {
     return {
@@ -254,8 +282,17 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
   const { toast } = useToast();
   const [applyDialogTarget, setApplyDialogTarget] = useState<RoutineRebalanceSuggestion | null>(null);
   const [applyingSuggestionId, setApplyingSuggestionId] = useState<string | null>(null);
+  const [aiRoutineSuggestions, setAiRoutineSuggestions] = useState<RoutineRebalanceSuggestion[]>([]);
+  const [isGeneratingAiSuggestions, setIsGeneratingAiSuggestions] = useState(false);
+  const [aiSuggestError, setAiSuggestError] = useState<string | null>(null);
   const today = startOfDay(new Date());
   const todayKey = format(today, "yyyy-MM-dd");
+  const isDesktopRuntime =
+    typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
+  const aiRuntimeSettings = useMemo(
+    () => normalizeAiSettings(settings.ai, isDesktopRuntime),
+    [settings.ai, isDesktopRuntime]
+  );
   const normalizeSlotName = (slot?: string): SlotName => {
     const casted = (slot || "Evening") as SlotName;
     return SLOT_ORDER.includes(casted) ? casted : "Evening";
@@ -1065,9 +1102,8 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
 
     const merged: RoutineRebalanceSuggestion[] = [];
     const usedRoutineIds = new Set<string>();
-    const maxCards = 8;
     let staggerCardCount = 0;
-    const maxStaggerCards = 2;
+    const maxStaggerCards = Math.max(2, routines.length);
     const pushUnique = (candidate?: RoutineRebalanceSuggestion) => {
       if (!candidate) return;
        if (candidate.action === "stagger" && staggerCardCount >= maxStaggerCards) return;
@@ -1078,22 +1114,273 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
     };
 
     // Prefer concrete slot moves first; cadence easing is a guarded fallback.
-    while (merged.length < maxCards && (moveSuggestions.length > 0 || staggerSuggestions.length > 0)) {
+    while (moveSuggestions.length > 0 || staggerSuggestions.length > 0) {
       pushUnique(moveSuggestions.shift());
-      if (merged.length >= maxCards) break;
       pushUnique(moveSuggestions.shift());
-      if (merged.length >= maxCards) break;
       pushUnique(staggerSuggestions.shift());
       if (moveSuggestions.length === 0 && staggerSuggestions.length > 0) {
         pushUnique(staggerSuggestions.shift());
       }
     }
 
-    return merged.slice(0, maxCards);
+    return merged;
   }, [settings.routines, settings.routineRebalanceLearning, schedule, todayKey, habitCards]);
   const routineById = useMemo(() => {
     return new Map((settings.routines || []).map((routine) => [routine.id, routine] as const));
   }, [settings.routines]);
+  const routineAiHistoricalPayload = useMemo(() => {
+    const allDateKeys = Object.keys(schedule || {}).sort().slice(-180);
+    const routines = (settings.routines || []).filter((r) => !!r.routine);
+
+    const normalizeSlot = (slot?: string): SlotName => {
+      const casted = (slot || "Evening") as SlotName;
+      return SLOT_ORDER.includes(casted) ? casted : "Evening";
+    };
+    const isRoutineDueOnDate = (routine: Activity, dateKey: string) => {
+      if (!routine.routine) return false;
+      const rule = routine.routine;
+      const baseKey = routine.baseDate || (routine as any).createdAt || routine.dateKey;
+      const date = parseISO(dateKey);
+      if (Number.isNaN(date.getTime())) return false;
+      if (rule.type === "daily") return true;
+      if (!baseKey) return false;
+      const base = parseISO(baseKey);
+      if (Number.isNaN(base.getTime()) || startOfDay(base) > startOfDay(date)) return false;
+      if (rule.type === "weekly") return getDay(base) === getDay(date);
+      if (rule.type === "custom") {
+        const interval = Math.max(1, rule.repeatInterval ?? rule.days ?? 1);
+        const unit = rule.repeatUnit ?? "day";
+        if (unit === "month") {
+          if (base.getDate() !== date.getDate()) return false;
+          const diffMonths = differenceInMonths(date, base);
+          return diffMonths >= 0 && diffMonths % interval === 0;
+        }
+        if (unit === "week") {
+          const diffDayCount = differenceInDays(date, base);
+          return diffDayCount >= 0 && diffDayCount % (interval * 7) === 0;
+        }
+        const diffDayCount = differenceInDays(date, base);
+        return diffDayCount >= 0 && diffDayCount % interval === 0;
+      }
+      return false;
+    };
+    const findRoutineInstance = (routine: Activity, dateKey: string) => {
+      const day = schedule?.[dateKey];
+      if (!day) return null;
+      const instanceId = `${routine.id}_${dateKey}`;
+      const allActivities: Activity[] = [];
+      Object.values(day).forEach((slotValue: any) => {
+        if (!Array.isArray(slotValue)) return;
+        slotValue.forEach((item: any) => {
+          if (!item || typeof item !== "object") return;
+          if (!("id" in item) || !("type" in item)) return;
+          allActivities.push(item as Activity);
+        });
+      });
+      const exact = allActivities.find((a) => a.id === instanceId);
+      if (exact) return exact;
+      const byTaskLink = allActivities.find((a) => (a.taskIds || []).includes(routine.id));
+      if (byTaskLink) return byTaskLink;
+      const bySameDetails = allActivities.find((a) => a.type === routine.type && a.details === routine.details);
+      return bySameDetails || null;
+    };
+
+    const dailyHistory = allDateKeys.map((dateKey) => {
+      const day = schedule?.[dateKey];
+      const activities: Activity[] = [];
+      SLOT_ORDER.forEach((slot) => {
+        const list = Array.isArray(day?.[slot]) ? (day?.[slot] as Activity[]) : [];
+        list.forEach((a) => activities.push(a));
+      });
+      const dedup = new Map<string, Activity>();
+      activities.forEach((a) => {
+        if (!a?.id) return;
+        if (!dedup.has(a.id)) dedup.set(a.id, a);
+      });
+      const unique = Array.from(dedup.values());
+      const scheduled = unique.filter((a) => a.type !== "interrupt").length;
+      const completed = unique.filter((a) => a.type !== "interrupt" && isCompletedActivityState(a)).length;
+      const workedMinutes = unique.reduce((sum, a) => sum + getLoggedMinutesFromActivity(a), 0);
+      return {
+        dateKey,
+        scheduled,
+        completed,
+        missed: Math.max(0, scheduled - completed),
+        workedMinutes,
+      };
+    });
+
+    const routineHistory = routines.map((routine) => {
+      let due = 0;
+      let scheduled = 0;
+      let completed = 0;
+      let workedMinutes = 0;
+      allDateKeys.forEach((dateKey) => {
+        if (!isRoutineDueOnDate(routine, dateKey)) return;
+        due += 1;
+        const instance = findRoutineInstance(routine, dateKey);
+        if (!instance) return;
+        scheduled += 1;
+        workedMinutes += getLoggedMinutesFromActivity(instance);
+        if (isCompletedActivityState(instance)) completed += 1;
+      });
+      const missed = Math.max(0, scheduled - completed);
+      const missRate = scheduled > 0 ? missed / scheduled : 0;
+      return {
+        id: routine.id,
+        details: routine.details,
+        currentSlot: normalizeSlot(routine.slot),
+        cadence: getCadenceLabel(routine.routine),
+        due,
+        scheduled,
+        completed,
+        missed,
+        missRate,
+        workedMinutes,
+      };
+    });
+
+    const totals = dailyHistory.reduce(
+      (acc, day) => {
+        acc.scheduled += day.scheduled;
+        acc.completed += day.completed;
+        acc.missed += day.missed;
+        acc.workedMinutes += day.workedMinutes;
+        return acc;
+      },
+      { scheduled: 0, completed: 0, missed: 0, workedMinutes: 0 }
+    );
+
+    return {
+      totalDays: dailyHistory.length,
+      totals,
+      dailyHistory,
+      routineHistory,
+    };
+  }, [schedule, settings.routines]);
+  const effectiveRoutineSuggestions = useMemo(() => {
+    if (!aiRoutineSuggestions.length) return routineRebalanceSuggestions;
+    const merged: RoutineRebalanceSuggestion[] = [];
+    const seen = new Set<string>();
+    [...aiRoutineSuggestions, ...routineRebalanceSuggestions].forEach((s) => {
+      const key = getSuggestionKey(s);
+      if (seen.has(key)) return;
+      seen.add(key);
+      merged.push(s);
+    });
+    return merged;
+  }, [aiRoutineSuggestions, routineRebalanceSuggestions]);
+
+  const generateAiRoutineSuggestions = useCallback(async () => {
+    if (!isDesktopRuntime || isGeneratingAiSuggestions) return;
+    try {
+      setIsGeneratingAiSuggestions(true);
+      setAiSuggestError(null);
+      const response = await fetch("/api/ai/routine-rebalance", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-studio-desktop": "1",
+        },
+        body: JSON.stringify({
+          aiConfig: getAiConfigFromSettings(settings, isDesktopRuntime),
+          historical: routineAiHistoricalPayload,
+          baselineSuggestions: routineRebalanceSuggestions.map((s) => ({
+            id: s.id,
+            action: s.action,
+            currentSlot: s.currentSlot,
+            suggestedSlot: s.suggestedSlot,
+            confidence: s.confidence,
+            reason: s.reason,
+            impact: s.impact,
+            missRate: s.missRate,
+            missed: s.missed,
+            due: s.due,
+          })),
+          routines: (settings.routines || []).map((r) => ({
+            id: r.id,
+            details: r.details,
+            slot: normalizeSlotName(r.slot),
+            cadence: getCadenceLabel(r.routine),
+          })),
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(String(result?.details || result?.error || "Failed to generate AI suggestions."));
+      }
+
+      const aiList = Array.isArray(result?.suggestions) ? result.suggestions : [];
+      const normalized: RoutineRebalanceSuggestion[] = aiList
+        .map((item: any) => {
+          const routine = routineById.get(String(item?.id || ""));
+          if (!routine) return null;
+          const currentSlot = normalizeSlotName(routine.slot);
+          const stats = routineAiHistoricalPayload.routineHistory.find((r) => r.id === routine.id);
+          const action: "move_slot" | "stagger" = item?.action === "stagger" ? "stagger" : "move_slot";
+          const suggestedSlot: SlotName | undefined =
+            typeof item?.suggestedSlot === "string" && SLOT_ORDER.includes(item.suggestedSlot as SlotName)
+              ? (item.suggestedSlot as SlotName)
+              : undefined;
+
+          if (action === "move_slot") {
+            if (!suggestedSlot || suggestedSlot === currentSlot) return null;
+          }
+          if (action === "stagger" && !item?.targetRule) return null;
+
+          const confidence = clamp01(Number(item?.confidence ?? 0.65));
+          return {
+            id: routine.id,
+            details: routine.details,
+            action,
+            source: "routine",
+            model: "ai" as const,
+            currentSlot,
+            suggestedSlot,
+            missRate: stats?.missRate || 0,
+            missed: stats?.missed || 0,
+            due: stats?.scheduled || 0,
+            confidence,
+            reason: String(item?.reason || "AI refinement based on full historical completion and workload trends."),
+            impact: String(item?.impact || "Expected improved consistency and slot fit."),
+            targetRule: action === "stagger" ? item?.targetRule : undefined,
+            currentCadenceLabel: action === "stagger" ? getCadenceLabel(routine.routine) : undefined,
+            targetCadenceLabel: action === "stagger" ? getCadenceLabel(item?.targetRule) : undefined,
+          } as RoutineRebalanceSuggestion;
+        })
+        .filter((item: RoutineRebalanceSuggestion | null): item is RoutineRebalanceSuggestion => !!item)
+        .slice(0, 8);
+
+      setAiRoutineSuggestions(normalized);
+      const warningText = typeof result?.warning === "string" ? result.warning : "";
+      toast({
+        title: "AI suggestions ready",
+        description:
+          normalized.length > 0
+            ? `${normalized.length} AI-refined routine suggestions generated.`
+            : warningText || "AI returned no valid routine suggestion. Keeping algorithm suggestions.",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate AI suggestions.";
+      setAiSuggestError(message);
+      toast({ title: "AI suggestion failed", description: message, variant: "destructive" });
+    } finally {
+      setIsGeneratingAiSuggestions(false);
+    }
+  }, [
+    isDesktopRuntime,
+    isGeneratingAiSuggestions,
+    routineAiHistoricalPayload,
+    routineRebalanceSuggestions,
+    settings.routines,
+    routineById,
+    toast,
+  ]);
+  useEffect(() => {
+    if (isOpen) return;
+    setAiRoutineSuggestions([]);
+    setAiSuggestError(null);
+  }, [isOpen]);
   const appendLearningHistory = (prev: UserSettings, event: RoutineRebalanceLearningEvent): UserSettings => {
     const previousLearning = prev.routineRebalanceLearning || { history: [] };
     const nextHistory = [...(previousLearning.history || []), event].slice(-400);
@@ -1137,7 +1424,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
     const applyKey = getSuggestionKey(suggestion);
     setApplyingSuggestionId(applyKey);
     try {
-      const stillSuggested = routineRebalanceSuggestions.some(
+      const stillSuggested = effectiveRoutineSuggestions.some(
         (candidate) =>
           (candidate.source || "routine") === (suggestion.source || "routine") &&
           (candidate.dateKey || "") === (suggestion.dateKey || "") &&
@@ -1762,16 +2049,34 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Gauge className="h-4 w-4 text-fuchsia-300" />
                 <h3 className="text-lg font-semibold">Routine Rebalance Suggestions</h3>
                 <Badge variant="outline" className="border-fuchsia-400/40 text-fuchsia-200 bg-fuchsia-500/10">
                   Suggest + Guarded Apply
                 </Badge>
+                {isDesktopRuntime ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="ml-auto border-fuchsia-400/40 text-fuchsia-100 hover:bg-fuchsia-500/10"
+                    onClick={generateAiRoutineSuggestions}
+                    disabled={isGeneratingAiSuggestions}
+                  >
+                    {isGeneratingAiSuggestions ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                    AI Enhance (Desktop)
+                  </Button>
+                ) : null}
               </div>
               <div className="text-xs text-muted-foreground">No automatic rescheduling is applied. You can apply each suggestion with guard checks.</div>
+              {isDesktopRuntime ? (
+                <div className="text-[11px] text-muted-foreground">
+                  Uses {aiRuntimeSettings.provider === "openai" ? "OpenAI API" : "local Ollama"} ({aiRuntimeSettings.model}) with historical task metrics to refine suggestions.
+                </div>
+              ) : null}
+              {aiSuggestError ? <div className="text-xs text-destructive">{aiSuggestError}</div> : null}
 
-              {routineRebalanceSuggestions.length === 0 ? (
+              {effectiveRoutineSuggestions.length === 0 ? (
                 <Card className="border-fuchsia-500/30 bg-fuchsia-500/5">
                   <CardContent className="py-8 text-center text-sm text-muted-foreground">
                     No rebalance recommendation right now. Miss pressure and last-5-day utilization signals are both within acceptable range.
@@ -1779,7 +2084,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                 </Card>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {routineRebalanceSuggestions.map((s) => {
+                  {effectiveRoutineSuggestions.map((s) => {
                     const suggestionKey = getSuggestionKey(s);
                     const canApply = isSuggestionApplyEligible(s);
                     const isApplying = applyingSuggestionId === suggestionKey;
@@ -1802,7 +2107,11 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                               </>
                             )}
                             <Badge variant="outline">Current {s.currentSlot}</Badge>
-                            {s.model === "utilization" ? (
+                            {s.model === "ai" ? (
+                              <Badge variant="outline" className="border-violet-400/40 text-violet-200 bg-violet-500/10">
+                                AI model
+                              </Badge>
+                            ) : s.model === "utilization" ? (
                               <Badge variant="outline" className="border-sky-400/40 text-sky-200 bg-sky-500/10">
                                 Utilization model
                               </Badge>

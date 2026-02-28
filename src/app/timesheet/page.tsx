@@ -9,12 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfDay, isAfter, getDay, differenceInMonths, differenceInDays } from 'date-fns';
-import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide, Check, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronDown, Repeat } from 'lucide-react';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfDay, isAfter, isBefore, getDay, differenceInMonths, differenceInDays } from 'date-fns';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide, Check, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronDown, Repeat, AlertTriangle, Trash2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from '@/lib/utils';
-import type { Activity, PauseEvent, ActivityType as ActivityTypeType, MindsetPoint } from '@/types/workout';
+import type { Activity, PauseEvent, ActivityType as ActivityTypeType, MindsetPoint, CoreDomainId } from '@/types/workout';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogDescription as DialogDescriptionComponent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
@@ -36,6 +35,7 @@ interface TimesheetPageContentProps {
 type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
 type ViewMode = "day" | "week" | "month";
 type TimeAllocationView = "bar" | "pie";
+type BatchFilter = "all" | "external" | "mismatch";
 
 type HabitDashboardMonthControlsProps = {
     month: Date;
@@ -96,6 +96,83 @@ const activityNameMap: Record<ActivityTypeType, string> = {
     nutrition: 'Nutrition',
     'spaced-repetition': 'Spaced Repetition',
     pomodoro: 'Pomodoro',
+};
+
+const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+const stripInstanceDateSuffix = (value?: string) => (value || '').replace(/_\d{4}-\d{2}-\d{2}$/, '');
+const normalizeDateKey = (value?: string | null) => {
+    if (!value) return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return format(parsed, 'yyyy-MM-dd');
+};
+
+const countRoutineOccurrencesBetween = (
+    routine: Activity,
+    startDate: Date,
+    endDate: Date
+): number | null => {
+    if (!routine?.routine) return null;
+    const rule = routine.routine;
+    const interval = Math.max(1, rule.repeatInterval || rule.days || 1);
+    const unit = rule.repeatUnit || (rule.type === 'weekly' ? 'week' : 'day');
+    const baseDateKey = normalizeDateKey(routine.baseDate) || normalizeDateKey((routine as any).createdAt) || format(startDate, 'yyyy-MM-dd');
+    if (!baseDateKey) return null;
+    let cursor = startOfDay(parseISO(baseDateKey));
+    if (Number.isNaN(cursor.getTime())) return null;
+    if (isBefore(endDate, startDate)) return 0;
+
+    if (unit === 'month') {
+        while (isBefore(cursor, startDate)) cursor = addMonths(cursor, interval);
+        let count = 0;
+        while (!isAfter(cursor, endDate)) {
+            if (!isBefore(cursor, startDate)) count += 1;
+            cursor = addMonths(cursor, interval);
+        }
+        return count;
+    }
+
+    const stepDays = unit === 'week' ? interval * 7 : interval;
+    while (isBefore(cursor, startDate)) cursor = addDays(cursor, stepDays);
+    let count = 0;
+    while (!isAfter(cursor, endDate)) {
+        if (!isBefore(cursor, startDate)) count += 1;
+        cursor = addDays(cursor, stepDays);
+    }
+    return count;
+};
+
+const CORE_LABEL_BY_ID: Record<CoreDomainId, string> = {
+    health: 'Health',
+    wealth: 'Wealth',
+    relations: 'Relations',
+    meaning: 'Meaning',
+    competence: 'Competence',
+    autonomy: 'Autonomy',
+    creativity: 'Creativity',
+    contribution: 'Contribution',
+    transcendence: 'Transcendence',
+};
+
+const BOTHERING_FALLBACK_CORE: Record<'external' | 'mismatch' | 'constraint', CoreDomainId> = {
+    external: 'health',
+    mismatch: 'meaning',
+    constraint: 'wealth',
+};
+
+const getRoutineRepeatabilityLabel = (routine?: Activity | null) => {
+    const rule = routine?.routine;
+    if (!rule) return 'None';
+    const interval = Math.max(1, rule.repeatInterval || rule.days || 1);
+    const unit = rule.repeatUnit || (rule.type === 'weekly' ? 'week' : 'day');
+
+    if (rule.type === 'daily' && unit === 'day' && interval === 1) return 'Daily';
+    if (rule.type === 'weekly' && unit === 'week' && interval === 1) return 'Weekly';
+    if (unit === 'day') return `Every ${interval} day${interval > 1 ? 's' : ''}`;
+    if (unit === 'week') return `Every ${interval} week${interval > 1 ? 's' : ''}`;
+    if (unit === 'month') return `Every ${interval} month${interval > 1 ? 's' : ''}`;
+    return 'Custom';
 };
 
 const activityTypeIcons: Record<ActivityTypeType, React.ReactNode> = {
@@ -291,6 +368,11 @@ export function TimesheetPageContent({
 }: TimesheetPageContentProps) {
     const {
         schedule,
+        setSchedule,
+        settings,
+        setSettings,
+        offerizationPlans,
+        coreSkills,
         allDeepWorkLogs,
         allUpskillLogs,
         allWorkoutLogs,
@@ -303,8 +385,9 @@ export function TimesheetPageContent({
         mindsetCards,
     } = useAuth();
     const [selectedDate, setSelectedDate] = useState(new Date());
-    const [viewMode, setViewMode] = useState<ViewMode>("day");
+    const [viewMode, setViewMode] = useState<ViewMode>("month");
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
+    const [batchFilter, setBatchFilter] = useState<BatchFilter>("all");
     const [modalData, setModalData] = useState<{ date: Date; activities: ProcessedActivity[], pieData: any[] } | null>(null);
     const [localModalTab, setLocalModalTab] = useState<'timesheet' | 'habit-dashboard'>('habit-dashboard');
     const [localDashboardMonth, setLocalDashboardMonth] = useState(startOfMonth(new Date()));
@@ -483,6 +566,735 @@ export function TimesheetPageContent({
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
         return timeData.dailyData[dateKey]?.activities || [];
     }, [selectedDate, timeData]);
+
+    const taskConsumptionRows = useMemo(() => {
+        const filterActivity = (activity: Activity): boolean => {
+            if (activityFilter === 'all') return true;
+            if (activityFilter === 'deepwork') return activity.type === 'deepwork';
+            if (activityFilter === 'upskill') return activity.type === 'upskill';
+            if (activityFilter === 'deepwork_upskill') return activity.type === 'deepwork' || activity.type === 'upskill';
+            return false;
+        };
+
+        let rangeStart: Date;
+        let rangeEnd: Date;
+        if (viewMode === 'week') {
+            rangeStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+            rangeEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
+        } else if (viewMode === 'month') {
+            rangeStart = startOfMonth(selectedDate);
+            rangeEnd = endOfMonth(selectedDate);
+        } else {
+            rangeStart = startOfDay(selectedDate);
+            rangeEnd = startOfDay(selectedDate);
+        }
+        const rangeDays = eachDayOfInterval({ start: rangeStart, end: rangeEnd });
+        const rangeDateKeys = new Set(rangeDays.map((day) => format(day, 'yyyy-MM-dd')));
+
+        const logs = Object.values(settings.learningPerformanceDailyLogs || {}).flat();
+        const externalTaskIds = new Set<string>();
+        const mismatchTaskIds = new Set<string>();
+        const externalTaskNames = new Set<string>();
+        const mismatchTaskNames = new Set<string>();
+        const taskCoreById = new Map<string, CoreDomainId[]>();
+        const taskCoreByName = new Map<string, CoreDomainId[]>();
+
+        Object.entries(settings.routineSourceOverrides || {}).forEach(([routineId, source]) => {
+            const normalized = stripInstanceDateSuffix(routineId);
+            if (!normalized) return;
+            if (source === 'external') externalTaskIds.add(normalized);
+            if (source === 'mismatch') mismatchTaskIds.add(normalized);
+        });
+
+        const collectBotheringTaskSignals = (cardId: string, source: 'external' | 'mismatch') => {
+            const card = (mindsetCards || []).find((item) => item.id === cardId);
+            (card?.points || []).forEach((point) => {
+                (point.tasks || []).forEach((task) => {
+                    const taskId = stripInstanceDateSuffix(task.id || task.activityId || '');
+                    const taskName = normalizeText(task.details || '');
+                    if (taskId) {
+                        if (source === 'external') externalTaskIds.add(taskId);
+                        if (source === 'mismatch') mismatchTaskIds.add(taskId);
+                    }
+                    if (taskName) {
+                        if (source === 'external') externalTaskNames.add(taskName);
+                        if (source === 'mismatch') mismatchTaskNames.add(taskName);
+                    }
+                });
+            });
+        };
+        collectBotheringTaskSignals('mindset_botherings_external', 'external');
+        collectBotheringTaskSignals('mindset_botherings_mismatch', 'mismatch');
+        const addTaskCore = (taskId: string, taskName: string, core: CoreDomainId) => {
+            if (taskId) {
+                const existing = taskCoreById.get(taskId) || [];
+                taskCoreById.set(taskId, [...existing, core]);
+            }
+            if (taskName) {
+                const existing = taskCoreByName.get(taskName) || [];
+                taskCoreByName.set(taskName, [...existing, core]);
+            }
+        };
+        const collectCoreSignals = (cardId: string, type: 'external' | 'mismatch' | 'constraint') => {
+            const card = (mindsetCards || []).find((item) => item.id === cardId);
+            (card?.points || []).forEach((point) => {
+                const manualCore = settings.coreStateManualOverrides?.[point.id];
+                const resolvedCore = (point.coreDomainId || manualCore || BOTHERING_FALLBACK_CORE[type]) as CoreDomainId;
+                (point.tasks || []).forEach((task) => {
+                    addTaskCore(stripInstanceDateSuffix(task.id || task.activityId || ''), normalizeText(task.details || ''), resolvedCore);
+                });
+            });
+        };
+        collectCoreSignals('mindset_botherings_external', 'external');
+        collectCoreSignals('mindset_botherings_mismatch', 'mismatch');
+        collectCoreSignals('mindset_botherings_constraint', 'constraint');
+
+        const findSpecializationMeta = (activity: Activity): { id: string; name: string } | null => {
+            const definitionList = activity.type === 'upskill' ? upskillDefinitions : activity.type === 'deepwork' ? deepWorkDefinitions : [];
+            const definition = definitionList.find((def) => normalizeText(def.name) === normalizeText(activity.details));
+            const category = normalizeText(definition?.category);
+            if (category) {
+                const microInfo = Array.from(microSkillMap.values()).find((m) => normalizeText(m.microSkillName) === category);
+                if (microInfo) {
+                    const core = (coreSkills || []).find((s) => s.type === 'Specialization' && normalizeText(s.name) === normalizeText(microInfo.coreSkillName));
+                    if (core) return { id: core.id, name: core.name };
+                }
+                const directCore = (coreSkills || []).find((s) => s.type === 'Specialization' && normalizeText(s.name) === category);
+                if (directCore) return { id: directCore.id, name: directCore.name };
+            }
+            const directName = (coreSkills || []).find((s) => s.type === 'Specialization' && normalizeText(s.name) === normalizeText(activity.details));
+            return directName ? { id: directName.id, name: directName.name } : null;
+        };
+
+        const getPlanMeta = (specId: string | null, activityType: Activity['type']) => {
+            if (!specId) {
+                return {
+                    hasPlan: false,
+                    metric: 'none' as const,
+                    endDate: null as string | null,
+                    remaining: 0,
+                    unitLabel: 'sessions',
+                };
+            }
+            const plan = offerizationPlans?.[specId];
+            const learningPlan = plan?.learningPlan;
+            const releases = plan?.releases || [];
+            const specialization = (coreSkills || []).find((skill) => skill.id === specId && skill.type === 'Specialization');
+
+            const bookResources = learningPlan?.bookWebpageResources || [];
+            const audioResources = learningPlan?.audioVideoResources || [];
+            const skillTreePaths = learningPlan?.skillTreePaths || [];
+
+            const latestBookEnd = bookResources
+                .map((resource) => normalizeDateKey(resource.completionDate))
+                .filter((date): date is string => !!date)
+                .reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+            const latestAudioEnd = audioResources
+                .map((resource) => normalizeDateKey(resource.completionDate))
+                .filter((date): date is string => !!date)
+                .reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+            const latestSkillEnd = skillTreePaths
+                .map((path) => normalizeDateKey(path.completionDate))
+                .filter((date): date is string => !!date)
+                .reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+            const latestProjectEnd = releases
+                .map((release) => normalizeDateKey(release.launchDate))
+                .filter((date): date is string => !!date)
+                .reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+
+            const hasAudio = audioResources.length > 0;
+            const hasBooks = bookResources.length > 0;
+            const hasSkillTree = skillTreePaths.length > 0;
+            const hasProject = releases.length > 0;
+            const hasPlan = hasAudio || hasBooks || hasSkillTree || hasProject;
+            if (!hasPlan) {
+                return {
+                    hasPlan: false,
+                    metric: 'none' as const,
+                    endDate: null as string | null,
+                    remaining: 0,
+                    unitLabel: 'sessions',
+                };
+            }
+
+            const completedHours = (specialization?.skillAreas || []).reduce(
+                (sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedHours || 0), 0),
+                0
+            );
+            const completedPages = (specialization?.skillAreas || []).reduce(
+                (sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedPages || 0), 0),
+                0
+            );
+            const totalHours = audioResources.reduce((sum, resource) => sum + (resource.totalHours || 0), 0);
+            const totalPages = bookResources.reduce((sum, resource) => sum + (resource.totalPages || 0), 0);
+            const remainingHours = Math.max(0, totalHours - completedHours);
+            const remainingPages = Math.max(0, totalPages - completedPages);
+
+            const remainingSkillItems = skillTreePaths.reduce((sum, path) => {
+                const selectedAreas = (specialization?.skillAreas || []).filter((area) => (path.skillAreaIds || []).includes(area.id));
+                const totalMicroSkills = selectedAreas.reduce((inner, area) => inner + area.microSkills.length, 0);
+                const completedMicroSkills = selectedAreas.reduce(
+                    (inner, area) =>
+                        inner +
+                        area.microSkills.filter((micro) =>
+                            !!micro.isReadyForRepetition ||
+                            (micro.completedItems || 0) > 0 ||
+                            (micro.completedHours || 0) > 0 ||
+                            (micro.completedPages || 0) > 0
+                        ).length,
+                    0
+                );
+                const targetMicroSkills = path.targetMicroSkills ?? totalMicroSkills;
+                const boundedCompleted = Math.min(completedMicroSkills, targetMicroSkills || completedMicroSkills);
+                const remainingMicroSkills = Math.max(0, (targetMicroSkills || 0) - boundedCompleted);
+                return sum + remainingMicroSkills;
+            }, 0);
+
+            const remainingProjectItems = releases.reduce((sum, release) => {
+                const normalizeStageItem = (item: string | { text: string; completed?: boolean }) =>
+                    typeof item === 'string'
+                        ? { text: item, completed: false }
+                        : { text: item.text || '', completed: !!item.completed };
+                const stages = release.workflowStages;
+                const allItems = [
+                    ...(stages?.ideaItems || []),
+                    ...(stages?.codeItems || []),
+                    ...(stages?.breakItems || []),
+                    ...(stages?.fixItems || []),
+                ].map(normalizeStageItem);
+                return sum + allItems.filter((item) => item.text.trim() && !item.completed).length;
+            }, 0);
+
+            // Priority requested: audio/video => hours, books/webpages => pages, skill tree => items.
+            if (hasAudio && remainingHours > 0) {
+                return {
+                    hasPlan: true,
+                    metric: 'hours' as const,
+                    endDate: latestAudioEnd,
+                    remaining: remainingHours,
+                    unitLabel: 'hrs',
+                };
+            }
+            if (hasBooks && remainingPages > 0) {
+                return {
+                    hasPlan: true,
+                    metric: 'pages' as const,
+                    endDate: latestBookEnd,
+                    remaining: remainingPages,
+                    unitLabel: 'pages',
+                };
+            }
+            if (hasSkillTree && remainingSkillItems > 0) {
+                return {
+                    hasPlan: true,
+                    metric: 'items' as const,
+                    endDate: latestSkillEnd,
+                    remaining: remainingSkillItems,
+                    unitLabel: 'items',
+                };
+            }
+            if ((activityType === 'deepwork' || activityType === 'planning') && hasProject && remainingProjectItems > 0) {
+                return {
+                    hasPlan: true,
+                    metric: 'items' as const,
+                    endDate: latestProjectEnd,
+                    remaining: remainingProjectItems,
+                    unitLabel: 'items',
+                };
+            }
+            return {
+                hasPlan: true,
+                metric: 'none' as const,
+                endDate: latestAudioEnd || latestBookEnd || latestSkillEnd || latestProjectEnd,
+                remaining: 0,
+                unitLabel: 'sessions',
+            };
+        };
+
+        const aggregate = new Map<string, {
+            taskKey: string;
+            taskName: string;
+            activityType: Activity['type'];
+            loggedMinutes: number;
+            loggedSessionCount: number;
+            representative: Activity;
+            specId: string | null;
+            specName: string | null;
+            candidateIds: Set<string>;
+            candidateNames: Set<string>;
+        }>();
+
+        rangeDays.forEach((day) => {
+            const dateKey = format(day, 'yyyy-MM-dd');
+            const daySchedule = schedule[dateKey] || {};
+            slotOrder.forEach((slot) => {
+                const slotActivities = daySchedule[slot.name] as Activity[] | undefined;
+                (slotActivities || []).forEach((activity) => {
+                    if (!filterActivity(activity)) return;
+                    const minutes = getLoggedMinutes(activity, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, dateKey);
+                    if (minutes <= 0) return;
+                    const specMeta = (activity.type === 'upskill' || activity.type === 'deepwork')
+                        ? findSpecializationMeta(activity)
+                        : null;
+                    const isWorkoutGroup = activity.type === 'workout';
+                    const taskKey = isWorkoutGroup
+                        ? 'group:workout'
+                        : specMeta
+                        ? `spec:${specMeta.id}`
+                        : (stripInstanceDateSuffix(activity.id) || activity.id);
+                    const candidateIds = new Set<string>([
+                        stripInstanceDateSuffix(activity.id),
+                        ...(activity.taskIds || []).map((id) => stripInstanceDateSuffix(id)),
+                    ].filter(Boolean));
+                    const candidateName = normalizeText(activity.details);
+                    const existing = aggregate.get(taskKey);
+                    if (existing) {
+                        existing.loggedMinutes += minutes;
+                        existing.loggedSessionCount += 1;
+                        candidateIds.forEach((id) => existing.candidateIds.add(id));
+                        if (candidateName) existing.candidateNames.add(candidateName);
+                        return;
+                    }
+                    aggregate.set(taskKey, {
+                        taskKey,
+                        taskName: isWorkoutGroup ? 'Workout' : (specMeta?.name || activity.details || taskKey),
+                        activityType: activity.type,
+                        loggedMinutes: minutes,
+                        loggedSessionCount: 1,
+                        representative: activity,
+                        specId: specMeta?.id || null,
+                        specName: specMeta?.name || null,
+                        candidateIds,
+                        candidateNames: candidateName ? new Set([candidateName]) : new Set<string>(),
+                    });
+                });
+            });
+        });
+
+        const today = startOfDay(new Date());
+        return Array.from(aggregate.values())
+            .map((row) => {
+                const taskLogs = logs.filter((entry) => {
+                    if (!rangeDateKeys.has(entry.dateKey)) return false;
+                    if (row.specId) return entry.specializationId === row.specId;
+                    const source = stripInstanceDateSuffix(entry.sourceTaskId || '');
+                    return source === row.taskKey;
+                });
+                const totalPages = taskLogs.reduce((sum, entry) => sum + Math.max(0, entry.pagesCompleted || 0), 0);
+                const totalHours = taskLogs.reduce((sum, entry) => sum + Math.max(0, entry.hoursCompleted || 0), 0);
+                const totalItems = taskLogs.reduce((sum, entry) => sum + Math.max(0, entry.itemsCompleted || 0), 0);
+                const logDays = new Set(taskLogs.map((entry) => entry.dateKey)).size;
+
+                const fallbackMetric: 'pages' | 'hours' | 'items' | 'none' =
+                    totalPages > 0 ? 'pages' :
+                    totalHours > 0 ? 'hours' :
+                    totalItems > 0 ? 'items' : 'none';
+                const matchedRoutines = (settings.routines || []).filter((routine) => {
+                    const routineId = stripInstanceDateSuffix(routine.id);
+                    const routineName = normalizeText(routine.details);
+                    if (row.candidateIds.has(routineId)) return true;
+                    if (row.candidateNames.has(routineName)) return true;
+                    return false;
+                });
+                const dueInRange = matchedRoutines.length > 0
+                    ? matchedRoutines.reduce((sum, routine) => sum + (countRoutineOccurrencesBetween(routine, rangeStart, rangeEnd) || 0), 0)
+                    : null;
+                const missedSessions = dueInRange == null ? null : Math.max(0, dueInRange - row.loggedSessionCount);
+                const missedRate = dueInRange && dueInRange > 0 ? (missedSessions || 0) / dueInRange : 0;
+                const cadenceLabels = Array.from(new Set(matchedRoutines.map((routine) => getRoutineRepeatabilityLabel(routine)).filter(Boolean)));
+                const repeatability =
+                    cadenceLabels.length === 0
+                        ? 'None'
+                        : cadenceLabels.length === 1
+                        ? cadenceLabels[0]
+                        : 'Mixed';
+
+                const specializationId = row.specId || findSpecializationMeta(row.representative)?.id || null;
+                const planMeta = getPlanMeta(specializationId, row.activityType);
+                const metric = planMeta.metric !== 'none' ? planMeta.metric : fallbackMetric;
+                const avgSpeedPerDay =
+                    metric === 'pages' ? `${logDays > 0 ? (totalPages / logDays).toFixed(2) : '0'} pages/day` :
+                    metric === 'hours' ? `${logDays > 0 ? (totalHours / logDays).toFixed(2) : '0'} hrs/day` :
+                    metric === 'items' ? `${logDays > 0 ? (totalItems / logDays).toFixed(2) : '0'} items/day` :
+                    'N/A';
+                const endDate = planMeta.endDate;
+                const daysRemaining = endDate ? Math.max(0, differenceInDays(startOfDay(parseISO(endDate)), today)) : null;
+                const sessionsTillEnd = endDate && matchedRoutines.length > 0
+                    ? matchedRoutines.reduce((sum, routine) => sum + (countRoutineOccurrencesBetween(routine, today, startOfDay(parseISO(endDate))) || 0), 0)
+                    : null;
+                const targetPerDayValue =
+                    metric !== 'none' && planMeta.remaining > 0
+                        ? sessionsTillEnd != null
+                            ? (sessionsTillEnd > 0
+                                ? planMeta.remaining / sessionsTillEnd
+                                : planMeta.remaining)
+                            : (daysRemaining != null
+                                ? (daysRemaining > 0 ? planMeta.remaining / Math.max(1, daysRemaining) : planMeta.remaining)
+                                : null)
+                        : null;
+                const targetPerDay = targetPerDayValue != null && metric !== 'none'
+                    ? `${metric === 'hours' ? targetPerDayValue.toFixed(1) : Math.ceil(targetPerDayValue)} ${planMeta.unitLabel}/day`
+                    : 'N/A';
+                const actualPerDayValue =
+                    metric === 'pages' ? (logDays > 0 ? totalPages / logDays : 0) :
+                    metric === 'hours' ? (logDays > 0 ? totalHours / logDays : 0) :
+                    metric === 'items' ? (logDays > 0 ? totalItems / logDays : 0) :
+                    0;
+                const normalizedTaskName = normalizeText(row.taskName);
+                const batchType: 'external' | 'mismatch' | 'other' =
+                    Array.from(row.candidateIds).some((id) => externalTaskIds.has(id)) || externalTaskNames.has(normalizedTaskName)
+                        ? 'external'
+                        : Array.from(row.candidateIds).some((id) => mismatchTaskIds.has(id)) || mismatchTaskNames.has(normalizedTaskName)
+                        ? 'mismatch'
+                        : 'other';
+                const coreVotes: CoreDomainId[] = [];
+                row.candidateIds.forEach((id) => {
+                    (taskCoreById.get(id) || []).forEach((core) => coreVotes.push(core));
+                });
+                row.candidateNames.forEach((name) => {
+                    (taskCoreByName.get(name) || []).forEach((core) => coreVotes.push(core));
+                });
+                const coreState = (() => {
+                    if (coreVotes.length === 0) return 'N/A';
+                    const counts = coreVotes.reduce((acc, core) => {
+                        acc.set(core, (acc.get(core) || 0) + 1);
+                        return acc;
+                    }, new Map<CoreDomainId, number>());
+                    const top = Array.from(counts.entries()).sort((a, b) => b[1] - a[1])[0]?.[0];
+                    return top ? CORE_LABEL_BY_ID[top] : 'N/A';
+                })();
+
+                return {
+                    taskKey: row.taskKey,
+                    taskName: row.taskName,
+                    hoursConsumed: Number((row.loggedMinutes / 60).toFixed(2)),
+                    targetPerDay,
+                    avgSpeedPerDay,
+                    missedSessions: missedSessions == null ? 'N/A' : String(missedSessions),
+                    endDate: endDate || 'N/A',
+                    daysRemaining: daysRemaining == null ? 'N/A' : String(daysRemaining),
+                    hasPlan: !!planMeta.hasPlan,
+                    remainingSessions: sessionsTillEnd == null ? 'N/A' : String(sessionsTillEnd),
+                    remainingWork:
+                        metric === 'none'
+                            ? 'N/A'
+                            : metric === 'hours'
+                            ? `${planMeta.remaining.toFixed(1)} ${planMeta.unitLabel}`
+                            : `${Math.max(0, Math.ceil(planMeta.remaining))} ${planMeta.unitLabel}`,
+                    repeatability,
+                    targetPerDayValue,
+                    actualPerDayValue,
+                    routineIds: matchedRoutines.map((routine) => routine.id),
+                    missedRate,
+                    coreState,
+                    batchType,
+                };
+            })
+            .sort((a, b) => b.hoursConsumed - a.hoursConsumed);
+    }, [
+        selectedDate,
+        viewMode,
+        activityFilter,
+        schedule,
+        settings.routines,
+        settings.routineSourceOverrides,
+        settings.coreStateManualOverrides,
+        settings.learningPerformanceDailyLogs,
+        offerizationPlans,
+        coreSkills,
+        upskillDefinitions,
+        deepWorkDefinitions,
+        microSkillMap,
+        mindsetCards,
+        allDeepWorkLogs,
+        allUpskillLogs,
+        brandingLogs,
+        allLeadGenLogs,
+        allWorkoutLogs,
+        allMindProgrammingLogs,
+    ]);
+
+    const renderTaskConsumptionView = () => {
+        const handleDeleteRoutineTasks = (routineIds: string[]) => {
+            if (!routineIds.length) return;
+            const shouldDelete = window.confirm(`Delete ${routineIds.length} routine task(s) linked to this card?`);
+            if (!shouldDelete) return;
+
+            const removeIds = new Set(routineIds.map((id) => stripInstanceDateSuffix(id)));
+
+            setSettings((prev) => {
+                const nextRoutines = (prev.routines || []).filter((routine) => !removeIds.has(stripInstanceDateSuffix(routine.id)));
+                const nextOverrides = { ...(prev.routineSourceOverrides || {}) };
+                Object.keys(nextOverrides).forEach((key) => {
+                    if (removeIds.has(stripInstanceDateSuffix(key))) delete nextOverrides[key];
+                });
+                const nextSkipByDate: Record<string, string[]> = {};
+                Object.entries(prev.routineSkipByDate || {}).forEach(([dateKey, ids]) => {
+                    const filtered = (ids || []).filter((id) => !removeIds.has(stripInstanceDateSuffix(id)));
+                    if (filtered.length > 0) nextSkipByDate[dateKey] = filtered;
+                });
+                return {
+                    ...prev,
+                    routines: nextRoutines,
+                    routineSourceOverrides: nextOverrides,
+                    routineSkipByDate: nextSkipByDate,
+                };
+            });
+
+            setSchedule((prev) => {
+                const next: typeof prev = {};
+                Object.entries(prev).forEach(([dateKey, daySchedule]) => {
+                    const updatedDay: typeof daySchedule = { ...daySchedule };
+                    Object.keys(updatedDay).forEach((slotKey) => {
+                        const slotValue = updatedDay[slotKey];
+                        if (!Array.isArray(slotValue)) return;
+                        updatedDay[slotKey] = slotValue.filter((activity: any) => {
+                            const baseId = stripInstanceDateSuffix(activity?.id || '');
+                            if (removeIds.has(baseId)) return false;
+                            const linkedIds = (activity?.taskIds || []).map((id: string) => stripInstanceDateSuffix(id));
+                            if (linkedIds.some((id: string) => removeIds.has(id))) return false;
+                            return true;
+                        });
+                    });
+                    next[dateKey] = updatedDay;
+                });
+                return next;
+            });
+        };
+
+        const visibleRows =
+            batchFilter === 'all'
+                ? taskConsumptionRows
+                : taskConsumptionRows.filter((row) => row.batchType === batchFilter);
+        const getRepeatBucket = (repeatability: string) => {
+            const value = (repeatability || '').toLowerCase();
+            if (value === 'daily') return 'daily';
+            if (value.startsWith('every ') && value.includes(' day')) {
+                const match = value.match(/every\s+(\d+)\s+day/);
+                const interval = match ? Number(match[1]) : NaN;
+                if (Number.isFinite(interval) && interval > 0) {
+                    if (interval % 30 === 0) return 'every_month';
+                    if (interval % 7 === 0) return 'weekly';
+                }
+                return 'every_day';
+            }
+            if (value === 'weekly') return 'weekly';
+            if (value.startsWith('every ') && value.includes(' week')) return 'weekly';
+            if (value.startsWith('every ') && value.includes(' month')) return 'every_month';
+            return 'other';
+        };
+        const orderedBuckets: Array<{ key: string; label: string }> = [
+            { key: 'daily', label: 'Daily' },
+            { key: 'every_day', label: 'Every X Days' },
+            { key: 'weekly', label: 'Weekly' },
+            { key: 'every_month', label: 'Every X Months' },
+            { key: 'other', label: 'Other' },
+        ];
+        const groupedRows = orderedBuckets
+            .map((bucket) => ({
+                ...bucket,
+                rows: visibleRows.filter((row) => getRepeatBucket(row.repeatability) === bucket.key),
+            }))
+            .filter((bucket) => bucket.rows.length > 0);
+        const periodLabel =
+            viewMode === 'day'
+                ? format(selectedDate, 'PPP')
+                : viewMode === 'week'
+                ? `${format(startOfWeek(selectedDate, { weekStartsOn: 1 }), 'MMM d')} - ${format(endOfWeek(selectedDate, { weekStartsOn: 1 }), 'MMM d, yyyy')}`
+                : format(selectedDate, 'MMMM yyyy');
+        const maxHours = Math.max(1, ...visibleRows.map((row) => row.hoursConsumed));
+        const numericMissed = visibleRows.map((row) => {
+            const parsed = Number(row.missedSessions);
+            return Number.isFinite(parsed) ? parsed : 0;
+        });
+        const maxMissed = Math.max(1, ...numericMissed);
+        const numericDays = visibleRows.map((row) => {
+            const parsed = Number(row.daysRemaining);
+            return Number.isFinite(parsed) ? parsed : 0;
+        });
+        const maxDays = Math.max(1, ...numericDays);
+        const totalHours = visibleRows.reduce((sum, row) => sum + row.hoursConsumed, 0);
+        const totalMissed = numericMissed.reduce((sum, value) => sum + value, 0);
+        const plannedRows = visibleRows.filter((row) => row.endDate !== 'N/A').length;
+        const missedLabel = viewMode === 'day' ? 'Missed Today' : viewMode === 'week' ? 'Missed This Week' : 'Missed This Month';
+
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Task Consumption ({viewMode})</CardTitle>
+                    <CardDescription>{periodLabel}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {visibleRows.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No logged tasks found for this range.</p>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                                <div className="rounded-lg border border-white/10 bg-muted/20 p-3">
+                                    <div className="text-[11px] text-muted-foreground">Total Tasks</div>
+                                    <div className="text-xl font-semibold tabular-nums">{visibleRows.length}</div>
+                                </div>
+                                <div className="rounded-lg border border-white/10 bg-muted/20 p-3">
+                                    <div className="text-[11px] text-muted-foreground">Hours Consumed</div>
+                                    <div className="text-xl font-semibold tabular-nums">{totalHours.toFixed(2)}</div>
+                                </div>
+                                <div className="rounded-lg border border-white/10 bg-muted/20 p-3">
+                                    <div className="text-[11px] text-muted-foreground">{missedLabel}</div>
+                                    <div className={cn("text-xl font-semibold tabular-nums", totalMissed > 0 ? "text-rose-300" : "text-emerald-300")}>{totalMissed}</div>
+                                </div>
+                                <div className="rounded-lg border border-white/10 bg-muted/20 p-3">
+                                    <div className="text-[11px] text-muted-foreground">With Plan Timeline</div>
+                                    <div className="text-xl font-semibold tabular-nums">{plannedRows}</div>
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                {groupedRows.map((group) => (
+                                    <div key={group.key} className="space-y-2">
+                                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{group.label}</div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+                                            {group.rows.map((row, index) => {
+                                    const missedValueRaw = Number(row.missedSessions);
+                                    const missedValue = Number.isFinite(missedValueRaw) ? missedValueRaw : 0;
+                                    const daysValueRaw = Number(row.daysRemaining);
+                                    const daysValue = Number.isFinite(daysValueRaw) ? daysValueRaw : null;
+                                    const hoursPct = Math.min(100, (row.hoursConsumed / maxHours) * 100);
+                                    const missedPct = Math.min(100, (missedValue / maxMissed) * 100);
+                                    const timelinePct = daysValue == null ? 0 : Math.min(100, (daysValue / maxDays) * 100);
+                                    const progressRatio =
+                                        row.hasPlan && row.targetPerDayValue && row.targetPerDayValue > 0
+                                            ? (row.actualPerDayValue / row.targetPerDayValue)
+                                            : null;
+                                    const borderGlowClass =
+                                        progressRatio == null
+                                            ? "border-white/10"
+                                            : progressRatio >= 1
+                                            ? "border-emerald-400/80 shadow-[0_0_0_1px_rgba(52,211,153,0.65),0_0_14px_rgba(52,211,153,0.25)]"
+                                            : progressRatio >= 0.75
+                                            ? "border-orange-400/80 shadow-[0_0_0_1px_rgba(251,146,60,0.65),0_0_14px_rgba(251,146,60,0.22)]"
+                                            : "border-rose-400/80 shadow-[0_0_0_1px_rgba(251,113,133,0.65),0_0_14px_rgba(251,113,133,0.24)]";
+                                    const riskState =
+                                        row.missedRate >= 0.8
+                                            ? "critical"
+                                            : row.missedRate >= 0.5
+                                            ? "at-risk"
+                                            : "safe";
+
+                                    return (
+                                        <div key={row.taskKey} className={cn("rounded-lg border bg-background/40 px-3 py-2.5 space-y-2 transition-colors", borderGlowClass)}>
+                                            <div className="flex items-center justify-between gap-3">
+                                                <h4 className="text-sm font-semibold leading-tight truncate" title={row.taskName}>
+                                                    <span className="text-[10px] text-muted-foreground mr-1">#{index + 1}</span>
+                                                    {row.taskName}
+                                                </h4>
+                                                <div className="text-right shrink-0">
+                                                    <p className="text-[10px] text-muted-foreground leading-none">Hours</p>
+                                                    <p className="text-base font-semibold tabular-nums leading-tight">{row.hoursConsumed.toFixed(2)}</p>
+                                                </div>
+                                            </div>
+                                            {(riskState === "at-risk" || riskState === "critical") && (
+                                                <div className={cn("flex items-center justify-between rounded-md border px-2 py-1 text-[10px]", riskState === "critical" ? "border-rose-400/50 bg-rose-500/10 text-rose-200" : "border-orange-400/50 bg-orange-500/10 text-orange-200")}>
+                                                    <div className="flex items-center gap-1">
+                                                        <AlertTriangle className="h-3 w-3" />
+                                                        <span>{riskState === "critical" ? "Critical Risk" : "At Risk"}</span>
+                                                        <span className="tabular-nums">({Math.round(row.missedRate * 100)}% missed)</span>
+                                                    </div>
+                                                    {riskState === "critical" && row.routineIds.length > 0 && (
+                                                        <Button
+                                                            variant="destructive"
+                                                            size="sm"
+                                                            className="h-6 px-2 text-[10px]"
+                                                            onClick={() => handleDeleteRoutineTasks(row.routineIds)}
+                                                        >
+                                                            <Trash2 className="h-3 w-3 mr-1" />
+                                                            Delete Routine
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            <div className="space-y-1">
+                                                <div className="h-1.5 rounded-full bg-muted/30 overflow-hidden">
+                                                    <div className="h-full bg-cyan-400/80 rounded-full" style={{ width: `${hoursPct}%` }} />
+                                                </div>
+                                                <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                                                    <span>{hoursPct.toFixed(0)}% consumption</span>
+                                                    <span className={cn("tabular-nums", missedValue > 0 ? "text-rose-300" : "text-emerald-300")}>
+                                                        Missed {row.missedSessions}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div className="text-[10px] text-muted-foreground">
+                                                Repeatability: <span className="font-medium text-foreground">{row.repeatability}</span>
+                                            </div>
+                                            <div className="text-[10px] text-muted-foreground">
+                                                Core State:{" "}
+                                                <span
+                                                    className={cn(
+                                                        "font-medium px-1.5 py-0.5 rounded",
+                                                        row.batchType === "external"
+                                                            ? "text-sky-200 bg-sky-500/15 border border-sky-400/40"
+                                                            : row.batchType === "mismatch"
+                                                            ? "text-amber-200 bg-amber-500/15 border border-amber-400/40"
+                                                            : "text-muted-foreground bg-muted/20 border border-white/10"
+                                                    )}
+                                                >
+                                                    {row.coreState}
+                                                </span>
+                                            </div>
+
+                                            {row.hasPlan && (
+                                                <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                                                    <div className="rounded-md border border-white/10 px-2 py-1">
+                                                        <span className="text-muted-foreground">Target</span>
+                                                        <p className="font-medium truncate" title={row.targetPerDay}>{row.targetPerDay}</p>
+                                                    </div>
+                                                    <div className="rounded-md border border-white/10 px-2 py-1">
+                                                        <span className="text-muted-foreground">Avg/day</span>
+                                                        <p className="font-medium truncate" title={row.avgSpeedPerDay}>{row.avgSpeedPerDay}</p>
+                                                    </div>
+                                                    <div className="rounded-md border border-white/10 px-2 py-1">
+                                                        <span className="text-muted-foreground">End</span>
+                                                        <p className="font-medium truncate">{row.endDate}</p>
+                                                    </div>
+                                                    <div className="rounded-md border border-white/10 px-2 py-1">
+                                                        <span className="text-muted-foreground">Days left</span>
+                                                        <p className="font-medium tabular-nums">{row.daysRemaining}</p>
+                                                    </div>
+                                                    <div className="rounded-md border border-white/10 px-2 py-1">
+                                                        <span className="text-muted-foreground">Remaining sessions</span>
+                                                        <p className="font-medium tabular-nums">{row.remainingSessions}</p>
+                                                    </div>
+                                                    <div className="rounded-md border border-white/10 px-2 py-1">
+                                                        <span className="text-muted-foreground">Remaining</span>
+                                                        <p className="font-medium truncate" title={row.remainingWork}>{row.remainingWork}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {row.hasPlan && daysValue != null && (
+                                                <div className="h-1 rounded-full bg-muted/25 overflow-hidden">
+                                                    <div className="h-full rounded-full bg-violet-400/80" style={{ width: `${timelinePct}%` }} />
+                                                </div>
+                                            )}
+                                            {missedValue > 0 && (
+                                                <div className="h-1 rounded-full bg-muted/25 overflow-hidden">
+                                                    <div className="h-full rounded-full bg-rose-400/80" style={{ width: `${missedPct}%` }} />
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                            })}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </CardContent>
+            </Card>
+        );
+    };
 
     const renderDayView = () => {
         const dateKey = format(selectedDate, 'yyyy-MM-dd');
@@ -1628,12 +2440,20 @@ export function TimesheetPageContent({
                         </SelectContent>
                     </Select>
                 </div>
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Batch</span>
+                    <Tabs value={batchFilter} onValueChange={(v) => setBatchFilter(v as BatchFilter)} className="w-auto">
+                        <TabsList className="h-9">
+                            <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
+                            <TabsTrigger value="external" className="text-xs">External</TabsTrigger>
+                            <TabsTrigger value="mismatch" className="text-xs">Mismatch</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
+                </div>
             </div>
             <div className={cn(isModal && "flex-grow min-h-0")}>
                 <ScrollArea className={cn(isModal && "h-full")}>
-                    {viewMode === 'day' && renderDayView()}
-                    {viewMode === 'week' && renderWeekView()}
-                    {viewMode === 'month' && renderMonthView()}
+                    {renderTaskConsumptionView()}
                 </ScrollArea>
             </div>
         </>

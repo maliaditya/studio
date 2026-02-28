@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import ReactPlayer from 'react-player/youtube';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from './ui/card';
@@ -35,6 +35,14 @@ const getYouTubeEmbedUrl = (url: string | null): string | null => {
     return null;
 };
 
+const getYouTubeWatchUrl = (url: string | null): string | null => {
+  const embedUrl = getYouTubeEmbedUrl(url);
+  if (!embedUrl) return null;
+  const videoId = embedUrl.split('/embed/')[1]?.split('?')[0];
+  if (!videoId) return null;
+  return `https://www.youtube.com/watch?v=${videoId}`;
+};
+
 
 export function FloatingVideoPlayer() {
   const { 
@@ -56,6 +64,10 @@ export function FloatingVideoPlayer() {
     if (!url) return false;
     return getYouTubeEmbedUrl(url) !== null;
   };
+  const pageOrigin = useMemo(() => {
+    if (typeof window === 'undefined') return undefined;
+    return window.location.origin;
+  }, []);
   
   const currentUrl = floatingVideoPlaylist.length > 0 ? floatingVideoPlaylist[0] : floatingVideoUrl;
 
@@ -159,9 +171,10 @@ export function FloatingVideoPlayer() {
     if (!currentUrl) return null;
 
     if (isYoutubeUrl(currentUrl)) {
+      const canonicalWatchUrl = getYouTubeWatchUrl(currentUrl) || currentUrl;
       return (
         <ReactPlayer
-          url={getYouTubeEmbedUrl(currentUrl)!}
+          url={canonicalWatchUrl}
           width="100%"
           height="100%"
           playing={true}
@@ -171,8 +184,11 @@ export function FloatingVideoPlayer() {
             youtube: {
               playerVars: {
                 autoplay: 1,
-                showinfo: 0,
                 modestbranding: 1,
+                rel: 0,
+                playsinline: 1,
+                enablejsapi: 1,
+                ...(pageOrigin ? { origin: pageOrigin } : {}),
               },
             },
           }}

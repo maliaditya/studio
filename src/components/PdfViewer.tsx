@@ -44,6 +44,10 @@ export default function PdfViewer({ resource }: PdfViewerProps) {
             url: settings.supabaseUrl,
             anonKey: settings.supabaseAnonKey,
             bucket: settings.supabasePdfBucket,
+            serviceRoleKey:
+              typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop)
+                ? settings.supabaseServiceRoleKey
+                : undefined,
           });
           if (remote) {
             await storePdf(resource.id, remote);
@@ -64,7 +68,7 @@ export default function PdfViewer({ resource }: PdfViewerProps) {
     setNumPages(null);
     setPageNumber(1);
     setScale(2);
-  }, [resource, currentUser?.username, settings.supabaseUrl, settings.supabaseAnonKey, settings.supabasePdfBucket]);
+  }, [resource, currentUser?.username, settings.supabaseUrl, settings.supabaseAnonKey, settings.supabasePdfBucket, settings.supabaseServiceRoleKey]);
 
   function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
     setNumPages(numPages);

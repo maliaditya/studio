@@ -18,10 +18,16 @@ export async function POST(request: Request) {
   }
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(
-      { error: 'Vercel Blob Storage is not configured on the server. Please link a Blob store.' },
-      { status: 500 }
-    );
+    if (!normalizedUsername || !password) {
+      return NextResponse.json({ error: 'Username and password are required.' }, { status: 400 });
+    }
+    const response = NextResponse.json({
+      success: true,
+      message: 'Login successful (local mode).',
+      localMode: true,
+    });
+    attachSessionCookie(response, normalizedUsername);
+    return response;
   }
 
   if (!normalizedUsername || !password) {

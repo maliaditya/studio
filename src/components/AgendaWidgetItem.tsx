@@ -9,7 +9,7 @@ import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Shar
 import type { Activity, ActivityType, RecurrenceRule } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
-import { isToday } from 'date-fns';
+import { addDays, addMonths, differenceInDays, differenceInMonths, isAfter, isBefore, isToday, parseISO, startOfDay } from 'date-fns';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { EditableActivityText } from './EditableActivityText';
@@ -76,6 +76,7 @@ export const AgendaWidgetItem = React.memo(({
         offerizationPlans,
         upskillDefinitions,
         deepWorkDefinitions,
+        settings,
     } = useAuth();
     const router = useRouter();
 
@@ -153,22 +154,86 @@ export const AgendaWidgetItem = React.memo(({
         if (!(activity.type === 'upskill' || activity.type === 'deepwork')) return null;
         const matchedSpec = learningContext?.spec;
         if (!matchedSpec) return null;
+
+        const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        const stripInstanceDateSuffix = (id?: string | null) => (id || '').replace(/_(\d{4}-\d{2}-\d{2})$/, '');
+        const normalizeDateKey = (value?: string | null) => {
+            if (!value) return null;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) return null;
+            return parsed.toISOString().slice(0, 10);
+        };
+        const today = startOfDay(new Date());
+        const activityBaseId = stripInstanceDateSuffix(activity.id);
+        const matchedRoutine = (settings.routines || []).find((routine) => {
+            const routineBaseId = stripInstanceDateSuffix(routine.id);
+            return (
+                routineBaseId === activityBaseId ||
+                (!!routine.details &&
+                    !!activity.details &&
+                    normalizeText(routine.details) === normalizeText(activity.details) &&
+                    routine.type === activity.type)
+            );
+        });
+        const routineRule = activity.routine || matchedRoutine?.routine || null;
+        const recurrence = routineRule?.type || 'none';
+        const repeatInterval = Math.max(1, routineRule?.repeatInterval || routineRule?.days || 1);
+        const repeatUnit = routineRule?.repeatUnit || (recurrence === 'weekly' ? 'week' : 'day');
+        const startDateKey = normalizeDateKey(activity.baseDate || matchedRoutine?.baseDate || null);
+
+        const countRemainingScheduledSessions = (endDateKey: string | null) => {
+            if (!endDateKey) return null;
+            const endDate = startOfDay(parseISO(endDateKey));
+            if (Number.isNaN(endDate.getTime())) return null;
+            if (isBefore(endDate, today)) return 0;
+
+            if (recurrence === 'none') {
+                if (!startDateKey) return null;
+                const oneTimeDate = startOfDay(parseISO(startDateKey));
+                if (Number.isNaN(oneTimeDate.getTime())) return null;
+                return !isBefore(oneTimeDate, today) && !isAfter(oneTimeDate, endDate) ? 1 : 0;
+            }
+
+            if (!startDateKey) return null;
+            let cursor = startOfDay(parseISO(startDateKey));
+            if (Number.isNaN(cursor.getTime())) return null;
+
+            if (repeatUnit === 'month') {
+                if (isBefore(cursor, today)) {
+                    const diffMonths = Math.max(0, differenceInMonths(today, cursor));
+                    const jumpCount = Math.floor(diffMonths / repeatInterval);
+                    cursor = addMonths(cursor, jumpCount * repeatInterval);
+                    while (isBefore(cursor, today)) cursor = addMonths(cursor, repeatInterval);
+                }
+                let count = 0;
+                while (!isAfter(cursor, endDate)) {
+                    if (!isBefore(cursor, today)) count += 1;
+                    cursor = addMonths(cursor, repeatInterval);
+                }
+                return count;
+            }
+
+            const stepDays = repeatUnit === 'week' ? repeatInterval * 7 : repeatInterval;
+            if (isBefore(cursor, today)) {
+                const diffDays = Math.max(0, differenceInDays(today, cursor));
+                const jumpCount = Math.ceil(diffDays / stepDays);
+                cursor = addDays(cursor, jumpCount * stepDays);
+            }
+            let count = 0;
+            while (!isAfter(cursor, endDate)) {
+                if (!isBefore(cursor, today)) count += 1;
+                cursor = addDays(cursor, stepDays);
+            }
+            return count;
+        };
+
         if (activity.type === 'deepwork') {
             const releases = offerizationPlans?.[matchedSpec.id]?.releases || [];
             const normalizeStageItem = (item: string | { text: string; completed?: boolean }) =>
                 typeof item === 'string'
                     ? { text: item, completed: false }
                     : { text: item.text || '', completed: !!item.completed };
-            const toDateKey = (value?: string | null) => {
-                if (!value) return null;
-                if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-                const parsed = new Date(value);
-                if (Number.isNaN(parsed.getTime())) return null;
-                return parsed.toISOString().slice(0, 10);
-            };
-            const today = new Date();
-            const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-            const msPerDay = 24 * 60 * 60 * 1000;
 
             const candidatePlans = releases
                 .map((release) => {
@@ -180,11 +245,10 @@ export const AgendaWidgetItem = React.memo(({
                         ...(stages?.fixItems || []),
                     ].map(normalizeStageItem);
                     const remainingItems = allItems.filter((item) => item.text.trim() && !item.completed).length;
-                    const launchDateKey = toDateKey(release.launchDate);
-                    const daysLeft = launchDateKey
-                        ? Math.max(0, Math.floor((new Date(launchDateKey).getTime() - startOfToday.getTime()) / msPerDay))
-                        : null;
-                    return { remainingItems, daysLeft };
+                    const launchDateKey = normalizeDateKey(release.launchDate);
+                    const daysLeft = launchDateKey ? Math.max(0, differenceInDays(parseISO(launchDateKey), today)) : null;
+                    const sessionsLeft = countRemainingScheduledSessions(launchDateKey);
+                    return { remainingItems, daysLeft, sessionsLeft };
                 })
                 .filter((plan) => plan.remainingItems > 0);
 
@@ -193,12 +257,16 @@ export const AgendaWidgetItem = React.memo(({
                 .filter((plan) => plan.daysLeft != null)
                 .sort((a, b) => (a.daysLeft as number) - (b.daysLeft as number));
             const chosen = withDate[0] || candidatePlans[0];
-            const daysWindow = chosen.daysLeft == null ? null : Math.max(1, chosen.daysLeft);
-            const itemTarget = daysWindow == null
-                ? null
-                : chosen.daysLeft === 0
-                    ? chosen.remainingItems
-                    : Math.max(1, Math.ceil(chosen.remainingItems / daysWindow));
+            const itemTarget =
+                chosen.sessionsLeft != null
+                    ? (chosen.sessionsLeft > 0
+                        ? Math.max(1, Math.ceil(chosen.remainingItems / chosen.sessionsLeft))
+                        : chosen.remainingItems)
+                    : (chosen.daysLeft != null
+                        ? (chosen.daysLeft === 0
+                            ? chosen.remainingItems
+                            : Math.max(1, Math.ceil(chosen.remainingItems / Math.max(1, chosen.daysLeft))))
+                        : null);
             return itemTarget != null ? `${itemTarget} items/day` : null;
         }
 
@@ -215,17 +283,6 @@ export const AgendaWidgetItem = React.memo(({
         const completedPages = matchedSpec.skillAreas.reduce((sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedPages || 0), 0), 0);
         const remainingHours = Math.max(0, totalHours - completedHours);
         const remainingPages = Math.max(0, totalPages - completedPages);
-
-        const normalizeDateKey = (value?: string | null) => {
-            if (!value) return null;
-            if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-            const parsed = new Date(value);
-            if (Number.isNaN(parsed.getTime())) return null;
-            return parsed.toISOString().slice(0, 10);
-        };
-        const today = new Date();
-        const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        const msPerDay = 24 * 60 * 60 * 1000;
         const latestAudioEndDate = audioResources
             .map((resource) => normalizeDateKey(resource.completionDate))
             .filter((date): date is string => !!date)
@@ -234,27 +291,38 @@ export const AgendaWidgetItem = React.memo(({
             .map((resource) => normalizeDateKey(resource.completionDate))
             .filter((date): date is string => !!date)
             .reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+        const audioDaysLeft = latestAudioEndDate ? Math.max(0, differenceInDays(parseISO(latestAudioEndDate), today)) : null;
+        const bookDaysLeft = latestBookEndDate ? Math.max(0, differenceInDays(parseISO(latestBookEndDate), today)) : null;
+        const audioSessionsLeft = countRemainingScheduledSessions(latestAudioEndDate);
+        const bookSessionsLeft = countRemainingScheduledSessions(latestBookEndDate);
 
-        const audioDaysLeft = latestAudioEndDate
-            ? Math.max(0, Math.floor((new Date(latestAudioEndDate).getTime() - startOfToday.getTime()) / msPerDay))
-            : null;
-        const bookDaysLeft = latestBookEndDate
-            ? Math.max(0, Math.floor((new Date(latestBookEndDate).getTime() - startOfToday.getTime()) / msPerDay))
-            : null;
-
-        const hourTarget = hasAudio && remainingHours > 0 && audioDaysLeft != null
-            ? Math.max(0.1, Number((remainingHours / Math.max(1, audioDaysLeft || 1)).toFixed(1)))
-            : null;
-        const pageTarget = hasBooks && remainingPages > 0 && bookDaysLeft != null
-            ? Math.max(1, Math.ceil(remainingPages / Math.max(1, bookDaysLeft || 1)))
-            : null;
+        const hourTarget =
+            hasAudio && remainingHours > 0
+                ? (audioSessionsLeft != null
+                    ? (audioSessionsLeft > 0
+                        ? Math.max(0.1, Number((remainingHours / audioSessionsLeft).toFixed(1)))
+                        : remainingHours)
+                    : (audioDaysLeft != null
+                        ? Math.max(0.1, Number((remainingHours / Math.max(1, audioDaysLeft || 1)).toFixed(1)))
+                        : null))
+                : null;
+        const pageTarget =
+            hasBooks && remainingPages > 0
+                ? (bookSessionsLeft != null
+                    ? (bookSessionsLeft > 0
+                        ? Math.max(1, Math.ceil(remainingPages / bookSessionsLeft))
+                        : remainingPages)
+                    : (bookDaysLeft != null
+                        ? Math.max(1, Math.ceil(remainingPages / Math.max(1, bookDaysLeft || 1)))
+                        : null))
+                : null;
 
         const pieces: string[] = [];
         if (pageTarget != null) pieces.push(`${pageTarget}p/day`);
         if (hourTarget != null) pieces.push(`${hourTarget}h/day`);
         if (pieces.length === 0) return null;
         return pieces.join(' / ');
-    }, [activity.type, learningContext, offerizationPlans]);
+    }, [activity.baseDate, activity.details, activity.id, activity.routine, activity.type, learningContext, offerizationPlans, settings.routines]);
     const linkedLearningPdfResource = useMemo(() => {
         if (!learningContext?.spec) return null;
         const learningPlan = offerizationPlans?.[learningContext.spec.id]?.learningPlan;

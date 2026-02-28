@@ -201,20 +201,6 @@ function PlanningContent() {
     });
   };
   
-  const handleSkillPlanFieldChange = (field: keyof Omit<SkillAcquisitionPlan, 'specializationId'>, value: any) => {
-    setCurrentSkillPlan(prev => ({...prev, [field]: value}));
-  };
-
-  const handleSkillRuleLinkToggle = (ruleId: string) => {
-    setCurrentSkillPlan(prev => {
-      const currentIds = prev.linkedRuleEquationIds || [];
-      const newIds = currentIds.includes(ruleId)
-        ? currentIds.filter(id => id !== ruleId)
-        : [...currentIds, ruleId];
-      return { ...prev, linkedRuleEquationIds: newIds };
-    });
-  };
-
   const handleOpenProductPlanModal = (project: Project) => {
     setSelectedProjectId(project.id);
     if (project.productPlan) {
@@ -270,7 +256,7 @@ function PlanningContent() {
                       <Book className="h-6 w-6 text-primary" />
                       Skill Acquisition Plan
                     </CardTitle>
-                    <CardDescription>Define the state and resources required to acquire a new specialization.</CardDescription>
+                    <CardDescription>Create and manage specialization plans in a simplified flow.</CardDescription>
                   </div>
                   <Button onClick={() => handleOpenSkillPlanModal()}>
                       <PlusCircle className="mr-2 h-4 w-4" />
@@ -285,14 +271,6 @@ function PlanningContent() {
                       const spec = specializations.find(s => s.id === plan.specializationId);
                       if (!spec) return null;
                       
-                      const linkedEquations = (plan.linkedRuleEquationIds || []).map(id => {
-                          for (const pillar in pillarEquations) {
-                              const found = pillarEquations[pillar].find(eq => eq.id === id);
-                              if (found) return found;
-                          }
-                          return null;
-                      }).filter((eq): eq is HabitEquation => !!eq);
-
                       return (
                           <Card key={plan.specializationId}>
                               <CardHeader>
@@ -319,32 +297,9 @@ function PlanningContent() {
                                   </div>
                               </CardHeader>
                               <CardContent className="space-y-4 cursor-pointer" onClick={() => handleOpenSkillPlanModal(plan)}>
-                                  <div>
-                                      <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Target/> Required State</h4>
-                                      {linkedEquations.length > 0 ? (
-                                          <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1">
-                                              {linkedEquations.map(eq => <li key={eq.id}>{eq.outcome}</li>)}
-                                          </ul>
-                                      ) : <p className="text-xs text-muted-foreground">No state linked.</p>}
-                                  </div>
-                                  <Separator />
-                                  <div>
-                                      <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Package/> Required Resources</h4>
-                                      <ul className="text-xs space-y-1">
-                                          <li className="flex justify-between">
-                                              <span className="text-muted-foreground flex items-center gap-2"><CalendarIcon className="h-4 w-4"/> Target Date:</span>
-                                              <span className="font-medium">{plan.targetDate ? format(parseISO(plan.targetDate), 'PPP') : 'Not set'}</span>
-                                          </li>
-                                          <li className="flex justify-between">
-                                              <span className="text-muted-foreground flex items-center gap-2"><Banknote className="h-4 w-4"/> Money Needed:</span>
-                                              <span className="font-medium">{plan.requiredMoney != null ? `$${plan.requiredMoney}` : 'Not set'}</span>
-                                          </li>
-                                          <li className="flex justify-between">
-                                              <span className="text-muted-foreground flex items-center gap-2"><Clock className="h-4 w-4"/> Energy Needed:</span>
-                                              <span className="font-medium">{plan.requiredHours != null ? `${plan.requiredHours} hrs` : 'Not set'}</span>
-                                          </li>
-                                      </ul>
-                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                      Specialization plan configured. Click to edit.
+                                  </p>
                               </CardContent>
                           </Card>
                       )
@@ -546,7 +501,7 @@ function PlanningContent() {
       
       <Dialog open={isSkillPlanModalOpen} onOpenChange={setIsSkillPlanModalOpen}>
         <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
-          <DialogHeader><DialogTitleComponent>Skill Acquisition Plan</DialogTitleComponent><DialogDescriptionComponent>Define the state and resources required to acquire a new specialization.</DialogDescriptionComponent></DialogHeader>
+          <DialogHeader><DialogTitleComponent>Skill Acquisition Plan</DialogTitleComponent><DialogDescriptionComponent>Select a specialization and save the plan.</DialogDescriptionComponent></DialogHeader>
           <div className="flex-grow min-h-0 py-4">
               <ScrollArea className="h-full pr-4">
                   <div className="space-y-6">
@@ -568,51 +523,10 @@ function PlanningContent() {
                       </div>
 
                       {selectedSpecId && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t">
-                              <div className="space-y-4">
-                                  <h3 className="font-semibold flex items-center gap-2"><Target className="h-5 w-5"/> Required State</h3>
-                                  <p className="text-xs text-muted-foreground">Link the meta-rule equations that create the necessary mindset for this skill acquisition.</p>
-                                  <Popover>
-                                      <PopoverTrigger asChild>
-                                          <Button variant="outline" className="w-full justify-start">Link Rule Equations...</Button>
-                                      </PopoverTrigger>
-                                      <PopoverContent className="w-80">
-                                          <ScrollArea className="h-60">
-                                              <div className="space-y-2 p-1">
-                                                  {Object.values(pillarEquations).flat().map(eq => (
-                                                      <div key={eq.id} className="flex items-center space-x-2 p-1">
-                                                          <Checkbox 
-                                                              id={`eq-${eq.id}`}
-                                                              checked={(currentSkillPlan.linkedRuleEquationIds || []).includes(eq.id)}
-                                                              onCheckedChange={() => handleSkillRuleLinkToggle(eq.id)}
-                                                          />
-                                                          <Label htmlFor={`eq-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
-                                                      </div>
-                                                  ))}
-                                              </div>
-                                          </ScrollArea>
-                                      </PopoverContent>
-                                  </Popover>
-                              </div>
-                              <div className="space-y-4">
-                                  <h3 className="font-semibold flex items-center gap-2"><Package className="h-5 w-5"/> Required Resources</h3>
-                                  <div className="space-y-1">
-                                      <Label className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarIcon className="h-4 w-4"/> Target Date:</Label>
-                                      <Input
-                                        type="date"
-                                        value={currentSkillPlan.targetDate || ''}
-                                        onChange={(e) => handleSkillPlanFieldChange('targetDate', e.target.value)}
-                                      />
-                                  </div>
-                                  <div className="space-y-1">
-                                      <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Banknote className="h-4 w-4"/> Money Needed:</Label>
-                                      <Input type="number" value={currentSkillPlan.requiredMoney || ''} onChange={(e) => handleSkillPlanFieldChange('requiredMoney', e.target.value === '' ? null : Number(e.target.value))} placeholder="e.g., 500" />
-                                  </div>
-                                  <div className="space-y-1">
-                                      <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Clock className="h-4 w-4"/> Energy Needed:</Label>
-                                      <Input type="number" value={currentSkillPlan.requiredHours || ''} onChange={(e) => handleSkillPlanFieldChange('requiredHours', e.target.value === '' ? null : Number(e.target.value))} placeholder="e.g., 200" />
-                                  </div>
-                              </div>
+                          <div className="pt-4 border-t">
+                              <p className="text-xs text-muted-foreground">
+                                  Plan is ready for this specialization. Click Save Plan to continue.
+                              </p>
                           </div>
                       )}
                   </div>
@@ -2044,23 +1958,30 @@ const ProjectForm = ({ specialization, editingRelease, handleUpdateEditingReleas
 
 function StrategicPlanningPageContent() {
   const router = useRouter();
+  const { settings } = useAuth();
   const [activeTab, setActiveTab] = useState('planning');
+  const simpleMode = settings.ispSimpleMode ?? true;
 
-  const tabs = [
+  const allTabs = [
     { value: 'planning', label: 'Planning' },
     { value: 'productization', label: 'Productization' },
     { value: 'offerization', label: 'Offerization' },
     { value: 'offers', label: 'Offers' },
     { value: 'matrix', label: 'Matrix' },
   ];
+  const tabs = simpleMode
+    ? allTabs.filter((tab) => tab.value === 'planning' || tab.value === 'offerization')
+    : allTabs;
   
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab');
     if (tab && tabs.some(t => t.value === tab)) {
       setActiveTab(tab);
+    } else if (simpleMode) {
+      setActiveTab('planning');
     }
-  }, []);
+  }, [tabs, simpleMode]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -2076,24 +1997,28 @@ function StrategicPlanningPageContent() {
       </div>
 
        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
+        <TabsList className={cn("grid w-full", simpleMode ? "grid-cols-2" : "grid-cols-2 md:grid-cols-5")}>
             {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
         </TabsList>
         <TabsContent value="planning" className="mt-6">
           <PlanningContent />
         </TabsContent>
-        <TabsContent value="productization" className="mt-6">
-          <ProductizationContent />
-        </TabsContent>
         <TabsContent value="offerization" className="mt-6">
           <OfferizationContent />
         </TabsContent>
-        <TabsContent value="offers" className="mt-6">
-          <OffersContent />
-        </TabsContent>
-        <TabsContent value="matrix" className="mt-6">
-          <MatrixContent />
-        </TabsContent>
+        {!simpleMode && (
+          <>
+            <TabsContent value="productization" className="mt-6">
+              <ProductizationContent />
+            </TabsContent>
+            <TabsContent value="offers" className="mt-6">
+              <OffersContent />
+            </TabsContent>
+            <TabsContent value="matrix" className="mt-6">
+              <MatrixContent />
+            </TabsContent>
+          </>
+        )}
       </Tabs>
     </div>
   );

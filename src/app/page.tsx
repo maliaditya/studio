@@ -62,44 +62,44 @@ const StrategicOverviewDiagram = () => {
         <div className="flex items-start justify-center p-8 overflow-x-auto bg-muted/30 rounded-lg">
             <div className="flex flex-row items-center gap-8">
                 <div className="flex flex-col items-center gap-4 text-center">
-                    <FlowCard icon={<HeartPulse size={32} />} title="1. Health" description="Track workouts, diet, and physical progress.">
-                        <FeatureList features={["Workout Plans", "Exercise Library", "Diet Planning", "Weight Tracking"]} />
+                    <FlowCard icon={<HeartPulse size={32} />} title="1. Core States" description="Track your core state signals daily.">
+                        <FeatureList features={["Energy + mood awareness", "Daily state signals", "Behavior-state relation", "Self-regulation baseline"]} />
                     </FlowCard>
-                    <FlowCard icon={<BookCopy size={32} />} title="2. Upskill" description="Structured learning and skill acquisition.">
-                        <FeatureList features={["Topic & Goal Setting", "Session Logging", "Progress Visualization"]} />
-                    </FlowCard>
-                </div>
-
-                <ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" />
-
-                <div className="flex flex-col items-center gap-4 text-center">
-                    <FlowCard icon={<Briefcase size={32} />} title="3. Deep Work" description="Apply skills to focus areas, creating tangible value.">
-                        <FeatureList features={["Focus Area Management", "Skill Integration", "Time Tracking", "Ready for Branding Pipeline"]} />
+                    <FlowCard icon={<BrainCircuit size={32} />} title="2. Bothering" description="Capture friction and connect it to action.">
+                        <FeatureList features={["External/Mismatch/Constraint botherings", "Bothering to routine links", "Bothering to tasks mapping", "Friction visibility"]} />
                     </FlowCard>
                 </div>
 
                 <ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" />
 
                 <div className="flex flex-col items-center gap-4 text-center">
-                    <FlowCard icon={<Share2 size={32} />} title="4a. Personal Branding" description="Bundle completed Deep Work into shareable content.">
-                        <FeatureList features={["Content Bundling", "Creation Workflow (4-stage)", "Publishing Checklist"]} />
+                    <FlowCard icon={<BookCopy size={32} />} title="3. Learning System" description="Skill Tree and learning plans connected to botherings and everyday tasks.">
+                        <FeatureList features={["Skill Tree -> Learning Plans", "Plans linked to botherings", "Botherings linked to everyday tasks", "Execution-ready learning flow"]} />
                     </FlowCard>
-                    <FlowCard icon={<Package size={32} />} title="4b. Productization & Offerization" description="Systematically plan products and services.">
-                        <FeatureList features={["Gap Analysis", "Product/Service Definition", "Release Planning"]} />
+                </div>
+
+                <ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" />
+
+                <div className="flex flex-col items-center gap-4 text-center">
+                    <FlowCard icon={<Share2 size={32} />} title="4. Timesheet & Habit Tracker" description="Track consistency and daily execution quality.">
+                        <FeatureList features={["Timesheet logging", "Habit tracking", "Completion trend visibility", "Consistency feedback"]} />
                     </FlowCard>
-                     <FlowCard icon={<Magnet size={32} />} title="4c. Lead Gen & Offer System" description="Define and track outreach and service offerings.">
-                        <FeatureList features={["Daily Action Tracking", "Service Offer Definition"]} />
+                    <FlowCard icon={<Briefcase size={32} />} title="5. Resource + Canvas System" description="Knowledge and work context in one connected layer.">
+                        <FeatureList features={["Resource cards + folders", "Canvas-linked notes", "Nested popup context", "Cross-linking support"]} />
+                    </FlowCard>
+                     <FlowCard icon={<ActivityIcon size={32} />} title="6. AI Review Loop (Desktop)" description="AI reviews logs and suggests execution improvements.">
+                        <FeatureList features={["Routine rebalance suggestions", "History-aware recommendations", "Guarded apply flow", "Local Ollama integration"]} />
                     </FlowCard>
                 </div>
 
                  <ArrowRight className="w-10 h-10 text-muted-foreground/30 shrink-0" />
 
                 <div className="flex flex-col items-center gap-4 text-center">
-                    <FlowCard icon={<LayoutDashboard size={32} />} title="5. Dashboard" description="Your daily command center for all activities.">
-                        <FeatureList features={["Time-Slotted Agenda", "Productivity Snapshot", "Activity Heatmap"]} />
+                    <FlowCard icon={<LayoutDashboard size={32} />} title="7. Command Center" description="One place to run your whole day.">
+                        <FeatureList features={["Today view", "Agenda control", "Cross-module actions", "Execution monitoring"]} />
                     </FlowCard>
-                    <FlowCard icon={<GitMerge size={32} />} title="6. Strategic Views" description="High-level visualization of all plans.">
-                        <FeatureList features={["Strategic Matrix", "Interactive Mind Map"]} />
+                    <FlowCard icon={<GitMerge size={32} />} title="8. Local First Backup + Git Sync" description="Keep data safe and portable by default.">
+                        <FeatureList features={["Local-first persistence", "Backup/export flow", "Git sync support", "Cross-device recovery"]} />
                     </FlowCard>
                 </div>
 
@@ -206,7 +206,7 @@ export default function LandingPage() {
                 >
                     <h2 className="text-3xl font-bold tracking-tight">The Dock Flywheel</h2>
                     <p className="mt-4 text-muted-foreground max-w-3xl mx-auto">
-                        A seamless pipeline from skill acquisition to value creation. What you learn is applied, and what you apply can be monetized.
+                        Closed-loop execution: signal capture -> botherings mapping -> routine/skill execution -> resource/canvas context -> AI-assisted rebalance -> strategic graph visibility.
                     </p>
                 </motion.div>
                 <motion.div

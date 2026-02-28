@@ -16,10 +16,14 @@
 # next.js
 /.next/
 /.next-local/
+/.next-desktop/
+/.next-desktop-temp/
 /out/
 
 # production
 /build
+/dist-electron
+/electron/node-runtime/
 
 # misc
 .DS_Store

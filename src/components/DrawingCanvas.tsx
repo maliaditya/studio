@@ -16,6 +16,7 @@ import { useDraggable } from '@dnd-kit/core';
 import dynamic from 'next/dynamic';
 import { loadExcalidrawFiles, saveExcalidrawFiles, type ExcalidrawFilesMetaMap } from '@/lib/excalidrawFileStore';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
+import { parseJsonWithRecovery } from '@/lib/jsonRecovery';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -144,7 +145,7 @@ const CanvasPreviewPopup = ({
   const parsedPreview = useMemo(() => {
     if (!drawingData) return { elements: [] as any[] };
     try {
-      const parsed = JSON.parse(drawingData);
+      const parsed = parseJsonWithRecovery<{ elements?: any[]; appState?: AppState; files?: ExcalidrawFilesMetaMap }>(drawingData);
       if (Array.isArray(parsed.elements)) {
         return { elements: parsed.elements, appState: parsed.appState, filesMeta: parsed.files };
       }
@@ -281,8 +282,8 @@ const CanvasPreviewPopup = ({
           left: position.x,
           width: size.width,
           height: size.height,
-          minWidth: 320,
-          minHeight: 240,
+          minWidth: 520,
+          minHeight: 360,
         }}
         className="fixed z-[160] rounded-2xl border border-white/10 bg-background/90 backdrop-blur-md shadow-2xl overflow-hidden resize both canvas-preview"
         onMouseEnter={() => setIsBackgroundBlurred(true)}
@@ -469,7 +470,7 @@ const ExcalidrawWrapper = ({
   const initialData = useMemo(() => {
     try {
       if (activeCanvas.data) {
-        const parsedData = JSON.parse(activeCanvas.data);
+        const parsedData = parseJsonWithRecovery<{ elements?: unknown[]; appState?: AppState }>(activeCanvas.data);
         // Ensure the parsed data has a valid elements array.
         if (Array.isArray(parsedData.elements)) {
           return { elements: parsedData.elements, appState: parsedData.appState, files };
@@ -688,7 +689,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
       let filesMeta: ExcalidrawFilesMetaMap | undefined;
       if (activeCanvas.data) {
         try {
-          const parsed = JSON.parse(activeCanvas.data);
+          const parsed = parseJsonWithRecovery<{ files?: ExcalidrawFilesMetaMap }>(activeCanvas.data);
           filesMeta = parsed.files;
         } catch (e) {
           console.error("Failed to parse canvas file metadata:", e);
@@ -885,8 +886,8 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         const point = resource?.points?.find(p => p.id === pointId);
         
         if (resource && point) {
-            const width = Math.max(360, Math.min(window.innerWidth * 0.6, 720));
-            const height = Math.max(260, Math.min(window.innerHeight * 0.55, 520));
+            const width = Math.max(520, Math.min(window.innerWidth * 0.8, 1100));
+            const height = Math.max(360, Math.min(window.innerHeight * 0.75, 760));
             const x = (window.innerWidth - width) / 2 + 20;
             const y = (window.innerHeight - height) / 2 + 20;
             setCanvasPreview({
@@ -1209,6 +1210,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
               initialDrawing: canvasPreview.drawing ?? undefined,
               size: 'normal',
             });
+            setCanvasPreview(null);
           }}
           storageKey={`canvasPreview:${canvasPreview.resourceId}-${canvasPreview.pointId}`}
         />

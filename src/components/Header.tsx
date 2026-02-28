@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github, Download, Paintbrush, UploadCloud, DownloadCloud, X, Link2, Plus, Pencil } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github, Download, Paintbrush, UploadCloud, DownloadCloud, X, Link2, Plus, Pencil, GitBranch } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
@@ -28,6 +28,8 @@ import { Checkbox } from './ui/checkbox';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { TimesheetPageContent } from '@/app/timesheet/page';
+import { StateDiagramModal } from './StateDiagramModal';
+import { LearningPerformanceModal } from './LearningPerformanceModal';
 
 
 const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolean) => void }) => {
@@ -159,7 +161,7 @@ const GlobalSearch = ({ open, setOpen }: { open: boolean, setOpen: (open: boolea
 };
 
 
-function NavigationMenu() {
+function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
   const [isClient, setIsClient] = useState(false);
   const [activePath, setActivePath] = useState('');
   const pathname = usePathname();
@@ -169,13 +171,23 @@ function NavigationMenu() {
     setActivePath(pathname);
   }, [pathname]);
 
-  const navLinks = [
-    { href: '/my-plate', label: 'Dashboard' },
-    { href: '/timetable', label: 'Timetable' },
-    { href: '/resources', label: 'Resources' },
-    { href: '/skill', label: 'Skill Tree' },
-    { href: '/strategic-planning', label: 'Strategy' },
-  ];
+  const navLinks: Array<{ href: string; label: string; icon?: React.ComponentType<{ className?: string }> }> = simpleMode
+    ? [
+        { href: '/my-plate', label: 'Dashboard' },
+        { href: '/timetable', label: 'Timetable' },
+        { href: '/resources', label: 'Resources' },
+        { href: '/skill', label: 'Skill Tree' },
+        { href: '/deep-work', label: 'Deep Work' },
+        { href: '/strategic-planning', label: 'Strategy' },
+      ]
+    : [
+        { href: '/my-plate', label: 'Dashboard' },
+        { href: '/timetable', label: 'Timetable' },
+        { href: '/resources', label: 'Resources' },
+        { href: '/skill', label: 'Skill Tree' },
+        { href: '/strategic-planning', label: 'Strategy' },
+        { href: '/graph', label: 'Graph', icon: Workflow },
+      ];
 
   if (!isClient) {
     return <div className="hidden md:flex items-center gap-4 h-8 w-96 bg-muted rounded-md animate-pulse" />;
@@ -190,10 +202,13 @@ function NavigationMenu() {
           variant={activePath === link.href ? 'default' : 'ghost'}
           size="sm"
         >
-          <Link href={link.href}>{link.label}</Link>
+          <Link href={link.href} className="flex items-center gap-1.5">
+            {link.icon ? <link.icon className="h-3.5 w-3.5" /> : null}
+            {link.label}
+          </Link>
         </Button>
       ))}
-       <DropdownMenu>
+      {!simpleMode && <DropdownMenu>
          <DropdownMenuTrigger asChild>
            <Button variant="ghost" size="sm" className="flex items-center gap-1">
              More <ChevronDown className="h-4 w-4" />
@@ -219,7 +234,7 @@ function NavigationMenu() {
           <DropdownMenuItem asChild><Link href="/canvas">Canvas</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/code-of-conduct">Code of Conduct</Link></DropdownMenuItem>
         </DropdownMenuContent>
-      </DropdownMenu>
+      </DropdownMenu>}
     </nav>
   );
 }
@@ -1559,6 +1574,7 @@ export function Header() {
   const { 
     currentUser, 
     signOut, 
+    settings,
     isDemoTokenModalOpen, 
     setIsDemoTokenModalOpen, 
     pushDemoDataWithToken,
@@ -1576,8 +1592,12 @@ export function Header() {
   const [isUpcomingTasksModalOpen, setIsUpcomingTasksModalOpen] = useState(false);
   const [upcomingTasksInitialTab, setUpcomingTasksInitialTab] = useState<OverviewTab>('scheduled');
   const [isHabitDashboardOpen, setIsHabitDashboardOpen] = useState(false);
+  const [isStateDiagramOpen, setIsStateDiagramOpen] = useState(false);
+  const [isLearningPerformanceOpen, setIsLearningPerformanceOpen] = useState(false);
   const [habitDashboardMonth, setHabitDashboardMonth] = useState(startOfMonth(new Date()));
   const isMobile = useIsMobile();
+  const simpleMode = settings.ispSimpleMode ?? true;
+  const keepCanvasAndBotheringsInSimpleMode = settings.ispSimpleKeepCanvasAndBotherings ?? true;
   
   if (isMobile) {
     return null;
@@ -1592,7 +1612,7 @@ export function Header() {
               <BrainCircuit className="h-6 w-6 text-primary" />
               <span className="font-bold">Dock</span>
             </Link>
-            <NavigationMenu />
+            <NavigationMenu simpleMode={simpleMode} />
           </div>
           
           <div className="flex items-center gap-2">
@@ -1613,6 +1633,8 @@ export function Header() {
                 <Repeat className="h-4 w-4" />
                 <span className="sr-only">Spaced Repetition</span>
               </Button>
+              {!simpleMode && (
+              <>
               <Button
                 variant="ghost"
                 size="icon"
@@ -1630,17 +1652,35 @@ export function Header() {
                 <ListChecks className="h-4 w-4" />
                 <span className="sr-only">Habit Dashboard</span>
               </Button>
+              </>
+              )}
               
               <GlobalSearch open={isSearchOpen} setOpen={setIsSearchOpen} />
 
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openMindsetWidget}>
-                  <Brain className="h-4 w-4" />
-                  <span className="sr-only">Resistances & Urges</span>
+              {(!simpleMode || keepCanvasAndBotheringsInSimpleMode) && (
+              <>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openMindsetWidget}>
+                    <Brain className="h-4 w-4" />
+                    <span className="sr-only">Resistances & Urges</span>
+                </Button>
+                
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openDrawingCanvasFromHeader}>
+                    <Paintbrush className="h-4 w-4" />
+                    <span className="sr-only">Drawing Canvas</span>
+                </Button>
+              </>
+              )}
+
+              {!simpleMode && (
+              <>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsStateDiagramOpen(true)}>
+                  <GitBranch className="h-4 w-4" />
+                  <span className="sr-only">State Diagram</span>
               </Button>
-              
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openDrawingCanvasFromHeader}>
-                  <Paintbrush className="h-4 w-4" />
-                  <span className="sr-only">Drawing Canvas</span>
+
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsLearningPerformanceOpen(true)}>
+                  <ActivityIcon className="h-4 w-4" />
+                  <span className="sr-only">Learning Performance</span>
               </Button>
               
               <DropdownMenu>
@@ -1679,6 +1719,8 @@ export function Header() {
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
+              </>
+              )}
 
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsSettingsModalOpen(true)}>
                   <Settings className="h-4 w-4" />
@@ -1714,6 +1756,8 @@ export function Header() {
           </ScrollArea>
         </DialogContent>
       </Dialog>
+      <StateDiagramModal isOpen={isStateDiagramOpen} onOpenChange={setIsStateDiagramOpen} />
+      <LearningPerformanceModal isOpen={isLearningPerformanceOpen} onOpenChange={setIsLearningPerformanceOpen} />
       {gitHubSyncNotification && (
         <Card className="fixed bottom-4 left-4 z-[120] w-[420px] max-w-[calc(100vw-2rem)] border-border/70 bg-background/95 backdrop-blur">
           <CardHeader className="pb-2">

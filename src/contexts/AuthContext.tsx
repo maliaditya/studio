@@ -38,8 +38,9 @@ import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { HabitDetailPopup } from '@/components/HabitDetailPopup';
-import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, storeExcalidrawFile, type ExcalidrawFileRecord, storeAudio, getAudioForResource, storePdf, getPdfForResource } from '@/lib/audioDB';
+import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, storeExcalidrawFile, type ExcalidrawFileRecord, storeAudio, getAudioForResource, storePdf, getPdfForResource, getAllPdfKeys } from '@/lib/audioDB';
 import { uploadPdfToSupabase, downloadPdfFromSupabase } from '@/lib/supabasePdfStorage';
+import { normalizeAiSettings } from '@/lib/ai/config';
 
 // Helper: convert ArrayBuffer to base64 in safe chunks to avoid "call stack size exceeded"
 const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
@@ -566,6 +567,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const [isLoadingState, setIsLoadingState] = useState(true);
   const [settings, setSettings] = useState<UserSettings>({ 
+    ispSimpleMode: true,
+    ispSimpleKeepCanvasAndBotherings: true,
     carryForward: true,
     autoPush: false,
     autoPushLimit: 100,
@@ -590,8 +593,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     routineSkipByDate: {},
     routineSourceOverrides: {},
     pdfLastOpenedPageByResourceId: {},
+    pdfDailyPageTargetByResourceId: {},
+    pdfDailyPageStatsByResourceId: {},
     pdfAnnotationsByResourceId: {},
+    learningPerformanceDailyLogs: {},
     supabasePdfBucket: 'pdfs',
+    ai: normalizeAiSettings(undefined, typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop)),
   });
   useEffect(() => {
     githubModuleHashesRef.current = settings.githubModuleHashes || {};
@@ -980,6 +987,66 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const hoursDelta = Math.max(0, progress?.hoursCompleted || 0);
     const pagesDelta = Math.max(0, progress?.pagesCompleted || 0);
     const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const stripInstanceDateSuffix = (value?: string) => (value || '').replace(/_\d{4}-\d{2}-\d{2}$/, '');
+    const specializationCandidates = coreSkills
+      .filter((skill) => skill.type === 'Specialization')
+      .filter((spec) => {
+        const normalizedSpec = normalizeText(spec.name);
+        const normalizedActivityDetails = normalizeText(activity.details);
+        if (normalizedSpec && normalizedSpec === normalizedActivityDetails) return true;
+        const normalizedCategory = normalizeText(matchedDefinitionCategory);
+        if (normalizedCategory) {
+          if (normalizedCategory === normalizedSpec) return true;
+          if (spec.skillAreas.some((area) => normalizeText(area.name) === normalizedCategory)) return true;
+          if (spec.skillAreas.some((area) => area.microSkills.some((micro) => normalizeText(micro.name) === normalizedCategory))) return true;
+        }
+        const rawIds = new Set<string>([
+          stripInstanceDateSuffix(activity.id),
+          ...(activity.taskIds || []).map(stripInstanceDateSuffix),
+          stripInstanceDateSuffix(taskInstanceId || ''),
+        ]);
+        if (rawIds.has(spec.id)) return true;
+
+        const linkedDefinitions = [...upskillDefinitions, ...deepWorkDefinitions];
+        const hasDefinitionMappedToSpec = linkedDefinitions.some((def) => {
+          const defId = stripInstanceDateSuffix(def.id);
+          const defName = normalizeText(def.name);
+          if (!rawIds.has(defId) && (!defName || defName !== normalizedActivityDetails)) return false;
+          const category = normalizeText(def.category);
+          if (!category) return false;
+          if (category === normalizedSpec) return true;
+          if (spec.skillAreas.some((area) => normalizeText(area.name) === category)) return true;
+          return spec.skillAreas.some((area) => area.microSkills.some((micro) => normalizeText(micro.name) === category));
+        });
+        return hasDefinitionMappedToSpec;
+      })
+      .map((spec) => ({ id: spec.id, name: spec.name }));
+    const primarySpecialization = specializationCandidates[0];
+    if (primarySpecialization && (itemsDelta > 0 || hoursDelta > 0 || pagesDelta > 0 || duration > 0)) {
+      setSettings((prev) => {
+        const current = prev.learningPerformanceDailyLogs || {};
+        const currentDay = current[todayKey] || [];
+        const entry = {
+          id: `lplog_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          dateKey: todayKey,
+          specializationId: primarySpecialization.id,
+          specializationName: primarySpecialization.name,
+          activityType: activity.type,
+          sourceTaskId: taskInstanceId || activity.id,
+          durationMinutes: Math.max(0, duration),
+          pagesCompleted: pagesDelta,
+          hoursCompleted: hoursDelta,
+          itemsCompleted: itemsDelta,
+        };
+        return {
+          ...prev,
+          learningPerformanceDailyLogs: {
+            ...current,
+            [todayKey]: [...currentDay, entry],
+          },
+        };
+      });
+    }
     const shouldApplyMicroSkillProgress = !!matchedDefinitionCategory && (itemsDelta > 0 || hoursDelta > 0 || pagesDelta > 0);
     const shouldRemoveFromRepetitionQueue = activity.type === 'spaced-repetition' && !!matchedDefinitionCategory;
     if (shouldApplyMicroSkillProgress || shouldRemoveFromRepetitionQueue) {
@@ -1050,7 +1117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       ? `Logged ${duration} minutes and moved to ${moveToSlot}.`
       : `Logged ${duration} minutes.`;
     toast({ title: 'Task Completed!', description: completionDescription });
-  }, [toast, allUpskillLogs, allDeepWorkLogs, setUpskillDefinitions, setDeepWorkDefinitions, upskillDefinitions, deepWorkDefinitions, setCoreSkills, setSchedule]);
+  }, [toast, allUpskillLogs, allDeepWorkLogs, setUpskillDefinitions, setDeepWorkDefinitions, upskillDefinitions, deepWorkDefinitions, setCoreSkills, setSchedule, coreSkills, setSettings]);
   
   const openDrawingCanvas = useCallback((state: Omit<DrawingCanvasPopupState, 'isOpen' | 'position' | 'onSave'> & { size?: 'normal' | 'compact' }) => {
     const canvasId = `${state.resourceId}-${state.pointId}`;
@@ -1605,6 +1672,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [
     weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, topPriorities, brainHacks, settings, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, selectedFormalizationSpecId, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pipState, spacedRepetitionData, dailyReviewLogs, abandonmentLogs
   ]);
+
+  const stripLocalOnlySecretsFromPayload = useCallback((payload: any) => {
+    if (!payload || typeof payload !== 'object') return payload;
+    const main = payload.main && typeof payload.main === 'object' ? payload.main : payload;
+    if (!main?.settings || typeof main.settings !== 'object') return payload;
+    if (!('supabaseServiceRoleKey' in main.settings)) return payload;
+
+    const sanitizedMain = {
+      ...main,
+      settings: {
+        ...main.settings,
+      },
+    };
+    delete (sanitizedMain.settings as any).supabaseServiceRoleKey;
+
+    if (payload.main && typeof payload.main === 'object') {
+      return { ...payload, main: sanitizedMain };
+    }
+    return sanitizedMain;
+  }, []);
   
   const saveState = useCallback(() => {
     if (currentUser?.username) {
@@ -1777,41 +1864,74 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setMindProgrammingPlanRotation(sanitizedMain.mindProgrammingPlanRotation === undefined ? true : sanitizedMain.mindProgrammingPlanRotation);
     setProductizationPlans(sanitizedMain.productizationPlans || {});
     setOfferizationPlans(sanitizedMain.offerizationPlans || {});
-    setResourceFolders(sanitizedMain.resourceFolders || []);
-    // Ensure default dashboard resources exist so dashboard cards can open popups
-    (function ensureDefaultDashboardResources() {
-      const incomingFolders = (sanitizedMain.resourceFolders || []);
-      const incomingResources = (sanitizedMain.resources || []);
+    // Repair folder/resource relationships from imported payload.
+    const rawFolders = Array.isArray(sanitizedMain.resourceFolders) ? sanitizedMain.resourceFolders : [];
+    const rawResources = Array.isArray(sanitizedMain.resources) ? sanitizedMain.resources : [];
+    const normalizedFolders: ResourceFolder[] = rawFolders
+      .filter((f: any) => f && typeof f.id === 'string' && typeof f.name === 'string')
+      .map((f: any) => ({
+        ...f,
+        id: f.id,
+        name: f.name,
+        parentId: typeof f.parentId === 'string' || f.parentId === null ? f.parentId : null,
+      }));
 
-      const updatedFolders = [...incomingFolders];
-      let dashboardFolder = updatedFolders.find((f: any) => f.name === 'Dashboard');
-      if (!dashboardFolder) {
-        dashboardFolder = { id: 'folder_dashboard', name: 'Dashboard', parentId: null, icon: 'Grid' };
-        updatedFolders.push(dashboardFolder);
-        setResourceFolders(updatedFolders);
+    const folderIds = new Set(normalizedFolders.map((f) => f.id));
+    const healedFolders: ResourceFolder[] = normalizedFolders.map((f) => {
+      if (typeof f.parentId !== 'string') return f;
+      if (f.parentId === f.id || !folderIds.has(f.parentId)) {
+        return { ...f, parentId: null };
       }
+      return f;
+    });
 
-      const updatedResources = [...incomingResources];
-      const addIfMissing = (name: string, id: string) => {
-        if (!updatedResources.some((r: any) => r.name === name)) {
-          updatedResources.push({
-            id,
-            name,
-            folderId: dashboardFolder.id,
-            type: 'card',
-            createdAt: new Date().toISOString(),
-            points: [{ id: `point_${id}_1`, text: `${name} resources`, type: 'text' }],
-          });
-        }
-      };
+    const updatedFolders: ResourceFolder[] = [...healedFolders];
+    let dashboardFolder = updatedFolders.find((f) => f.name === 'Dashboard');
+    if (!dashboardFolder) {
+      dashboardFolder = { id: 'folder_dashboard', name: 'Dashboard', parentId: null, icon: 'Grid' };
+      updatedFolders.push(dashboardFolder);
+    }
 
-      addIfMissing('Health', 'res_health');
-      addIfMissing('Wealth', 'res_wealth');
-      addIfMissing('Growth', 'res_growth');
-      addIfMissing('Direction', 'res_direction');
+    let fallbackFolderId =
+      updatedFolders.find((f) => f.name === 'Quick Access')?.id ||
+      dashboardFolder.id ||
+      updatedFolders.find((f) => f.parentId === null)?.id ||
+      updatedFolders[0]?.id;
 
-      setResources(updatedResources);
-    })();
+    if (!fallbackFolderId) {
+      const recoveredFolder: ResourceFolder = { id: 'folder_recovered', name: 'Recovered', parentId: null, icon: 'Folder' };
+      updatedFolders.push(recoveredFolder);
+      fallbackFolderId = recoveredFolder.id;
+    }
+
+    const updatedFolderIds = new Set(updatedFolders.map((f) => f.id));
+    const updatedResources = rawResources
+      .filter((r: any) => r && typeof r.id === 'string')
+      .map((r: any) => {
+        const folderId = typeof r.folderId === 'string' && updatedFolderIds.has(r.folderId) ? r.folderId : fallbackFolderId!;
+        return { ...r, folderId };
+      });
+
+    const addIfMissing = (name: string, id: string) => {
+      if (!updatedResources.some((r: any) => r.name === name)) {
+        updatedResources.push({
+          id,
+          name,
+          folderId: dashboardFolder!.id,
+          type: 'card',
+          createdAt: new Date().toISOString(),
+          points: [{ id: `point_${id}_1`, text: `${name} resources`, type: 'text' }],
+        });
+      }
+    };
+
+    addIfMissing('Health', 'res_health');
+    addIfMissing('Wealth', 'res_wealth');
+    addIfMissing('Growth', 'res_growth');
+    addIfMissing('Direction', 'res_direction');
+
+    setResourceFolders(updatedFolders);
+    setResources(updatedResources as Resource[]);
     setCanvasLayout(sanitizedMain.canvasLayout || { nodes: [], edges: [] });
     setMindsetCards(sanitizedMain.mindsetCards || []);
     setPistons(sanitizedMain.pistons || {});
@@ -1835,9 +1955,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAbandonmentLogs(sanitizedMain.abandonmentLogs || []);
     
     // UI State
-    setPinnedFolderIds(new Set(sanitizedUi.pinnedFolderIds || []));
-    setActiveResourceTabIds(sanitizedUi.activeResourceTabIds || []);
-    setSelectedResourceFolderId(sanitizedUi.selectedResourceFolderId || null);
+    const safeFolderIds = new Set(updatedFolders.map((f) => f.id));
+    const safePinnedFolderIds = (sanitizedUi.pinnedFolderIds || []).filter((id: string) => safeFolderIds.has(id));
+    const safeActiveTabs = (sanitizedUi.activeResourceTabIds || []).filter((id: string) => safeFolderIds.has(id));
+    const safeSelectedFolderId =
+      sanitizedUi.selectedResourceFolderId && safeFolderIds.has(sanitizedUi.selectedResourceFolderId)
+        ? sanitizedUi.selectedResourceFolderId
+        : (safeActiveTabs[0] || updatedFolders.find((f) => f.parentId === null)?.id || null);
+    setPinnedFolderIds(new Set(safePinnedFolderIds));
+    setActiveResourceTabIds(safeActiveTabs);
+    setSelectedResourceFolderId(safeSelectedFolderId);
     setLastSelectedHabitFolder(sanitizedUi.lastSelectedHabitFolder || null);
     setSelectedUpskillTask(sanitizedUi.selectedUpskillTask || null);
     setSelectedDeepWorkTask(sanitizedUi.selectedDeepWorkTask || null);
@@ -1865,6 +1992,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     
   const defaultSettings: UserSettings = { 
+        ispSimpleMode: true,
+        ispSimpleKeepCanvasAndBotherings: true,
         carryForward: true, autoPush: false, autoPushLimit: 100, 
         carryForwardEssentials: true, carryForwardNutrition: false,
         smartLogging: false, defaultHabitLinks: {}, routines: [],
@@ -1884,13 +2013,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           routineSkipByDate: {},
           routineSourceOverrides: {},
           pdfLastOpenedPageByResourceId: {},
+          pdfDailyPageTargetByResourceId: {},
+          pdfDailyPageStatsByResourceId: {},
           pdfAnnotationsByResourceId: {},
+          learningPerformanceDailyLogs: {},
           supabasePdfBucket: 'pdfs',
+          ai: normalizeAiSettings(undefined, typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop)),
       };
     const incomingSettings = (sanitizedMain.settings || {}) as Partial<UserSettings>;
     setSettings((prev) => ({
       ...defaultSettings,
       ...incomingSettings,
+      ai: normalizeAiSettings(
+        {
+          ...(defaultSettings.ai || {}),
+          ...(prev.ai || {}),
+          ...(incomingSettings.ai || {}),
+        },
+        typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop)
+      ),
+      supabaseServiceRoleKey: incomingSettings.supabaseServiceRoleKey ?? prev.supabaseServiceRoleKey,
       // Keep local hash maps if imported payload does not include them.
       githubModuleHashes:
         incomingSettings.githubModuleHashes && Object.keys(incomingSettings.githubModuleHashes).length > 0
@@ -2060,7 +2202,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     toast({ title: "Syncing...", description: "Pushing demo data to the cloud." });
     try {
-        const allUserData = getAllUserData().main;
+        const allUserData = stripLocalOnlySecretsFromPayload(getAllUserData().main);
         const requestBody = {
           username,
           data: allUserData,
@@ -2109,7 +2251,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: "Syncing...", description: "Pushing your data to the cloud." });
 
     try {
-        const allUserData = getAllUserData();
+        const allUserData = stripLocalOnlySecretsFromPayload(getAllUserData());
         const requestBody = { username, data: allUserData, baseRevision: cloudRevisionRef.current ?? 0 };
         const response = await fetch('/api/blob-sync', {
             method: 'POST',
@@ -6095,15 +6237,44 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           let processed = 0;
           emitProgress({ phase: 'preparing', total: pdfs.length, processed, uploaded, skipped, note: 'Preparing PDF upload to Supabase...' });
 
+          const allLocalPdfKeys = await getAllPdfKeys().catch(() => [] as string[]);
           for (const res of pdfs) {
             const primaryKey = `${res.id}`;
-            const { blob, key: matchedPdfKey } = await getPdfForResource(primaryKey, res.pdfFileName ? String(res.pdfFileName) : undefined);
-            if (!blob) {
+            let lookup = await getPdfForResource(primaryKey, res.pdfFileName ? String(res.pdfFileName) : undefined);
+            if (!lookup.blob && res.name) {
+              // Older resources may only have filename in DB, not pdfFileName metadata.
+              lookup = await getPdfForResource(primaryKey, String(res.name));
+            }
+            if (!lookup.blob && allLocalPdfKeys.length > 0) {
+              const normalizeKey = (value: string) =>
+                String(value || '')
+                  .toLowerCase()
+                  .replace(/\.[a-z0-9]{1,5}$/i, '')
+                  .replace(/[^\w]/g, '_')
+                  .replace(/_+/g, '_')
+                  .replace(/^_+|_+$/g, '');
+              const targetSet = new Set<string>([
+                normalizeKey(primaryKey),
+                normalizeKey(String(res.pdfFileName || '')),
+                normalizeKey(String(res.name || '')),
+              ]);
+              for (const localKey of allLocalPdfKeys) {
+                const keyNorm = normalizeKey(localKey);
+                if (!keyNorm) continue;
+                if (targetSet.has(keyNorm)) {
+                  lookup = await getPdfForResource(localKey, localKey);
+                  if (lookup.blob) break;
+                }
+              }
+            }
+            if (!lookup.blob) {
               skipped += 1;
               processed += 1;
               emitProgress({ phase: 'uploading', total: pdfs.length, processed, uploaded, skipped, currentItem: res.name || primaryKey, note: 'Skipped missing local PDF.' });
               continue;
             }
+            const blob = lookup.blob;
+            const matchedPdfKey = lookup.key;
 
             let uploadSucceeded = false;
             let lastUploadError: unknown = null;
@@ -6113,6 +6284,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
                   url: settings.supabaseUrl,
                   anonKey: settings.supabaseAnonKey,
                   bucket: settings.supabasePdfBucket,
+                  serviceRoleKey:
+                    typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop)
+                      ? settings.supabaseServiceRoleKey
+                      : undefined,
                 });
                 uploadSucceeded = true;
               } catch (e) {
@@ -6182,6 +6357,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
               url: settings.supabaseUrl,
               anonKey: settings.supabaseAnonKey,
               bucket: settings.supabasePdfBucket,
+              serviceRoleKey:
+                typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop)
+                  ? settings.supabaseServiceRoleKey
+                  : undefined,
             });
             if (!blob) continue;
             await storePdf(res.id, blob);
@@ -6240,6 +6419,23 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
               ...Array.from(remoteCanvasIds),
           ]);
 
+          let remoteCanvasMetaPathById = new Map<string, string>();
+          try {
+              const canvasFilesListResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${canvasFilesBase}`, {
+                  headers: { 'Authorization': `token ${githubToken}` }
+              });
+              if (canvasFilesListResponse.ok) {
+                  const canvasFilesListData = await canvasFilesListResponse.json();
+                  remoteCanvasMetaPathById = new Map(
+                      (Array.isArray(canvasFilesListData) ? canvasFilesListData : [])
+                          .filter((item: any) => item?.type === 'file' && typeof item?.name === 'string' && item.name.endsWith('.json') && item.name !== 'index.json')
+                          .map((item: any) => [item.name.slice(0, -5), item.path] as const)
+                  );
+              }
+          } catch {
+              // Optional optimization; fallback logic below still works without this list.
+          }
+
           if (candidateCanvasIds.size === 0) {
               toast({ title: "No canvas metadata found", description: "No canvases with image metadata were found in local or GitHub index." });
               return;
@@ -6284,13 +6480,16 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
 
           for (const canvasId of candidateCanvasIds) {
               let filesMeta = localCanvasFilesById.get(canvasId) || {};
-              try {
-                  const canvasMeta = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, `${canvasFilesBase}/${canvasId}.json`);
-                  if (canvasMeta?.files && typeof canvasMeta.files === 'object' && Object.keys(canvasMeta.files).length > 0) {
-                      filesMeta = canvasMeta.files;
+              const remoteCanvasMetaPath = remoteCanvasMetaPathById.get(canvasId);
+              if (remoteCanvasMetaPath) {
+                  try {
+                      const canvasMeta = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, remoteCanvasMetaPath);
+                      if (canvasMeta?.files && typeof canvasMeta.files === 'object' && Object.keys(canvasMeta.files).length > 0) {
+                          filesMeta = canvasMeta.files;
+                      }
+                  } catch {
+                      // fallback to local metadata
                   }
-              } catch (e) {
-                  // fallback to local metadata
               }
 
               if (!filesMeta || Object.keys(filesMeta).length === 0) {

@@ -17,7 +17,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter }
 import { ScrollArea } from './ui/scroll-area';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { motion, useDragControls } from 'framer-motion';
-import { format, isToday, getISODay, getDay, parseISO, differenceInDays, differenceInMonths, startOfDay, addDays } from 'date-fns';
+import { format, isToday, getISODay, getDay, parseISO, differenceInDays, differenceInMonths, startOfDay, addDays, addMonths, isAfter, isBefore } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
@@ -238,6 +238,7 @@ export const AgendaWidgetItem = React.memo(({
         offerizationPlans,
         upskillDefinitions,
         deepWorkDefinitions,
+        settings,
     } = useAuth();
     const router = useRouter();
 
@@ -265,8 +266,79 @@ export const AgendaWidgetItem = React.memo(({
         if (!(activity.type === 'upskill' || activity.type === 'deepwork')) return null;
 
         const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        const stripInstanceDateSuffix = (id?: string | null) => (id || '').replace(/_(\d{4}-\d{2}-\d{2})$/, '');
+        const normalizeDateKey = (value?: string | null) => {
+            if (!value) return null;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) return null;
+            return parsed.toISOString().slice(0, 10);
+        };
         const specs = (coreSkills || []).filter((skill) => skill.type === 'Specialization');
         const allDefs = [...(upskillDefinitions || []), ...(deepWorkDefinitions || [])];
+        const today = startOfDay(new Date());
+        const activityBaseId = stripInstanceDateSuffix(activity.id);
+        const matchedRoutine = (settings.routines || []).find((routine) => {
+            const routineBaseId = stripInstanceDateSuffix(routine.id);
+            return (
+                routineBaseId === activityBaseId ||
+                (!!routine.details &&
+                    !!activity.details &&
+                    normalizeText(routine.details) === normalizeText(activity.details) &&
+                    routine.type === activity.type)
+            );
+        });
+        const routineRule = activity.routine || matchedRoutine?.routine || null;
+        const recurrence = routineRule?.type || 'none';
+        const repeatInterval = Math.max(1, routineRule?.repeatInterval || routineRule?.days || 1);
+        const repeatUnit = routineRule?.repeatUnit || (recurrence === 'weekly' ? 'week' : 'day');
+        const startDateKey = normalizeDateKey(activity.baseDate || matchedRoutine?.baseDate || null);
+
+        const countRemainingScheduledSessions = (endDateKey: string | null) => {
+            if (!endDateKey) return null;
+            const endDate = startOfDay(parseISO(endDateKey));
+            if (Number.isNaN(endDate.getTime())) return null;
+            if (isBefore(endDate, today)) return 0;
+
+            if (recurrence === 'none') {
+                if (!startDateKey) return null;
+                const oneTimeDate = startOfDay(parseISO(startDateKey));
+                if (Number.isNaN(oneTimeDate.getTime())) return null;
+                return !isBefore(oneTimeDate, today) && !isAfter(oneTimeDate, endDate) ? 1 : 0;
+            }
+
+            if (!startDateKey) return null;
+            let cursor = startOfDay(parseISO(startDateKey));
+            if (Number.isNaN(cursor.getTime())) return null;
+
+            if (repeatUnit === 'month') {
+                if (isBefore(cursor, today)) {
+                    const diffMonths = Math.max(0, differenceInMonths(today, cursor));
+                    const jumpCount = Math.floor(diffMonths / repeatInterval);
+                    cursor = addMonths(cursor, jumpCount * repeatInterval);
+                    while (isBefore(cursor, today)) cursor = addMonths(cursor, repeatInterval);
+                }
+                let count = 0;
+                while (!isAfter(cursor, endDate)) {
+                    if (!isBefore(cursor, today)) count += 1;
+                    cursor = addMonths(cursor, repeatInterval);
+                }
+                return count;
+            }
+
+            const stepDays = repeatUnit === 'week' ? repeatInterval * 7 : repeatInterval;
+            if (isBefore(cursor, today)) {
+                const diffDays = Math.max(0, differenceInDays(today, cursor));
+                const jumpCount = Math.ceil(diffDays / stepDays);
+                cursor = addDays(cursor, jumpCount * stepDays);
+            }
+            let count = 0;
+            while (!isAfter(cursor, endDate)) {
+                if (!isBefore(cursor, today)) count += 1;
+                cursor = addDays(cursor, stepDays);
+            }
+            return count;
+        };
 
         let matchedSpec = specs.find((spec) => spec.id === activity.id || normalizeText(spec.name) === normalizeText(activity.details));
         if (!matchedSpec) {
@@ -290,16 +362,6 @@ export const AgendaWidgetItem = React.memo(({
                 typeof item === 'string'
                     ? { text: item, completed: false }
                     : { text: item.text || '', completed: !!item.completed };
-            const toDateKey = (value?: string | null) => {
-                if (!value) return null;
-                if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-                const parsed = new Date(value);
-                if (Number.isNaN(parsed.getTime())) return null;
-                return parsed.toISOString().slice(0, 10);
-            };
-            const today = new Date();
-            const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-            const msPerDay = 24 * 60 * 60 * 1000;
 
             const candidatePlans = releases
                 .map((release) => {
@@ -311,11 +373,10 @@ export const AgendaWidgetItem = React.memo(({
                         ...(stages?.fixItems || []),
                     ].map(normalizeStageItem);
                     const remainingItems = allItems.filter((item) => item.text.trim() && !item.completed).length;
-                    const launchDateKey = toDateKey(release.launchDate);
-                    const daysLeft = launchDateKey
-                        ? Math.max(0, Math.floor((new Date(launchDateKey).getTime() - startOfToday.getTime()) / msPerDay))
-                        : null;
-                    return { remainingItems, daysLeft };
+                    const launchDateKey = normalizeDateKey(release.launchDate);
+                    const daysLeft = launchDateKey ? Math.max(0, differenceInDays(parseISO(launchDateKey), today)) : null;
+                    const sessionsLeft = countRemainingScheduledSessions(launchDateKey);
+                    return { remainingItems, daysLeft, sessionsLeft };
                 })
                 .filter((plan) => plan.remainingItems > 0);
 
@@ -324,12 +385,16 @@ export const AgendaWidgetItem = React.memo(({
                 .filter((plan) => plan.daysLeft != null)
                 .sort((a, b) => (a.daysLeft as number) - (b.daysLeft as number));
             const chosen = withDate[0] || candidatePlans[0];
-            const daysWindow = chosen.daysLeft == null ? null : Math.max(1, chosen.daysLeft);
-            const itemTarget = daysWindow == null
-                ? null
-                : chosen.daysLeft === 0
-                    ? chosen.remainingItems
-                    : Math.max(1, Math.ceil(chosen.remainingItems / daysWindow));
+            const itemTarget =
+                chosen.sessionsLeft != null
+                    ? (chosen.sessionsLeft > 0
+                        ? Math.max(1, Math.ceil(chosen.remainingItems / chosen.sessionsLeft))
+                        : chosen.remainingItems)
+                    : (chosen.daysLeft != null
+                        ? (chosen.daysLeft === 0
+                            ? chosen.remainingItems
+                            : Math.max(1, Math.ceil(chosen.remainingItems / Math.max(1, chosen.daysLeft))))
+                        : null);
             return itemTarget != null ? `${itemTarget} items/day` : null;
         }
 
@@ -347,16 +412,6 @@ export const AgendaWidgetItem = React.memo(({
         const remainingHours = Math.max(0, totalHours - completedHours);
         const remainingPages = Math.max(0, totalPages - completedPages);
 
-        const normalizeDateKey = (value?: string | null) => {
-            if (!value) return null;
-            if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-            const parsed = new Date(value);
-            if (Number.isNaN(parsed.getTime())) return null;
-            return parsed.toISOString().slice(0, 10);
-        };
-        const today = new Date();
-        const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-        const msPerDay = 24 * 60 * 60 * 1000;
         const latestAudioEndDate = audioResources
             .map((resource) => normalizeDateKey(resource.completionDate))
             .filter((date): date is string => !!date)
@@ -365,26 +420,38 @@ export const AgendaWidgetItem = React.memo(({
             .map((resource) => normalizeDateKey(resource.completionDate))
             .filter((date): date is string => !!date)
             .reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
-        const audioDaysLeft = latestAudioEndDate
-            ? Math.max(0, Math.floor((new Date(latestAudioEndDate).getTime() - startOfToday.getTime()) / msPerDay))
-            : null;
-        const bookDaysLeft = latestBookEndDate
-            ? Math.max(0, Math.floor((new Date(latestBookEndDate).getTime() - startOfToday.getTime()) / msPerDay))
-            : null;
+        const audioDaysLeft = latestAudioEndDate ? Math.max(0, differenceInDays(parseISO(latestAudioEndDate), today)) : null;
+        const bookDaysLeft = latestBookEndDate ? Math.max(0, differenceInDays(parseISO(latestBookEndDate), today)) : null;
+        const audioSessionsLeft = countRemainingScheduledSessions(latestAudioEndDate);
+        const bookSessionsLeft = countRemainingScheduledSessions(latestBookEndDate);
 
-        const hourTarget = hasAudio && remainingHours > 0 && audioDaysLeft != null
-            ? Math.max(0.1, Number((remainingHours / Math.max(1, audioDaysLeft || 1)).toFixed(1)))
-            : null;
-        const pageTarget = hasBooks && remainingPages > 0 && bookDaysLeft != null
-            ? Math.max(1, Math.ceil(remainingPages / Math.max(1, bookDaysLeft || 1)))
-            : null;
+        const hourTarget =
+            hasAudio && remainingHours > 0
+                ? (audioSessionsLeft != null
+                    ? (audioSessionsLeft > 0
+                        ? Math.max(0.1, Number((remainingHours / audioSessionsLeft).toFixed(1)))
+                        : remainingHours)
+                    : (audioDaysLeft != null
+                        ? Math.max(0.1, Number((remainingHours / Math.max(1, audioDaysLeft || 1)).toFixed(1)))
+                        : null))
+                : null;
+        const pageTarget =
+            hasBooks && remainingPages > 0
+                ? (bookSessionsLeft != null
+                    ? (bookSessionsLeft > 0
+                        ? Math.max(1, Math.ceil(remainingPages / bookSessionsLeft))
+                        : remainingPages)
+                    : (bookDaysLeft != null
+                        ? Math.max(1, Math.ceil(remainingPages / Math.max(1, bookDaysLeft || 1)))
+                        : null))
+                : null;
 
         const pieces: string[] = [];
         if (pageTarget != null) pieces.push(`${pageTarget}p/day`);
         if (hourTarget != null) pieces.push(`${hourTarget}h/day`);
         if (pieces.length === 0) return null;
         return pieces.join(' / ');
-    }, [activity.details, activity.id, activity.type, coreSkills, deepWorkDefinitions, offerizationPlans, upskillDefinitions]);
+    }, [activity.baseDate, activity.details, activity.id, activity.routine, activity.type, coreSkills, deepWorkDefinitions, offerizationPlans, settings.routines, upskillDefinitions]);
 
     const handleBadgeClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -746,14 +813,13 @@ export function TodaysScheduleCard({
     let total = 0;
     let completed = 0;
     tasks.forEach((t) => {
-      const completedToday = isBotheringTaskCompletedOnDate(t, dayKey);
       const scheduledToday = !!(
         (t.activityId && todayActivityIds.has(t.activityId)) ||
         (t.id && todayActivityIds.has(t.id))
       );
-      if (!scheduledToday && !completedToday) return;
+      if (!scheduledToday) return;
       total += 1;
-      if (completedToday) completed += 1;
+      if (isBotheringTaskCompletedOnDate(t, dayKey)) completed += 1;
     });
     return { total, completed };
   }, [dayKey, getEffectiveBotheringTasks, isBotheringTaskCompletedOnDate, todayActivityIds]);
@@ -775,13 +841,10 @@ export function TodaysScheduleCard({
   }, [currentSlotActivityIds, dayKey, getEffectiveBotheringTasks, isBotheringTaskCompletedOnDate, isBotheringTaskDueOnDate]);
 
   const visibleBotheringsByType = useMemo(() => {
-    const byType = activeBotheringsByType.map((group) => {
-      if (group.type === "Parked") return group;
-      return {
-        ...group,
-        points: group.points.filter(({ point, sourceType }) => getTodayBotheringStats(point, sourceType).total > 0),
-      };
-    });
+    const byType = activeBotheringsByType.map((group) => ({
+      ...group,
+      points: group.points.filter(({ point, sourceType }) => getTodayBotheringStats(point, sourceType).total > 0),
+    }));
     const currentPoints = byType
       .filter((group) => group.type !== "Parked")
       .flatMap((group) => group.points)

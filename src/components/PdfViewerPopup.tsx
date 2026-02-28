@@ -19,6 +19,8 @@ import {
   Undo2,
   Eraser,
   Download,
+  Sparkles,
+  Send,
 } from "lucide-react";
 import { getPdfForResource, storePdf } from "@/lib/audioDB";
 import { downloadPdfFromSupabase, uploadPdfToSupabase } from "@/lib/supabasePdfStorage";
@@ -28,6 +30,10 @@ import { Button } from './ui/button';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
 import { useAuth } from "@/contexts/AuthContext";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { addDays, addMonths, differenceInDays, differenceInMonths, isAfter, isBefore, parseISO, startOfDay } from "date-fns";
+import { getAiConfigFromSettings } from "@/lib/ai/config";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
@@ -35,6 +41,7 @@ type AnnotationPoint = { x: number; y: number };
 type AnnotationStroke = { color: string; size: number; points: AnnotationPoint[] };
 type AnnotationByPage = Record<number, AnnotationStroke[]>;
 type ViewerPrefs = { scale: number; fitMode: "custom" | "width"; rotation: number };
+type ChatMessage = { role: "user" | "assistant"; content: string };
 
 const persistAnnotationsLocalMirror = (key: string | null, data: AnnotationByPage) => {
     if (!key) return;
@@ -46,7 +53,7 @@ const persistAnnotationsLocalMirror = (key: string | null, data: AnnotationByPag
 };
 
 export default function PdfViewerPopup() {
-    const { pdfViewerState, setPdfViewerState, settings, setSettings, setResources, currentUser } = useAuth();
+    const { pdfViewerState, setPdfViewerState, settings, setSettings, setResources, currentUser, offerizationPlans, coreSkills } = useAuth();
     const [numPages, setNumPages] = useState<number | null>(null);
     const [pageNumber, setPageNumber] = useState(1);
     const [file, setFile] = useState<Blob | null>(null);
@@ -62,6 +69,17 @@ export default function PdfViewerPopup() {
     const [penSize, setPenSize] = useState(2);
     const [annotations, setAnnotations] = useState<AnnotationByPage>({});
     const [pageRenderWidth, setPageRenderWidth] = useState<number | undefined>(undefined);
+    const [selectedText, setSelectedText] = useState("");
+    const [isExplaining, setIsExplaining] = useState(false);
+    const [explainError, setExplainError] = useState("");
+    const [showExplainPanel, setShowExplainPanel] = useState(false);
+    const [activeExplainText, setActiveExplainText] = useState("");
+    const [chatInput, setChatInput] = useState("");
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+    const [showTargetCelebration, setShowTargetCelebration] = useState(false);
+    const [celebratedKey, setCelebratedKey] = useState<string | null>(null);
+    const isDesktopRuntime =
+        typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
 
     const [resizeMode, setResizeMode] = useState<null | "x" | "y" | "xy">(null);
     const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0, mode: "x" as "x" | "y" | "xy" });
@@ -96,6 +114,10 @@ export default function PdfViewerPopup() {
                         url: settings.supabaseUrl,
                         anonKey: settings.supabaseAnonKey,
                         bucket: settings.supabasePdfBucket,
+                        serviceRoleKey:
+                            typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop)
+                                ? settings.supabaseServiceRoleKey
+                                : undefined,
                     });
                     if (remote) {
                         await storePdf(resource.id, remote);
@@ -126,6 +148,7 @@ export default function PdfViewerPopup() {
         settings.supabaseUrl,
         settings.supabaseAnonKey,
         settings.supabasePdfBucket,
+        settings.supabaseServiceRoleKey,
         setResources,
     ]);
 
@@ -146,7 +169,174 @@ export default function PdfViewerPopup() {
         });
     }, [numPages, pageNumber, pdfViewerState?.resource?.id, setSettings]);
 
+    useEffect(() => {
+        const activeResourceId = pdfViewerState?.resource?.id;
+        if (!activeResourceId || pageNumber <= 0) return;
+        const todayKey = new Date().toISOString().slice(0, 10);
+        setSettings((prev) => {
+            const statsMap = prev.pdfDailyPageStatsByResourceId || {};
+            const existing = statsMap[activeResourceId];
+
+            if (!existing || existing.date !== todayKey) {
+                return {
+                    ...prev,
+                    pdfDailyPageStatsByResourceId: {
+                        ...statsMap,
+                        [activeResourceId]: { date: todayKey, startPage: pageNumber, maxPage: pageNumber },
+                    },
+                };
+            }
+
+            const nextMaxPage = Math.max(existing.maxPage || existing.startPage || 1, pageNumber);
+            if (nextMaxPage === existing.maxPage) return prev;
+
+            return {
+                ...prev,
+                pdfDailyPageStatsByResourceId: {
+                    ...statsMap,
+                    [activeResourceId]: { ...existing, maxPage: nextMaxPage },
+                },
+            };
+        });
+    }, [pdfViewerState?.resource?.id, pageNumber, setSettings]);
+
     const resourceId = pdfViewerState?.resource?.id || null;
+    const learningPageMetrics = useMemo(() => {
+        if (!resourceId) {
+            return {
+                targetPagesToday: 0,
+                completedPagesBaseline: 0,
+            };
+        }
+        const normalizeDateKey = (value?: string | null) => {
+            if (!value) return null;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) return null;
+            return parsed.toISOString().slice(0, 10);
+        };
+        const normalizeText = (value?: string) => (value || "").trim().toLowerCase().replace(/\s+/g, " ");
+        const stripInstanceDateSuffix = (id?: string | null) => (id || "").replace(/_(\d{4}-\d{2}-\d{2})$/, "");
+        const today = startOfDay(new Date());
+
+        const countRemainingScheduledSessions = (routine: any, endDateKey: string | null) => {
+            if (!routine || !endDateKey) return null;
+            const endDate = startOfDay(parseISO(endDateKey));
+            if (Number.isNaN(endDate.getTime())) return null;
+            if (isBefore(endDate, today)) return 0;
+
+            const rule = routine.routine || null;
+            const recurrence = rule?.type || "none";
+            const repeatInterval = Math.max(1, rule?.repeatInterval || rule?.days || 1);
+            const repeatUnit = rule?.repeatUnit || (recurrence === "weekly" ? "week" : "day");
+            const startDateKey = normalizeDateKey(routine.baseDate || routine.startDate || routine.createdAt || null);
+
+            if (recurrence === "none") {
+                if (!startDateKey) return null;
+                const oneTimeDate = startOfDay(parseISO(startDateKey));
+                if (Number.isNaN(oneTimeDate.getTime())) return null;
+                return !isBefore(oneTimeDate, today) && !isAfter(oneTimeDate, endDate) ? 1 : 0;
+            }
+
+            if (!startDateKey) return null;
+            let cursor = startOfDay(parseISO(startDateKey));
+            if (Number.isNaN(cursor.getTime())) return null;
+
+            if (repeatUnit === "month") {
+                if (isBefore(cursor, today)) {
+                    const diffMonths = Math.max(0, differenceInMonths(today, cursor));
+                    const jumpCount = Math.floor(diffMonths / repeatInterval);
+                    cursor = addMonths(cursor, jumpCount * repeatInterval);
+                    while (isBefore(cursor, today)) cursor = addMonths(cursor, repeatInterval);
+                }
+                let count = 0;
+                while (!isAfter(cursor, endDate)) {
+                    if (!isBefore(cursor, today)) count += 1;
+                    cursor = addMonths(cursor, repeatInterval);
+                }
+                return count;
+            }
+
+            const stepDays = repeatUnit === "week" ? repeatInterval * 7 : repeatInterval;
+            if (isBefore(cursor, today)) {
+                const diffDays = Math.max(0, differenceInDays(today, cursor));
+                const jumpCount = Math.ceil(diffDays / stepDays);
+                cursor = addDays(cursor, jumpCount * stepDays);
+            }
+            let count = 0;
+            while (!isAfter(cursor, endDate)) {
+                if (!isBefore(cursor, today)) count += 1;
+                cursor = addDays(cursor, stepDays);
+            }
+            return count;
+        };
+
+        let bestTarget = 0;
+        let bestCompletedPages = 0;
+        for (const spec of (coreSkills || []).filter((skill) => skill.type === "Specialization")) {
+            const learningPlan = offerizationPlans?.[spec.id]?.learningPlan;
+            if (!learningPlan) continue;
+            const linkedByBook = (learningPlan.bookWebpageResources || []).some((book) => book.linkedPdfResourceId === resourceId);
+            const linkedByPath = (learningPlan.skillTreePaths || []).some((path) => path.linkedPdfResourceId === resourceId);
+            if (!linkedByBook && !linkedByPath) continue;
+
+            const bookResources = learningPlan.bookWebpageResources || [];
+            if (bookResources.length === 0) continue;
+            const totalPages = bookResources.reduce((sum, resource) => sum + (resource.totalPages || 0), 0);
+            const completedPages = spec.skillAreas.reduce(
+                (sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedPages || 0), 0),
+                0
+            );
+            const remainingPages = Math.max(0, totalPages - completedPages);
+            if (remainingPages <= 0) continue;
+
+            const latestBookEndDate = bookResources
+                .map((resource) => normalizeDateKey(resource.completionDate))
+                .filter((date): date is string => !!date)
+                .reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+            if (!latestBookEndDate) continue;
+
+            const matchingRoutine = (settings.routines || []).find((routine) => {
+                if (routine.type !== "upskill") return false;
+                if (stripInstanceDateSuffix(routine.id) === stripInstanceDateSuffix(spec.id)) return true;
+                return normalizeText(routine.details) === normalizeText(spec.name);
+            });
+            const sessionsRemaining = countRemainingScheduledSessions(matchingRoutine, latestBookEndDate);
+            const daysLeft = Math.max(0, differenceInDays(parseISO(latestBookEndDate), today));
+            const pageTarget =
+                sessionsRemaining != null
+                    ? (sessionsRemaining > 0
+                        ? Math.max(1, Math.ceil(remainingPages / sessionsRemaining))
+                        : remainingPages)
+                    : Math.max(1, Math.ceil(remainingPages / Math.max(1, daysLeft || 1)));
+            if (pageTarget >= bestTarget) {
+                bestTarget = pageTarget;
+                bestCompletedPages = completedPages;
+            }
+        }
+        return {
+            targetPagesToday: bestTarget,
+            completedPagesBaseline: bestCompletedPages,
+        };
+    }, [resourceId, coreSkills, offerizationPlans, settings.routines]);
+    const pagesCompletedToday = Math.max(0, pageNumber - learningPageMetrics.completedPagesBaseline);
+    const targetPagesToday = learningPageMetrics.targetPagesToday > 0
+        ? learningPageMetrics.targetPagesToday
+        : resourceId
+            ? Math.max(0, settings.pdfDailyPageTargetByResourceId?.[resourceId] || 0)
+            : 0;
+    const floatingCount = targetPagesToday - pagesCompletedToday;
+    const celebrationKey = resourceId ? `${resourceId}:${new Date().toISOString().slice(0, 10)}` : null;
+
+    useEffect(() => {
+        if (!celebrationKey) return;
+        if (floatingCount !== -1) return;
+        if (celebratedKey === celebrationKey) return;
+        setCelebratedKey(celebrationKey);
+        setShowTargetCelebration(true);
+        const timer = window.setTimeout(() => setShowTargetCelebration(false), 2600);
+        return () => window.clearTimeout(timer);
+    }, [floatingCount, celebrationKey, celebratedKey]);
     const annotationStorageKey = useMemo(() => {
         return resourceId ? `pdf-annotations:${resourceId}` : null;
     }, [resourceId]);
@@ -550,6 +740,10 @@ export default function PdfViewerPopup() {
                     url: settings.supabaseUrl,
                     anonKey: settings.supabaseAnonKey,
                     bucket: settings.supabasePdfBucket,
+                    serviceRoleKey:
+                        typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop)
+                            ? settings.supabaseServiceRoleKey
+                            : undefined,
                 });
             }
             setResources(prev => prev.map(r => 
@@ -559,6 +753,106 @@ export default function PdfViewerPopup() {
             setPdfViewerState(prev => prev ? { ...prev, resource: { ...resource, hasLocalPdf: true, pdfFileName: file.name } } : null);
         } catch (error) {
             console.error("Failed to store PDF:", error);
+        }
+    };
+
+    const captureSelectedText = useCallback(() => {
+        if (!popupRef.current) return;
+        const selection = window.getSelection();
+        if (!selection || selection.rangeCount === 0) {
+            setSelectedText("");
+            return;
+        }
+        const anchorNode = selection.anchorNode;
+        const focusNode = selection.focusNode;
+        const isInsidePopup =
+            (!!anchorNode && popupRef.current.contains(anchorNode)) ||
+            (!!focusNode && popupRef.current.contains(focusNode));
+        if (!isInsidePopup) {
+            setSelectedText("");
+            return;
+        }
+        const text = selection.toString().replace(/\s+/g, " ").trim();
+        setSelectedText(text);
+    }, []);
+
+    useEffect(() => {
+        window.addEventListener("mouseup", captureSelectedText);
+        window.addEventListener("keyup", captureSelectedText);
+        return () => {
+            window.removeEventListener("mouseup", captureSelectedText);
+            window.removeEventListener("keyup", captureSelectedText);
+        };
+    }, [captureSelectedText]);
+
+    const handleExplainSelection = async () => {
+        const text = selectedText.trim();
+        if (!text || isExplaining) return;
+        setActiveExplainText(text);
+        setIsExplaining(true);
+        setExplainError("");
+        setShowExplainPanel(true);
+        try {
+            const response = await fetch("/api/ai/explain", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(isDesktopRuntime ? { "x-studio-desktop": "1" } : {}),
+                },
+                body: JSON.stringify({
+                    text,
+                    context: `PDF: ${resource?.name || "Untitled"}`,
+                    aiConfig: getAiConfigFromSettings(settings, isDesktopRuntime),
+                }),
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result?.details || result?.error || "Failed to explain selection.");
+            }
+            const explanation = String(result?.explanation || "");
+            setChatMessages([{ role: "assistant", content: explanation }]);
+        } catch (error) {
+            setChatMessages([]);
+            setExplainError(error instanceof Error ? error.message : "Failed to explain selection.");
+        } finally {
+            setIsExplaining(false);
+        }
+    };
+
+    const handleAskFollowup = async () => {
+        const question = chatInput.trim();
+        const text = (activeExplainText || selectedText).trim();
+        if (!question || !text || isExplaining) return;
+        const nextHistory = [...chatMessages, { role: "user" as const, content: question }];
+        setChatMessages(nextHistory);
+        setChatInput("");
+        setIsExplaining(true);
+        setExplainError("");
+        try {
+            const response = await fetch("/api/ai/explain", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(isDesktopRuntime ? { "x-studio-desktop": "1" } : {}),
+                },
+                body: JSON.stringify({
+                    text,
+                    context: `PDF: ${resource?.name || "Untitled"}`,
+                    question,
+                    history: nextHistory.slice(-8),
+                    aiConfig: getAiConfigFromSettings(settings, isDesktopRuntime),
+                }),
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result?.details || result?.error || "Failed to answer follow-up.");
+            }
+            const answer = String(result?.explanation || "");
+            setChatMessages((prev) => [...prev, { role: "assistant", content: answer }]);
+        } catch (error) {
+            setExplainError(error instanceof Error ? error.message : "Failed to answer follow-up.");
+        } finally {
+            setIsExplaining(false);
         }
     };
 
@@ -595,6 +889,8 @@ export default function PdfViewerPopup() {
     const hasPageAnnotations = (annotations[pageNumber] || []).length > 0;
     const canGoPrev = pageNumber > 1;
     const canGoNext = !!numPages && pageNumber < numPages;
+    const hasSelectedText = selectedText.length > 0;
+    const explainContextText = activeExplainText || selectedText;
 
     return (
         <div ref={setNodeRef} style={style}>
@@ -641,6 +937,11 @@ export default function PdfViewerPopup() {
                                 <span className="text-xs text-muted-foreground">/ {numPages ?? "-"}</span>
                             </div>
                             <Button variant="outline" size="sm" onClick={() => setPageNumber(p => (numPages ? Math.min(numPages, p + 1) : p + 1))} disabled={!canGoNext}>Next</Button>
+                        </div>
+                        <div className="flex items-center gap-2 rounded-md border px-2 py-1">
+                            <div className="text-xs">
+                                Today: <span className="font-semibold">{pagesCompletedToday}</span> / <span className="font-semibold">{targetPagesToday}</span> pages
+                            </div>
                         </div>
                         <div className="flex items-center gap-1 flex-wrap">
                             <Button variant="outline" size="icon" className="h-8 w-8" onClick={zoomOut}><ZoomOut className="h-4 w-4" /></Button>
@@ -749,15 +1050,135 @@ export default function PdfViewerPopup() {
                        )}
                     </ScrollArea>
                 </CardContent>
+                {showExplainPanel && (
+                    <div className="absolute inset-0 z-50 bg-zinc-950/96 backdrop-blur-sm flex flex-col text-zinc-100">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/90 bg-zinc-900/95">
+                            <div className="text-base font-semibold flex items-center gap-2">
+                                <Sparkles className="h-4 w-4" />
+                                AI Explanation
+                            </div>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => setShowExplainPanel(false)}
+                                title="Close explanation overlay"
+                            >
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+                        <div className="px-4 py-2 text-xs text-zinc-400 border-b border-zinc-800/90 bg-zinc-900/80 truncate">
+                            Selected: {explainContextText ? explainContextText : "No active selection."}
+                        </div>
+                        <div className="flex-1 min-h-0 px-4 py-3">
+                            <ScrollArea className="h-full pr-3">
+                                <div className="space-y-3">
+                                    {chatMessages.map((message, idx) => (
+                                        <div key={`${message.role}-${idx}`} className={cn("rounded-md border p-3", message.role === "user" ? "bg-zinc-800/70 border-zinc-700/80" : "bg-zinc-900/70 border-zinc-800/80")}>
+                                            <div className="mb-1 text-[11px] uppercase tracking-wide text-zinc-400">
+                                                {message.role === "user" ? "You" : "AI"}
+                                            </div>
+                                            <div className="text-sm leading-relaxed whitespace-pre-wrap text-zinc-100 [&_hr]:my-3 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-zinc-700/90 [&_strong]:font-bold">
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                    {message.content}
+                                                </ReactMarkdown>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {isExplaining && (
+                                        <div className="flex items-center gap-2 text-zinc-400 text-sm">
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            Thinking...
+                                        </div>
+                                    )}
+                                    {!isExplaining && explainError && (
+                                        <div className="text-destructive text-sm">{explainError}</div>
+                                    )}
+                                    {!isExplaining && !explainError && chatMessages.length === 0 && (
+                                        <div className="text-zinc-400 text-sm">Select text and tap Explain.</div>
+                                    )}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                        <div className="border-t border-zinc-800/90 px-4 py-3 bg-zinc-900/90">
+                            <div className="flex items-center gap-2">
+                                <input
+                                    value={chatInput}
+                                    onChange={(e) => setChatInput(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" && !e.shiftKey) {
+                                            e.preventDefault();
+                                            void handleAskFollowup();
+                                        }
+                                    }}
+                                    placeholder="Ask follow-up question about selected text..."
+                                    className="flex-1 h-10 rounded-md border border-zinc-700 bg-zinc-950 px-3 text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
+                                    disabled={!explainContextText || isExplaining}
+                                />
+                                <Button
+                                    onClick={() => void handleAskFollowup()}
+                                    disabled={!explainContextText || !chatInput.trim() || isExplaining}
+                                    className="h-10"
+                                >
+                                    <Send className="h-4 w-4 mr-1.5" />
+                                    Ask
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {showTargetCelebration && (
+                    <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden">
+                        <div className="absolute inset-0 bg-emerald-500/10 backdrop-blur-[2px]" />
+                        {Array.from({ length: 20 }).map((_, i) => (
+                            <span
+                                key={`pdf-celebrate-${i}`}
+                                className="pdf-celebrate-piece"
+                                style={
+                                    {
+                                        left: `${5 + ((i * 7) % 88)}%`,
+                                        animationDelay: `${(i % 8) * 0.07}s`,
+                                        ["--piece-rotate" as any]: `${(i % 2 === 0 ? 1 : -1) * (8 + (i % 5) * 6)}deg`,
+                                    } as React.CSSProperties
+                                }
+                            />
+                        ))}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="rounded-xl border border-emerald-300/40 bg-emerald-950/85 px-5 py-3 text-emerald-100 shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+                                <div className="text-sm font-semibold flex items-center gap-2">
+                                    <Sparkles className="h-4 w-4 text-emerald-300" />
+                                    Today&apos;s target completed
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 <Button
-                    variant={isReaderOnly ? "default" : "outline"}
+                    variant={hasSelectedText ? "default" : isReaderOnly ? "default" : "outline"}
                     size="sm"
-                    onClick={() => setIsReaderOnly((prev) => !prev)}
+                    onClick={() => {
+                        if (hasSelectedText) {
+                            void handleExplainSelection();
+                            return;
+                        }
+                        setIsReaderOnly((prev) => !prev);
+                    }}
                     className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 shadow-lg"
-                    title={isReaderOnly ? "Exit page-only mode" : "Show page only"}
+                    title={hasSelectedText ? "Explain selected text" : isReaderOnly ? "Exit page-only mode" : "Show page only"}
                 >
-                    {isReaderOnly ? "Show Tools" : "Page Only"}
+                    {hasSelectedText ? (
+                        <>
+                            <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                            Explain
+                        </>
+                    ) : isReaderOnly ? "Show Tools" : "Page Only"}
                 </Button>
+                <div
+                    className="absolute bottom-4 right-4 z-30 h-8 min-w-8 rounded-md border border-border/70 bg-background/90 px-2 text-sm font-semibold flex items-center justify-center shadow-lg"
+                    title="Today's completion - target"
+                >
+                    {floatingCount}
+                </div>
                  <div
                     onMouseDown={handleResizeMouseDown("x")}
                     className="absolute right-0 top-0 h-full w-2 cursor-ew-resize z-10"
@@ -770,6 +1191,31 @@ export default function PdfViewerPopup() {
                     onMouseDown={handleResizeMouseDown("xy")}
                     className="absolute right-0 bottom-0 w-4 h-4 cursor-nwse-resize z-20 bg-primary/30 border-t border-l border-white/20"
                 />
+                <style jsx>{`
+                    .pdf-celebrate-piece {
+                        position: absolute;
+                        top: -10%;
+                        width: 8px;
+                        height: 14px;
+                        border-radius: 2px;
+                        background: linear-gradient(180deg, #86efac, #34d399);
+                        opacity: 0.95;
+                        animation: pdf-confetti-fall 1.35s ease-in forwards;
+                    }
+                    @keyframes pdf-confetti-fall {
+                        0% {
+                            transform: translateY(0) rotate(0deg);
+                            opacity: 0;
+                        }
+                        12% {
+                            opacity: 1;
+                        }
+                        100% {
+                            transform: translateY(120vh) rotate(var(--piece-rotate, 12deg));
+                            opacity: 0;
+                        }
+                    }
+                `}</style>
             </Card>
         </div>
     );

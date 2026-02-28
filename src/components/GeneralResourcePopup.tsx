@@ -29,6 +29,7 @@ import ReactPlayer from 'react-player/youtube';
 import { format, parseISO } from 'date-fns';
 import AudioMiniPlayer from './AudioMiniPlayer';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
+import { parseJsonWithRecovery } from '@/lib/jsonRecovery';
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
     if (!url) return null;
@@ -192,7 +193,7 @@ const CanvasPreviewPopup = ({
   const initialData = useMemo(() => {
     if (!drawingData) return { elements: [] as any[] };
     try {
-      const parsed = JSON.parse(drawingData);
+      const parsed = parseJsonWithRecovery<{ elements?: any[]; appState?: any }>(drawingData);
       if (Array.isArray(parsed.elements)) {
         return { elements: parsed.elements, appState: parsed.appState };
       }
@@ -291,14 +292,14 @@ const CanvasPreviewPopup = ({
   return (
     <div
       ref={containerRef}
-      style={{
-        top: position.y,
-        left: position.x,
-        width: size.width,
-        height: size.height,
-        minWidth: 320,
-        minHeight: 240,
-      }}
+        style={{
+          top: position.y,
+          left: position.x,
+          width: size.width,
+          height: size.height,
+          minWidth: 520,
+          minHeight: 360,
+        }}
       className="fixed z-[160] rounded-2xl border border-white/10 bg-background/90 backdrop-blur-md shadow-2xl overflow-hidden resize both canvas-preview"
     >
       <div
@@ -710,8 +711,8 @@ export function GeneralResourcePopup({ popupState, onClose, onNavigatePath, onUp
         }
 
         const rect = cardRef.current?.getBoundingClientRect();
-        const width = Math.max(360, Math.min(window.innerWidth * 0.6, 720));
-        const height = Math.max(260, Math.min(window.innerHeight * 0.55, 520));
+        const width = Math.max(520, Math.min(window.innerWidth * 0.8, 1100));
+        const height = Math.max(360, Math.min(window.innerHeight * 0.75, 760));
         const x = (rect?.x ?? (window.innerWidth - width) / 2) + 20;
         const y = (rect?.y ?? (window.innerHeight - height) / 2) + 20;
 

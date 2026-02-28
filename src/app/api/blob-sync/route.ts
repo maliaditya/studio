@@ -67,10 +67,17 @@ export async function POST(request: Request) {
   const { username, data, demo_override_token, baseRevision } = await request.json();
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(
-      { error: 'Vercel Blob Storage is not configured on the server. Please link a Blob store.' },
-      { status: 500 }
-    );
+    const requestedUsername = normalizeUsername(String(username || ''));
+    if (!requestedUsername || data === undefined) {
+      return NextResponse.json({ error: 'Username and data payload are required.' }, { status: 400 });
+    }
+    const responseRevision = parseBaseRevision(baseRevision) ?? 0;
+    return NextResponse.json({
+      success: true,
+      message: 'Cloud sync skipped (local mode).',
+      localMode: true,
+      revision: responseRevision,
+    });
   }
 
   if (!username || data === undefined) {
@@ -154,10 +161,12 @@ export async function GET(request: Request) {
   const username = searchParams.get('username');
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(
-      { error: 'Vercel Blob Storage is not configured on the server.' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      data: null,
+      revision: 0,
+      message: 'Cloud sync unavailable in local mode.',
+      localMode: true,
+    });
   }
 
   if (!username) {

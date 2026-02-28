@@ -17,6 +17,7 @@ import { OnLinkOpen, PointerDownState, AppState, ExcalidrawElement, NonDeleted }
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { loadExcalidrawFiles, saveExcalidrawFiles, type ExcalidrawFilesMetaMap } from '@/lib/excalidrawFileStore';
+import { parseJsonWithRecovery } from '@/lib/jsonRecovery';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -179,7 +180,7 @@ const ExcalidrawWrapper = ({
   const initialData = useMemo(() => {
     try {
       if (activeCanvas.data) {
-        const parsedData = JSON.parse(activeCanvas.data);
+        const parsedData = parseJsonWithRecovery<{ elements?: unknown[]; appState?: AppState }>(activeCanvas.data);
         if (Array.isArray(parsedData.elements)) {
           return { elements: parsedData.elements, appState: parsedData.appState, files };
         }
@@ -431,7 +432,7 @@ function DrawingCanvasPageContent() {
             let filesMeta: ExcalidrawFilesMetaMap | undefined;
             if (activeCanvas.data) {
                 try {
-                    const parsed = JSON.parse(activeCanvas.data);
+                    const parsed = parseJsonWithRecovery<{ files?: ExcalidrawFilesMetaMap }>(activeCanvas.data);
                     filesMeta = parsed.files;
                 } catch (e) {
                     console.error("Failed to parse canvas file metadata:", e);

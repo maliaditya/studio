@@ -10,10 +10,17 @@ export async function POST(request: Request) {
   const { username, password } = await request.json();
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(
-      { error: 'Vercel Blob Storage is not configured on the server. Please link a Blob store.' },
-      { status: 500 }
-    );
+    if (!username || !password) {
+      return NextResponse.json({ error: 'Username and password are required.' }, { status: 400 });
+    }
+    const normalizedUsername = String(username).trim().toLowerCase();
+    const response = NextResponse.json({
+      success: true,
+      message: 'Registration successful (local mode).',
+      localMode: true,
+    });
+    attachSessionCookie(response, normalizedUsername);
+    return response;
   }
 
   if (!username || !password) {

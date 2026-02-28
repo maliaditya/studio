@@ -7,10 +7,9 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, BookCopy, Briefcase } from 'lucide-react';
+import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, BookCopy, Briefcase, X } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Textarea } from './ui/textarea';
 import { BrainHack, ExerciseDefinition } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
@@ -34,8 +33,6 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
     const inputRef = useRef<HTMLInputElement>(null);
     const [isFetching, setIsFetching] = useState(false);
     const { toast } = useToast();
-
-    const isMultiLine = text.includes('\n') || text.length > 50;
 
     useEffect(() => {
         if (hack.text === "New Brain Hack" || hack.text === "https://example.com") {
@@ -76,10 +73,10 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
 
     if (hack.type === 'link' && !isFetching && hack.displayText) {
         return (
-             <div className="flex items-center justify-between group p-2 rounded-md bg-muted/50 hover:bg-muted/80 w-full">
-                <Globe className="h-4 w-4 text-blue-500 mr-2 flex-shrink-0" />
+             <div className="grid grid-cols-[16px_minmax(0,1fr)_24px] items-center gap-2 p-2 rounded-md bg-muted/50 hover:bg-muted/80 w-full">
+                <Globe className="h-4 w-4 text-blue-500 flex-shrink-0" />
                 <button 
-                    className="text-sm font-medium w-full text-left truncate text-primary hover:underline"
+                    className="text-sm font-medium min-w-0 flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap text-primary hover:underline"
                     onClick={() => onOpenLink(hack.link!)}
                     onContextMenu={(e) => {
                         e.preventDefault();
@@ -88,11 +85,9 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
                 >
                     {hack.displayText || hack.link}
                 </button>
-                <div className="flex items-center flex-shrink-0">
-                    <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); onDelete(hack.id); }}>
-                        <Trash2 className="h-3 w-3 text-destructive" />
-                    </Button>
-                </div>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onDelete(hack.id); }}>
+                    <Trash2 className="h-3 w-3 text-destructive" />
+                </Button>
             </div>
         )
     }
@@ -102,25 +97,21 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
         onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setText(e.target.value),
         onBlur: handleBlur,
         onKeyDown: handleKeyDown,
-        className: "h-auto text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full resize-none overflow-hidden p-1 flex-grow min-w-0",
+        className: "h-8 text-sm border-0 bg-transparent focus-visible:ring-1 focus-visible:ring-ring w-full p-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap",
         placeholder: hack.type === 'link' ? 'https://...' : 'New hack...',
     };
 
     return (
-        <div className="flex items-center justify-between group p-2 rounded-md bg-muted/50 hover:bg-muted/80 w-full">
-            <div className="flex items-center gap-2 flex-grow min-w-0">
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1 p-2 rounded-md bg-muted/50 hover:bg-muted/80 w-full">
+            <div className="flex items-center gap-2 min-w-0">
                 {isFetching ? (
                      <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
                 ) : (
                     hack.type === 'link' ? <LinkIcon className="h-4 w-4 text-blue-500 flex-shrink-0" /> : null
                 )}
-                {isMultiLine ? (
-                    <Textarea {...commonProps} rows={1} autoFocus />
-                ) : (
-                    <Input {...commonProps} ref={inputRef} />
-                )}
+                <Input {...commonProps} ref={inputRef} />
             </div>
-            <div className="flex items-center flex-shrink-0">
+            <div className="flex items-center flex-shrink-0 gap-0.5">
                 <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); onLinkTasks(hack); }}>
                     <LinkIcon className="h-3 w-3 text-primary" />
                 </Button>
@@ -129,7 +120,7 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
                         <GitBranch className="h-3 w-3 text-blue-500" />
                     </Button>
                 )}
-                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" onClick={(e) => { e.stopPropagation(); onDelete(hack.id); }}>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); onDelete(hack.id); }}>
                     <Trash2 className="h-3 w-3 text-destructive" />
                 </Button>
             </div>
@@ -138,11 +129,20 @@ const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, 
 });
 EditableBrainHack.displayName = 'EditableBrainHack';
 
-export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?: string | null, initialPosition?: { x: number, y: number } }) {
+export function BrainHacksCard({
+    parentId = null,
+    initialPosition,
+    onClose,
+}: {
+    parentId?: string | null,
+    initialPosition?: { x: number, y: number },
+    onClose?: () => void,
+}) {
     const { 
         brainHacks, setBrainHacks, 
         setFloatingVideoUrl, setFloatingVideoPlaylist,
-        upskillDefinitions, deepWorkDefinitions 
+        upskillDefinitions, deepWorkDefinitions,
+        setOpenBrainHackPopups,
     } = useAuth();
     const { toast } = useToast();
     const [isClient, setIsClient] = useState(false);
@@ -356,6 +356,24 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
         setLinkTaskModal({ isOpen: false, hack: null });
         toast({ title: 'Tasks Linked!' });
     };
+
+    const handleCloseCard = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (onClose) {
+            onClose();
+            return;
+        }
+        if (parentId) {
+            setOpenBrainHackPopups(prev => {
+                if (!prev[parentId]) return prev;
+                const next = { ...prev };
+                delete next[parentId];
+                return next;
+            });
+        }
+    };
+
+    const showCloseButton = !!onClose || (parentId !== null && !!initialPosition);
     
     const style: React.CSSProperties = {
         position: 'fixed',
@@ -374,7 +392,7 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
             <motion.div
                 ref={cardRef}
                 style={style}
-                className="fixed w-full max-w-xs z-50"
+                className="fixed w-full max-w-xs z-[120]"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 20 }}
@@ -400,6 +418,11 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
                                 <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => handleAddHack('hack')}>
                                     <PlusCircle className="h-4 w-4 text-green-500" />
                                 </Button>
+                                {showCloseButton && (
+                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={handleCloseCard}>
+                                        <X className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                )}
                             </div>
                         </CardHeader>
                     </div>
@@ -425,7 +448,16 @@ export function BrainHacksCard({ parentId = null, initialPosition }: { parentId?
                 </Card>
             </motion.div>
             {Object.entries(openChildPopups).map(([hackId, pos]) => (
-                <BrainHacksCard key={hackId} parentId={hackId} initialPosition={pos} />
+                <BrainHacksCard
+                    key={hackId}
+                    parentId={hackId}
+                    initialPosition={pos}
+                    onClose={() => setOpenChildPopups(prev => {
+                        const next = { ...prev };
+                        delete next[hackId];
+                        return next;
+                    })}
+                />
             ))}
             <Dialog open={!!linkTextDialog} onOpenChange={() => setLinkTextDialog(null)}>
                 <DialogContent>

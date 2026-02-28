@@ -808,6 +808,8 @@ export type CoreDomainId =
   | 'transcendence';
 
 export interface UserSettings {
+  ispSimpleMode?: boolean;
+  ispSimpleKeepCanvasAndBotherings?: boolean;
   carryForward: boolean;
   autoPush: boolean;
   autoPushLimit: number;
@@ -836,6 +838,7 @@ export interface UserSettings {
   supabaseUrl?: string;
   supabaseAnonKey?: string;
   supabasePdfBucket?: string;
+  supabaseServiceRoleKey?: string;
   lastSync?: { sha: string, timestamp: number };
   githubModuleHashes?: Record<string, string>;
   githubPulledHashes?: Record<string, string>;
@@ -858,7 +861,68 @@ export interface UserSettings {
   routineSkipByDate?: Record<string, string[]>;
   routineSourceOverrides?: Record<string, 'external' | 'mismatch'>;
   pdfLastOpenedPageByResourceId?: Record<string, number>;
+  pdfDailyPageTargetByResourceId?: Record<string, number>;
+  pdfDailyPageStatsByResourceId?: Record<string, { date: string; startPage: number; maxPage: number }>;
   pdfAnnotationsByResourceId?: Record<string, Record<string, PdfAnnotationStroke[]>>;
+  learningPerformanceDailyLogs?: Record<string, LearningPerformanceLogEntry[]>;
+  stateDiagramStore?: StateDiagramStore;
+  ai?: {
+    provider: 'ollama' | 'openai';
+    model: string;
+    ollamaBaseUrl?: string;
+    openaiApiKey?: string;
+    openaiBaseUrl?: string;
+    requestTimeoutMs?: number;
+  };
+}
+
+export interface LearningPerformanceLogEntry {
+  id: string;
+  dateKey: string;
+  specializationId: string;
+  specializationName: string;
+  activityType: ActivityType;
+  sourceTaskId?: string;
+  durationMinutes: number;
+  pagesCompleted: number;
+  hoursCompleted: number;
+  itemsCompleted: number;
+}
+
+export interface StateDiagramNodeConfig {
+  id: string;
+  title: string;
+  subtitle: string;
+  note: string;
+  x: number;
+  y: number;
+  fill: string;
+  linkedBrainHackId?: string | null;
+}
+
+export interface StateDiagramEdgeConfig {
+  id: string;
+  from: string;
+  to: string;
+  label: string;
+  color: string;
+}
+
+export interface StateDiagramDocConfig {
+  id: string;
+  name: string;
+  nodes: StateDiagramNodeConfig[];
+  edges: StateDiagramEdgeConfig[];
+  camera: {
+    x: number;
+    y: number;
+    zoom: number;
+  };
+}
+
+export interface StateDiagramStore {
+  diagrams: StateDiagramDocConfig[];
+  activeDiagramId: string;
 }
 
 export interface ActiveFocusSession {

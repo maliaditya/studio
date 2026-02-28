@@ -635,6 +635,53 @@ export function MindsetCategoriesCard() {
             if (Number.isNaN(parsed.getTime())) return null;
             return format(parsed, 'yyyy-MM-dd');
         };
+        const stripInstanceDateSuffix = (value?: string | null) =>
+            (value || '').replace(/_\d{4}-\d{2}-\d{2}$/, '');
+        const resolveTaskCadence = (task: NonNullable<MindsetPoint['tasks']>[number] | undefined) => {
+            if (!task) {
+                return {
+                    recurrence: 'none' as const,
+                    repeatInterval: 1,
+                    repeatUnit: 'day' as const,
+                    startDateKey: null as string | null,
+                };
+            }
+
+            const taskId = stripInstanceDateSuffix(task.id);
+            const activityId = stripInstanceDateSuffix(task.activityId || '');
+            const matchingRoutine = (settings.routines || []).find((routine) => {
+                const routineId = stripInstanceDateSuffix(routine.id);
+                return (
+                    routineId === taskId ||
+                    routineId === activityId ||
+                    (!!task.details && !!routine.details && normalizeText(task.details) === normalizeText(routine.details) && task.type === routine.type)
+                );
+            });
+
+            const routineRule = matchingRoutine?.routine;
+            const resolvedRecurrence =
+                task.recurrence && task.recurrence !== 'none'
+                    ? task.recurrence
+                    : ((routineRule?.type as 'daily' | 'weekly' | 'custom' | undefined) || 'none');
+            const resolvedInterval = Math.max(
+                1,
+                task.repeatInterval || routineRule?.repeatInterval || routineRule?.days || 1
+            );
+            const resolvedUnit =
+                task.repeatUnit ||
+                routineRule?.repeatUnit ||
+                (resolvedRecurrence === 'weekly' ? 'week' : 'day');
+            const resolvedStartDateKey =
+                normalizeDateKey(task.startDate || task.dateKey) ||
+                normalizeDateKey(matchingRoutine?.baseDate || null);
+
+            return {
+                recurrence: resolvedRecurrence,
+                repeatInterval: resolvedInterval,
+                repeatUnit: resolvedUnit as 'day' | 'week' | 'month',
+                startDateKey: resolvedStartDateKey,
+            };
+        };
         const countRemainingScheduledSessions = (
             task: NonNullable<MindsetPoint['tasks']>[number] | undefined,
             endDateKey: string | null,
@@ -645,12 +692,18 @@ export function MindsetCategoriesCard() {
             if (Number.isNaN(endDate.getTime())) return null;
             if (isBefore(endDate, fromDate)) return 0;
 
-            const recurrence = task.recurrence || 'daily';
-            if (recurrence === 'none') return 1;
+            const cadence = resolveTaskCadence(task);
+            const recurrence = cadence.recurrence;
+            if (recurrence === 'none') {
+                if (!cadence.startDateKey) return 0;
+                const oneTimeDate = startOfDay(parseISO(cadence.startDateKey));
+                if (Number.isNaN(oneTimeDate.getTime())) return 0;
+                return !isBefore(oneTimeDate, fromDate) && !isAfter(oneTimeDate, endDate) ? 1 : 0;
+            }
 
-            const interval = Math.max(1, task.repeatInterval || 1);
-            const repeatUnit = task.repeatUnit || (recurrence === 'weekly' ? 'week' : 'day');
-            const baseDateKey = normalizeDateKey(task.startDate || task.dateKey) || format(fromDate, 'yyyy-MM-dd');
+            const interval = Math.max(1, cadence.repeatInterval || 1);
+            const repeatUnit = cadence.repeatUnit || (recurrence === 'weekly' ? 'week' : 'day');
+            const baseDateKey = cadence.startDateKey || format(fromDate, 'yyyy-MM-dd');
             let cursor = startOfDay(parseISO(baseDateKey));
             if (Number.isNaN(cursor.getTime())) cursor = fromDate;
 
@@ -899,6 +952,7 @@ export function MindsetCategoriesCard() {
                     daysRemaining,
                     remainingMicroSkills,
                     dailyTarget,
+                    totalSessions: null as number | null,
                 };
             });
             const hasLearningPlan = audioCount > 0 || bookCount > 0 || skillTreePathCount > 0;
@@ -949,6 +1003,7 @@ export function MindsetCategoriesCard() {
                 launchDate: string;
                 description?: string;
                 focusAreaCount: number;
+                totalSessions?: number | null;
                 workflowStages?: {
                     botheringText?: string;
                     ideaItems: Array<string | { text: string; completed?: boolean }>;
@@ -975,11 +1030,15 @@ export function MindsetCategoriesCard() {
                 daysRemaining: number | null;
                 remainingMicroSkills: number;
                 dailyTarget: number | null;
+                totalSessions: number | null;
             }>;
             latestAudioEndDate: string | null;
             latestBookEndDate: string | null;
             audioDaysRemaining: number | null;
             bookDaysRemaining: number | null;
+            totalSessions: number | null;
+            audioTotalSessions: number | null;
+            bookTotalSessions: number | null;
             completedPages: number;
             completedHours: number;
             remainingPages: number;
@@ -996,6 +1055,7 @@ export function MindsetCategoriesCard() {
             const linkedTask = taskById.get(taskId);
             const audioSessionsRemaining = countRemainingScheduledSessions(linkedTask, target.latestAudioEndDate, today);
             const bookSessionsRemaining = countRemainingScheduledSessions(linkedTask, target.latestBookEndDate, today);
+            const totalSessions = countRemainingScheduledSessions(linkedTask, target.latestLearningPlanEndDate, today);
             const adjustedDailyHourTarget =
                 target.audioCount > 0 && target.remainingHours > 0
                     ? (audioSessionsRemaining != null
@@ -1020,8 +1080,12 @@ export function MindsetCategoriesCard() {
                         ? Math.max(1, Math.ceil(path.remainingMicroSkills / pathSessionsRemaining))
                         : path.remainingMicroSkills)
                     : path.dailyTarget;
-                return { ...path, dailyTarget };
+                return { ...path, dailyTarget, totalSessions: pathSessionsRemaining };
             });
+            const adjustedProjectPlans = target.projectPlans.map((plan) => ({
+                ...plan,
+                totalSessions: countRemainingScheduledSessions(linkedTask, normalizeDateKey(plan.launchDate), today),
+            }));
 
             taskLearningPlanByTaskId.set(taskId, {
                 specializationId: target.specializationId,
@@ -1031,7 +1095,7 @@ export function MindsetCategoriesCard() {
                 learningPlanSummary: target.learningPlanSummary,
                 hasProjectPlan: target.hasProjectPlan,
                 projectPlanSummary: target.projectPlanSummary,
-                projectPlans: target.projectPlans,
+                projectPlans: adjustedProjectPlans,
                 latestLearningPlanEndDate: target.latestLearningPlanEndDate,
                 totalPages: target.totalPages,
                 totalHours: target.totalHours,
@@ -1046,6 +1110,9 @@ export function MindsetCategoriesCard() {
                 latestBookEndDate: target.latestBookEndDate,
                 audioDaysRemaining: target.audioDaysRemaining,
                 bookDaysRemaining: target.bookDaysRemaining,
+                totalSessions,
+                audioTotalSessions: audioSessionsRemaining,
+                bookTotalSessions: bookSessionsRemaining,
                 completedPages: target.completedPages,
                 completedHours: target.completedHours,
                 remainingPages: target.remainingPages,
@@ -1058,7 +1125,7 @@ export function MindsetCategoriesCard() {
             taskLearningPlanByTaskId,
             targets,
         };
-    }, [activeBotheringPoint, coreSkills, deepWorkDefinitions, getEffectiveBotheringTasks, offerizationPlans, upskillDefinitions]);
+    }, [activeBotheringPoint, coreSkills, deepWorkDefinitions, getEffectiveBotheringTasks, offerizationPlans, upskillDefinitions, settings.routines]);
 
     const shouldShowCompletionResolutionInput = useMemo(() => {
         if (!activeBotheringPoint) return true;
@@ -2442,6 +2509,7 @@ export function MindsetCategoriesCard() {
                                                         <span>Status: {daysLeft === 0 ? 'Due' : 'In progress'}</span>
                                                         <span>Items: {completedItems}/{totalItems}</span>
                                                         <span>Items/day: {itemsPerDay != null ? itemsPerDay : 'N/A'}</span>
+                                                        <span>Remaining sessions (till end): {plan.totalSessions != null ? plan.totalSessions : 'N/A'}</span>
                                                     </div>
                                                     {plan.description && (
                                                         <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">{plan.description}</p>
@@ -2514,6 +2582,7 @@ export function MindsetCategoriesCard() {
                                                         <span>Days left: {path.daysRemaining != null ? path.daysRemaining : 'N/A'}</span>
                                                         <span>Remaining: {path.remainingMicroSkills}</span>
                                                         <span>Daily target: {path.dailyTarget != null ? `${path.dailyTarget}/day` : (path.remainingMicroSkills === 0 ? 'Done' : 'N/A')}</span>
+                                                        <span>Remaining sessions (till end): {path.totalSessions != null ? path.totalSessions : 'N/A'}</span>
                                                     </div>
                                                 </div>
                                             ))}
@@ -2530,6 +2599,7 @@ export function MindsetCategoriesCard() {
                                             <span>Days left: {learningPlanMeta.audioDaysRemaining != null ? learningPlanMeta.audioDaysRemaining : 'N/A'}</span>
                                             <span>Remaining: {learningPlanMeta.remainingHours}</span>
                                             <span>Daily target: {learningPlanMeta.dailyHourTarget != null ? `${learningPlanMeta.dailyHourTarget} hrs/day` : 'Done'}</span>
+                                            <span>Remaining sessions (till end): {learningPlanMeta.audioTotalSessions != null ? learningPlanMeta.audioTotalSessions : 'N/A'}</span>
                                         </div>
                                     </div>
                                     )}
@@ -2543,6 +2613,7 @@ export function MindsetCategoriesCard() {
                                             <span>Days left: {learningPlanMeta.bookDaysRemaining != null ? learningPlanMeta.bookDaysRemaining : 'N/A'}</span>
                                             <span>Remaining: {learningPlanMeta.remainingPages}</span>
                                             <span>Daily target: {learningPlanMeta.dailyPageTarget != null ? `${learningPlanMeta.dailyPageTarget} pages/day` : 'Done'}</span>
+                                            <span>Remaining sessions (till end): {learningPlanMeta.bookTotalSessions != null ? learningPlanMeta.bookTotalSessions : 'N/A'}</span>
                                         </div>
                                     </div>
                                     )}

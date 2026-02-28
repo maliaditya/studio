@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Dialog,
   DialogHeader,
@@ -29,13 +29,15 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Copy, Trash2, RefreshCw, Github, HardDrive } from 'lucide-react';
+import { Copy, Trash2, RefreshCw, Github, HardDrive, Sparkles } from 'lucide-react';
 import type { Activity, ActivityType, WorkoutSchedulingMode, WidgetVisibility, SlotName } from '@/types/workout';
 import { initSupabasePdfStorage } from '@/lib/supabasePdfStorage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from './ui/progress';
+import { normalizeAiSettings, DEFAULT_OPENAI_MODEL, DEFAULT_OLLAMA_MODEL } from '@/lib/ai/config';
+import type { AiProvider } from '@/types/ai';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -91,9 +93,24 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const [supabaseServiceRoleKey, setSupabaseServiceRoleKey] = useState('');
   const [isSupabaseSecretConfigured, setIsSupabaseSecretConfigured] = useState(false);
   const [isInitializingSupabase, setIsInitializingSupabase] = useState(false);
+  const [availableAiModels, setAvailableAiModels] = useState<string[]>([]);
+  const [isLoadingAiModels, setIsLoadingAiModels] = useState(false);
+  const [aiModelsError, setAiModelsError] = useState<string | null>(null);
+  const isDesktopRuntime =
+    typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
 
   // State for GitHub settings inputs
   const [localSettings, setLocalSettings] = useState(settings);
+  const resolvedAiSettings = useMemo(
+    () => normalizeAiSettings(settings.ai, isDesktopRuntime),
+    [settings.ai, isDesktopRuntime]
+  );
+  const modelOptions = useMemo(() => {
+    const current = resolvedAiSettings.model?.trim();
+    if (!current) return availableAiModels;
+    if (availableAiModels.includes(current)) return availableAiModels;
+    return [current, ...availableAiModels];
+  }, [availableAiModels, resolvedAiSettings.model]);
 
   // Drag state for non-modal popup
   const popupRef = React.useRef<HTMLDivElement | null>(null);
@@ -150,7 +167,11 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
           ...settings,
           githubPath: settings.githubPath || defaultFileName,
       });
-      if (currentUser?.username) {
+      setSupabaseServiceRoleKey(settings.supabaseServiceRoleKey || '');
+
+      if (isDesktopRuntime) {
+        setIsSupabaseSecretConfigured(!!settings.supabaseServiceRoleKey);
+      } else if (currentUser?.username) {
         fetch(`/api/supabase-secret?username=${currentUser.username.toLowerCase()}`, { credentials: 'include' })
           .then(async (res) => {
             const json = await res.json().catch(() => ({}));
@@ -159,7 +180,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
           .catch(() => setIsSupabaseSecretConfigured(false));
       }
     }
-  }, [isOpen, settings, defaultFileName, currentUser?.username]);
+  }, [isOpen, settings, defaultFileName, currentUser?.username, isDesktopRuntime]);
 
   const handleModalOpenChange = (open: boolean) => {
     onOpenChange(open);
@@ -344,6 +365,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
         supabaseUrl: localSettings.supabaseUrl,
         supabaseAnonKey: localSettings.supabaseAnonKey,
         supabasePdfBucket: localSettings.supabasePdfBucket,
+        supabaseServiceRoleKey: localSettings.supabaseServiceRoleKey,
     }));
 
     if (!currentUser?.username) {
@@ -379,12 +401,20 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   };
 
   const handleSaveSupabaseServiceKey = async () => {
-    if (!currentUser?.username) {
-      toast({ title: "Error", description: "You must be logged in to save the service key.", variant: "destructive" });
-      return;
-    }
     if (!supabaseServiceRoleKey.trim()) {
       toast({ title: "Error", description: "Enter Supabase service role key.", variant: "destructive" });
+      return;
+    }
+    if (isDesktopRuntime) {
+      const nextKey = supabaseServiceRoleKey.trim();
+      setLocalSettings(prev => ({ ...prev, supabaseServiceRoleKey: nextKey }));
+      setSettings(prev => ({ ...prev, supabaseServiceRoleKey: nextKey }));
+      setIsSupabaseSecretConfigured(true);
+      toast({ title: "Saved", description: "Supabase service key saved locally on this desktop app." });
+      return;
+    }
+    if (!currentUser?.username) {
+      toast({ title: "Error", description: "You must be logged in to save the service key.", variant: "destructive" });
       return;
     }
     try {
@@ -421,6 +451,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
       await initSupabasePdfStorage(currentUser.username, {
         url: localSettings.supabaseUrl,
         bucket: localSettings.supabasePdfBucket || 'pdfs',
+        serviceRoleKey: isDesktopRuntime ? (supabaseServiceRoleKey.trim() || localSettings.supabaseServiceRoleKey) : undefined,
       });
       toast({ title: "Initialized", description: "Supabase PDF bucket is ready." });
     } catch (error) {
@@ -433,6 +464,56 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const handleSettingChange = (key: keyof typeof settings, value: any) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
+  const handleAiSettingChange = (key: keyof NonNullable<typeof settings.ai>, value: string | number) => {
+    setSettings((prev) => {
+      const normalized = normalizeAiSettings(prev.ai, isDesktopRuntime);
+      return {
+        ...prev,
+        ai: {
+          ...normalized,
+          [key]: value,
+        },
+      };
+    });
+  };
+  const loadAvailableAiModels = useCallback(async () => {
+    try {
+      setIsLoadingAiModels(true);
+      setAiModelsError(null);
+      const response = await fetch('/api/ai/models', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+        },
+        body: JSON.stringify({
+          aiConfig: resolvedAiSettings,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(String(result?.details || result?.error || 'Failed to load models.'));
+      }
+      const list = Array.isArray(result?.models) ? result.models.map((m: any) => String(m)).filter(Boolean) : [];
+      setAvailableAiModels(list);
+    } catch (error) {
+      setAvailableAiModels([]);
+      setAiModelsError(error instanceof Error ? error.message : 'Failed to load models.');
+    } finally {
+      setIsLoadingAiModels(false);
+    }
+  }, [isDesktopRuntime, resolvedAiSettings]);
+  useEffect(() => {
+    if (!isOpen) return;
+    void loadAvailableAiModels();
+  }, [
+    isOpen,
+    resolvedAiSettings.provider,
+    resolvedAiSettings.ollamaBaseUrl,
+    resolvedAiSettings.openaiBaseUrl,
+    resolvedAiSettings.openaiApiKey,
+    loadAvailableAiModels,
+  ]);
 
   const handleWidgetVisibilityChange = (widgetId: keyof WidgetVisibility, isVisible: boolean) => {
     handleSettingChange('widgetVisibility', {
@@ -767,9 +848,15 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                             <Input id="supabase-bucket" placeholder="pdfs" value={localSettings.supabasePdfBucket || ''} onChange={(e) => handleLocalSettingChange('supabasePdfBucket', e.target.value)} />
                           </div>
                           <div className="space-y-1">
-                            <Label htmlFor="supabase-service-role">Supabase Service Role Key (Server-only)</Label>
+                            <Label htmlFor="supabase-service-role">
+                              {isDesktopRuntime ? 'Supabase Service Role Key (Desktop local only)' : 'Supabase Service Role Key (Server-only)'}
+                            </Label>
                             <Input id="supabase-service-role" type="password" placeholder="sb_secret_..." value={supabaseServiceRoleKey} onChange={(e) => setSupabaseServiceRoleKey(e.target.value)} />
-                            <p className="text-xs text-muted-foreground">{isSupabaseSecretConfigured ? 'Service key configured on server.' : 'No service key saved yet.'}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {isDesktopRuntime
+                                ? (isSupabaseSecretConfigured ? 'Service key configured locally on this desktop app.' : 'No local service key saved yet.')
+                                : (isSupabaseSecretConfigured ? 'Service key configured on server.' : 'No service key saved yet.')}
+                            </p>
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <Button onClick={handleGithubSettingsSave}>Save Sync Settings</Button>
@@ -782,6 +869,107 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                             <Button variant="secondary" onClick={syncPdfFilesToGitHub}>Upload PDFs</Button>
                             <Button variant="outline" onClick={fetchPdfFilesFromGitHub}>Fetch PDFs</Button>
                           </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                  <AccordionItem value="item-ai" className="border rounded-lg">
+                    <AccordionTrigger className="px-4 py-3">
+                      <div className="space-y-0.5 text-left">
+                        <Label className="text-base flex items-center gap-2"><Sparkles className="h-4 w-4" /> AI Settings</Label>
+                        <p className="text-sm text-muted-foreground">Choose provider/model for AI enhancements.</p>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4">
+                      <div className="space-y-4 pt-4 border-t">
+                        <div className="space-y-1">
+                          <Label htmlFor="ai-provider">Provider</Label>
+                          <Select
+                            value={resolvedAiSettings.provider}
+                            onValueChange={(value) => handleAiSettingChange('provider', value as AiProvider)}
+                          >
+                            <SelectTrigger id="ai-provider">
+                              <SelectValue placeholder="Select provider" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ollama">Local (Ollama)</SelectItem>
+                              <SelectItem value="openai">OpenAI API</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="ai-model">Model</Label>
+                          <div className="flex items-center gap-2">
+                            {modelOptions.length > 0 ? (
+                              <Select
+                                value={resolvedAiSettings.model}
+                                onValueChange={(value) => handleAiSettingChange('model', value)}
+                              >
+                                <SelectTrigger id="ai-model" className="flex-1">
+                                  <SelectValue placeholder="Select model" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {modelOptions.map((model) => (
+                                    <SelectItem key={model} value={model}>{model}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <Input
+                                id="ai-model"
+                                className="flex-1"
+                                placeholder={resolvedAiSettings.provider === 'ollama' ? DEFAULT_OLLAMA_MODEL : DEFAULT_OPENAI_MODEL}
+                                value={resolvedAiSettings.model}
+                                onChange={(e) => handleAiSettingChange('model', e.target.value)}
+                              />
+                            )}
+                            <Button type="button" variant="outline" size="icon" onClick={() => void loadAvailableAiModels()} disabled={isLoadingAiModels}>
+                              <RefreshCw className={`h-4 w-4 ${isLoadingAiModels ? 'animate-spin' : ''}`} />
+                            </Button>
+                          </div>
+                          {availableAiModels.length > 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                              {availableAiModels.length} available model{availableAiModels.length === 1 ? '' : 's'} detected.
+                            </p>
+                          ) : null}
+                          {aiModelsError ? <p className="text-xs text-destructive">{aiModelsError}</p> : null}
+                        </div>
+                        {resolvedAiSettings.provider === 'ollama' ? (
+                          <div className="space-y-1">
+                            <Label htmlFor="ai-ollama-base-url">Ollama Base URL</Label>
+                            <Input
+                              id="ai-ollama-base-url"
+                              placeholder="http://127.0.0.1:11434"
+                              value={resolvedAiSettings.ollamaBaseUrl}
+                              onChange={(e) => handleAiSettingChange('ollamaBaseUrl', e.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              {isDesktopRuntime ? 'Uses local Ollama server on this desktop app.' : 'Use this only if your web app can reach your Ollama endpoint.'}
+                            </p>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="space-y-1">
+                              <Label htmlFor="ai-openai-key">OpenAI API Key</Label>
+                              <Input
+                                id="ai-openai-key"
+                                type="password"
+                                placeholder="sk-..."
+                                value={resolvedAiSettings.openaiApiKey}
+                                onChange={(e) => handleAiSettingChange('openaiApiKey', e.target.value)}
+                              />
+                              <p className="text-xs text-muted-foreground">Key stored in browser on this device.</p>
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="ai-openai-base-url">OpenAI Base URL (optional)</Label>
+                              <Input
+                                id="ai-openai-base-url"
+                                placeholder="https://api.openai.com"
+                                value={resolvedAiSettings.openaiBaseUrl}
+                                onChange={(e) => handleAiSettingChange('openaiBaseUrl', e.target.value)}
+                              />
+                            </div>
+                          </>
+                        )}
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -994,7 +1182,27 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                       className="w-20 h-8"
                     />
                   </div>
-                   <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="isp-simple-mode"
+                      checked={settings.ispSimpleMode ?? true}
+                      onCheckedChange={(checked) => handleSettingChange('ispSimpleMode', checked)}
+                    />
+                    <Label htmlFor="isp-simple-mode" className="font-normal">
+                      Simple Production Mode (hide advanced features)
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="isp-simple-mode-keep-icons"
+                      checked={settings.ispSimpleKeepCanvasAndBotherings ?? true}
+                      onCheckedChange={(checked) => handleSettingChange('ispSimpleKeepCanvasAndBotherings', checked)}
+                    />
+                    <Label htmlFor="isp-simple-mode-keep-icons" className="font-normal">
+                      In Simple Mode, keep Canvas + Botherings icons visible
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
                     <Switch
                       id="smart-logging"
                       checked={settings.smartLogging}
