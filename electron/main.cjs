@@ -9,10 +9,10 @@ const DEV_URL = process.env.ELECTRON_DEV_URL || "http://localhost:9002";
 const PROD_URL = process.env.ELECTRON_START_URL || null;
 const FORCE_REMOTE = process.env.ELECTRON_FORCE_REMOTE === "1";
 const AUTH_BASE_URL = process.env.ELECTRON_AUTH_BASE_URL || "https://vdock.vercel.app";
+const APP_DISPLAY_NAME = "Dock";
 const ICON_CANDIDATES = [
   path.join(__dirname, "assets", "icon.ico"),
   path.join(process.cwd(), "electron", "assets", "icon.ico"),
-  path.join(process.cwd(), "src", "app", "favicon.ico"),
 ];
 
 let mainWindow = null;
@@ -235,6 +235,7 @@ async function createWindow() {
     minWidth: 1100,
     minHeight: 700,
     autoHideMenuBar: true,
+    title: APP_DISPLAY_NAME,
     icon: resolvedIcon,
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -259,6 +260,7 @@ async function createWindow() {
     logLine(`[renderer console] level=${level} ${sourceId}:${line} ${message}`);
   });
   mainWindow.webContents.on("did-finish-load", () => {
+    mainWindow?.setTitle(APP_DISPLAY_NAME);
     logLine(`did-finish-load url=${mainWindow?.webContents.getURL() || ""}`);
   });
 
@@ -298,6 +300,7 @@ async function createWindow() {
 }
 
 app.whenReady().then(() => {
+  app.setName(APP_DISPLAY_NAME);
   app.setAppUserModelId("com.studio.desktop");
   logFilePath = path.join(app.getPath("userData"), "desktop.log");
   logLine(`App starting. isDev=${isDev} userData=${app.getPath("userData")}`);

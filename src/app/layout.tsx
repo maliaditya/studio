@@ -37,6 +37,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { StopperProgressModal } from '@/components/StopperProgressModal';
 import { PillarPopup } from '@/components/PillarPopup';
 import { DrawingCanvas } from '@/components/DrawingCanvas';
+import { MindsetCategoriesCard } from '@/components/MindsetCategoriesCard';
 import dynamic from 'next/dynamic';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { usePathname } from 'next/navigation';
@@ -454,6 +455,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           <Toaster />
           <BackgroundAudioPlayer />
           <FloatingVideoPlayer />
+          <MindsetCategoriesCard />
           <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
           <StopperProgressModal 
             popupState={stopperProgressPopup}
