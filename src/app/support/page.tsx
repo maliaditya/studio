@@ -10,10 +10,28 @@ import { Heart, ArrowLeft, Loader2, Rocket, Calendar } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import type { Release } from '@/types/workout';
 import { format, parseISO } from 'date-fns';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 import { trackSupportMetric } from '@/lib/metricsClient';
+import { cn } from '@/lib/utils';
+
+type TierId = 'supporter' | 'backer' | 'champion' | 'custom';
+
+const SUPPORT_TIERS: Array<{ id: TierId; title: string; amountUsd: number; tagline: string }> = [
+    { id: 'supporter', title: 'Supporter', amountUsd: 5, tagline: 'Quick thank-you boost' },
+    { id: 'backer', title: 'Backer', amountUsd: 15, tagline: 'Most common support level' },
+    { id: 'champion', title: 'Champion', amountUsd: 49, tagline: 'Big push for faster shipping' },
+];
+const BMC_PROFILE_URL = 'https://buymeacoffee.com/adityamali98';
+
+const BMC_TIER_URLS: Partial<Record<TierId, string | undefined>> = {
+    supporter: process.env.NEXT_PUBLIC_BMC_SUPPORTER_URL,
+    backer: process.env.NEXT_PUBLIC_BMC_BACKER_URL,
+    champion: process.env.NEXT_PUBLIC_BMC_CHAMPION_URL,
+    custom: process.env.NEXT_PUBLIC_BMC_CUSTOM_URL || BMC_PROFILE_URL,
+};
 
 export default function SupportPage() {
     const isMobile = useIsMobile();
@@ -22,10 +40,30 @@ export default function SupportPage() {
     const [hasSupported, setHasSupported] = useState(false);
     const [releases, setReleases] = useState<Release[]>([]);
     const [isLoadingReleases, setIsLoadingReleases] = useState(true);
+    const [selectedTier, setSelectedTier] = useState<TierId>('backer');
+    const [customAmountInput, setCustomAmountInput] = useState('3');
 
-    const trackSupportEvent = async (event: 'support_page_view' | 'support_cta_click' | 'donation_intent', channel?: 'buymeacoffee' | 'upi') => {
+    const parseCustomAmount = (): number => {
+        const parsed = Number(customAmountInput);
+        return Number.isFinite(parsed) ? parsed : 0;
+    };
+
+    const selectedAmountUsd =
+        selectedTier === 'custom'
+            ? parseCustomAmount()
+            : (SUPPORT_TIERS.find((tier) => tier.id === selectedTier)?.amountUsd ?? 15);
+
+    const isCustomAmountValid = selectedTier !== 'custom' || selectedAmountUsd >= 3;
+    const selectedTierBmcUrl = BMC_TIER_URLS[selectedTier];
+    const hasTierSpecificBmcCheckout = typeof selectedTierBmcUrl === 'string' && selectedTierBmcUrl.trim().length > 0;
+
+    const trackSupportEvent = async (
+        event: 'support_page_view' | 'support_cta_click' | 'donation_intent',
+        channel?: 'buymeacoffee' | 'upi',
+        amountUsd?: number
+    ) => {
         try {
-            await trackSupportMetric(event, channel);
+            await trackSupportMetric(event, channel, amountUsd);
         } catch {
             // Metrics should never block support flow.
         }
@@ -84,13 +122,11 @@ export default function SupportPage() {
         }
     }, []);
 
-    const handleSupportClick = async () => {
-        void trackSupportEvent('support_cta_click', 'upi');
+    const markSupporterIfNeeded = async () => {
         if (hasSupported) {
-            handleUpiClick();
             return;
         }
-        
+
         try {
             const response = await fetch('/api/support-count', { method: 'POST' });
             const data = await response.json();
@@ -99,13 +135,15 @@ export default function SupportPage() {
             setHasSupported(true);
         } catch (error) {
             console.error("Failed to update support count:", error);
-        } finally {
-            handleUpiClick();
         }
     };
 
-    const handleUpiClick = () => {
-        void trackSupportEvent('donation_intent', 'upi');
+    const handleUpiClick = async () => {
+        if (!isCustomAmountValid) return;
+        void trackSupportEvent('support_cta_click', 'upi', selectedAmountUsd);
+        await markSupporterIfNeeded();
+        void trackSupportEvent('donation_intent', 'upi', selectedAmountUsd);
+
         if (isMobile) {
             window.open('upi://pay?pa=adityamali33@okaxis&pn=Aditya%20Mali&cu=INR', '_blank', 'noopener,noreferrer');
         } else {
@@ -113,9 +151,15 @@ export default function SupportPage() {
         }
     };
 
-    const handleBuyMeCoffeeClick = () => {
-        void trackSupportEvent('support_cta_click', 'buymeacoffee');
-        void trackSupportEvent('donation_intent', 'buymeacoffee');
+    const handleBuyMeCoffeeClick = async () => {
+        if (!isCustomAmountValid) return;
+        if (!hasTierSpecificBmcCheckout) return;
+        void trackSupportEvent('support_cta_click', 'buymeacoffee', selectedAmountUsd);
+        await markSupporterIfNeeded();
+        void trackSupportEvent('donation_intent', 'buymeacoffee', selectedAmountUsd);
+
+        const finalUrl = selectedTierBmcUrl!.trim();
+        window.open(finalUrl, '_blank', 'noopener,noreferrer');
     };
     
     const renderReleases = () => {
@@ -180,7 +224,7 @@ export default function SupportPage() {
                     <CardDescription className="text-center pt-2">
                         {showQr
                             ? "Scan the QR code to pay with any UPI app. Your contribution directly supports the development of the features below. Thank you!"
-                            : "Your support helps bring the features below to life. If you see something you're excited about, please consider contributing to the project's development."}
+                            : "Choose a supporter tier. Stage 1 is donations-only: no paywall, no feature gating."}
                     </CardDescription>
                 </CardHeader>
 
@@ -195,23 +239,93 @@ export default function SupportPage() {
                                 height={250}
                                 className="rounded-lg border bg-white p-2"
                             />
+                            <p className="text-xs text-center text-muted-foreground">
+                                Selected support amount: <strong className="text-foreground">${selectedAmountUsd.toFixed(2)}</strong>
+                            </p>
                         </div>
                     ) : (
-                        <div className="flex flex-col items-center justify-center gap-4">
-                            <a 
-                                href="https://www.buymeacoffee.com/adityamali98" 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                onClick={handleBuyMeCoffeeClick}
-                            >
-                                <img className="h-12 w-auto" src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=adityamali98&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Keep this project alive" />
-                            </a>
-                            <Button 
-                                onClick={handleSupportClick}
-                                className="h-12 w-auto px-6 bg-[#FFDD00] text-black hover:bg-[#FFDD00]/90 font-bold text-lg rounded-lg shadow-md"
-                            >
-                                Support via UPI
-                            </Button>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                                {SUPPORT_TIERS.map((tier) => (
+                                    <button
+                                        key={tier.id}
+                                        type="button"
+                                        onClick={() => setSelectedTier(tier.id)}
+                                        className={cn(
+                                            "rounded-lg border p-3 text-left transition-colors",
+                                            selectedTier === tier.id
+                                                ? "border-primary bg-primary/10"
+                                                : "border-border bg-muted/30 hover:bg-muted/50"
+                                        )}
+                                    >
+                                        <p className="text-sm font-semibold">{tier.title}</p>
+                                        <p className="text-lg font-bold">${tier.amountUsd}</p>
+                                        <p className="text-[11px] text-muted-foreground">{tier.tagline}</p>
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className={cn(
+                                "rounded-lg border p-3",
+                                selectedTier === 'custom' ? "border-primary bg-primary/10" : "border-border bg-muted/30"
+                            )}>
+                                <div className="flex items-center justify-between gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedTier('custom')}
+                                        className="text-left"
+                                    >
+                                        <p className="text-sm font-semibold">Custom</p>
+                                        <p className="text-[11px] text-muted-foreground">Minimum $3</p>
+                                    </button>
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-sm text-muted-foreground">$</span>
+                                        <Input
+                                            type="number"
+                                            min={3}
+                                            step="1"
+                                            value={customAmountInput}
+                                            onChange={(e) => {
+                                                setSelectedTier('custom');
+                                                setCustomAmountInput(e.target.value);
+                                            }}
+                                            className="h-9 w-24"
+                                        />
+                                    </div>
+                                </div>
+                                {!isCustomAmountValid && (
+                                    <p className="mt-2 text-xs text-destructive">Custom amount must be at least $3.</p>
+                                )}
+                            </div>
+
+                            <p className="text-center text-xs text-muted-foreground">
+                                Selected amount: <strong className="text-foreground">${selectedAmountUsd.toFixed(2)} USD</strong>
+                            </p>
+                            <p className="text-center text-[11px] text-muted-foreground">
+                                {hasTierSpecificBmcCheckout
+                                    ? "Tier-specific Buy Me a Coffee checkout is configured for this selection."
+                                    : "Buy Me a Coffee cannot enforce selected tier on profile links. Configure tier URLs to enable exact-amount BMC checkout."}
+                            </p>
+
+                            <div className="flex flex-col items-center justify-center gap-3">
+                                <Button
+                                    onClick={handleBuyMeCoffeeClick}
+                                    disabled={!isCustomAmountValid || !hasTierSpecificBmcCheckout}
+                                    className="h-11 w-full bg-[#FFDD00] text-black hover:bg-[#FFDD00]/90 font-bold rounded-lg shadow-md"
+                                >
+                                    {hasTierSpecificBmcCheckout
+                                        ? `Buy Me a Coffee ($${selectedAmountUsd.toFixed(0)})`
+                                        : "Buy Me a Coffee (Configure Tier URL)"}
+                                </Button>
+                                <Button
+                                    onClick={handleUpiClick}
+                                    disabled={!isCustomAmountValid}
+                                    variant="outline"
+                                    className="h-11 w-full font-semibold rounded-lg"
+                                >
+                                    Support via UPI
+                                </Button>
+                            </div>
                         </div>
                     )}
                 </CardContent>

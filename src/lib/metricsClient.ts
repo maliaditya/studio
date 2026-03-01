@@ -74,10 +74,18 @@ export const trackEngagementMetric = async (username: string, dateIso?: string) 
 
 export const trackSupportMetric = async (
   event: "support_page_view" | "support_cta_click" | "donation_intent",
-  channel?: "buymeacoffee" | "upi"
+  channel?: "buymeacoffee" | "upi",
+  amountUsd?: number
 ) => {
-  return sendMetricsRequest("/api/metrics/support-event", {
+  const payload: Record<string, unknown> = {
     event,
     channel,
+  };
+  if (typeof amountUsd === "number" && Number.isFinite(amountUsd)) {
+    payload.amountUsd = amountUsd;
+  }
+
+  return sendMetricsRequest("/api/metrics/support-event", {
+    ...payload,
   });
 };

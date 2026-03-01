@@ -10,7 +10,6 @@ import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, L
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
-import { SupportModal } from './SupportModal';
 import { cn } from '@/lib/utils';
 import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
@@ -181,6 +180,7 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
         { href: '/skill', label: 'Skill Tree' },
         { href: '/deep-work', label: 'Deep Work' },
         { href: '/strategic-planning', label: 'Strategy' },
+        { href: '/support', label: 'Support' },
         ...(isAdminUser ? [{ href: '/admin/monetization', label: 'Admin' }] : []),
       ]
     : [
@@ -189,6 +189,7 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
         { href: '/resources', label: 'Resources' },
         { href: '/skill', label: 'Skill Tree' },
         { href: '/strategic-planning', label: 'Strategy' },
+        { href: '/support', label: 'Support' },
         { href: '/graph', label: 'Graph', icon: Workflow },
         ...(isAdminUser ? [{ href: '/admin/monetization', label: 'Admin' }] : []),
       ];
@@ -1590,7 +1591,6 @@ export function Header() {
     openDrawingCanvasFromHeader,
   } = useAuth();
 
-  const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUpcomingTasksModalOpen, setIsUpcomingTasksModalOpen] = useState(false);
@@ -1624,6 +1624,12 @@ export function Header() {
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsSearchOpen(true)}>
                 <Search className="h-4 w-4" />
                 <span className="sr-only">Search</span>
+              </Button>
+              <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+                <Link href="/support">
+                  <Heart className="h-4 w-4" />
+                  <span className="sr-only">Support</span>
+                </Link>
               </Button>
               <Button
                 variant="ghost"
@@ -1736,7 +1742,6 @@ export function Header() {
           </div>
         </div>
       </header>
-      <SupportModal isOpen={isSupportModalOpen} onOpenChange={setIsSupportModalOpen} />
       <DemoTokenModal isOpen={isDemoTokenModalOpen} onOpenChange={setIsDemoTokenModalOpen} onSubmit={pushDemoDataWithToken} />
       <SettingsModal isOpen={isSettingsModalOpen} onOpenChange={setIsSettingsModalOpen} />
       <UpcomingTasksModal

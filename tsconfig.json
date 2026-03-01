@@ -38,6 +38,7 @@
     ".next-desktop-temp/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "_dc_tmp.tsx"
   ]
 }

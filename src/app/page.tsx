@@ -2,10 +2,11 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, HeartPulse, Briefcase, TrendingUp, DollarSign, GitMerge, Share2, LayoutDashboard, BookCopy, Activity as ActivityIcon, Download, Sparkles, CheckCircle2, Laptop } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, HeartPulse, Briefcase, TrendingUp, DollarSign, GitMerge, Share2, LayoutDashboard, BookCopy, Activity as ActivityIcon, Download, Sparkles, CheckCircle2, Laptop, PhoneCall } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -13,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 
 const WINDOWS_EXE_URL = "https://github.com/maliaditya/studio/releases/download/v1.0.0/Studio.Setup.0.1.0.exe";
+const SETUP_CALL_URL = process.env.NEXT_PUBLIC_SETUP_CALL_URL || "https://buymeacoffee.com/adityamali98/e/515325";
+const IS_EXTERNAL_SETUP_CALL_URL = /^https?:\/\//i.test(SETUP_CALL_URL);
 
 const featureCards = [
     {
@@ -243,6 +246,25 @@ export default function LandingPage() {
                                     Launch Your Dock <ArrowRight className="ml-2 h-5 w-5" />
                                 </Button>
                             )}
+                            <Button asChild variant="outline" size="lg" className="text-base font-semibold">
+                                <Link href="/support">
+                                    <Heart className="mr-2 h-4 w-4" />
+                                    Support Development
+                                </Link>
+                            </Button>
+                            <Button asChild variant="outline" size="lg" className="text-base font-semibold">
+                                {IS_EXTERNAL_SETUP_CALL_URL ? (
+                                    <a href={SETUP_CALL_URL} target="_blank" rel="noopener noreferrer">
+                                        <PhoneCall className="mr-2 h-4 w-4" />
+                                        Book 1:1 Setup Call
+                                    </a>
+                                ) : (
+                                    <Link href={SETUP_CALL_URL}>
+                                        <PhoneCall className="mr-2 h-4 w-4" />
+                                        Book 1:1 Setup Call
+                                    </Link>
+                                )}
+                            </Button>
                             {!isDesktopRuntime ? (
                                 <>
                                     <Button asChild variant="outline" size="lg" className="text-base font-semibold">

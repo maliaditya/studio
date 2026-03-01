@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -51,6 +52,13 @@ export default function LoginPage() {
           <div className="text-center text-sm text-muted-foreground p-3 mb-4 border rounded-md bg-muted/50 space-y-1">
             <p>After first successful sign-in on this device, offline resume is available and the app can be accessed without internet.</p>
             <p>Demo access: <strong className="text-primary font-mono">demo</strong>/<strong className="text-primary font-mono">demo</strong>.</p>
+            <p>
+              Like the product?{" "}
+              <Link href="/support" className="text-primary underline underline-offset-4">
+                Support development
+              </Link>
+              .
+            </p>
           </div>
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
