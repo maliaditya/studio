@@ -25,11 +25,16 @@ const SUPPORT_TIERS: Array<{ id: TierId; title: string; amountUsd: number; tagli
     { id: 'champion', title: 'Champion', amountUsd: 49, tagline: 'Big push for faster shipping' },
 ];
 const BMC_PROFILE_URL = 'https://buymeacoffee.com/adityamali98';
+const DEFAULT_BMC_TIER_URLS: Record<Exclude<TierId, 'custom'>, string> = {
+    supporter: 'https://buymeacoffee.com/adityamali98/e/515315',
+    backer: 'https://buymeacoffee.com/adityamali98/e/515318',
+    champion: 'https://buymeacoffee.com/adityamali98/e/515322',
+};
 
 const BMC_TIER_URLS: Partial<Record<TierId, string | undefined>> = {
-    supporter: process.env.NEXT_PUBLIC_BMC_SUPPORTER_URL,
-    backer: process.env.NEXT_PUBLIC_BMC_BACKER_URL,
-    champion: process.env.NEXT_PUBLIC_BMC_CHAMPION_URL,
+    supporter: process.env.NEXT_PUBLIC_BMC_SUPPORTER_URL || DEFAULT_BMC_TIER_URLS.supporter,
+    backer: process.env.NEXT_PUBLIC_BMC_BACKER_URL || DEFAULT_BMC_TIER_URLS.backer,
+    champion: process.env.NEXT_PUBLIC_BMC_CHAMPION_URL || DEFAULT_BMC_TIER_URLS.champion,
     custom: process.env.NEXT_PUBLIC_BMC_CUSTOM_URL || BMC_PROFILE_URL,
 };
 
