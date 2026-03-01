@@ -12,6 +12,10 @@ LifeOS helps you move from intention to execution:
 5. Review weekly signals and rebalance routines.
 6. Feed strategy layers (productization/offerization) from actual execution data.
 
+## Live Web App
+
+- https://vdock.vercel.app
+
 ## Core Product Flow
 
 ### 1) Daily Planning and Execution

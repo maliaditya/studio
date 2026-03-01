@@ -62,6 +62,30 @@ const heroPanelItems = [
   { title: "AI Review Loop", detail: "Explain and rebalance from your real logs." },
 ];
 
+const ORGANIZATION_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: "Dock",
+  url: "https://vdock.vercel.app",
+  sameAs: ["https://github.com/maliaditya/studio"],
+};
+
+const SOFTWARE_APP_SCHEMA = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Dock",
+  applicationCategory: "ProductivityApplication",
+  operatingSystem: "Web, Windows",
+  url: "https://vdock.vercel.app",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
+  description:
+    "Dock is a personal execution system connecting planning, routines, deep work, resources, and strategy.",
+};
+
 const FlowCard = ({ icon, title, description, children }: { icon: React.ReactNode, title: string, description: string, children?: React.ReactNode }) => (
   <div className="flex flex-col items-center p-4 border rounded-xl bg-card/80 shadow-sm w-64 text-center h-full backdrop-blur-sm">
     <div className="text-primary/90">{icon}</div>
@@ -204,6 +228,14 @@ export default function LandingPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(ORGANIZATION_SCHEMA) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(SOFTWARE_APP_SCHEMA) }}
+      />
       <main className="flex-grow">
         <section className="relative overflow-hidden">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(34,197,94,0.16),transparent_40%),radial-gradient(circle_at_82%_15%,rgba(59,130,246,0.16),transparent_40%),linear-gradient(to_bottom,rgba(17,24,39,0.55),rgba(2,6,23,0.95))]" />
@@ -294,6 +326,11 @@ export default function LandingPage() {
                                     <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{stat.label}</div>
                                 </div>
                             ))}
+                        </div>
+                        <div className="mt-4">
+                            <Link href="/changelog" className="text-sm text-primary underline underline-offset-4">
+                                View latest changelog updates
+                            </Link>
                         </div>
                     </motion.div>
 

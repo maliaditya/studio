@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
@@ -606,8 +605,6 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <title>Dock</title>
-        <meta name="description" content="Your personal dashboard for growth and productivity." />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
