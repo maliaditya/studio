@@ -3,6 +3,7 @@ import { put, list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { hashPassword } from '@/lib/password';
 import { attachSessionCookie } from '@/lib/serverSession';
+import { issueAuthTokens } from '@/lib/authTokens';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,17 +11,13 @@ export async function POST(request: Request) {
   const { username, password } = await request.json();
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    if (!username || !password) {
-      return NextResponse.json({ error: 'Username and password are required.' }, { status: 400 });
-    }
-    const normalizedUsername = String(username).trim().toLowerCase();
-    const response = NextResponse.json({
-      success: true,
-      message: 'Registration successful (local mode).',
-      localMode: true,
-    });
-    attachSessionCookie(response, normalizedUsername);
-    return response;
+    return NextResponse.json(
+      {
+        error: 'Cloud authentication is currently unavailable. Internet access is required for first-time registration.',
+        code: 'CLOUD_AUTH_UNAVAILABLE',
+      },
+      { status: 503 }
+    );
   }
 
   if (!username || !password) {
@@ -48,7 +45,14 @@ export async function POST(request: Request) {
       addRandomSuffix: false,
     });
 
-    const response = NextResponse.json({ success: true, message: 'Registration successful.', blob });
+    const tokens = await issueAuthTokens(normalizedUsername);
+    const response = NextResponse.json({
+      success: true,
+      message: 'Registration successful.',
+      blob,
+      user: { username: normalizedUsername },
+      ...tokens,
+    });
     attachSessionCookie(response, normalizedUsername);
     return response;
   } catch (error) {

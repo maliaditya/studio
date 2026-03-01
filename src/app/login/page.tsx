@@ -48,8 +48,9 @@ export default function LoginPage() {
           <CardDescription className="text-muted-foreground">Access your personal dashboard for growth.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center text-sm text-muted-foreground p-3 mb-4 border rounded-md bg-muted/50">
-            <p>To check out the app with dummy data, log in with <strong className="text-primary font-mono">demo</strong>/<strong className="text-primary font-mono">demo</strong> or register your own account.</p>
+          <div className="text-center text-sm text-muted-foreground p-3 mb-4 border rounded-md bg-muted/50 space-y-1">
+            <p>After first successful sign-in on this device, offline resume is available and the app can be accessed without internet.</p>
+            <p>Demo access: <strong className="text-primary font-mono">demo</strong>/<strong className="text-primary font-mono">demo</strong>.</p>
           </div>
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">

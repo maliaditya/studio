@@ -164,11 +164,14 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
   const [isClient, setIsClient] = useState(false);
   const [activePath, setActivePath] = useState('');
   const pathname = usePathname();
+  const { currentUser } = useAuth();
 
   useEffect(() => {
     setIsClient(true);
     setActivePath(pathname);
   }, [pathname]);
+
+  const isAdminUser = (currentUser?.username || '').trim().toLowerCase() === 'lonewolf';
 
   const navLinks: Array<{ href: string; label: string; icon?: React.ComponentType<{ className?: string }> }> = simpleMode
     ? [
@@ -178,6 +181,7 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
         { href: '/skill', label: 'Skill Tree' },
         { href: '/deep-work', label: 'Deep Work' },
         { href: '/strategic-planning', label: 'Strategy' },
+        ...(isAdminUser ? [{ href: '/admin/monetization', label: 'Admin' }] : []),
       ]
     : [
         { href: '/my-plate', label: 'Dashboard' },
@@ -186,6 +190,7 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
         { href: '/skill', label: 'Skill Tree' },
         { href: '/strategic-planning', label: 'Strategy' },
         { href: '/graph', label: 'Graph', icon: Workflow },
+        ...(isAdminUser ? [{ href: '/admin/monetization', label: 'Admin' }] : []),
       ];
 
   if (!isClient) {

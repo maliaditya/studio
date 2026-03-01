@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, dialog } = require("electron");
+const { app, BrowserWindow, shell, dialog, ipcMain, safeStorage } = require("electron");
 const path = require("path");
 const http = require("http");
 const { spawn } = require("child_process");
@@ -7,6 +7,8 @@ const fs = require("fs");
 const isDev = !app.isPackaged;
 const DEV_URL = process.env.ELECTRON_DEV_URL || "http://localhost:9002";
 const PROD_URL = process.env.ELECTRON_START_URL || null;
+const FORCE_REMOTE = process.env.ELECTRON_FORCE_REMOTE === "1";
+const AUTH_BASE_URL = process.env.ELECTRON_AUTH_BASE_URL || "https://vdock.vercel.app";
 const ICON_CANDIDATES = [
   path.join(__dirname, "assets", "icon.ico"),
   path.join(process.cwd(), "electron", "assets", "icon.ico"),
@@ -19,6 +21,7 @@ let localServerPort = null;
 let logFilePath = null;
 const DESKTOP_HOST = "127.0.0.1";
 const DESKTOP_PORT = Number(process.env.ELECTRON_DESKTOP_PORT || 47651);
+const SECURE_AUTH_FILE = "secure-auth.json";
 
 function resolveAppIconPath() {
   for (const candidate of ICON_CANDIDATES) {
@@ -60,6 +63,121 @@ function waitForHttpReady(url, timeoutMs = 30000) {
       });
     };
     ping();
+  });
+}
+
+function getSecureAuthPath() {
+  return path.join(app.getPath("userData"), SECURE_AUTH_FILE);
+}
+
+function readSecureAuthMap() {
+  const filePath = getSecureAuthPath();
+  if (!fs.existsSync(filePath)) return {};
+  const raw = fs.readFileSync(filePath, "utf8");
+  if (!raw) return {};
+  const parsed = JSON.parse(raw);
+  if (!parsed || typeof parsed !== "object") return {};
+  if (parsed.enc && typeof parsed.data === "string" && safeStorage.isEncryptionAvailable()) {
+    const decrypted = safeStorage.decryptString(Buffer.from(parsed.data, "base64"));
+    return JSON.parse(decrypted || "{}");
+  }
+  if (parsed.data && typeof parsed.data === "object") {
+    return parsed.data;
+  }
+  return {};
+}
+
+function writeSecureAuthMap(data) {
+  const filePath = getSecureAuthPath();
+  const payload =
+    safeStorage.isEncryptionAvailable()
+      ? {
+          enc: true,
+          data: safeStorage.encryptString(JSON.stringify(data)).toString("base64"),
+        }
+      : {
+          enc: false,
+          data,
+        };
+  fs.writeFileSync(filePath, JSON.stringify(payload), "utf8");
+}
+
+function registerSecureAuthIpc() {
+  ipcMain.handle("auth-token:set", (_event, payload) => {
+    const username = String(payload?.username || "").trim().toLowerCase();
+    const refreshToken = String(payload?.refreshToken || "");
+    if (!username || !refreshToken) {
+      return { success: false, error: "username and refreshToken are required." };
+    }
+    const map = readSecureAuthMap();
+    map[username] = {
+      refreshToken,
+      updatedAt: Date.now(),
+    };
+    writeSecureAuthMap(map);
+    return { success: true };
+  });
+
+  ipcMain.handle("auth-token:get", (_event, payload) => {
+    const username = String(payload?.username || "").trim().toLowerCase();
+    if (!username) return { success: false, error: "username is required." };
+    const map = readSecureAuthMap();
+    return { success: true, token: map[username]?.refreshToken || null };
+  });
+
+  ipcMain.handle("auth-token:clear", (_event, payload) => {
+    const username = String(payload?.username || "").trim().toLowerCase();
+    if (!username) return { success: false, error: "username is required." };
+    const map = readSecureAuthMap();
+    delete map[username];
+    writeSecureAuthMap(map);
+    return { success: true };
+  });
+
+  ipcMain.handle("auth-http:request", async (_event, payload) => {
+    try {
+      const url = String(payload?.url || "");
+      const method = String(payload?.method || "GET").toUpperCase();
+      const headers = payload?.headers && typeof payload.headers === "object" ? payload.headers : {};
+      const body = payload?.body ? String(payload.body) : undefined;
+
+      const parsed = new URL(url);
+      const allowedOrigin = new URL(AUTH_BASE_URL).origin;
+      if (parsed.origin !== allowedOrigin) {
+        return { success: false, error: `Auth proxy origin mismatch. Allowed: ${allowedOrigin}` };
+      }
+      const allowedPrefixes = ["/api/auth/", "/api/metrics/"];
+      if (!allowedPrefixes.some((prefix) => parsed.pathname.startsWith(prefix))) {
+        return { success: false, error: "Only /api/auth/* and /api/metrics/* routes are allowed." };
+      }
+
+      const response = await fetch(url, {
+        method,
+        headers,
+        body,
+      });
+
+      const text = await response.text();
+      let data = null;
+      try {
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = null;
+      }
+
+      return {
+        success: true,
+        ok: response.ok,
+        status: response.status,
+        data,
+        text,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
   });
 }
 
@@ -147,7 +265,12 @@ async function createWindow() {
   try {
     let startUrl = DEV_URL;
     if (!isDev) {
-      startUrl = await startBundledServer();
+      if (PROD_URL && FORCE_REMOTE) {
+        startUrl = PROD_URL;
+        logLine(`Using forced remote URL: ${startUrl}`);
+      } else {
+        startUrl = await startBundledServer();
+      }
     }
     logLine(`Loading URL: ${startUrl}`);
     await mainWindow.loadURL(startUrl);
@@ -178,6 +301,7 @@ app.whenReady().then(() => {
   app.setAppUserModelId("com.studio.desktop");
   logFilePath = path.join(app.getPath("userData"), "desktop.log");
   logLine(`App starting. isDev=${isDev} userData=${app.getPath("userData")}`);
+  registerSecureAuthIpc();
   createWindow();
 
   app.on("activate", () => {

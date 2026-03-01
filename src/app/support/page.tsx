@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import type { Release } from '@/types/workout';
 import { format, parseISO } from 'date-fns';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
+import { trackSupportMetric } from '@/lib/metricsClient';
 
 export default function SupportPage() {
     const isMobile = useIsMobile();
@@ -21,6 +22,14 @@ export default function SupportPage() {
     const [hasSupported, setHasSupported] = useState(false);
     const [releases, setReleases] = useState<Release[]>([]);
     const [isLoadingReleases, setIsLoadingReleases] = useState(true);
+
+    const trackSupportEvent = async (event: 'support_page_view' | 'support_cta_click' | 'donation_intent', channel?: 'buymeacoffee' | 'upi') => {
+        try {
+            await trackSupportMetric(event, channel);
+        } catch {
+            // Metrics should never block support flow.
+        }
+    };
 
     useEffect(() => {
         const fetchCount = async () => {
@@ -62,6 +71,13 @@ export default function SupportPage() {
         fetchCount();
         fetchReleases();
 
+        const supportViewSessionKey = 'metrics_support_page_view_sent';
+        const hasTrackedView = sessionStorage.getItem(supportViewSessionKey);
+        if (!hasTrackedView) {
+            void trackSupportEvent('support_page_view');
+            sessionStorage.setItem(supportViewSessionKey, '1');
+        }
+
         const supported = localStorage.getItem('has_supported_dock');
         if (supported) {
             setHasSupported(true);
@@ -69,6 +85,7 @@ export default function SupportPage() {
     }, []);
 
     const handleSupportClick = async () => {
+        void trackSupportEvent('support_cta_click', 'upi');
         if (hasSupported) {
             handleUpiClick();
             return;
@@ -88,11 +105,17 @@ export default function SupportPage() {
     };
 
     const handleUpiClick = () => {
+        void trackSupportEvent('donation_intent', 'upi');
         if (isMobile) {
             window.open('upi://pay?pa=adityamali33@okaxis&pn=Aditya%20Mali&cu=INR', '_blank', 'noopener,noreferrer');
         } else {
             setShowQr(true);
         }
+    };
+
+    const handleBuyMeCoffeeClick = () => {
+        void trackSupportEvent('support_cta_click', 'buymeacoffee');
+        void trackSupportEvent('donation_intent', 'buymeacoffee');
     };
     
     const renderReleases = () => {
@@ -175,10 +198,11 @@ export default function SupportPage() {
                         </div>
                     ) : (
                         <div className="flex flex-col items-center justify-center gap-4">
-                             <a 
+                            <a 
                                 href="https://www.buymeacoffee.com/adityamali98" 
                                 target="_blank" 
                                 rel="noopener noreferrer"
+                                onClick={handleBuyMeCoffeeClick}
                             >
                                 <img className="h-12 w-auto" src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=adityamali98&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Keep this project alive" />
                             </a>

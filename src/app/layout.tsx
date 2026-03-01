@@ -6,7 +6,6 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { Header } from '@/components/Header';
 import { BackgroundAudioPlayer } from '@/components/BackgroundAudioPlayer';
 import { MatrixBackground } from '@/components/MatrixBackground';
 import { DefaultBackground } from '@/components/DefaultBackground';
@@ -22,11 +21,9 @@ import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { DietPlanModal } from '@/components/DietPlanModal';
 import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
-import { SmartLoggingPrompt } from '@/components/SmartLoggingPrompt';
 import { MissedSlotModal } from '@/components/MissedSlotModal';
 import { InterruptModal } from '@/components/InterruptModal';
 import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
-import { PistonsHead } from '@/components/PistonsHead';
 import { format, startOfToday, isAfter, parseISO, isBefore } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -38,15 +35,6 @@ import { useToast } from '@/hooks/use-toast';
 import type { Project, Activity, MissedSlotReview, SlotName } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { MindsetCategoriesCard } from '@/components/MindsetCategoriesCard';
-import { ActivityDistributionCard } from '@/components/ActivityDistributionCard';
-import { FavoriteCards } from '@/components/FavoriteCards';
-import { TopPrioritiesCard } from '@/components/TopPrioritiesCard';
-import { GoalsWidget } from '@/components/GoalsWidget';
-import { BrainHacksCard } from '@/components/BrainHacksCard';
-import { RuleEquationsCard } from '@/components/RuleEquationsCard';
-import { VisualizationTechniquesCard } from '@/components/VisualizationTechniquesCard';
-import { SpacedRepetitionPopup } from '@/components/SpacedRepetitionPopup';
 import { StopperProgressModal } from '@/components/StopperProgressModal';
 import { PillarPopup } from '@/components/PillarPopup';
 import { DrawingCanvas } from '@/components/DrawingCanvas';
@@ -54,8 +42,12 @@ import dynamic from 'next/dynamic';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { usePathname } from 'next/navigation';
 import { useIsMobile } from '@/hooks/use-is-mobile';
+import { trackEngagementMetric } from '@/lib/metricsClient';
 
 const PdfViewerPopup = dynamic(() => import('@/components/PdfViewerPopup'), {
+  ssr: false,
+});
+const Header = dynamic(() => import('@/components/Header').then((mod) => mod.Header), {
   ssr: false,
 });
 
@@ -148,6 +140,8 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const [remainingTime, setRemainingTime] = React.useState<string | null>(null);
   const pathname = usePathname();
   const isMobile = useIsMobile();
+  const isWidgetSuppressedRoute = pathname === '/' || pathname === '/login';
+  const shouldShowAgendaWidget = !isWidgetSuppressedRoute;
   
   const [interruptModalState, setInterruptModalState] = useState<{isOpen: boolean, slotName: string | null, activityType: 'interrupt' | 'distraction' | null}>({ isOpen: false, slotName: null, activityType: null });
   const [interruptDetails, setInterruptDetails] = useState('');
@@ -167,6 +161,36 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
       setIsBrowser(true);
   }, []);
+
+  useEffect(() => {
+    const username = authContext.currentUser?.username?.trim().toLowerCase();
+    if (!username) return;
+
+    const dayKey = format(new Date(), 'yyyy-MM-dd');
+    const storageKey = `metrics_engagement_${dayKey}_${username}`;
+
+    try {
+      if (localStorage.getItem(storageKey)) return;
+    } catch {
+      return;
+    }
+
+    let isCancelled = false;
+    const sendEngagementSignal = async () => {
+      try {
+        const response = await trackEngagementMetric(username, new Date().toISOString());
+        if (!response.ok || isCancelled) return;
+        localStorage.setItem(storageKey, '1');
+      } catch {
+        // Metrics should never block app usage.
+      }
+    };
+
+    void sendEngagementSignal();
+    return () => {
+      isCancelled = true;
+    };
+  }, [authContext.currentUser?.username]);
 
   useEffect(() => {
     const originalWarn = console.warn;
@@ -427,20 +451,10 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
 
       {pathname !== '/canvas' && (
         <>
-          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.pistons && <PistonsHead />}
           <main>{children}</main>
           <Toaster />
           <BackgroundAudioPlayer />
           <FloatingVideoPlayer />
-          <MindsetCategoriesCard />
-          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.activityDistribution && <ActivityDistributionCard />}
-          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.favorites && <FavoriteCards />}
-          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.topPriorities && <TopPrioritiesCard />}
-          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.goals && <GoalsWidget />}
-          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.brainHacks && <BrainHacksCard />}
-          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.ruleEquations && <RuleEquationsCard />}
-          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.visualizationTechniques && <VisualizationTechniquesCard />}
-          {authContext.settings.allWidgetsVisible && authContext.settings.widgetVisibility.spacedRepetition && <SpacedRepetitionPopup />}
           <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
           <StopperProgressModal 
             popupState={stopperProgressPopup}
@@ -464,7 +478,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onLogDuration={onLogDuration}
             initialDuration={focusDuration}
           />
-          {(!isAgendaDocked && authContext.settings.widgetVisibility.agenda && !isMobile) && (
+          {(shouldShowAgendaWidget && !isAgendaDocked && !isMobile) && (
             <TodaysScheduleCard
                 date={new Date()}
                 schedule={schedule}
@@ -475,18 +489,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                 onOpenHabitPopup={openHabitPopup}
                 currentSlot={currentSlot}
             />
-          )}
-          {authContext.settings.widgetVisibility.smartLogging && (
-              <SmartLoggingPrompt 
-                  promptType={promptType} 
-                  onOpenInterruptModal={() => setInterruptModalState({ isOpen: true, slotName: currentSlot, activityType: null })} 
-                  activeProjects={activeProjectsForPrompt}
-                  currentSlot={currentSlot}
-                  activeFocusSession={activeFocusSession}
-                  lastSessionReview={lastSessionReview}
-                  openMindsetTechniquePopup={openMindsetTechniquePopup}
-                  openHabitDetailPopup={openHabitPopup}
-              />
           )}
         </>
       )}

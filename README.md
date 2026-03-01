@@ -115,6 +115,12 @@ npm run desktop:dist
 Desktop packaging notes:
 - Uses bundled local Next server for runtime.
 - Supports optional startup URL fallback with `ELECTRON_START_URL`.
+- To force desktop to use hosted web origin (recommended for shared cloud auth/session):
+  - Set `ELECTRON_START_URL=https://vdock.vercel.app`
+  - Set `ELECTRON_FORCE_REMOTE=1`
+- To keep local desktop runtime but use hosted cloud auth APIs (recommended hybrid mode):
+  - Set `ELECTRON_AUTH_BASE_URL=https://vdock.vercel.app`
+  - (Optional for web builds) set `NEXT_PUBLIC_AUTH_BASE_URL=https://vdock.vercel.app`
 
 ## Data and Sync Notes
 

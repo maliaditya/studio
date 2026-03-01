@@ -13,6 +13,7 @@ import {
   getCurrentLocalUser,
   isCurrentSessionOwner,
   refreshSessionHeartbeat,
+  refreshSessionFromStoredToken,
 } from '@/lib/localAuth';
 import { format, addDays, parseISO, subDays, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay, getHours, startOfToday, isSameDay, getISODay, differenceInMonths } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
@@ -579,7 +580,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     routines: [],
     workoutScheduling: 'day-of-week',
     slotRules: {},
-    widgetVisibility: { agenda: true, smartLogging: true, pistons: true, mindset: true, activityDistribution: true, favorites: true, topPriorities: true, goals: true, brainHacks: true, ruleEquations: true, visualizationTechniques: true, spacedRepetition: true },
+    widgetVisibility: { agenda: true, smartLogging: false, pistons: false, mindset: false, activityDistribution: false, favorites: false, topPriorities: false, goals: false, brainHacks: false, ruleEquations: false, visualizationTechniques: false, spacedRepetition: false },
     allWidgetsVisible: true,
     agendaShowCurrentSlotOnly: false,
     spacedRepetitionSlot: 'Late Night',
@@ -1999,7 +2000,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         smartLogging: false, defaultHabitLinks: {}, routines: [],
         workoutScheduling: 'day-of-week',
         slotRules: {},
-        widgetVisibility: { agenda: true, smartLogging: true, pistons: true, mindset: true, activityDistribution: true, favorites: true, topPriorities: true, goals: true, brainHacks: true, ruleEquations: true, visualizationTechniques: true, spacedRepetition: true },
+        widgetVisibility: { agenda: true, smartLogging: false, pistons: false, mindset: false, activityDistribution: false, favorites: false, topPriorities: false, goals: false, brainHacks: false, ruleEquations: false, visualizationTechniques: false, spacedRepetition: false },
         allWidgetsVisible: true,
         agendaShowCurrentSlotOnly: false,
         spacedRepetitionSlot: 'Late Night',
@@ -6605,6 +6606,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     const user = getCurrentLocalUser();
     if (user) {
       setCurrentUser(user);
+      void refreshSessionFromStoredToken(user.username);
       void loadState(user.username);
     }
     setLoading(false);

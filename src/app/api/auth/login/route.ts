@@ -3,6 +3,7 @@ import { list, put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { attachSessionCookie } from '@/lib/serverSession';
+import { issueAuthTokens } from '@/lib/authTokens';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,22 +13,28 @@ export async function POST(request: Request) {
 
   // Bypass Blob check for demo user
   if (normalizedUsername === 'demo' && password === 'demo') {
-    const response = NextResponse.json({ success: true, message: 'Demo login successful.' });
+    const responsePayload: Record<string, unknown> = {
+      success: true,
+      message: 'Demo login successful.',
+      user: { username: normalizedUsername },
+    };
+    if (process.env.BLOB_READ_WRITE_TOKEN) {
+      const tokens = await issueAuthTokens(normalizedUsername);
+      Object.assign(responsePayload, tokens);
+    }
+    const response = NextResponse.json(responsePayload);
     attachSessionCookie(response, normalizedUsername);
     return response;
   }
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    if (!normalizedUsername || !password) {
-      return NextResponse.json({ error: 'Username and password are required.' }, { status: 400 });
-    }
-    const response = NextResponse.json({
-      success: true,
-      message: 'Login successful (local mode).',
-      localMode: true,
-    });
-    attachSessionCookie(response, normalizedUsername);
-    return response;
+    return NextResponse.json(
+      {
+        error: 'Cloud authentication is currently unavailable. Internet access is required for first login on this device.',
+        code: 'CLOUD_AUTH_UNAVAILABLE',
+      },
+      { status: 503 }
+    );
   }
 
   if (!normalizedUsername || !password) {
@@ -87,7 +94,13 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Incorrect password.' }, { status: 401 });
     }
 
-    const responsePayload = NextResponse.json({ success: true, message: 'Login successful.' });
+    const tokens = await issueAuthTokens(normalizedUsername);
+    const responsePayload = NextResponse.json({
+      success: true,
+      message: 'Login successful.',
+      user: { username: normalizedUsername },
+      ...tokens,
+    });
     attachSessionCookie(responsePayload, normalizedUsername);
     return responsePayload;
 
