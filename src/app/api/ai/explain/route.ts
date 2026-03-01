@@ -28,11 +28,21 @@ export async function POST(request: Request) {
           ollamaBaseUrl: aiConfigInput.ollamaBaseUrl,
           openaiApiKey: aiConfigInput.openaiApiKey,
           openaiBaseUrl: aiConfigInput.openaiBaseUrl,
+          perplexityApiKey: aiConfigInput.perplexityApiKey,
+          perplexityBaseUrl: aiConfigInput.perplexityBaseUrl,
+          anthropicApiKey: aiConfigInput.anthropicApiKey,
+          anthropicBaseUrl: aiConfigInput.anthropicBaseUrl,
           requestTimeoutMs: aiConfigInput.requestTimeoutMs,
         },
       },
       isDesktopRuntime
     );
+    if (aiConfig.provider === "none") {
+      return NextResponse.json(
+        { error: "AI provider is not set. Choose a provider in Settings > AI Settings." },
+        { status: 400 }
+      );
+    }
     if (aiConfig.provider === "openai" && !aiConfig.openaiApiKey) {
       return NextResponse.json(
         { error: "OpenAI API key is required when provider is OpenAI." },
@@ -42,6 +52,18 @@ export async function POST(request: Request) {
     if (aiConfig.provider === "ollama" && !aiConfig.ollamaBaseUrl) {
       return NextResponse.json(
         { error: "Ollama base URL is required when provider is Ollama." },
+        { status: 400 }
+      );
+    }
+    if (aiConfig.provider === "perplexity" && !aiConfig.perplexityApiKey) {
+      return NextResponse.json(
+        { error: "Perplexity API key is required when provider is Perplexity." },
+        { status: 400 }
+      );
+    }
+    if (aiConfig.provider === "anthropic" && !aiConfig.anthropicApiKey) {
+      return NextResponse.json(
+        { error: "Anthropic API key is required when provider is Anthropic." },
         { status: 400 }
       );
     }
@@ -77,7 +99,7 @@ export async function POST(request: Request) {
     if (!aiResponse.ok) {
       return NextResponse.json(
         {
-          error: `${aiResponse.provider === "openai" ? "OpenAI" : "Ollama"} call failed (model ${aiResponse.model || aiConfig.model}).`,
+          error: `${aiResponse.provider === "openai" ? "OpenAI" : aiResponse.provider === "ollama" ? "Ollama" : aiResponse.provider === "perplexity" ? "Perplexity" : aiResponse.provider === "anthropic" ? "Anthropic" : "AI"} call failed (model ${aiResponse.model || aiConfig.model}).`,
           details: aiResponse.details || "Provider call failed.",
         },
         { status: 502 }

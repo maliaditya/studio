@@ -36,7 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { ScrollArea } from './ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from './ui/progress';
-import { normalizeAiSettings, DEFAULT_OPENAI_MODEL, DEFAULT_OLLAMA_MODEL } from '@/lib/ai/config';
+import { normalizeAiSettings, DEFAULT_OPENAI_MODEL, DEFAULT_OLLAMA_MODEL, DEFAULT_PERPLEXITY_MODEL, DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai/config';
 import type { AiProvider } from '@/types/ai';
 
 interface SettingsModalProps {
@@ -467,6 +467,16 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const handleAiSettingChange = (key: keyof NonNullable<typeof settings.ai>, value: string | number) => {
     setSettings((prev) => {
       const normalized = normalizeAiSettings(prev.ai, isDesktopRuntime);
+      if (key === 'provider' && value === 'none') {
+        return {
+          ...prev,
+          ai: {
+            ...normalized,
+            provider: 'none',
+            model: '',
+          },
+        };
+      }
       return {
         ...prev,
         ai: {
@@ -477,6 +487,11 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     });
   };
   const loadAvailableAiModels = useCallback(async () => {
+    if (resolvedAiSettings.provider === 'none') {
+      setAvailableAiModels([]);
+      setAiModelsError(null);
+      return;
+    }
     try {
       setIsLoadingAiModels(true);
       setAiModelsError(null);
@@ -891,48 +906,67 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                               <SelectValue placeholder="Select provider" />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="none">None</SelectItem>
                               <SelectItem value="ollama">Local (Ollama)</SelectItem>
                               <SelectItem value="openai">OpenAI API</SelectItem>
+                              <SelectItem value="perplexity">Perplexity API</SelectItem>
+                              <SelectItem value="anthropic">Anthropic API</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="space-y-1">
-                          <Label htmlFor="ai-model">Model</Label>
-                          <div className="flex items-center gap-2">
-                            {modelOptions.length > 0 ? (
-                              <Select
-                                value={resolvedAiSettings.model}
-                                onValueChange={(value) => handleAiSettingChange('model', value)}
-                              >
-                                <SelectTrigger id="ai-model" className="flex-1">
-                                  <SelectValue placeholder="Select model" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {modelOptions.map((model) => (
-                                    <SelectItem key={model} value={model}>{model}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <Input
-                                id="ai-model"
-                                className="flex-1"
-                                placeholder={resolvedAiSettings.provider === 'ollama' ? DEFAULT_OLLAMA_MODEL : DEFAULT_OPENAI_MODEL}
-                                value={resolvedAiSettings.model}
-                                onChange={(e) => handleAiSettingChange('model', e.target.value)}
-                              />
-                            )}
-                            <Button type="button" variant="outline" size="icon" onClick={() => void loadAvailableAiModels()} disabled={isLoadingAiModels}>
-                              <RefreshCw className={`h-4 w-4 ${isLoadingAiModels ? 'animate-spin' : ''}`} />
-                            </Button>
-                          </div>
-                          {availableAiModels.length > 0 ? (
-                            <p className="text-xs text-muted-foreground">
-                              {availableAiModels.length} available model{availableAiModels.length === 1 ? '' : 's'} detected.
-                            </p>
-                          ) : null}
-                          {aiModelsError ? <p className="text-xs text-destructive">{aiModelsError}</p> : null}
-                        </div>
+                        {resolvedAiSettings.provider === 'none' ? (
+                          <p className="text-xs text-muted-foreground">
+                            AI is disabled by default. Choose a provider to enable AI features.
+                          </p>
+                        ) : (
+                          <>
+                            <div className="space-y-1">
+                              <Label htmlFor="ai-model">Model</Label>
+                              <div className="flex items-center gap-2">
+                                {modelOptions.length > 0 ? (
+                                  <Select
+                                    value={resolvedAiSettings.model}
+                                    onValueChange={(value) => handleAiSettingChange('model', value)}
+                                  >
+                                    <SelectTrigger id="ai-model" className="flex-1">
+                                      <SelectValue placeholder="Select model" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {modelOptions.map((model) => (
+                                        <SelectItem key={model} value={model}>{model}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <Input
+                                    id="ai-model"
+                                    className="flex-1"
+                                    placeholder={
+                                      resolvedAiSettings.provider === 'ollama'
+                                        ? DEFAULT_OLLAMA_MODEL
+                                        : resolvedAiSettings.provider === 'perplexity'
+                                        ? DEFAULT_PERPLEXITY_MODEL
+                                        : resolvedAiSettings.provider === 'anthropic'
+                                        ? DEFAULT_ANTHROPIC_MODEL
+                                        : DEFAULT_OPENAI_MODEL
+                                    }
+                                    value={resolvedAiSettings.model}
+                                    onChange={(e) => handleAiSettingChange('model', e.target.value)}
+                                  />
+                                )}
+                                <Button type="button" variant="outline" size="icon" onClick={() => void loadAvailableAiModels()} disabled={isLoadingAiModels}>
+                                  <RefreshCw className={`h-4 w-4 ${isLoadingAiModels ? 'animate-spin' : ''}`} />
+                                </Button>
+                              </div>
+                              {availableAiModels.length > 0 ? (
+                                <p className="text-xs text-muted-foreground">
+                                  {availableAiModels.length} available model{availableAiModels.length === 1 ? '' : 's'} detected.
+                                </p>
+                              ) : null}
+                              {aiModelsError ? <p className="text-xs text-destructive">{aiModelsError}</p> : null}
+                            </div>
+                          </>
+                        )}
                         {resolvedAiSettings.provider === 'ollama' ? (
                           <div className="space-y-1">
                             <Label htmlFor="ai-ollama-base-url">Ollama Base URL</Label>
@@ -946,7 +980,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                               {isDesktopRuntime ? 'Uses local Ollama server on this desktop app.' : 'Use this only if your web app can reach your Ollama endpoint.'}
                             </p>
                           </div>
-                        ) : (
+                        ) : resolvedAiSettings.provider === 'openai' ? (
                           <>
                             <div className="space-y-1">
                               <Label htmlFor="ai-openai-key">OpenAI API Key</Label>
@@ -969,7 +1003,53 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                               />
                             </div>
                           </>
-                        )}
+                        ) : resolvedAiSettings.provider === 'perplexity' ? (
+                          <>
+                            <div className="space-y-1">
+                              <Label htmlFor="ai-perplexity-key">Perplexity API Key</Label>
+                              <Input
+                                id="ai-perplexity-key"
+                                type="password"
+                                placeholder="pplx-..."
+                                value={resolvedAiSettings.perplexityApiKey || ''}
+                                onChange={(e) => handleAiSettingChange('perplexityApiKey', e.target.value)}
+                              />
+                              <p className="text-xs text-muted-foreground">Key stored in browser on this device.</p>
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="ai-perplexity-base-url">Perplexity Base URL (optional)</Label>
+                              <Input
+                                id="ai-perplexity-base-url"
+                                placeholder="https://api.perplexity.ai"
+                                value={resolvedAiSettings.perplexityBaseUrl || ''}
+                                onChange={(e) => handleAiSettingChange('perplexityBaseUrl', e.target.value)}
+                              />
+                            </div>
+                          </>
+                        ) : resolvedAiSettings.provider === 'anthropic' ? (
+                          <>
+                            <div className="space-y-1">
+                              <Label htmlFor="ai-anthropic-key">Anthropic API Key</Label>
+                              <Input
+                                id="ai-anthropic-key"
+                                type="password"
+                                placeholder="sk-ant-..."
+                                value={resolvedAiSettings.anthropicApiKey || ''}
+                                onChange={(e) => handleAiSettingChange('anthropicApiKey', e.target.value)}
+                              />
+                              <p className="text-xs text-muted-foreground">Key stored in browser on this device.</p>
+                            </div>
+                            <div className="space-y-1">
+                              <Label htmlFor="ai-anthropic-base-url">Anthropic Base URL (optional)</Label>
+                              <Input
+                                id="ai-anthropic-base-url"
+                                placeholder="https://api.anthropic.com"
+                                value={resolvedAiSettings.anthropicBaseUrl || ''}
+                                onChange={(e) => handleAiSettingChange('anthropicBaseUrl', e.target.value)}
+                              />
+                            </div>
+                          </>
+                        ) : null}
                       </div>
                     </AccordionContent>
                   </AccordionItem>

@@ -539,12 +539,12 @@ export const AgendaWidgetItem = React.memo(({
                     )}
                     {isPlanningTask && <Badge variant="outline">Planning</Badge>}
                     {!activity.completed && expectedDuration && (
-                        <Badge className="bg-yellow-500/20 text-yellow-300 border border-yellow-400/40 hover:bg-yellow-500/25">
+                        <Badge className="theme-pill-warning border">
                             {expectedDuration}
                         </Badge>
                     )}
                     {!activity.completed && learningTargetLabel && (
-                        <Badge className="bg-cyan-500/15 text-cyan-300 border border-cyan-400/40 hover:bg-cyan-500/20">
+                        <Badge className="theme-pill-info border">
                             {learningTargetLabel}
                         </Badge>
                     )}

@@ -2,16 +2,17 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, HeartPulse, Briefcase, TrendingUp, DollarSign, GitMerge, Package, Share2, Rocket, LayoutDashboard, BookCopy, Magnet, Activity as ActivityIcon } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowRight, BrainCircuit, HeartPulse, Briefcase, TrendingUp, DollarSign, GitMerge, Share2, LayoutDashboard, BookCopy, Activity as ActivityIcon, Download, Sparkles, CheckCircle2, Laptop } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
+
+const WINDOWS_EXE_URL = "https://github.com/maliaditya/studio/releases/download/v1.0.0/Studio.Setup.0.1.0.exe";
 
 const featureCards = [
     {
@@ -40,10 +41,28 @@ const featureCards = [
     }
 ];
 
+const heroBullets = [
+  "Convert friction into clear next actions",
+  "Run routines, projects, learning, and review in one loop",
+  "Use local or API AI enhancements with explicit control",
+];
+
+const quickStats = [
+  { label: "Execution Layers", value: "8" },
+  { label: "AI-Enhanced Flows", value: "2" },
+  { label: "Desktop Release", value: "v1.0.0" },
+];
+
+const heroPanelItems = [
+  { title: "Botherings -> Routine Links", detail: "Friction gets mapped to executable tasks." },
+  { title: "Timeslot-Driven Execution", detail: "Today cards align to your routine schedule." },
+  { title: "AI Review Loop", detail: "Explain and rebalance from your real logs." },
+];
+
 const FlowCard = ({ icon, title, description, children }: { icon: React.ReactNode, title: string, description: string, children?: React.ReactNode }) => (
-  <div className="flex flex-col items-center p-4 border rounded-lg bg-card shadow-sm w-64 text-center h-full">
-    <div className="text-primary">{icon}</div>
-    <h3 className="mt-2 font-semibold text-foreground">{title}</h3>
+  <div className="flex flex-col items-center p-4 border rounded-xl bg-card/80 shadow-sm w-64 text-center h-full backdrop-blur-sm">
+    <div className="text-primary/90">{icon}</div>
+    <h3 className="mt-2 font-semibold text-foreground text-sm">{title}</h3>
     <p className="mt-1 text-xs text-muted-foreground flex-grow">{description}</p>
     {children}
   </div>
@@ -59,7 +78,7 @@ const FeatureList = ({ features }: { features: string[] }) => (
 
 const StrategicOverviewDiagram = () => {
     return (
-        <div className="flex items-start justify-center p-8 overflow-x-auto bg-muted/30 rounded-lg">
+        <div className="flex items-start justify-center p-8 overflow-x-auto bg-muted/20 rounded-2xl border border-border/60">
             <div className="flex flex-row items-center gap-8">
                 <div className="flex flex-col items-center gap-4 text-center">
                     <FlowCard icon={<HeartPulse size={32} />} title="1. Core States" description="Track your core state signals daily.">
@@ -113,6 +132,9 @@ export default function LandingPage() {
   const { currentUser } = useAuth();
   const router = useRouter();
   const [dontShowAgain, setDontShowAgain] = useState(false);
+  const [downloadCount, setDownloadCount] = useState<number | null>(null);
+  const [downloadUrl, setDownloadUrl] = useState(WINDOWS_EXE_URL);
+  const isDesktopRuntime = typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
 
   useEffect(() => {
     if (currentUser) {
@@ -122,6 +144,53 @@ export default function LandingPage() {
       }
     }
   }, [currentUser, router]);
+
+  useEffect(() => {
+    if (isDesktopRuntime) return;
+    let isMounted = true;
+    const loadLatestRelease = async () => {
+      try {
+        const res = await fetch("/api/latest-windows-release", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { url?: string };
+        if (isMounted && typeof data.url === "string" && data.url.length > 0) {
+          setDownloadUrl(data.url);
+        }
+      } catch {
+        // Keep fallback URL.
+      }
+    };
+    const loadDownloadCount = async () => {
+      try {
+        const res = await fetch("/api/download-count", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { count?: number };
+        if (isMounted) setDownloadCount(typeof data.count === "number" ? data.count : 0);
+      } catch {
+        // Ignore API failures and keep count hidden.
+      }
+    };
+    void loadLatestRelease();
+    void loadDownloadCount();
+    return () => {
+      isMounted = false;
+    };
+  }, [isDesktopRuntime]);
+
+  const handleDownloadClick = async () => {
+    try {
+      const res = await fetch("/api/download-count", { method: "POST" });
+      if (!res.ok) return;
+      const data = (await res.json()) as { count?: number };
+      if (typeof data.count === "number") {
+        setDownloadCount(data.count);
+      } else {
+        setDownloadCount((prev) => (typeof prev === "number" ? prev + 1 : 1));
+      }
+    } catch {
+      setDownloadCount((prev) => (typeof prev === "number" ? prev + 1 : 1));
+    }
+  };
   
   const handleProceed = () => {
     if (dontShowAgain && currentUser) {
@@ -134,43 +203,117 @@ export default function LandingPage() {
     <div className="flex flex-col min-h-screen bg-background">
       <main className="flex-grow">
         <section className="relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-background via-muted/50 to-background"></div>
-            <div className="relative container mx-auto px-4 py-24 md:py-32 text-center">
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                >
-                    <BrainCircuit className="mx-auto h-16 w-16 text-primary mb-6" />
-                    <h1 className="text-4xl md:text-6xl font-bold tracking-tighter text-foreground">
-                    Your Personal OS for Growth
-                    </h1>
-                    <p className="mt-6 text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto">
-                    Dock is an all-in-one dashboard to systematically manage your health, skills, and strategic projects. Turn ambition into tangible results.
-                    </p>
-                    <div className="mt-8 flex flex-col items-center justify-center gap-4">
-                        {currentUser ? (
-                            <>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(34,197,94,0.16),transparent_40%),radial-gradient(circle_at_82%_15%,rgba(59,130,246,0.16),transparent_40%),linear-gradient(to_bottom,rgba(17,24,39,0.55),rgba(2,6,23,0.95))]" />
+            <div className="relative container mx-auto px-4 py-20 md:py-24">
+                <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
+                    <motion.div
+                        initial={{ opacity: 0, y: 16 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.5 }}
+                    >
+                        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-200">
+                            <Sparkles className="h-3.5 w-3.5" />
+                            Personal Operating System
+                        </div>
+                        <div className="mt-6 flex items-center gap-3 text-primary">
+                            <BrainCircuit className="h-10 w-10" />
+                            <span className="text-sm font-medium uppercase tracking-[0.22em] text-muted-foreground">Dock Platform</span>
+                        </div>
+                        <h1 className="mt-5 text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
+                            Build execution momentum every day, not just plans.
+                        </h1>
+                        <p className="mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
+                            Dock connects your botherings, tasks, schedules, routines, learning plans, resources, and AI review loop into one system so daily action compounds.
+                        </p>
+                        <ul className="mt-6 grid gap-2 sm:grid-cols-2">
+                            {heroBullets.map((bullet) => (
+                                <li key={bullet} className="flex items-center gap-2 text-sm text-muted-foreground">
+                                    <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+                                    {bullet}
+                                </li>
+                            ))}
+                        </ul>
+                        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                            {currentUser ? (
                                 <Button onClick={handleProceed} size="lg" className="text-base font-semibold">
                                     Go to Dashboard <ArrowRight className="ml-2 h-5 w-5" />
                                 </Button>
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox id="dont-show-again" checked={dontShowAgain} onCheckedChange={(checked) => setDontShowAgain(!!checked)} />
-                                    <Label htmlFor="dont-show-again" className="text-sm font-normal text-muted-foreground">Don't show this again</Label>
-                                </div>
-                            </>
-                        ) : (
-                             <Button onClick={() => router.push('/login')} size="lg" className="text-base font-semibold">
-                                Launch Your Dock <ArrowRight className="ml-2 h-5 w-5" />
-                            </Button>
+                            ) : (
+                                <Button onClick={() => router.push('/login')} size="lg" className="text-base font-semibold">
+                                    Launch Your Dock <ArrowRight className="ml-2 h-5 w-5" />
+                                </Button>
+                            )}
+                            {!isDesktopRuntime ? (
+                                <>
+                                    <Button asChild variant="outline" size="lg" className="text-base font-semibold">
+                                        <a href={downloadUrl} target="_blank" rel="noopener noreferrer" onClick={handleDownloadClick}>
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Download for Windows
+                                        </a>
+                                    </Button>
+                                    {downloadCount !== null ? (
+                                        <div className="text-sm text-muted-foreground">
+                                            Downloads: <span className="font-semibold text-foreground">{downloadCount.toLocaleString()}</span>
+                                        </div>
+                                    ) : null}
+                                </>
+                            ) : null}
+                        </div>
+                        {currentUser && (
+                            <div className="mt-4 flex items-center gap-2">
+                                <Checkbox id="dont-show-again" checked={dontShowAgain} onCheckedChange={(checked) => setDontShowAgain(!!checked)} />
+                                <Label htmlFor="dont-show-again" className="text-sm font-normal text-muted-foreground">Don&apos;t show this again</Label>
+                            </div>
                         )}
-                    </div>
-                </motion.div>
+                        <div className="mt-8 grid max-w-xl grid-cols-3 gap-3">
+                            {quickStats.map((stat) => (
+                                <div key={stat.label} className="rounded-lg border border-border/60 bg-background/50 p-3 text-center backdrop-blur-sm">
+                                    <div className="text-lg font-semibold text-foreground">{stat.value}</div>
+                                    <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{stat.label}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </motion.div>
+
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6, delay: 0.1 }}
+                        className="mx-auto w-full max-w-md lg:max-w-none"
+                    >
+                        <Card className="border-border/60 bg-card/70 backdrop-blur-md shadow-2xl shadow-black/35">
+                            <CardHeader>
+                                <CardTitle className="flex items-center justify-between text-lg">
+                                    <span>Dock In Action</span>
+                                    <Laptop className="h-5 w-5 text-emerald-300" />
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {heroPanelItems.map((item) => (
+                                    <div key={item.title} className="rounded-lg border border-border/60 bg-background/55 p-3">
+                                        <p className="text-sm font-semibold text-foreground">{item.title}</p>
+                                        <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>
+                                    </div>
+                                ))}
+                                <div className="rounded-lg border border-emerald-400/25 bg-emerald-500/10 p-3 text-xs text-emerald-100">
+                                    Desktop includes local Ollama support. Web supports API-based AI providers via settings.
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </motion.div>
+                </div>
             </div>
         </section>
 
-        <section className="py-20 bg-background">
-            <div className="container mx-auto px-4">
+        <section className="relative py-20">
+            <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(2,6,23,0.96)_0%,rgba(2,6,23,0.985)_30%,rgba(2,6,23,1)_100%)]" />
+            <div className="relative container mx-auto px-4">
+                <div className="mb-10 text-center">
+                    <h2 className="text-3xl font-bold tracking-tight">Four Core Systems</h2>
+                    <p className="mx-auto mt-3 max-w-2xl text-muted-foreground">
+                        Start with one system or run all four together. Everything shares the same execution context.
+                    </p>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
                     {featureCards.map((card, index) => (
                       <motion.div
@@ -180,13 +323,16 @@ export default function LandingPage() {
                         viewport={{ once: true }}
                         transition={{ duration: 0.5, delay: index * 0.1 }}
                       >
-                        <Card className="text-center h-full border-0 bg-muted/30 hover:bg-muted/60 transition-all hover:shadow-lg">
+                        <Card className="text-center h-full border border-border/60 bg-muted/20 hover:bg-muted/45 transition-all hover:shadow-xl hover:shadow-black/15">
                             <CardHeader className="items-center">
                                 {card.icon}
                                 <CardTitle className="text-lg">{card.title}</CardTitle>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="space-y-4">
                                 <p className="text-sm text-muted-foreground">{card.description}</p>
+                                <Button variant="ghost" className="w-full" onClick={() => router.push(card.link)}>
+                                    Open Module <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
                             </CardContent>
                         </Card>
                       </motion.div>
@@ -195,7 +341,9 @@ export default function LandingPage() {
             </div>
         </section>
         
-        <section className="container mx-auto px-4 py-20">
+        <section className="relative py-20">
+            <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(2,6,23,1)_0%,rgba(3,10,28,0.98)_100%)]" />
+            <div className="relative container mx-auto px-4">
             <div className="grid md:grid-cols-1 gap-12 items-center">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -206,7 +354,7 @@ export default function LandingPage() {
                 >
                     <h2 className="text-3xl font-bold tracking-tight">The Dock Flywheel</h2>
                     <p className="mt-4 text-muted-foreground max-w-3xl mx-auto">
-                        Closed-loop execution: signal capture -> botherings mapping -> routine/skill execution -> resource/canvas context -> AI-assisted rebalance -> strategic graph visibility.
+                        Closed-loop execution: signal capture -> bothering mapping -> routine and skill execution -> resource context -> AI-assisted rebalance -> strategic visibility.
                     </p>
                 </motion.div>
                 <motion.div
@@ -219,10 +367,11 @@ export default function LandingPage() {
                     <StrategicOverviewDiagram />
                 </motion.div>
             </div>
+            </div>
         </section>
       </main>
       
-      <footer className="border-t bg-muted/50">
+      <footer className="border-t border-border/60 bg-[rgba(3,10,28,0.96)]">
           <div className="container mx-auto px-4 py-6 text-center text-muted-foreground text-sm">
               &copy; {new Date().getFullYear()} Dock. All systems operational.
           </div>

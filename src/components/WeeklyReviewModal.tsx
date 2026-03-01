@@ -293,6 +293,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
     () => normalizeAiSettings(settings.ai, isDesktopRuntime),
     [settings.ai, isDesktopRuntime]
   );
+  const isAiEnabled = aiRuntimeSettings.provider !== "none";
   const normalizeSlotName = (slot?: string): SlotName => {
     const casted = (slot || "Evening") as SlotName;
     return SLOT_ORDER.includes(casted) ? casted : "Evening";
@@ -2055,7 +2056,7 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                 <Badge variant="outline" className="border-fuchsia-400/40 text-fuchsia-200 bg-fuchsia-500/10">
                   Suggest + Guarded Apply
                 </Badge>
-                {isDesktopRuntime ? (
+                {isDesktopRuntime && isAiEnabled ? (
                   <Button
                     size="sm"
                     variant="outline"
@@ -2069,9 +2070,9 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
                 ) : null}
               </div>
               <div className="text-xs text-muted-foreground">No automatic rescheduling is applied. You can apply each suggestion with guard checks.</div>
-              {isDesktopRuntime ? (
+              {isDesktopRuntime && isAiEnabled ? (
                 <div className="text-[11px] text-muted-foreground">
-                  Uses {aiRuntimeSettings.provider === "openai" ? "OpenAI API" : "local Ollama"} ({aiRuntimeSettings.model}) with historical task metrics to refine suggestions.
+                  Uses {aiRuntimeSettings.provider === "openai" ? "OpenAI API" : aiRuntimeSettings.provider === "ollama" ? "local Ollama" : aiRuntimeSettings.provider === "perplexity" ? "Perplexity API" : aiRuntimeSettings.provider === "anthropic" ? "Anthropic API" : "No provider selected"} ({aiRuntimeSettings.model || "no model"}) with historical task metrics to refine suggestions.
                 </div>
               ) : null}
               {aiSuggestError ? <div className="text-xs text-destructive">{aiSuggestError}</div> : null}

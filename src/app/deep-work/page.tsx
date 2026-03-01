@@ -68,7 +68,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { SkillLibrary } from '@/components/SkillLibrary';
 import { LinkedUpskillCard } from '@/components/LinkedUpskillCard';
 import { LinkedDeepWorkCard } from '@/components/LinkedDeepWorkCard';
-import { storePdf } from '@/lib/audioDB';
+import { getAiConfigFromSettings, normalizeAiSettings } from '@/lib/ai/config';
+import { getPdfForResource, storePdf } from '@/lib/audioDB';
+import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+
+if (typeof window !== "undefined" && (pdfjs as any).GlobalWorkerOptions) {
+  (pdfjs as any).GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjs as any).version}/pdf.worker.min.mjs`;
+}
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -386,6 +392,9 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     onOpenMindMap: (id: string) => void;
     handleUpdateFocusAreaName: (id: string, newName: string) => void;
     handleCreateAndLinkChild: (parentId: string, type: 'deepwork' | 'upskill') => void;
+    handleGenerateVisualizationsFromLinkedPdf: (parentTask: ExerciseDefinition & { type: 'deepwork' | 'upskill' }) => void;
+    isGeneratingVisualizationsFromLinkedPdf: boolean;
+    isAiEnabled: boolean;
     setEmbedUrl: (url: string | null) => void;
     setFloatingVideoUrl: (url: string | null) => void;
     handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void;
@@ -420,6 +429,9 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     onOpenMindMap,
     handleUpdateFocusAreaName,
     handleCreateAndLinkChild,
+    handleGenerateVisualizationsFromLinkedPdf,
+    isGeneratingVisualizationsFromLinkedPdf,
+    isAiEnabled,
     setEmbedUrl,
     setFloatingVideoUrl,
     handleOpenNestedPopup,
@@ -453,6 +465,16 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     
     const nodeType = currentTask.type === 'deepwork' ? getDeepWorkNodeType(currentTask) : getUpskillNodeType(currentTask);
     const isHighLevelNode = nodeType === 'Intention' || nodeType === 'Curiosity';
+    const isCuriosityNode = currentTask.type === 'upskill' && nodeType === 'Curiosity';
+    const linkedPdfNameForCurrentTask = useMemo(() => {
+        if (currentTask.type !== 'upskill') return null;
+        const microSkill = Array.from(microSkillMap.values()).find(ms => ms.microSkillName === currentTask.category);
+        if (!microSkill) return null;
+        const coreSkill = coreSkills.find(cs => cs.name === microSkill.coreSkillName);
+        if (!coreSkill?.linkedPdfResourceId) return null;
+        const resource = resources.find(r => r.id === coreSkill.linkedPdfResourceId && r.type === 'pdf');
+        return resource?.name || null;
+    }, [currentTask, microSkillMap, coreSkills, resources]);
     const linkedProjects = (currentTask.linkedProjectIds || [])
       .map(pid => projects.find(p => p.id === pid))
       .filter((p): p is Project => !!p);
@@ -603,6 +625,36 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                         Add New Resource
                     </p>
                 </Card>
+                {isCuriosityNode && isAiEnabled && (
+                    <Card
+                        onClick={() => {
+                            if (!isGeneratingVisualizationsFromLinkedPdf) {
+                                handleGenerateVisualizationsFromLinkedPdf(currentTask);
+                            }
+                        }}
+                        className={cn(
+                            "rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed transition-all duration-300 min-h-[230px]",
+                            isGeneratingVisualizationsFromLinkedPdf
+                                ? "cursor-wait opacity-80 border-primary/50"
+                                : "cursor-pointer hover:border-primary hover:bg-muted/50 hover:shadow-xl hover:-translate-y-1"
+                        )}
+                    >
+                        {isGeneratingVisualizationsFromLinkedPdf ? (
+                            <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                        ) : (
+                            <BrainCircuit className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                        )}
+                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors text-center">
+                            Generate with AI
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground text-center">
+                            Curiosity: {currentTask.name}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground text-center">
+                            {linkedPdfNameForCurrentTask ? `PDF: ${linkedPdfNameForCurrentTask}` : "Link a PDF in Skill Tree first"}
+                        </p>
+                    </Card>
+                )}
             </div>
         </div>
     );
@@ -649,6 +701,7 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
     currentSlot,
     permanentlyLoggedTaskIds,
     openPdfViewer,
+    settings,
   } = useAuth();
   const router = useRouter();
   
@@ -705,6 +758,91 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
   const [mechanismFramework, setMechanismFramework] = useState<'negative' | 'positive'>('negative');
   const modelUploadInputRef = useRef<HTMLInputElement>(null);
   const pdfUploadInputRef = useRef<HTMLInputElement>(null);
+  const [isGeneratingCuriositiesFromLinkedPdf, setIsGeneratingCuriositiesFromLinkedPdf] = useState(false);
+  const [isGeneratingVisualizationsFromLinkedPdf, setIsGeneratingVisualizationsFromLinkedPdf] = useState(false);
+  const isDesktopRuntime = typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
+  const isAiEnabled = normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== 'none';
+
+  const extractLinesFromPageItems = useCallback((items: any[]): string[] => {
+    const rows = new Map<number, Array<{ x: number; text: string }>>();
+    items.forEach((item) => {
+      const text = typeof item?.str === "string" ? item.str : "";
+      if (!text.trim()) return;
+      const x = Number(item?.transform?.[4] ?? 0);
+      const y = Number(item?.transform?.[5] ?? 0);
+      const key = Math.round(y * 2) / 2;
+      if (!rows.has(key)) rows.set(key, []);
+      rows.get(key)!.push({ x, text });
+    });
+
+    return Array.from(rows.entries())
+      .sort((a, b) => b[0] - a[0])
+      .map(([, words]) =>
+        words
+          .sort((a, b) => a.x - b.x)
+          .map((w) => w.text)
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim()
+      )
+      .filter((line) => line.length > 0);
+  }, []);
+
+  const pickIndexLikeLines = useCallback((lines: string[]): string[] => {
+    const candidates = lines.filter((line) => {
+      if (line.length < 4 || line.length > 160) return false;
+      if (/^\d+$/.test(line)) return false;
+      if (/^(contents|table of contents|index)$/i.test(line.trim())) return true;
+      if (/\b\d{1,4}\s*$/.test(line) && /[A-Za-z]/.test(line)) return true;
+      if (/\.\.\.+\s*\d+\s*$/.test(line)) return true;
+      if (/^\d+(\.\d+){0,3}\s+[A-Za-z]/.test(line)) return true;
+      return false;
+    });
+    return candidates.length > 20 ? candidates.slice(0, 240) : lines.slice(0, 240);
+  }, []);
+
+  const extractPdfOutlineTextFromBlob = useCallback(async (pdfBlob: Blob): Promise<string> => {
+    const arrayBuffer = await pdfBlob.arrayBuffer();
+    const loadingTask = (pdfjs as any).getDocument({ data: new Uint8Array(arrayBuffer) });
+    const pdf = await loadingTask.promise;
+
+    try {
+      const outline = await pdf.getOutline();
+      if (Array.isArray(outline) && outline.length > 0) {
+        const outlineLines: string[] = [];
+        const walk = (items: any[], prefix: number[] = []) => {
+          items.forEach((item, idx) => {
+            const title = String(item?.title || "").replace(/\s+/g, " ").trim();
+            const number = [...prefix, idx + 1].join(".");
+            if (title) outlineLines.push(`${number} ${title}`);
+            const children = Array.isArray(item?.items) ? item.items : [];
+            if (children.length > 0) walk(children, [...prefix, idx + 1]);
+          });
+        };
+        walk(outline, []);
+        if (outlineLines.length >= 4) {
+          return outlineLines.slice(0, 1200).join("\n").slice(0, 24000);
+        }
+      }
+    } catch {
+      // Fallback to page text extraction.
+    }
+
+    const maxPages = Math.min(pdf.numPages, 24);
+    const allLines: string[] = [];
+
+    for (let pageNum = 1; pageNum <= maxPages; pageNum += 1) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageLines = extractLinesFromPageItems(Array.isArray(textContent.items) ? textContent.items : []);
+      if (pageLines.length > 0) {
+        allLines.push(`--- Page ${pageNum} ---`);
+        allLines.push(...pageLines);
+      }
+    }
+
+    return pickIndexLikeLines(allLines).join("\n").slice(0, 24000);
+  }, [extractLinesFromPageItems, pickIndexLikeLines]);
 
 
   const onOpenMindMap = (id: string) => {
@@ -728,6 +866,344 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
     if (!coreSkill) return null;
     return skillDomains.find(sd => sd.id === coreSkill.domainId);
   }, [microSkillMap, coreSkills, skillDomains]);
+
+  const selectedMicroSkillCoreSkill = useMemo(() => {
+    if (!selectedMicroSkill) return null;
+    const info = microSkillMap.get(selectedMicroSkill.id);
+    if (info) {
+      return coreSkills.find((skill) => skill.name === info.coreSkillName) || null;
+    }
+    const fallback = Array.from(microSkillMap.values()).find((ms) => ms.microSkillName === selectedMicroSkill.name);
+    if (!fallback) return null;
+    return coreSkills.find((skill) => skill.name === fallback.coreSkillName) || null;
+  }, [selectedMicroSkill, microSkillMap, coreSkills]);
+
+  const selectedMicroSkillLinkedPdfResource = useMemo(() => {
+    if (!selectedMicroSkillCoreSkill?.linkedPdfResourceId) return null;
+    return (
+      resources.find(
+        (resource) => resource.id === selectedMicroSkillCoreSkill.linkedPdfResourceId && resource.type === 'pdf'
+      ) || null
+    );
+  }, [resources, selectedMicroSkillCoreSkill]);
+
+  const selectedMicroSkillCuriosityCount = useMemo(() => {
+    if (!selectedMicroSkill) return 0;
+    return upskillDefinitions.filter(
+      (def) => def.category === selectedMicroSkill.name && getUpskillNodeType(def) === 'Curiosity'
+    ).length;
+  }, [selectedMicroSkill, upskillDefinitions, getUpskillNodeType]);
+
+  const handleGenerateCuriositiesFromLinkedPdf = useCallback(async () => {
+    if (!selectedMicroSkill) {
+      toast({ title: "Error", description: "Please select a micro-skill first.", variant: "destructive" });
+      return;
+    }
+    if (!selectedMicroSkillLinkedPdfResource?.id) {
+      toast({
+        title: "Linked PDF Required",
+        description: "Link a PDF to this specialization in Skill Tree first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingCuriositiesFromLinkedPdf(true);
+    try {
+      const localPdf = await getPdfForResource(
+        selectedMicroSkillLinkedPdfResource.id,
+        selectedMicroSkillLinkedPdfResource.pdfFileName || undefined
+      );
+      if (!localPdf.blob) {
+        throw new Error("Linked PDF was not found in local IndexedDB. Open/upload it in the PDF viewer first.");
+      }
+
+      const extractedText = await extractPdfOutlineTextFromBlob(localPdf.blob);
+      if (!extractedText.trim()) {
+        throw new Error("Could not extract readable headings from the linked PDF.");
+      }
+
+      const response = await fetch('/api/ai/skill-from-pdf-index', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+        },
+        body: JSON.stringify({
+          specializationName: selectedMicroSkillCoreSkill?.name || selectedMicroSkill.name,
+          targetMicroSkill: selectedMicroSkill.name,
+          extractedText,
+          aiConfig: getAiConfigFromSettings(settings, isDesktopRuntime),
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(String(result?.details || result?.error || 'Failed to generate curiosities.'));
+      }
+
+      const normalizeKey = (value: string) =>
+        value
+          .trim()
+          .toLowerCase()
+          .replace(/[^\w\s]/g, " ")
+          .replace(/\s+/g, " ");
+      const matchedMicroSkillName = String(result?.matchedMicroSkill || selectedMicroSkill.name).replace(/\s+/g, " ").trim();
+      if (normalizeKey(matchedMicroSkillName) !== normalizeKey(selectedMicroSkill.name)) {
+        throw new Error(
+          `AI matched "${matchedMicroSkillName}" instead of "${selectedMicroSkill.name}". Please refine the PDF index or micro-skill naming and try again.`
+        );
+      }
+      const curiosities = Array.from(
+        new Set(
+          (Array.isArray(result?.curiosities) ? result.curiosities : [])
+            .map((value: unknown) => String(value || "").replace(/\s+/g, " ").trim())
+            .filter((value: string) => value.length >= 2)
+        )
+      );
+
+      if (curiosities.length === 0) {
+        throw new Error("No curiosities were detected for this micro-skill from the linked PDF.");
+      }
+
+      let createdCount = 0;
+      setUpskillDefinitions((prev) => {
+        const existing = new Set(prev.map((def) => `${normalizeKey(def.category)}::${normalizeKey(def.name)}`));
+        const additions: ExerciseDefinition[] = [];
+
+        curiosities.forEach((name) => {
+          const key = `${normalizeKey(selectedMicroSkill.name)}::${normalizeKey(name)}`;
+          if (existing.has(key)) return;
+          existing.add(key);
+          additions.push({
+            id: `def_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+            name,
+            category: selectedMicroSkill.name as ExerciseCategory,
+            nodeType: 'Curiosity',
+            linkedUpskillIds: [],
+          });
+        });
+
+        createdCount = additions.length;
+        if (additions.length === 0) return prev;
+        return [...prev, ...additions];
+      });
+
+      toast({
+        title: createdCount > 0 ? "Curiosities Generated" : "No New Curiosities",
+        description:
+          createdCount > 0
+            ? `Added ${createdCount} curiosities for "${selectedMicroSkill.name}".`
+            : `All detected curiosities already exist under "${selectedMicroSkill.name}".`,
+      });
+    } catch (error) {
+      toast({
+        title: "Generation Failed",
+        description: error instanceof Error ? error.message : "Unable to generate curiosities from linked PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingCuriositiesFromLinkedPdf(false);
+    }
+  }, [
+    selectedMicroSkill,
+    selectedMicroSkillLinkedPdfResource,
+    selectedMicroSkillCoreSkill,
+    extractPdfOutlineTextFromBlob,
+    isDesktopRuntime,
+    settings,
+    setUpskillDefinitions,
+    toast,
+  ]);
+
+  const handleGenerateVisualizationsFromLinkedPdf = useCallback(async (parentTask: ExerciseDefinition & { type: 'deepwork' | 'upskill' }) => {
+    if (parentTask.type !== 'upskill') {
+      toast({ title: "Error", description: "AI visualization generation is available for curiosity tasks only.", variant: "destructive" });
+      return;
+    }
+    if (getUpskillNodeType(parentTask) !== 'Curiosity') {
+      toast({ title: "Error", description: "Select a curiosity card to generate visualizations.", variant: "destructive" });
+      return;
+    }
+
+    const microSkillInfo = Array.from(microSkillMap.values()).find((ms) => ms.microSkillName === parentTask.category);
+    const coreSkill = microSkillInfo ? coreSkills.find((cs) => cs.name === microSkillInfo.coreSkillName) : null;
+    const linkedPdf =
+      coreSkill?.linkedPdfResourceId
+        ? resources.find((resource) => resource.id === coreSkill.linkedPdfResourceId && resource.type === 'pdf') || null
+        : null;
+
+    if (!linkedPdf?.id) {
+      toast({
+        title: "Linked PDF Required",
+        description: "Link a PDF to this specialization in Skill Tree first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingVisualizationsFromLinkedPdf(true);
+    try {
+      const localPdf = await getPdfForResource(linkedPdf.id, linkedPdf.pdfFileName || undefined);
+      if (!localPdf.blob) {
+        throw new Error("Linked PDF was not found in local IndexedDB. Open/upload it in the PDF viewer first.");
+      }
+
+      const extractedText = await extractPdfOutlineTextFromBlob(localPdf.blob);
+      if (!extractedText.trim()) {
+        throw new Error("Could not extract readable headings from the linked PDF.");
+      }
+
+      const response = await fetch('/api/ai/skill-from-pdf-index', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+        },
+        body: JSON.stringify({
+          specializationName: coreSkill?.name || parentTask.category,
+          targetMicroSkill: parentTask.name,
+          targetMode: 'bci',
+          extractedText,
+          aiConfig: getAiConfigFromSettings(settings, isDesktopRuntime),
+        }),
+      });
+
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(String(result?.details || result?.error || 'Failed to generate visualizations.'));
+      }
+
+      const normalizeKey = (value: string) =>
+        value
+          .trim()
+          .toLowerCase()
+          .replace(/[^\w\s]/g, " ")
+          .replace(/\s+/g, " ");
+      const stripSectionPrefix = (value: string) => value.replace(/^\d+(?:\.\d+){0,6}\s+/, "").trim();
+
+      const matchedName = String(result?.matchedMicroSkill || parentTask.name).replace(/\s+/g, " ").trim();
+      const matchedKey = normalizeKey(stripSectionPrefix(matchedName));
+      const parentKey = normalizeKey(stripSectionPrefix(parentTask.name));
+      if (matchedKey !== parentKey) {
+        throw new Error(`AI matched "${matchedName}" instead of "${parentTask.name}".`);
+      }
+
+      const toItems = (value: unknown) =>
+        Array.from(
+          new Set(
+            (Array.isArray(value) ? value : [])
+              .map((entry: unknown) => String(entry || "").replace(/\s+/g, " ").trim())
+              .filter((entry: string) => entry.length >= 2)
+          )
+        ).slice(0, 24);
+
+      const bci = result?.bci || {};
+      const sections = [
+        { key: 'boundary', name: 'Boundary', items: toItems(bci.boundary) },
+        { key: 'contents', name: 'Contents', items: toItems(bci.contents) },
+        { key: 'invariant', name: 'Invariant', items: toItems(bci.invariant) },
+      ] as const;
+
+      const totalItems = sections.reduce((sum, section) => sum + section.items.length, 0);
+      if (totalItems === 0) {
+        throw new Error("AI returned empty Boundary/Contents/Invariant details for this curiosity.");
+      }
+
+      const linkedResources = (parentTask.linkedResourceIds || [])
+        .map((id) => resources.find((resource) => resource.id === id))
+        .filter((resource): resource is Resource => !!resource);
+
+      const existingBySection = new Map<string, Resource>();
+      linkedResources.forEach((resource) => {
+        const key = normalizeKey(resource.name);
+        if (key.includes('boundary') && !existingBySection.has('boundary')) existingBySection.set('boundary', resource);
+        if (key.includes('contents') && !existingBySection.has('contents')) existingBySection.set('contents', resource);
+        if (key.includes('invariant') && !existingBySection.has('invariant')) existingBySection.set('invariant', resource);
+      });
+
+      const createdResourceIds: string[] = [];
+      let mutableParent = parentTask as ExerciseDefinition & { type: 'deepwork' | 'upskill' };
+
+      sections.forEach((section) => {
+        const points: ResourcePoint[] = section.items.map((text, idx) => ({
+          id: `point_${Date.now()}_${section.key}_${idx}_${Math.random().toString(36).slice(2, 8)}`,
+          text,
+          type: 'text',
+        }));
+        const existing = existingBySection.get(section.key);
+
+        if (existing) {
+          setResources((prev) =>
+            prev.map((resource) =>
+              resource.id === existing.id
+                ? {
+                    ...resource,
+                    name: section.name,
+                    points,
+                  }
+                : resource
+            )
+          );
+          return;
+        }
+
+        const updatedParent = createResourceWithHierarchy(mutableParent, undefined, 'card') as ExerciseDefinition | undefined;
+        if (!updatedParent) return;
+        const newResourceId = (updatedParent.linkedResourceIds || [])[updatedParent.linkedResourceIds!.length - 1];
+        if (!newResourceId) return;
+
+        createdResourceIds.push(newResourceId);
+        setResources((prev) =>
+          prev.map((resource) =>
+            resource.id === newResourceId
+              ? {
+                  ...resource,
+                  name: section.name,
+                  points,
+                }
+              : resource
+          )
+        );
+
+        mutableParent = { ...updatedParent, type: 'upskill' };
+      });
+
+      if (createdResourceIds.length > 0) {
+        setNavigationStack((prev) =>
+          prev.map((item) =>
+            item.id === parentTask.id
+              ? { ...item, linkedResourceIds: Array.from(new Set([...(item.linkedResourceIds || []), ...createdResourceIds])) }
+              : item
+          )
+        );
+      }
+
+      toast({
+        title: "Model Cards Generated",
+        description: `Boundary, Contents, and Invariant cards are ready for "${parentTask.name}".`,
+      });
+    } catch (error) {
+      toast({
+        title: "Generation Failed",
+        description: error instanceof Error ? error.message : "Unable to generate model cards from linked PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingVisualizationsFromLinkedPdf(false);
+    }
+  }, [
+    getUpskillNodeType,
+    microSkillMap,
+    coreSkills,
+    resources,
+    createResourceWithHierarchy,
+    extractPdfOutlineTextFromBlob,
+    isDesktopRuntime,
+    settings,
+    setResources,
+    toast,
+  ]);
 
   const linkProjectToTask = useCallback((taskId: string, projectId: string) => {
     const isDeepWork = deepWorkDefinitions.some(d => d.id === taskId);
@@ -1698,6 +2174,9 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                                 onOpenMindMap={onOpenMindMap}
                                 handleUpdateFocusAreaName={handleUpdateFocusAreaName}
                                 handleCreateAndLinkChild={handleCreateAndLinkChild}
+                                handleGenerateVisualizationsFromLinkedPdf={handleGenerateVisualizationsFromLinkedPdf}
+                                isGeneratingVisualizationsFromLinkedPdf={isGeneratingVisualizationsFromLinkedPdf}
+                                isAiEnabled={isAiEnabled}
                                 setEmbedUrl={setEmbedUrl}
                                 setFloatingVideoUrl={setFloatingVideoUrl}
                                 handleOpenNestedPopup={handleOpenNestedPopup}
@@ -1778,6 +2257,38 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                                         <PlusCircle className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
                                         <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors">
                                             Add New Task
+                                        </p>
+                                    </Card>
+                                )}
+                                {selectedMicroSkill && !selectedProject && selectedMicroSkillCuriosityCount === 0 && isAiEnabled && (
+                                    <Card
+                                        onClick={() => {
+                                            if (!isGeneratingCuriositiesFromLinkedPdf) {
+                                                void handleGenerateCuriositiesFromLinkedPdf();
+                                            }
+                                        }}
+                                        className={cn(
+                                            "rounded-2xl group flex flex-col items-center justify-center p-6 border-2 border-dashed transition-all duration-300 min-h-[230px]",
+                                            isGeneratingCuriositiesFromLinkedPdf
+                                                ? "cursor-wait opacity-80 border-primary/50"
+                                                : "cursor-pointer hover:border-primary hover:bg-muted/50 hover:shadow-xl hover:-translate-y-1"
+                                        )}
+                                    >
+                                        {isGeneratingCuriositiesFromLinkedPdf ? (
+                                            <Loader2 className="h-10 w-10 text-primary animate-spin" />
+                                        ) : (
+                                            <BrainCircuit className="h-10 w-10 text-muted-foreground group-hover:text-primary transition-colors" />
+                                        )}
+                                        <p className="mt-4 text-md font-semibold text-muted-foreground group-hover:text-primary transition-colors text-center">
+                                            Generate Curiosities with AI
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground text-center">
+                                            Micro-skill: {selectedMicroSkill.name}
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground text-center">
+                                            {selectedMicroSkillLinkedPdfResource
+                                                ? `Use linked PDF: ${selectedMicroSkillLinkedPdfResource.name}`
+                                                : "Link a PDF in Skill Tree first"}
                                         </p>
                                     </Card>
                                 )}

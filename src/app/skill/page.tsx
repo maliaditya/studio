@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical, Upload, LineChart as LineChartIcon, Download, ClipboardList } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical, Upload, LineChart as LineChartIcon, Download, ClipboardList, Sparkles, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule, ProjectSkillLink, Resource, ResourceFolder } from '@/types/workout';
@@ -39,6 +39,13 @@ import { cn } from '@/lib/utils';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
 import { SpacedRepetitionModal } from '@/components/SpacedRepetitionModal';
 import { DeepWorkPageContent } from '@/app/deep-work/page';
+import { getAiConfigFromSettings, normalizeAiSettings } from '@/lib/ai/config';
+import { getPdfForResource } from '@/lib/audioDB';
+import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+
+if (typeof window !== "undefined" && (pdfjs as any).GlobalWorkerOptions) {
+  (pdfjs as any).GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjs as any).version}/pdf.worker.min.mjs`;
+}
 
 
 function Draggable({ id, children, className }: { id: string, children: React.ReactNode, className?: string }) {
@@ -187,6 +194,7 @@ function SkillPageContent() {
     offerizationPlans,
     logSubTaskTime,
     mindsetCards,
+    settings,
   } = useAuth();
   
   const router = useRouter();
@@ -233,6 +241,95 @@ function SkillPageContent() {
 
   const [isDeepWorkModalOpen, setIsDeepWorkModalOpen] = useState(false);
   const [specializationFilter, setSpecializationFilter] = useState<'all' | 'linked'>('linked');
+  const [isGeneratingFromLinkedPdf, setIsGeneratingFromLinkedPdf] = useState(false);
+  const isDesktopRuntime = typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
+  const isAiEnabled = normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== 'none';
+
+  const extractLinesFromPageItems = useCallback((items: any[]): string[] => {
+    const rows = new Map<number, Array<{ x: number; text: string }>>();
+    items.forEach((item) => {
+      const text = typeof item?.str === "string" ? item.str : "";
+      if (!text.trim()) return;
+      const x = Number(item?.transform?.[4] ?? 0);
+      const y = Number(item?.transform?.[5] ?? 0);
+      const key = Math.round(y * 2) / 2;
+      if (!rows.has(key)) rows.set(key, []);
+      rows.get(key)!.push({ x, text });
+    });
+
+    return Array.from(rows.entries())
+      .sort((a, b) => b[0] - a[0])
+      .map(([, words]) =>
+        words
+          .sort((a, b) => a.x - b.x)
+          .map((w) => w.text)
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim()
+      )
+      .filter((line) => line.length > 0);
+  }, []);
+
+  const pickIndexLikeLines = useCallback((lines: string[]): string[] => {
+    const candidates = lines.filter((line) => {
+      if (line.length < 4 || line.length > 160) return false;
+      if (/^\d+$/.test(line)) return false;
+      if (/^(contents|table of contents|index)$/i.test(line.trim())) return true;
+      if (/\b\d{1,4}\s*$/.test(line) && /[A-Za-z]/.test(line)) return true;
+      if (/\.\.\.+\s*\d+\s*$/.test(line)) return true;
+      if (/^\d+(\.\d+){0,3}\s+[A-Za-z]/.test(line)) return true;
+      return false;
+    });
+    return candidates.length > 20 ? candidates.slice(0, 240) : lines.slice(0, 240);
+  }, []);
+
+  const extractPdfOutlineTextFromBlob = useCallback(async (pdfBlob: Blob): Promise<string> => {
+    const arrayBuffer = await pdfBlob.arrayBuffer();
+    const loadingTask = (pdfjs as any).getDocument({ data: new Uint8Array(arrayBuffer) });
+    const pdf = await loadingTask.promise;
+
+    // Prefer embedded PDF outline/bookmarks (chapters/sections) when available.
+    try {
+      const outline = await pdf.getOutline();
+      if (Array.isArray(outline) && outline.length > 0) {
+        const outlineLines: string[] = [];
+        const walk = (items: any[], prefix: number[] = []) => {
+          items.forEach((item, idx) => {
+            const title = String(item?.title || "").replace(/\s+/g, " ").trim();
+            const number = [...prefix, idx + 1].join(".");
+            if (title) {
+              outlineLines.push(`${number} ${title}`);
+            }
+            const children = Array.isArray(item?.items) ? item.items : [];
+            if (children.length > 0) {
+              walk(children, [...prefix, idx + 1]);
+            }
+          });
+        };
+        walk(outline, []);
+        if (outlineLines.length >= 4) {
+          return outlineLines.slice(0, 1200).join("\n").slice(0, 24000);
+        }
+      }
+    } catch {
+      // If outline extraction fails, continue with text extraction.
+    }
+
+    const maxPages = Math.min(pdf.numPages, 24);
+    const allLines: string[] = [];
+
+    for (let pageNum = 1; pageNum <= maxPages; pageNum += 1) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageLines = extractLinesFromPageItems(Array.isArray(textContent.items) ? textContent.items : []);
+      if (pageLines.length > 0) {
+        allLines.push(`--- Page ${pageNum} ---`);
+        allLines.push(...pageLines);
+      }
+    }
+
+    return pickIndexLikeLines(allLines).join("\n").slice(0, 24000);
+  }, [extractLinesFromPageItems, pickIndexLikeLines]);
 
 
   useEffect(() => {
@@ -942,6 +1039,18 @@ function SkillPageContent() {
   const selectedCoreSkill = useMemo(() => coreSkills.find(s => s.id === selectedSkillId), [coreSkills, selectedSkillId]);
   const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
   const selectedCompanyPositions = useMemo(() => positions.filter(p => p.companyId === selectedCompanyId), [positions, selectedCompanyId]);
+  const pdfResources = useMemo(
+    () =>
+      resources
+        .filter((resource) => resource.type === 'pdf')
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    [resources]
+  );
+  const linkedPdfResource = useMemo(() => {
+    if (!selectedCoreSkill || selectedCoreSkill.type !== 'Specialization') return null;
+    if (!selectedCoreSkill.linkedPdfResourceId) return null;
+    return pdfResources.find((resource) => resource.id === selectedCoreSkill.linkedPdfResourceId) || null;
+  }, [selectedCoreSkill, pdfResources]);
 
   const coreSkillsInDomain = useMemo(() => {
     if (!selectedDomainId) return [];
@@ -1042,6 +1151,221 @@ function SkillPageContent() {
   const handleSelectForDeepWork = (microSkill: MicroSkill) => {
     setSelectedMicroSkill(microSkill);
     setIsDeepWorkModalOpen(true);
+  };
+
+  const handleLinkSpecializationPdf = (resourceId: string) => {
+    if (!selectedCoreSkill || selectedCoreSkill.type !== 'Specialization') return;
+    const normalizedId = resourceId === '__none__' ? null : resourceId;
+    setCoreSkills((prev) =>
+      prev.map((skill) =>
+        skill.id === selectedCoreSkill.id
+          ? {
+              ...skill,
+              linkedPdfResourceId: normalizedId,
+            }
+          : skill
+      )
+    );
+    if (!normalizedId) {
+      toast({ title: "PDF Unlinked", description: "Removed linked PDF from this specialization." });
+      return;
+    }
+    const linked = pdfResources.find((resource) => resource.id === normalizedId);
+    toast({
+      title: "PDF Linked",
+      description: linked ? `"${linked.name}" linked to ${selectedCoreSkill.name}.` : "PDF linked.",
+    });
+  };
+
+  const handleGenerateFromLinkedPdf = async () => {
+    if (!selectedCoreSkill || selectedCoreSkill.type !== 'Specialization') return;
+    if (!linkedPdfResource?.id) {
+      toast({ title: "Link a PDF First", description: "Select a PDF resource card for this specialization.", variant: "destructive" });
+      return;
+    }
+
+    setIsGeneratingFromLinkedPdf(true);
+    try {
+      const localPdf = await getPdfForResource(linkedPdfResource.id, linkedPdfResource.pdfFileName || undefined);
+      if (!localPdf.blob) {
+        throw new Error("Linked PDF was not found in local IndexedDB. Open/upload it in the PDF viewer first.");
+      }
+      const extractedText = await extractPdfOutlineTextFromBlob(localPdf.blob);
+      if (!extractedText.trim()) {
+        throw new Error("Could not extract readable index/headings from the linked PDF.");
+      }
+
+      const response = await fetch('/api/ai/skill-from-pdf-index', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+        },
+        body: JSON.stringify({
+          specializationName: selectedCoreSkill.name,
+          extractedText,
+          aiConfig: getAiConfigFromSettings(settings, isDesktopRuntime),
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(String(result?.details || result?.error || 'Failed to generate from linked PDF.'));
+      }
+
+      const generatedAreasRaw = Array.isArray(result?.skillAreas) ? result.skillAreas : [];
+      const generatedAreas = generatedAreasRaw
+        .map((area: unknown) => {
+          const areaName = String((area as any)?.name || '').replace(/\s+/g, ' ').trim();
+          const rawMicroSkills = Array.isArray((area as any)?.microSkills) ? (area as any).microSkills : [];
+          const microSkills = rawMicroSkills
+            .map((value: unknown) => {
+              if (typeof value === 'string') {
+                const name = value.replace(/\s+/g, ' ').trim();
+                if (!name) return null;
+                return { name, curiosities: [] as string[] };
+              }
+              const name = String((value as any)?.name || '').replace(/\s+/g, ' ').trim();
+              const curiositiesRaw = Array.isArray((value as any)?.curiosities) ? (value as any).curiosities : [];
+              const curiosities = Array.from(
+                new Set(
+                  curiositiesRaw
+                    .map((c: unknown) => String(c || '').replace(/\s+/g, ' ').trim())
+                    .filter((c: string) => c.length > 1)
+                )
+              );
+              if (!name) return null;
+              return { name, curiosities };
+            })
+            .filter((v): v is { name: string; curiosities: string[] } => !!v)
+            .slice(0, 120);
+          if (!areaName || microSkills.length === 0) return null;
+          return { areaName, microSkills };
+        })
+        .filter((value): value is { areaName: string; microSkills: Array<{ name: string; curiosities: string[] }> } => !!value);
+
+      const isChapterLike = (name: string) => /^chapter\b/i.test(name) || /^appendix\b/i.test(name);
+      const normalizedGeneratedAreas = generatedAreas.map((area) => {
+        const isPartArea = /^part\b/i.test(area.areaName);
+        const hasExistingCuriosities = area.microSkills.some((micro) => micro.curiosities.length > 0);
+        if (!isPartArea || hasExistingCuriosities) return area;
+
+        const chapterCount = area.microSkills.filter((micro) => isChapterLike(micro.name)).length;
+        if (chapterCount === 0) return area;
+
+        const regrouped: Array<{ name: string; curiosities: string[] }> = [];
+        let currentChapter: { name: string; curiosities: string[] } | null = null;
+
+        area.microSkills.forEach((micro) => {
+          if (isChapterLike(micro.name)) {
+            currentChapter = { name: micro.name, curiosities: [] };
+            regrouped.push(currentChapter);
+            return;
+          }
+          if (currentChapter) {
+            if (!currentChapter.curiosities.some((c) => c.toLowerCase() === micro.name.toLowerCase())) {
+              currentChapter.curiosities.push(micro.name);
+            }
+          } else {
+            // If entries appear before first chapter, keep them as standalone micro-skills.
+            regrouped.push({ name: micro.name, curiosities: [] });
+          }
+        });
+
+        return { ...area, microSkills: regrouped };
+      });
+
+      if (normalizedGeneratedAreas.length === 0) {
+        throw new Error('AI did not return usable hierarchical skill data.');
+      }
+
+      const normalizeKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, ' ');
+      const generatedCuriosities: Array<{ microSkillName: string; curiosityName: string }> = [];
+
+      setCoreSkills((prev) =>
+        prev.map((skill) => {
+          if (skill.id !== selectedCoreSkill.id) return skill;
+          const nextAreas = [...skill.skillAreas];
+
+          normalizedGeneratedAreas.forEach((generatedArea) => {
+            const existingAreaIndex = nextAreas.findIndex(
+              (area) => area.name.trim().toLowerCase() === generatedArea.areaName.trim().toLowerCase()
+            );
+            const generatedMicros = generatedArea.microSkills.map((micro) => ({
+              id: `ms_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${Math.random().toString(36).slice(2, 6)}`,
+              name: micro.name,
+              isReadyForRepetition: false,
+            }));
+
+            generatedArea.microSkills.forEach((micro) => {
+              micro.curiosities.forEach((curiosity) => {
+                generatedCuriosities.push({ microSkillName: micro.name, curiosityName: curiosity });
+              });
+            });
+
+            if (existingAreaIndex >= 0) {
+              const existing = nextAreas[existingAreaIndex];
+              const existingNames = new Set(existing.microSkills.map((m) => normalizeKey(m.name)));
+              const mergedMicros = [
+                ...existing.microSkills,
+                ...generatedMicros.filter((m) => !existingNames.has(normalizeKey(m.name))),
+              ];
+              nextAreas[existingAreaIndex] = { ...existing, microSkills: mergedMicros };
+            } else {
+              nextAreas.push({
+                id: `sa_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                name: generatedArea.areaName,
+                purpose: `Generated from PDF index: ${linkedPdfResource.name}`,
+                microSkills: generatedMicros,
+              });
+            }
+          });
+
+          return {
+            ...skill,
+            skillAreas: nextAreas,
+          };
+        })
+      );
+
+      if (generatedCuriosities.length > 0) {
+        setUpskillDefinitions((prev) => {
+          const existing = new Set(prev.map((d) => `${normalizeKey(d.category)}::${normalizeKey(d.name)}`));
+          const additions: ExerciseDefinition[] = [];
+          generatedCuriosities.forEach(({ microSkillName, curiosityName }) => {
+            const key = `${normalizeKey(microSkillName)}::${normalizeKey(curiosityName)}`;
+            if (existing.has(key)) return;
+            existing.add(key);
+            additions.push({
+              id: `def_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+              name: curiosityName,
+              category: microSkillName as any,
+              linkedUpskillIds: [],
+            });
+          });
+          if (additions.length === 0) return prev;
+          return [...prev, ...additions];
+        });
+      }
+
+      const areaCount = normalizedGeneratedAreas.length;
+      const microCount = normalizedGeneratedAreas.reduce((sum, area) => sum + area.microSkills.length, 0);
+      const curiosityCount = normalizedGeneratedAreas.reduce(
+        (sum, area) => sum + area.microSkills.reduce((s, m) => s + m.curiosities.length, 0),
+        0
+      );
+      toast({
+        title: 'Skill Hierarchy Generated',
+        description: `Added/updated ${areaCount} skills, ${microCount} micro-skills, ${curiosityCount} curiosities.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Generation Failed',
+        description: error instanceof Error ? error.message : 'Unable to generate skill area from PDF index.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingFromLinkedPdf(false);
+    }
   };
 
   const formatMinutes = (minutes: number) => {
@@ -1424,9 +1748,46 @@ function SkillPageContent() {
                                 <CardTitle className="text-base">Skill Areas</CardTitle>
                               </CardHeader>
                               <CardContent>
-                                  <div className="flex items-center gap-2">
-                                    <Input value={newSkillAreaNames[selectedSkillId!] || ''} onChange={e => setNewSkillAreaNames(prev => ({...prev, [selectedSkillId!]: e.target.value}))} placeholder="New Skill Area Name" />
-                                    <Button onClick={() => handleAddSkillArea(selectedSkillId!)}>Add</Button>
+                                  <div className="space-y-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_auto] gap-2 items-end">
+                                      <div className="space-y-1">
+                                        <Label htmlFor="spec-linked-pdf" className="text-xs text-muted-foreground">Linked PDF Resource</Label>
+                                        <Select
+                                          value={selectedCoreSkill.linkedPdfResourceId || '__none__'}
+                                          onValueChange={handleLinkSpecializationPdf}
+                                        >
+                                          <SelectTrigger id="spec-linked-pdf">
+                                            <SelectValue placeholder="Select linked PDF..." />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="__none__">No linked PDF</SelectItem>
+                                            {pdfResources.map((resource) => (
+                                              <SelectItem key={resource.id} value={resource.id}>
+                                                {resource.name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                      {linkedPdfResource && isAiEnabled ? (
+                                        <Button
+                                          variant="secondary"
+                                          onClick={handleGenerateFromLinkedPdf}
+                                          disabled={isGeneratingFromLinkedPdf}
+                                        >
+                                          {isGeneratingFromLinkedPdf ? (
+                                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                          ) : (
+                                            <Sparkles className="mr-2 h-4 w-4 text-emerald-500" />
+                                          )}
+                                          AI Generate
+                                        </Button>
+                                      ) : null}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Input value={newSkillAreaNames[selectedSkillId!] || ''} onChange={e => setNewSkillAreaNames(prev => ({...prev, [selectedSkillId!]: e.target.value}))} placeholder="New Skill Area Name" />
+                                      <Button onClick={() => handleAddSkillArea(selectedSkillId!)}>Add</Button>
+                                    </div>
                                   </div>
                               </CardContent>
                           </Card>
@@ -1491,7 +1852,7 @@ function SkillPageContent() {
                                             return (
                                               <Card key={micro.id} className="flex flex-col group/item">
                                                   <CardHeader className="p-3 flex flex-row items-center justify-between">
-                                                      <CardTitle className="text-base flex-grow cursor-pointer hover:underline" onClick={() => onSelectMicroSkill(micro)}>{micro.name}</CardTitle>
+                                                      <CardTitle className="text-base flex-grow cursor-pointer hover:underline" onClick={() => setSelectedMicroSkill(micro)}>{micro.name}</CardTitle>
                                                       <div className="flex items-center">
                                                           <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover/item:opacity-100" onClick={() => handleSelectForDeepWork(micro)}>
                                                             <Briefcase className="h-4 w-4 text-muted-foreground hover:text-primary"/>

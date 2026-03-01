@@ -533,6 +533,7 @@ export interface CoreSkill {
   purposePillar?: string;
   parentId?: string | null;
   addToPortfolio?: boolean; // New field
+  linkedPdfResourceId?: string | null;
 }
 
 export interface SkillArea {
@@ -867,11 +868,15 @@ export interface UserSettings {
   learningPerformanceDailyLogs?: Record<string, LearningPerformanceLogEntry[]>;
   stateDiagramStore?: StateDiagramStore;
   ai?: {
-    provider: 'ollama' | 'openai';
+    provider: 'none' | 'ollama' | 'openai' | 'perplexity' | 'anthropic';
     model: string;
     ollamaBaseUrl?: string;
     openaiApiKey?: string;
     openaiBaseUrl?: string;
+    perplexityApiKey?: string;
+    perplexityBaseUrl?: string;
+    anthropicApiKey?: string;
+    anthropicBaseUrl?: string;
     requestTimeoutMs?: number;
   };
 }

@@ -33,7 +33,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { addDays, addMonths, differenceInDays, differenceInMonths, isAfter, isBefore, parseISO, startOfDay } from "date-fns";
-import { getAiConfigFromSettings } from "@/lib/ai/config";
+import { getAiConfigFromSettings, normalizeAiSettings } from "@/lib/ai/config";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
@@ -80,6 +80,7 @@ export default function PdfViewerPopup() {
     const [celebratedKey, setCelebratedKey] = useState<string | null>(null);
     const isDesktopRuntime =
         typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
+    const isAiEnabled = normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== "none";
 
     const [resizeMode, setResizeMode] = useState<null | "x" | "y" | "xy">(null);
     const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0, mode: "x" as "x" | "y" | "xy" });
@@ -204,6 +205,7 @@ export default function PdfViewerPopup() {
     const learningPageMetrics = useMemo(() => {
         if (!resourceId) {
             return {
+                isLinkedToLearningPlan: false,
                 targetPagesToday: 0,
                 completedPagesBaseline: 0,
             };
@@ -271,6 +273,7 @@ export default function PdfViewerPopup() {
             return count;
         };
 
+        let isLinkedToLearningPlan = false;
         let bestTarget = 0;
         let bestCompletedPages = 0;
         for (const spec of (coreSkills || []).filter((skill) => skill.type === "Specialization")) {
@@ -279,6 +282,7 @@ export default function PdfViewerPopup() {
             const linkedByBook = (learningPlan.bookWebpageResources || []).some((book) => book.linkedPdfResourceId === resourceId);
             const linkedByPath = (learningPlan.skillTreePaths || []).some((path) => path.linkedPdfResourceId === resourceId);
             if (!linkedByBook && !linkedByPath) continue;
+            isLinkedToLearningPlan = true;
 
             const bookResources = learningPlan.bookWebpageResources || [];
             if (bookResources.length === 0) continue;
@@ -315,20 +319,28 @@ export default function PdfViewerPopup() {
             }
         }
         return {
+            isLinkedToLearningPlan,
             targetPagesToday: bestTarget,
             completedPagesBaseline: bestCompletedPages,
         };
     }, [resourceId, coreSkills, offerizationPlans, settings.routines]);
+    const showLearningTargetUi = learningPageMetrics.isLinkedToLearningPlan;
     const pagesCompletedToday = Math.max(0, pageNumber - learningPageMetrics.completedPagesBaseline);
-    const targetPagesToday = learningPageMetrics.targetPagesToday > 0
+    const targetPagesToday = showLearningTargetUi
+        ? (learningPageMetrics.targetPagesToday > 0
         ? learningPageMetrics.targetPagesToday
         : resourceId
             ? Math.max(0, settings.pdfDailyPageTargetByResourceId?.[resourceId] || 0)
-            : 0;
-    const floatingCount = targetPagesToday - pagesCompletedToday;
-    const celebrationKey = resourceId ? `${resourceId}:${new Date().toISOString().slice(0, 10)}` : null;
+            : 0)
+        : 0;
+    const floatingCount = showLearningTargetUi ? targetPagesToday - pagesCompletedToday : 0;
+    const celebrationKey = showLearningTargetUi && resourceId ? `${resourceId}:${new Date().toISOString().slice(0, 10)}` : null;
 
     useEffect(() => {
+        if (!showLearningTargetUi) {
+            setShowTargetCelebration(false);
+            return;
+        }
         if (!celebrationKey) return;
         if (floatingCount !== -1) return;
         if (celebratedKey === celebrationKey) return;
@@ -336,7 +348,7 @@ export default function PdfViewerPopup() {
         setShowTargetCelebration(true);
         const timer = window.setTimeout(() => setShowTargetCelebration(false), 2600);
         return () => window.clearTimeout(timer);
-    }, [floatingCount, celebrationKey, celebratedKey]);
+    }, [showLearningTargetUi, floatingCount, celebrationKey, celebratedKey]);
     const annotationStorageKey = useMemo(() => {
         return resourceId ? `pdf-annotations:${resourceId}` : null;
     }, [resourceId]);
@@ -890,6 +902,7 @@ export default function PdfViewerPopup() {
     const canGoPrev = pageNumber > 1;
     const canGoNext = !!numPages && pageNumber < numPages;
     const hasSelectedText = selectedText.length > 0;
+    const hasExplainableSelection = hasSelectedText && isAiEnabled;
     const explainContextText = activeExplainText || selectedText;
 
     return (
@@ -938,11 +951,13 @@ export default function PdfViewerPopup() {
                             </div>
                             <Button variant="outline" size="sm" onClick={() => setPageNumber(p => (numPages ? Math.min(numPages, p + 1) : p + 1))} disabled={!canGoNext}>Next</Button>
                         </div>
-                        <div className="flex items-center gap-2 rounded-md border px-2 py-1">
-                            <div className="text-xs">
-                                Today: <span className="font-semibold">{pagesCompletedToday}</span> / <span className="font-semibold">{targetPagesToday}</span> pages
+                        {showLearningTargetUi && (
+                            <div className="flex items-center gap-2 rounded-md border px-2 py-1">
+                                <div className="text-xs">
+                                    Today: <span className="font-semibold">{pagesCompletedToday}</span> / <span className="font-semibold">{targetPagesToday}</span> pages
+                                </div>
                             </div>
-                        </div>
+                        )}
                         <div className="flex items-center gap-1 flex-wrap">
                             <Button variant="outline" size="icon" className="h-8 w-8" onClick={zoomOut}><ZoomOut className="h-4 w-4" /></Button>
                             <Button variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => setFitMode(fitMode === "width" ? "custom" : "width")}>
@@ -1050,9 +1065,9 @@ export default function PdfViewerPopup() {
                        )}
                     </ScrollArea>
                 </CardContent>
-                {showExplainPanel && (
-                    <div className="absolute inset-0 z-50 bg-zinc-950/96 backdrop-blur-sm flex flex-col text-zinc-100">
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/90 bg-zinc-900/95">
+                {showExplainPanel && isAiEnabled && (
+                    <div className="absolute inset-0 z-50 bg-zinc-950 flex flex-col text-zinc-100">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900">
                             <div className="text-base font-semibold flex items-center gap-2">
                                 <Sparkles className="h-4 w-4" />
                                 AI Explanation
@@ -1067,14 +1082,14 @@ export default function PdfViewerPopup() {
                                 <X className="h-4 w-4" />
                             </Button>
                         </div>
-                        <div className="px-4 py-2 text-xs text-zinc-400 border-b border-zinc-800/90 bg-zinc-900/80 truncate">
+                        <div className="px-4 py-2 text-xs text-zinc-300 border-b border-zinc-800 bg-zinc-900 truncate">
                             Selected: {explainContextText ? explainContextText : "No active selection."}
                         </div>
                         <div className="flex-1 min-h-0 px-4 py-3">
                             <ScrollArea className="h-full pr-3">
                                 <div className="space-y-3">
                                     {chatMessages.map((message, idx) => (
-                                        <div key={`${message.role}-${idx}`} className={cn("rounded-md border p-3", message.role === "user" ? "bg-zinc-800/70 border-zinc-700/80" : "bg-zinc-900/70 border-zinc-800/80")}>
+                                        <div key={`${message.role}-${idx}`} className={cn("rounded-md border p-3", message.role === "user" ? "bg-zinc-800 border-zinc-700" : "bg-zinc-900 border-zinc-800")}>
                                             <div className="mb-1 text-[11px] uppercase tracking-wide text-zinc-400">
                                                 {message.role === "user" ? "You" : "AI"}
                                             </div>
@@ -1100,7 +1115,7 @@ export default function PdfViewerPopup() {
                                 </div>
                             </ScrollArea>
                         </div>
-                        <div className="border-t border-zinc-800/90 px-4 py-3 bg-zinc-900/90">
+                        <div className="border-t border-zinc-800 px-4 py-3 bg-zinc-900">
                             <div className="flex items-center gap-2">
                                 <input
                                     value={chatInput}
@@ -1127,7 +1142,7 @@ export default function PdfViewerPopup() {
                         </div>
                     </div>
                 )}
-                {showTargetCelebration && (
+                {showLearningTargetUi && showTargetCelebration && (
                     <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden">
                         <div className="absolute inset-0 bg-emerald-500/10 backdrop-blur-[2px]" />
                         {Array.from({ length: 20 }).map((_, i) => (
@@ -1154,31 +1169,33 @@ export default function PdfViewerPopup() {
                     </div>
                 )}
                 <Button
-                    variant={hasSelectedText ? "default" : isReaderOnly ? "default" : "outline"}
+                    variant={hasExplainableSelection ? "default" : isReaderOnly ? "default" : "outline"}
                     size="sm"
                     onClick={() => {
-                        if (hasSelectedText) {
+                        if (hasExplainableSelection) {
                             void handleExplainSelection();
                             return;
                         }
                         setIsReaderOnly((prev) => !prev);
                     }}
                     className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 shadow-lg"
-                    title={hasSelectedText ? "Explain selected text" : isReaderOnly ? "Exit page-only mode" : "Show page only"}
+                    title={hasExplainableSelection ? "Explain selected text" : isReaderOnly ? "Exit page-only mode" : "Show page only"}
                 >
-                    {hasSelectedText ? (
+                    {hasExplainableSelection ? (
                         <>
                             <Sparkles className="h-3.5 w-3.5 mr-1.5" />
                             Explain
                         </>
                     ) : isReaderOnly ? "Show Tools" : "Page Only"}
                 </Button>
-                <div
-                    className="absolute bottom-4 right-4 z-30 h-8 min-w-8 rounded-md border border-border/70 bg-background/90 px-2 text-sm font-semibold flex items-center justify-center shadow-lg"
-                    title="Today's completion - target"
-                >
-                    {floatingCount}
-                </div>
+                {showLearningTargetUi && (
+                    <div
+                        className="absolute bottom-4 right-4 z-30 h-8 min-w-8 rounded-md border border-border/70 bg-background/90 px-2 text-sm font-semibold flex items-center justify-center shadow-lg"
+                        title="Today's completion - target"
+                    >
+                        {floatingCount}
+                    </div>
+                )}
                  <div
                     onMouseDown={handleResizeMouseDown("x")}
                     className="absolute right-0 top-0 h-full w-2 cursor-ew-resize z-10"

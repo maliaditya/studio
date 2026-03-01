@@ -423,7 +423,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <DefaultBackground />
       <MatrixBackground />
       <ClothBackground />
-      {pathname !== '/canvas' && <Header />}
+      {pathname !== '/canvas' && pathname !== '/' && <Header />}
 
       {pathname !== '/canvas' && (
         <>

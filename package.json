@@ -1,6 +1,8 @@
 {
   "name": "nextn",
   "version": "0.1.0",
+  "description": "Studio productivity app (web + desktop)",
+  "author": "Studio Team",
   "private": "true",
   "scripts": {
     "dev": "next dev -p 9002",
@@ -19,6 +21,7 @@
   "build": {
     "appId": "com.studio.desktop",
     "productName": "Studio",
+    "npmRebuild": false,
     "icon": "electron/assets/icon.ico",
     "extraResources": [
       {

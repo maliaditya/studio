@@ -1766,9 +1766,9 @@ export function MindsetCategoriesCard() {
                         className="fixed w-[920px] max-w-[95vw]"
                         style={{ top: position.y, left: position.x }}
                     >
-                        <div className="shadow-2xl border border-white/10 bg-[#141416]/95 backdrop-blur rounded-3xl overflow-hidden">
+                        <div className="mindset-shell shadow-2xl border backdrop-blur rounded-3xl overflow-hidden">
                             <div
-                                className="px-5 py-4 border-b border-white/10 flex items-start justify-between cursor-grab select-none"
+                                className="mindset-header px-5 py-4 border-b flex items-start justify-between cursor-grab select-none"
                                 onPointerDown={(event) => {
                                     dragState.current = {
                                         startX: event.clientX,
@@ -1813,14 +1813,14 @@ export function MindsetCategoriesCard() {
                                 </div>
                             </div>
                             <div className="p-5 grid grid-cols-[1.35fr_1fr] gap-4">
-                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                <div className="mindset-panel rounded-2xl border p-4">
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="text-sm font-semibold">Resistances &amp; Urges</div>
                                         <span className="text-xs text-muted-foreground">
                                             {sortedResistances.length} items
                                         </span>
                                     </div>
-                        <div className="rounded-xl border border-white/10 bg-black/20 p-3 mb-4">
+                        <div className="mindset-quickadd rounded-xl border p-3 mb-4">
                             <button
                                 type="button"
                                 onClick={() => setIsQuickAddOpen((prev) => !prev)}
@@ -1861,7 +1861,7 @@ export function MindsetCategoriesCard() {
                                 {sortedResistances.map((link) => {
                                     const { className: highlightClass, dormant } = getResistanceHighlightClass(link.stopper);
                                     return (
-                                        <li key={`${link.habitId}-${link.stopper.id}`} className={cn("text-sm p-2 rounded-xl transition-all border border-white/5", highlightClass)}>
+                                        <li key={`${link.habitId}-${link.stopper.id}`} className={cn("mindset-resistance-item text-sm p-2 rounded-xl transition-all border", highlightClass)}>
                                             <div
                                                 className="flex justify-between items-start w-full text-left"
                                             >
@@ -1915,7 +1915,7 @@ export function MindsetCategoriesCard() {
                             </ul>
                          </ScrollArea>
                                 </div>
-                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                <div className="mindset-panel rounded-2xl border p-4">
                                     <div className="text-sm font-semibold mb-3">Botherings</div>
     <Tabs value={botheringType} onValueChange={(v) => setBotheringType(v as any)}>
         <TabsList className="grid grid-cols-3 w-full mb-3">
@@ -1946,7 +1946,7 @@ export function MindsetCategoriesCard() {
                                                             const stats = getTodayTaskStats(point);
                                                             const isDoneToday = stats.total > 0 && stats.completed === stats.total;
                                                             return (
-                                                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isDoneToday ? "bg-emerald-500/10 border-emerald-500/40" : isBotheringActive(point) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-white/5")}>
+                                                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isDoneToday ? "mindset-bothering-item-done" : isBotheringActive(point) ? "mindset-bothering-item-active" : "mindset-bothering-item-idle")}>
                                                                     <button
                                                                         type="button"
                                                                         className="flex-1 min-w-0 text-left"
@@ -1958,11 +1958,11 @@ export function MindsetCategoriesCard() {
                                                                         </div>
                                                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                                                             {getDaysLeftLabel(point.endDate) ? (
-                                                                                <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
+                                                                                <span className="mindset-deadline-pill px-2 py-0.5 rounded-full border">
                                                                                     {getDaysLeftLabel(point.endDate)}
                                                                                 </span>
                                                                             ) : (
-                                                                                <span className="px-2 py-0.5 rounded-full border border-muted-foreground/30 text-muted-foreground bg-muted/10">
+                                                                                <span className="mindset-no-end-pill px-2 py-0.5 rounded-full border">
                                                                                     No end date
                                                                                 </span>
                                                                             )}
@@ -2018,7 +2018,7 @@ export function MindsetCategoriesCard() {
                                                             const stats = getTodayTaskStats(point);
                                                             const isDoneToday = stats.total > 0 && stats.completed === stats.total;
                                                             return (
-                                                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isDoneToday ? "bg-emerald-500/10 border-emerald-500/40" : isBotheringActive(point) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-white/5")}>
+                                                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isDoneToday ? "mindset-bothering-item-done" : isBotheringActive(point) ? "mindset-bothering-item-active" : "mindset-bothering-item-idle")}>
                                                                     <button
                                                                         type="button"
                                                                         className="flex-1 min-w-0 text-left"
@@ -2030,11 +2030,11 @@ export function MindsetCategoriesCard() {
                                                                         </div>
                                                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                                                             {getDaysLeftLabel(point.endDate) ? (
-                                                                                <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
+                                                                                <span className="mindset-deadline-pill px-2 py-0.5 rounded-full border">
                                                                                     {getDaysLeftLabel(point.endDate)}
                                                                                 </span>
                                                                             ) : (
-                                                                                <span className="px-2 py-0.5 rounded-full border border-muted-foreground/30 text-muted-foreground bg-muted/10">
+                                                                                <span className="mindset-no-end-pill px-2 py-0.5 rounded-full border">
                                                                                     No end date
                                                                                 </span>
                                                                             )}
@@ -2080,7 +2080,7 @@ export function MindsetCategoriesCard() {
                             const stats = getTodayTaskStats(point);
                             const isDoneToday = stats.total > 0 && stats.completed === stats.total;
                             return (
-                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isDoneToday ? "bg-emerald-500/10 border-emerald-500/40" : isBotheringActive(point) ? "bg-emerald-500/5 border-emerald-500/20" : "bg-muted/30 border-white/5")}>
+                                <li key={point.id} className={cn("flex items-center justify-between text-sm p-2 rounded-xl border", isDoneToday ? "mindset-bothering-item-done" : isBotheringActive(point) ? "mindset-bothering-item-active" : "mindset-bothering-item-idle")}>
                                     <button
                                         type="button"
                                         className="flex-1 min-w-0 text-left"
@@ -2092,11 +2092,11 @@ export function MindsetCategoriesCard() {
                                         </div>
                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                                             {getDaysLeftLabel(point.endDate) ? (
-                                                <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
+                                                <span className="mindset-deadline-pill px-2 py-0.5 rounded-full border">
                                                     {getDaysLeftLabel(point.endDate)}
                                                 </span>
                                             ) : (
-                                                <span className="px-2 py-0.5 rounded-full border border-muted-foreground/30 text-muted-foreground bg-muted/10">
+                                                <span className="mindset-no-end-pill px-2 py-0.5 rounded-full border">
                                                     No end date
                                                 </span>
                                             )}
@@ -2142,13 +2142,13 @@ export function MindsetCategoriesCard() {
             {botheringPopup && activeBotheringPoint && (
                 <div className="fixed inset-0 z-[170] pointer-events-none">
                     <div className="pointer-events-auto fixed inset-0 flex items-center justify-center">
-                        <div className="w-[960px] max-w-[96vw] max-h-[88vh] overflow-hidden rounded-2xl border border-white/10 bg-[#121216]/95 shadow-[0_30px_80px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-                            <div className="px-5 py-4 border-b border-white/10 bg-black/20 flex items-start justify-between gap-3">
+                        <div className="mindset-detail-shell w-[960px] max-w-[96vw] max-h-[88vh] overflow-hidden rounded-2xl border backdrop-blur-xl">
+                            <div className="mindset-detail-header px-5 py-4 border-b flex items-start justify-between gap-3">
                                 <div className="space-y-2 flex-1 min-w-0">
                                     <div className="text-lg font-semibold">
                                         {botheringPopup.type === 'mismatch' ? 'Mismatch Bothering' : botheringPopup.type === 'constraint' ? 'Constraint Bothering' : 'External Bothering'}
                                     </div>
-                                    <div className="pt-1 space-y-2 rounded-xl border border-white/10 bg-black/25 p-3">
+                                    <div className="mindset-title-box pt-1 space-y-2 rounded-xl border p-3">
                                         <div className="flex items-center justify-between gap-2">
                                             <Label className="text-xs uppercase tracking-wide text-muted-foreground">Title</Label>
                                             {isEditingBotheringTitle ? (

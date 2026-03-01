@@ -18,7 +18,7 @@ import type { MindsetPoint } from "@/types/workout";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ChartContainer } from "@/components/ui/chart";
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
-import { getAiConfigFromSettings } from "@/lib/ai/config";
+import { getAiConfigFromSettings, normalizeAiSettings } from "@/lib/ai/config";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -39,6 +39,8 @@ const SOURCE_CONFIG: Array<{ id: string; label: BotheringSourceType }> = [
 
 export function BotheringsCard() {
   const { mindsetCards, highlightedTaskIds, setHighlightedTaskIds, schedule, settings, setMindsetCards } = useAuth();
+  const isDesktopRuntime = typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
+  const isAiEnabled = normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== "none";
 
   const [activeTab, setActiveTab] = useState<BotheringTab>("External");
   const [rewritingIds, setRewritingIds] = useState<Set<string>>(new Set());
@@ -472,13 +474,13 @@ export function BotheringsCard() {
               onClick={() => setActiveTab(tab)}
               className={`px-2.5 py-1 rounded-full border text-xs transition ${
                 activeTab === tab
-                  ? "border-emerald-400/50 text-emerald-300 bg-emerald-500/10"
-                  : "border-white/10 text-muted-foreground hover:text-foreground hover:border-white/20"
+                  ? "bothering-tab-active"
+                  : "bothering-tab-inactive"
               }`}
             >
               <span className="inline-flex items-center gap-1.5">
                 <span>{tab}</span>
-                <span className="px-1.5 py-0.5 rounded-full border border-white/10 bg-background/40 text-[10px]">
+                <span className="bothering-tab-count px-1.5 py-0.5 rounded-full border text-[10px]">
                   {tabCounts[tab] ?? 0}
                 </span>
               </span>
@@ -502,8 +504,8 @@ export function BotheringsCard() {
                   key={`${item.sourceType}:${b.id}`}
                   className={`rounded-lg border p-3 cursor-pointer transition ${
                     isDoneToday
-                      ? "border-emerald-400/50 bg-emerald-500/10"
-                      : "border-muted/40 bg-muted/20 hover:border-emerald-400/40 hover:bg-emerald-500/5"
+                      ? "bothering-item-done"
+                      : "bothering-item-open"
                   }`}
                   onClick={() => setHighlightForPoint(b, item.sourceType)}
                 >
@@ -532,7 +534,7 @@ export function BotheringsCard() {
                         <LineChartIcon className="h-3.5 w-3.5" />
                       </button>
 
-                      {(hasEgoIdentification(b.text) || isMalformedBotheringText(b.text)) ? (
+                      {isAiEnabled && (hasEgoIdentification(b.text) || isMalformedBotheringText(b.text)) ? (
                         <button
                           type="button"
                           className="mt-0.5 text-muted-foreground hover:text-foreground"
@@ -566,7 +568,7 @@ export function BotheringsCard() {
                   </div>
 
                   <div className="mt-2 text-xs text-muted-foreground inline-flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-full border border-amber-400/40 text-amber-300/90 bg-amber-400/10">
+                    <span className="bothering-deadline-pill px-2 py-0.5 rounded-full border">
                       {getDaysLeftLabel(b.endDate)}
                     </span>
                     {getEffectiveTasks(b, item.sourceType).length === 0 ? (

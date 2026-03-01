@@ -31,11 +31,19 @@ export async function POST(request: Request) {
           ollamaBaseUrl: aiConfigInput.ollamaBaseUrl,
           openaiApiKey: aiConfigInput.openaiApiKey,
           openaiBaseUrl: aiConfigInput.openaiBaseUrl,
+          perplexityApiKey: aiConfigInput.perplexityApiKey,
+          perplexityBaseUrl: aiConfigInput.perplexityBaseUrl,
+          anthropicApiKey: aiConfigInput.anthropicApiKey,
+          anthropicBaseUrl: aiConfigInput.anthropicBaseUrl,
           requestTimeoutMs: aiConfigInput.requestTimeoutMs,
         },
       },
       isDesktopRuntime
     );
+
+    if (aiConfig.provider === "none") {
+      return NextResponse.json({ provider: "none", models: [] });
+    }
 
     if (aiConfig.provider === "ollama") {
       const response = await withTimeout(aiConfig.requestTimeoutMs || 20000, (signal) =>
@@ -57,6 +65,61 @@ export async function POST(request: Request) {
         )
       ).sort((a, b) => a.localeCompare(b));
       return NextResponse.json({ provider: "ollama", models });
+    }
+
+    if (aiConfig.provider === "perplexity") {
+      if (!aiConfig.perplexityApiKey) {
+        return NextResponse.json(
+          { error: "Perplexity API key is required when provider is Perplexity." },
+          { status: 400 }
+        );
+      }
+      const response = await withTimeout(aiConfig.requestTimeoutMs || 20000, (signal) =>
+        fetch(`${(aiConfig.perplexityBaseUrl || "https://api.perplexity.ai").replace(/\/+$/, "")}/models`, {
+          headers: { Authorization: `Bearer ${aiConfig.perplexityApiKey}` },
+          signal,
+        })
+      );
+      if (!response.ok) {
+        const details = await response.text().catch(() => "");
+        return NextResponse.json(
+          { error: "Failed to fetch Perplexity models.", details, provider: "perplexity" },
+          { status: 502 }
+        );
+      }
+      const data = (await response.json()) as { data?: Array<{ id?: string }> };
+      const models = Array.from(new Set((data?.data || []).map((m) => String(m.id || "").trim()).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b));
+      return NextResponse.json({ provider: "perplexity", models });
+    }
+
+    if (aiConfig.provider === "anthropic") {
+      if (!aiConfig.anthropicApiKey) {
+        return NextResponse.json(
+          { error: "Anthropic API key is required when provider is Anthropic." },
+          { status: 400 }
+        );
+      }
+      const response = await withTimeout(aiConfig.requestTimeoutMs || 20000, (signal) =>
+        fetch(`${(aiConfig.anthropicBaseUrl || "https://api.anthropic.com").replace(/\/+$/, "")}/v1/models`, {
+          headers: {
+            "x-api-key": aiConfig.anthropicApiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          signal,
+        })
+      );
+      if (!response.ok) {
+        const details = await response.text().catch(() => "");
+        return NextResponse.json(
+          { error: "Failed to fetch Anthropic models.", details, provider: "anthropic" },
+          { status: 502 }
+        );
+      }
+      const data = (await response.json()) as { data?: Array<{ id?: string }> };
+      const models = Array.from(new Set((data?.data || []).map((m) => String(m.id || "").trim()).filter(Boolean)))
+        .sort((a, b) => a.localeCompare(b));
+      return NextResponse.json({ provider: "anthropic", models });
     }
 
     if (!aiConfig.openaiApiKey) {
@@ -92,4 +155,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

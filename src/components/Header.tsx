@@ -14,7 +14,6 @@ import { SupportModal } from './SupportModal';
 import { cn } from '@/lib/utils';
 import { DemoTokenModal } from './DemoTokenModal';
 import { SettingsModal } from './SettingsModal';
-import { SaveStatusWidget } from './SaveStatusWidget';
 import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import type { Resource, ResourcePoint, MicroSkill, Activity, SlotName, WorkoutExercise, ExerciseDefinition, Stopper, ActivityType, RecurrenceRule } from '@/types/workout';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
@@ -1727,8 +1726,6 @@ export function Header() {
                   <span className="sr-only">Settings</span>
               </Button>
             
-              {currentUser && <SaveStatusWidget />}
-
               <UserProfile onSettingsClick={() => setIsSettingsModalOpen(true)} />
             </nav>
           </div>

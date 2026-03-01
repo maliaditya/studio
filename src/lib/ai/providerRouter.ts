@@ -1,7 +1,9 @@
 import {
   DEFAULT_AI_TIMEOUT_MS,
+  DEFAULT_ANTHROPIC_BASE_URL,
   DEFAULT_OLLAMA_BASE_URL,
   DEFAULT_OPENAI_BASE_URL,
+  DEFAULT_PERPLEXITY_BASE_URL,
 } from "@/lib/ai/config";
 import type { AiRequestConfig } from "@/types/ai";
 
@@ -155,14 +157,171 @@ export async function callOpenAIChat(
   }
 }
 
+export async function callPerplexityChat(
+  config: AiRequestConfig,
+  messages: ChatMessage[],
+  options?: ChatOptions
+): Promise<ProviderChatResult> {
+  const model = (config.model || "").trim();
+  const apiKey = (config.perplexityApiKey || "").trim();
+  const baseUrl = (config.perplexityBaseUrl || DEFAULT_PERPLEXITY_BASE_URL).trim();
+  if (!apiKey) {
+    return {
+      ok: false,
+      content: "",
+      details: "Perplexity API key is required.",
+      provider: "perplexity",
+      model,
+    };
+  }
+  if (!model) {
+    return {
+      ok: false,
+      content: "",
+      details: "Perplexity model is required.",
+      provider: "perplexity",
+      model: "",
+    };
+  }
+
+  try {
+    const response = await withTimeout(config.requestTimeoutMs || DEFAULT_AI_TIMEOUT_MS, (signal) =>
+      fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: typeof options?.temperature === "number" ? options.temperature : undefined,
+          response_format: options?.format === "json" ? { type: "json_object" } : undefined,
+        }),
+        signal,
+      })
+    );
+
+    if (!response.ok) {
+      const details = await response.text().catch(() => "");
+      return { ok: false, content: "", details, provider: "perplexity", model };
+    }
+
+    const data = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string } }>;
+    };
+    const content = data?.choices?.[0]?.message?.content?.trim() || "";
+    return { ok: true, content, provider: "perplexity", model };
+  } catch (error) {
+    return {
+      ok: false,
+      content: "",
+      details: error instanceof Error ? error.message : "Unknown Perplexity error",
+      provider: "perplexity",
+      model,
+    };
+  }
+}
+
+export async function callAnthropicChat(
+  config: AiRequestConfig,
+  messages: ChatMessage[],
+  options?: ChatOptions
+): Promise<ProviderChatResult> {
+  const model = (config.model || "").trim();
+  const apiKey = (config.anthropicApiKey || "").trim();
+  const baseUrl = (config.anthropicBaseUrl || DEFAULT_ANTHROPIC_BASE_URL).trim();
+  if (!apiKey) {
+    return {
+      ok: false,
+      content: "",
+      details: "Anthropic API key is required.",
+      provider: "anthropic",
+      model,
+    };
+  }
+  if (!model) {
+    return {
+      ok: false,
+      content: "",
+      details: "Anthropic model is required.",
+      provider: "anthropic",
+      model: "",
+    };
+  }
+
+  const systemMessages = messages.filter((m) => m.role === "system").map((m) => m.content.trim()).filter(Boolean);
+  const conversation = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }));
+
+  try {
+    const response = await withTimeout(config.requestTimeoutMs || DEFAULT_AI_TIMEOUT_MS, (signal) =>
+      fetch(`${baseUrl.replace(/\/+$/, "")}/v1/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 2000,
+          system: systemMessages.join("\n\n") || undefined,
+          messages: conversation,
+          temperature: typeof options?.temperature === "number" ? options.temperature : undefined,
+        }),
+        signal,
+      })
+    );
+
+    if (!response.ok) {
+      const details = await response.text().catch(() => "");
+      return { ok: false, content: "", details, provider: "anthropic", model };
+    }
+
+    const data = (await response.json()) as {
+      content?: Array<{ type?: string; text?: string }>;
+    };
+    const content = (data?.content || [])
+      .filter((part) => part?.type === "text" && typeof part?.text === "string")
+      .map((part) => part.text || "")
+      .join("\n")
+      .trim();
+    return { ok: true, content, provider: "anthropic", model };
+  } catch (error) {
+    return {
+      ok: false,
+      content: "",
+      details: error instanceof Error ? error.message : "Unknown Anthropic error",
+      provider: "anthropic",
+      model,
+    };
+  }
+}
+
 export async function runChatWithProvider(
   config: AiRequestConfig,
   messages: ChatMessage[],
   options?: ChatOptions
 ): Promise<ProviderChatResult> {
+  if (config.provider === "none") {
+    return {
+      ok: false,
+      content: "",
+      details: "AI provider is not set. Choose a provider in Settings > AI Settings.",
+      provider: "none",
+      model: "",
+    };
+  }
   if (config.provider === "openai") {
     return callOpenAIChat(config, messages, options);
   }
+  if (config.provider === "perplexity") {
+    return callPerplexityChat(config, messages, options);
+  }
+  if (config.provider === "anthropic") {
+    return callAnthropicChat(config, messages, options);
+  }
   return callOllamaChat(config, messages, options);
 }
-
