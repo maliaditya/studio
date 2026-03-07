@@ -12,4 +12,12 @@ contextBridge.exposeInMainWorld("studioDesktop", {
   authHttp: {
     request: (payload) => ipcRenderer.invoke("auth-http:request", payload),
   },
+  kokoro: {
+    startServer: (payload) => ipcRenderer.invoke("kokoro:start-server", payload),
+    status: (payload) => ipcRenderer.invoke("kokoro:status", payload),
+  },
+  stt: {
+    startServer: (payload) => ipcRenderer.invoke("stt:start-server", payload),
+    status: (payload) => ipcRenderer.invoke("stt:status", payload),
+  },
 });

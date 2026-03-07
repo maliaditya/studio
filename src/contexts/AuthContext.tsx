@@ -451,7 +451,6 @@ interface AuthContextType {
   openBrainHackPopups: Record<string, {x: number, y: number}>;
   setOpenBrainHackPopups: React.Dispatch<React.SetStateAction<Record<string, {x: number, y: number}>>>;
   openBrainHackPopup: (hackId: string, event: React.MouseEvent) => void;
-  setIsMindsetModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   recalculateAndFixTaskTypes: () => void;
   openMindsetWidget: () => void;
   isMindsetModalOpen: boolean;
@@ -581,7 +580,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     workoutScheduling: 'day-of-week',
     slotRules: {},
     widgetVisibility: { agenda: true, smartLogging: false, pistons: false, mindset: false, activityDistribution: false, favorites: false, topPriorities: false, goals: false, brainHacks: false, ruleEquations: false, visualizationTechniques: false, spacedRepetition: false },
-    allWidgetsVisible: true,
+    allWidgetsVisible: false,
     agendaShowCurrentSlotOnly: false,
     spacedRepetitionSlot: 'Late Night',
     pinnedCanvasIds: [],
@@ -599,6 +598,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pdfAnnotationsByResourceId: {},
     learningPerformanceDailyLogs: {},
     supabasePdfBucket: 'pdfs',
+    localSttBaseUrl: '',
     ai: normalizeAiSettings(undefined, typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop)),
   });
   useEffect(() => {
@@ -1361,12 +1361,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const openPdfViewer = (resource: Resource) => {
-    const initialWidth = settings.pdfViewerWidth || 1024;
-    const initialHeight = settings.pdfViewerHeight || Math.max(520, Math.floor(window.innerHeight * 0.9));
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const minWidth = 500;
+    const minHeight = 360;
+    const horizontalMargin = 20;
+    const verticalMargin = 20;
+    const maxWidth = Math.max(minWidth, viewportWidth - horizontalMargin * 2);
+    const maxHeight = Math.max(minHeight, viewportHeight - verticalMargin * 2);
+
+    const requestedWidth = settings.pdfViewerWidth || 1024;
+    const requestedHeight = settings.pdfViewerHeight || Math.max(520, Math.floor(viewportHeight * 0.9));
+    const initialWidth = Math.max(minWidth, Math.min(requestedWidth, maxWidth));
+    const initialHeight = Math.max(minHeight, Math.min(requestedHeight, maxHeight));
+
+    const defaultX = Math.max(horizontalMargin, viewportWidth - initialWidth - horizontalMargin);
+    const defaultY = Math.max(verticalMargin, Math.floor((viewportHeight - initialHeight) / 2));
+    const savedX = typeof settings.pdfViewerPositionX === "number" ? settings.pdfViewerPositionX : defaultX;
+    const savedY = typeof settings.pdfViewerPositionY === "number" ? settings.pdfViewerPositionY : defaultY;
+    const clampedX = Math.max(horizontalMargin, Math.min(savedX, viewportWidth - initialWidth - horizontalMargin));
+    const clampedY = Math.max(verticalMargin, Math.min(savedY, viewportHeight - initialHeight - verticalMargin));
+
     setPdfViewerState({
       isOpen: true,
       resource,
-      position: { x: window.innerWidth - initialWidth - 20, y: 80 },
+      position: { x: clampedX, y: clampedY },
       size: { width: initialWidth, height: initialHeight }
     });
   };
@@ -1374,13 +1393,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const handlePdfViewerPopupDragEnd = (event: DragEndEvent) => {
     const { active, delta } = event;
     if (pdfViewerState && active.id === 'pdf-viewer-popup') {
-      setPdfViewerState(prev => prev ? {
-        ...prev,
-        position: {
-          x: prev.position.x + delta.x,
-          y: prev.position.y + delta.y,
-        },
-      } : null);
+      setPdfViewerState(prev => {
+        if (!prev) return null;
+        const nextX = prev.position.x + delta.x;
+        const nextY = prev.position.y + delta.y;
+        setSettings(current => ({
+          ...current,
+          pdfViewerPositionX: nextX,
+          pdfViewerPositionY: nextY,
+        }));
+        return {
+          ...prev,
+          position: {
+            x: nextX,
+            y: nextY,
+          },
+        };
+      });
     }
   };
 
@@ -2001,7 +2030,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         workoutScheduling: 'day-of-week',
         slotRules: {},
         widgetVisibility: { agenda: true, smartLogging: false, pistons: false, mindset: false, activityDistribution: false, favorites: false, topPriorities: false, goals: false, brainHacks: false, ruleEquations: false, visualizationTechniques: false, spacedRepetition: false },
-        allWidgetsVisible: true,
+        allWidgetsVisible: false,
         agendaShowCurrentSlotOnly: false,
         spacedRepetitionSlot: 'Late Night',
           pinnedCanvasIds: [],
@@ -2019,12 +2048,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           pdfAnnotationsByResourceId: {},
           learningPerformanceDailyLogs: {},
           supabasePdfBucket: 'pdfs',
+          localSttBaseUrl: '',
           ai: normalizeAiSettings(undefined, typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop)),
       };
     const incomingSettings = (sanitizedMain.settings || {}) as Partial<UserSettings>;
     setSettings((prev) => ({
       ...defaultSettings,
       ...incomingSettings,
+      // Session-only behavior: always start with widgets hidden on fresh app launch.
+      allWidgetsVisible: false,
       ai: normalizeAiSettings(
         {
           ...(defaultSettings.ai || {}),
@@ -2114,75 +2146,88 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const signIn = async (username: string, password: string, opts?: { force?: boolean }) => {
       setLoading(true);
-      const trimmedUsername = username.trim();
-      const isDemoLogin = trimmedUsername.toLowerCase() === 'demo';
-      const loginUsername = isDemoLogin ? 'demo' : trimmedUsername;
-      const { success, message, user, code } = await localLoginUser(loginUsername, password, opts);
-      if (success && user) {
-          setCurrentUser(user);
-          let didLoadData = false;
-          const localMainEntry = getUserScopedStorageValue('lifeos_data_', user.username);
-          const localMainRefEntry = getUserScopedStorageValue('lifeos_data_ref_', user.username);
-          const localMainDataString = localMainEntry?.value ?? null;
-          const hasLocalMainState = !!localMainDataString || !!localMainRefEntry?.value;
-  
-          if (user.username === 'demo') {
-              if (hasLocalMainState) {
-                await loadState(user.username);
-                didLoadData = true;
+      try {
+        const trimmedUsername = username.trim();
+        const isDemoLogin = trimmedUsername.toLowerCase() === 'demo';
+        const loginUsername = isDemoLogin ? 'demo' : trimmedUsername;
+        const { success, message, user, code } = await localLoginUser(loginUsername, password, opts);
+        if (success && user) {
+            setCurrentUser(user);
+            let didLoadData = false;
+            const localMainEntry = getUserScopedStorageValue('lifeos_data_', user.username);
+            const localMainRefEntry = getUserScopedStorageValue('lifeos_data_ref_', user.username);
+            const localMainDataString = localMainEntry?.value ?? null;
+            const hasLocalMainState = !!localMainDataString || !!localMainRefEntry?.value;
+    
+            try {
+              if (user.username === 'demo') {
+                  if (hasLocalMainState) {
+                    await loadState(user.username);
+                    didLoadData = true;
+                  } else {
+                    await pullDataFromCloud(user.username);
+                  }
               } else {
-                await pullDataFromCloud(user.username);
-              }
-          } else {
-            if (hasLocalMainState) {
-                await loadState(user.username);
-                didLoadData = true;
-            } else {
-                const mainDataResponse = await fetch(`/api/blob-sync?username=${user.username.toLowerCase()}`, {
-                  credentials: 'include',
-                });
-                if (mainDataResponse.ok) {
-                    const mainDataResult = await mainDataResponse.json();
-                    if (typeof mainDataResult?.revision === 'number') {
-                      cloudRevisionRef.current = mainDataResult.revision;
-                    }
-                    if (mainDataResult.data) {
-                        const normalizedCloud = normalizePersistedPayload(mainDataResult.data);
-                        if (!normalizedCloud) {
-                          throw new Error('Cloud payload is malformed.');
+                if (hasLocalMainState) {
+                    await loadState(user.username);
+                    didLoadData = true;
+                } else {
+                    const mainDataResponse = await fetch(`/api/blob-sync?username=${user.username.toLowerCase()}`, {
+                      credentials: 'include',
+                    });
+                    if (mainDataResponse.ok) {
+                        const mainDataResult = await mainDataResponse.json();
+                        if (typeof mainDataResult?.revision === 'number') {
+                          cloudRevisionRef.current = mainDataResult.revision;
                         }
-                        const githubSettingsResponse = await fetch(`/api/github-settings?username=${user.username.toLowerCase()}`, {
-                          credentials: 'include',
-                        });
-                        if (githubSettingsResponse.ok) {
-                            const githubSettingsResult = await githubSettingsResponse.json();
-                            if (githubSettingsResult.settings) {
-                                const currentMainSettings = normalizedCloud.main?.settings || {};
-                                const combinedSettings = { ...currentMainSettings, ...githubSettingsResult.settings };
-                                normalizedCloud.main.settings = combinedSettings;
+                        if (mainDataResult.data) {
+                            const normalizedCloud = normalizePersistedPayload(mainDataResult.data);
+                            if (!normalizedCloud) {
+                              throw new Error('Cloud payload is malformed.');
                             }
+                            const githubSettingsResponse = await fetch(`/api/github-settings?username=${user.username.toLowerCase()}`, {
+                              credentials: 'include',
+                            });
+                            if (githubSettingsResponse.ok) {
+                                const githubSettingsResult = await githubSettingsResponse.json();
+                                if (githubSettingsResult.settings) {
+                                    const currentMainSettings = normalizedCloud.main?.settings || {};
+                                    const combinedSettings = { ...currentMainSettings, ...githubSettingsResult.settings };
+                                    normalizedCloud.main.settings = combinedSettings;
+                                }
+                            }
+                            loadImportedData(normalizedCloud.main, normalizedCloud.ui || {});
+                            didLoadData = true;
                         }
-                        loadImportedData(normalizedCloud.main, normalizedCloud.ui || {});
-                        didLoadData = true;
                     }
                 }
+              }
+            } catch (syncError) {
+              console.error('Post-login cloud sync failed. Continuing with local session.', syncError);
+              toast({
+                title: "Partial Sync",
+                description: "Logged in, but cloud data sync failed. Opening dashboard with available local data.",
+                variant: "default",
+              });
+            }
+
+            if (!didLoadData) {
+              setIsLoadingState(false);
+            }
+          
+            router.push('/my-plate');
+            toast({ title: "Success", description: message });
+        } else {
+            if (code === "SESSION_ACTIVE") {
+                toast({ title: "Session Active", description: message, variant: "destructive" });
+            } else {
+                toast({ title: "Error", description: message, variant: "destructive" });
             }
         }
-          if (!didLoadData) {
-            setIsLoadingState(false);
-          }
-        
-          router.push('/my-plate');
-          toast({ title: "Success", description: message });
-      } else {
-          if (code === "SESSION_ACTIVE") {
-              toast({ title: "Session Active", description: message, variant: "destructive" });
-          } else {
-              toast({ title: "Error", description: message, variant: "destructive" });
-          }
+        return { success, message, code };
+      } finally {
+        setLoading(false);
       }
-    setLoading(false);
-    return { success, message, code };
   };
 
   const signOut = async () => {
@@ -6898,7 +6943,6 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     handleCreateBrainHack,
     handleToggleDailyGoalCompletion,
     openBrainHackPopups, setOpenBrainHackPopups, openBrainHackPopup,
-    setIsMindsetModalOpen,
     recalculateAndFixTaskTypes,
     openMindsetWidget,
     isMindsetModalOpen, setIsMindsetModalOpen,

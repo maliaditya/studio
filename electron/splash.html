@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dock</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        font-family: Inter, Segoe UI, Arial, sans-serif;
+        background: #020617;
+        color: #e2e8f0;
+      }
+      .screen {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at 20% 20%, rgba(16, 185, 129, 0.22), transparent 40%),
+          radial-gradient(circle at 75% 10%, rgba(59, 130, 246, 0.2), transparent 45%),
+          linear-gradient(to bottom, rgba(17, 24, 39, 0.65), rgba(2, 6, 23, 0.98));
+      }
+      .panel {
+        width: min(92vw, 420px);
+        padding: 28px;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.04);
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(6px);
+      }
+      .title {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        text-align: center;
+      }
+      .subtitle {
+        margin: 8px 0 0;
+        font-size: 14px;
+        color: rgba(226, 232, 240, 0.85);
+        text-align: center;
+      }
+      .bar {
+        margin-top: 18px;
+        height: 8px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .fill {
+        width: 45%;
+        height: 100%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, rgba(52, 211, 153, 0.9), rgba(147, 197, 253, 0.9));
+        animation: pulse 1s ease-in-out infinite alternate;
+      }
+      .dots {
+        margin-top: 14px;
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #86efac;
+        animation: bounce 0.8s infinite;
+      }
+      .dot:nth-child(2) {
+        animation-delay: 0.12s;
+      }
+      .dot:nth-child(3) {
+        animation-delay: 0.24s;
+      }
+      @keyframes pulse {
+        from {
+          opacity: 0.6;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+      @keyframes bounce {
+        0%, 80%, 100% {
+          transform: translateY(0);
+          opacity: 0.6;
+        }
+        40% {
+          transform: translateY(-4px);
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="screen">
+      <div class="panel">
+        <h1 class="title">Preparing Dock...</h1>
+        <p class="subtitle">Starting desktop server and loading your workspace.</p>
+        <div class="bar"><div class="fill"></div></div>
+        <div class="dots">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

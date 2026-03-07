@@ -830,6 +830,10 @@ export interface UserSettings {
   spacedRepetitionSlot?: SlotName;
   pdfViewerWidth?: number;
   pdfViewerHeight?: number;
+  pdfViewerPositionX?: number;
+  pdfViewerPositionY?: number;
+  kokoroTtsBaseUrl?: string;
+  localSttBaseUrl?: string;
   timestampAnnotationOffset?: number;
   drawingCanvasAutoSaveInterval?: number;
   githubToken?: string;
@@ -864,7 +868,7 @@ export interface UserSettings {
   pdfLastOpenedPageByResourceId?: Record<string, number>;
   pdfDailyPageTargetByResourceId?: Record<string, number>;
   pdfDailyPageStatsByResourceId?: Record<string, { date: string; startPage: number; maxPage: number }>;
-  pdfAnnotationsByResourceId?: Record<string, Record<string, PdfAnnotationStroke[]>>;
+  pdfAnnotationsByResourceId?: Record<string, Record<string, PdfPageAnnotation[]>>;
   learningPerformanceDailyLogs?: Record<string, LearningPerformanceLogEntry[]>;
   stateDiagramStore?: StateDiagramStore;
   ai?: {
@@ -878,6 +882,13 @@ export interface UserSettings {
     anthropicApiKey?: string;
     anthropicBaseUrl?: string;
     requestTimeoutMs?: number;
+  };
+  shivDynamicTaskAliases?: Record<string, string[]>;
+  shivAliasRefreshMeta?: {
+    lastRefreshedAt?: string;
+    sourceProvider?: string;
+    sourceModel?: string;
+    version?: number;
   };
 }
 
@@ -983,10 +994,27 @@ export interface PdfAnnotationPoint {
 }
 
 export interface PdfAnnotationStroke {
+    kind?: "stroke";
     color: string;
     size: number;
     points: PdfAnnotationPoint[];
 }
+
+export interface PdfTextHighlightRect {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+}
+
+export interface PdfTextHighlight {
+    kind: "text-highlight";
+    color: string;
+    opacity: number;
+    rects: PdfTextHighlightRect[];
+}
+
+export type PdfPageAnnotation = PdfAnnotationStroke | PdfTextHighlight;
 
 export interface PdfViewerPopupState {
   isOpen: boolean;

@@ -12,6 +12,7 @@ import { motion } from 'framer-motion';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
+import { LoadingScreen } from '@/components/LoadingScreen';
 
 const WINDOWS_EXE_URL = "https://github.com/maliaditya/studio/releases/download/v1.0.0/Studio.Setup.0.1.0.exe";
 const SETUP_CALL_URL = process.env.NEXT_PUBLIC_SETUP_CALL_URL || "https://buymeacoffee.com/adityamali98/e/515325";
@@ -156,21 +157,34 @@ const StrategicOverviewDiagram = () => {
 
 
 export default function LandingPage() {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
   const router = useRouter();
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [downloadCount, setDownloadCount] = useState<number | null>(null);
   const [downloadUrl, setDownloadUrl] = useState(WINDOWS_EXE_URL);
+  const [isPageReady, setIsPageReady] = useState(false);
   const isDesktopRuntime = typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
 
   useEffect(() => {
+    if (loading) return;
     if (currentUser) {
       const hideLanding = localStorage.getItem('dock_hide_landing_page');
       if (hideLanding === 'true') {
-        router.push('/my-plate');
+        router.replace('/my-plate');
+        return;
       }
     }
-  }, [currentUser, router]);
+    setIsPageReady(true);
+  }, [currentUser, loading, router]);
+
+  useEffect(() => {
+    if (isPageReady) return;
+    const timeoutId = window.setTimeout(() => {
+      setIsPageReady(true);
+      console.warn("[landing] Startup loading watchdog released the splash screen.");
+    }, 9000);
+    return () => window.clearTimeout(timeoutId);
+  }, [isPageReady]);
 
   useEffect(() => {
     if (isDesktopRuntime) return;
@@ -226,6 +240,15 @@ export default function LandingPage() {
     router.push(currentUser ? "/my-plate" : "/login");
   };
 
+  if (!isPageReady) {
+    return (
+      <LoadingScreen
+        label="Preparing Dock..."
+        subLabel="Checking session and loading your startup experience."
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <script
@@ -242,7 +265,7 @@ export default function LandingPage() {
             <div className="relative container mx-auto px-4 py-20 md:py-24">
                 <div className="grid gap-10 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
                     <motion.div
-                        initial={{ opacity: 0, y: 16 }}
+                        initial={false}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5 }}
                     >
@@ -335,7 +358,7 @@ export default function LandingPage() {
                     </motion.div>
 
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={false}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.6, delay: 0.1 }}
                         className="mx-auto w-full max-w-md lg:max-w-none"
@@ -377,7 +400,7 @@ export default function LandingPage() {
                     {featureCards.map((card, index) => (
                       <motion.div
                         key={card.title}
-                        initial={{ opacity: 0, y: 20 }}
+                        initial={false}
                         whileInView={{ opacity: 1, y: 0 }}
                         viewport={{ once: true }}
                         transition={{ duration: 0.5, delay: index * 0.1 }}
@@ -405,7 +428,7 @@ export default function LandingPage() {
             <div className="relative container mx-auto px-4">
             <div className="grid md:grid-cols-1 gap-12 items-center">
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
+                    initial={false}
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.7 }}
@@ -413,11 +436,11 @@ export default function LandingPage() {
                 >
                     <h2 className="text-3xl font-bold tracking-tight">The Dock Flywheel</h2>
                     <p className="mt-4 text-muted-foreground max-w-3xl mx-auto">
-                        Closed-loop execution: signal capture -> bothering mapping -> routine and skill execution -> resource context -> AI-assisted rebalance -> strategic visibility.
+                        Closed-loop execution: signal capture {"->"} bothering mapping {"->"} routine and skill execution {"->"} resource context {"->"} AI-assisted rebalance {"->"} strategic visibility.
                     </p>
                 </motion.div>
                 <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
+                    initial={false}
                     whileInView={{ opacity: 1, scale: 1 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.7, delay: 0.2 }}

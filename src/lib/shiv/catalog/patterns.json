@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "updatedAt": "2026-03-06",
+  "botherings.list": {
+    "cues": ["bothering", "botherings", "mismatch", "constraint", "external", "what are my botherings", "current slot botherings", "today botherings"]
+  },
+  "schedule.when_next": {
+    "cues": ["when", "next", "scheduled", "schedule", "due", "when is", "when next", "next scheduled"]
+  },
+  "schedule.days_remaining": {
+    "cues": ["days remaining", "how many days", "remaining", "left", "time remaining", "how long"]
+  },
+  "tasks.today": {
+    "cues": ["today tasks", "todays tasks", "today", "current slot tasks", "tasks in current slot", "my tasks today"]
+  },
+  "resources.search": {
+    "cues": ["resource", "resources", "pdf", "book", "folder", "canvas", "notes", "find file"]
+  },
+  "skills.summary": {
+    "cues": ["skills", "skill", "project", "upskill", "deepwork", "logs", "learning progress"]
+  },
+  "health.current_weight": {
+    "cues": ["current weight", "latest weight", "my weight", "weight now", "what is my weight"]
+  }
+}

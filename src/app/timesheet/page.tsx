@@ -108,6 +108,9 @@ const normalizeDateKey = (value?: string | null) => {
     return format(parsed, 'yyyy-MM-dd');
 };
 
+const isSameMonthYear = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+
 const countRoutineOccurrencesBetween = (
     routine: Activity,
     startDate: Date,
@@ -578,12 +581,14 @@ export function TimesheetPageContent({
 
         let rangeStart: Date;
         let rangeEnd: Date;
+        const today = startOfDay(new Date());
         if (viewMode === 'week') {
             rangeStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
             rangeEnd = endOfWeek(selectedDate, { weekStartsOn: 1 });
         } else if (viewMode === 'month') {
             rangeStart = startOfMonth(selectedDate);
-            rangeEnd = endOfMonth(selectedDate);
+            const monthEnd = endOfMonth(selectedDate);
+            rangeEnd = isSameMonthYear(selectedDate, today) ? (isBefore(today, monthEnd) ? today : monthEnd) : monthEnd;
         } else {
             rangeStart = startOfDay(selectedDate);
             rangeEnd = startOfDay(selectedDate);
@@ -871,7 +876,6 @@ export function TimesheetPageContent({
             });
         });
 
-        const today = startOfDay(new Date());
         return Array.from(aggregate.values())
             .map((row) => {
                 const taskLogs = logs.filter((entry) => {

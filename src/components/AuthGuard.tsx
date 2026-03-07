@@ -4,7 +4,7 @@
 import React, { type ReactNode, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
-import { BrainCircuit } from 'lucide-react';
+import { LoadingScreen } from '@/components/LoadingScreen';
 
 interface AuthGuardProps {
   children: ReactNode;
@@ -28,10 +28,11 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   if (loading || authContextLoading) {
     return (
-      <div className="flex flex-col justify-center items-center min-h-[calc(100vh-4rem)]">
-        <BrainCircuit className="h-16 w-16 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading your Dock experience...</p>
-      </div>
+      <LoadingScreen
+        className="min-h-[calc(100vh-4rem)]"
+        label="Securing your session..."
+        subLabel="Redirecting to your workspace."
+      />
     );
   }
 

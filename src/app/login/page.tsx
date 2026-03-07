@@ -1,23 +1,66 @@
 
 "use client";
 
-import React, { useState, type FormEvent } from 'react';
+import React, { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BrainCircuit } from 'lucide-react';
+import { safeSetLocalStorageItem } from '@/lib/safeStorage';
+
+const REMEMBER_LOGIN_KEY = 'dock_remember_login_v1';
+type RememberLoginPayload = { username?: string; password?: string; remember?: boolean };
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [sessionBlockedMessage, setSessionBlockedMessage] = useState('');
+  const router = useRouter();
   
-  const { signIn, register, loading } = useAuth();
+  const { signIn, register, loading, currentUser } = useAuth();
+
+  useEffect(() => {
+    if (!loading && currentUser) {
+      router.replace('/my-plate');
+    }
+  }, [currentUser, loading, router]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(REMEMBER_LOGIN_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as RememberLoginPayload;
+      if (!parsed?.remember) return;
+      if (typeof parsed.username === 'string') setUsername(parsed.username);
+      if (typeof parsed.password === 'string') setPassword(parsed.password);
+      setRememberMe(true);
+    } catch {
+      // ignore malformed stored login data
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!rememberMe) {
+      localStorage.removeItem(REMEMBER_LOGIN_KEY);
+      return;
+    }
+    const payload: RememberLoginPayload = {
+      username: username.trim(),
+      password,
+      remember: true,
+    };
+    safeSetLocalStorageItem(REMEMBER_LOGIN_KEY, JSON.stringify(payload));
+  }, [rememberMe, username, password]);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -26,6 +69,7 @@ export default function LoginPage() {
       setSessionBlockedMessage(result.message);
     } else if (result?.success) {
       setSessionBlockedMessage('');
+      router.replace('/my-plate');
     }
   };
 
@@ -75,6 +119,7 @@ export default function LoginPage() {
                     placeholder="Enter your username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
+                    autoComplete="username"
                     required
                     className="h-10"
                   />
@@ -87,9 +132,26 @@ export default function LoginPage() {
                     placeholder="Enter your password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
                     required
                     className="h-10"
                   />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="remember-me"
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => {
+                      const next = Boolean(checked);
+                      setRememberMe(next);
+                      if (!next && typeof window !== 'undefined') {
+                        localStorage.removeItem(REMEMBER_LOGIN_KEY);
+                      }
+                    }}
+                  />
+                  <Label htmlFor="remember-me" className="cursor-pointer text-sm text-muted-foreground">
+                    Remember me
+                  </Label>
                 </div>
                 <Button type="submit" className="w-full h-10" disabled={loading}>
                   {loading ? 'Logging in...' : 'Login'}

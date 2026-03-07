@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "updatedAt": "2026-03-06",
+  "domains": {
+    "task": ["task", "tasks", "today", "slot", "agenda", "scheduled"],
+    "routine": ["routine", "routines", "repeat", "recurring", "schedule", "next", "due"],
+    "bothering": ["bothering", "botherings", "mismatch", "constraint", "external"],
+    "resource": ["resource", "resources", "pdf", "book", "folder", "note", "canvas"],
+    "skill": ["skill", "skills", "upskill", "deepwork", "project", "logs"],
+    "health": ["weight", "health", "goal weight"],
+    "canvas": ["canvas", "drawing", "node", "edge"]
+  },
+  "taskAliases": {
+    "haircut": ["hair cutting", "haircutting", "hair cut", "haicutting"],
+    "car service": ["car servicing", "car service", "service car", "start car", "car servicing task"],
+    "workout": ["gym", "exercise", "training"],
+    "reading": ["read", "study", "book reading"]
+  }
+}

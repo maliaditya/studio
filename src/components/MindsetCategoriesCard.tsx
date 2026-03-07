@@ -1415,10 +1415,11 @@ export function MindsetCategoriesCard() {
             if (!detail?.type || !detail?.pointId) return;
             setBotheringType(detail.type);
             setBotheringPopup({ type: detail.type, pointId: detail.pointId });
+            setIsMindsetModalOpen(true);
         };
         window.addEventListener('open-bothering-popup', handler as EventListener);
         return () => window.removeEventListener('open-bothering-popup', handler as EventListener);
-    }, []);
+    }, [setIsMindsetModalOpen]);
 
     useEffect(() => {
         const handler = (event: Event) => {

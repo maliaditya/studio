@@ -441,6 +441,10 @@ export async function loginUser(
       if (result?.code === 'CLOUD_AUTH_UNAVAILABLE') {
         return await finalizeOfflineLogin();
       }
+      // Treat transient server failures as offline-compatible when trusted credentials exist.
+      if (response.status >= 500) {
+        return await finalizeOfflineLogin();
+      }
       return { success: false, message: result?.error || 'Login failed.' };
     }
 

@@ -14,7 +14,7 @@ import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { createPortal } from 'react-dom';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
-import { RuleDetailPopupCard } from '@/components/HabitDetailPopup';
+import { MindsetTechniquePopup, RuleDetailPopupCard } from '@/components/HabitDetailPopup';
 import { TaskContextPopup } from '@/components/TaskContextPopup';
 import { FocusTimerPopup } from '@/components/FocusTimerPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
@@ -38,6 +38,14 @@ import { StopperProgressModal } from '@/components/StopperProgressModal';
 import { PillarPopup } from '@/components/PillarPopup';
 import { DrawingCanvas } from '@/components/DrawingCanvas';
 import { MindsetCategoriesCard } from '@/components/MindsetCategoriesCard';
+import { BrainHacksCard } from '@/components/BrainHacksCard';
+import { PistonsHead } from '@/components/PistonsHead';
+import { GoalsWidget } from '@/components/GoalsWidget';
+import { TopPrioritiesCard } from '@/components/TopPrioritiesCard';
+import { ActivityDistributionCard } from '@/components/ActivityDistributionCard';
+import { RuleEquationsCard } from '@/components/RuleEquationsCard';
+import { VisualizationTechniquesCard } from '@/components/VisualizationTechniquesCard';
+import { SpacedRepetitionPopup } from '@/components/SpacedRepetitionPopup';
 import dynamic from 'next/dynamic';
 import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { usePathname } from 'next/navigation';
@@ -125,7 +133,6 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handleStartFocusSession,
     focusDuration,
     currentSlot,
-    openMindsetTechniquePopup,
     missedSlotReviews,
     setMissedSlotReviews,
     linkedResistancePopup,
@@ -133,6 +140,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     stopperProgressPopup,
     setStopperProgressPopup,
     openBrainHackPopups,
+    settings,
     openHabitDetailPopup: openHabitPopup,
   } = authContext;
   const [isBrowser, setIsBrowser] = React.useState(false);
@@ -141,7 +149,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isMobile = useIsMobile();
   const isWidgetSuppressedRoute = pathname === '/' || pathname === '/login';
+  const isDashboardRoute = pathname === '/my-plate';
   const shouldShowAgendaWidget = !isWidgetSuppressedRoute;
+  const shouldRenderFloatingWidgets = isDashboardRoute && !isMobile && settings.allWidgetsVisible;
   
   const [interruptModalState, setInterruptModalState] = useState<{isOpen: boolean, slotName: string | null, activityType: 'interrupt' | 'distraction' | null}>({ isOpen: false, slotName: null, activityType: null });
   const [interruptDetails, setInterruptDetails] = useState('');
@@ -456,11 +466,24 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           <BackgroundAudioPlayer />
           <FloatingVideoPlayer />
           <MindsetCategoriesCard />
+          {(shouldRenderFloatingWidgets && settings.widgetVisibility.pistons) && <PistonsHead />}
+          {(shouldRenderFloatingWidgets && settings.widgetVisibility.goals) && <GoalsWidget />}
+          {(shouldRenderFloatingWidgets && settings.widgetVisibility.topPriorities) && <TopPrioritiesCard />}
+          {(shouldRenderFloatingWidgets && settings.widgetVisibility.activityDistribution) && <ActivityDistributionCard />}
+          {(shouldRenderFloatingWidgets && settings.widgetVisibility.ruleEquations) && <RuleEquationsCard />}
+          {(shouldRenderFloatingWidgets && settings.widgetVisibility.visualizationTechniques) && <VisualizationTechniquesCard />}
+          {(shouldRenderFloatingWidgets && settings.widgetVisibility.spacedRepetition) && <SpacedRepetitionPopup />}
           <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
           <StopperProgressModal 
             popupState={stopperProgressPopup}
             onOpenChange={(isOpen) => setStopperProgressPopup(prev => ({ ...prev, isOpen }))}
           />
+          {linkedResistancePopup && (
+            <MindsetTechniquePopup
+              popupState={linkedResistancePopup}
+              onClose={() => setLinkedResistancePopup(null)}
+            />
+          )}
           {activeFocusSession && (
               <FocusTimerPopup
                 activity={activeFocusSession.activity}
@@ -479,7 +502,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
             onLogDuration={onLogDuration}
             initialDuration={focusDuration}
           />
-          {(shouldShowAgendaWidget && !isAgendaDocked && !isMobile) && (
+          {(shouldShowAgendaWidget && !isAgendaDocked && !isMobile && settings.allWidgetsVisible && settings.widgetVisibility.agenda) && (
             <TodaysScheduleCard
                 date={new Date()}
                 schedule={schedule}
@@ -606,11 +629,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-      </head>
+      <head />
       <body className={cn("font-body antialiased")}>
         <AuthProvider>
           <AppWrapper>{children}</AppWrapper>

@@ -73,7 +73,7 @@ import { getPdfForResource, storePdf } from '@/lib/audioDB';
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 
 if (typeof window !== "undefined" && (pdfjs as any).GlobalWorkerOptions) {
-  (pdfjs as any).GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${(pdfjs as any).version}/pdf.worker.min.mjs`;
+  (pdfjs as any).GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${(pdfjs as any).version}/build/pdf.worker.min.mjs`;
 }
 
 

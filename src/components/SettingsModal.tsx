@@ -96,6 +96,23 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const [availableAiModels, setAvailableAiModels] = useState<string[]>([]);
   const [isLoadingAiModels, setIsLoadingAiModels] = useState(false);
   const [aiModelsError, setAiModelsError] = useState<string | null>(null);
+  const [isRefreshingLocalServerStatus, setIsRefreshingLocalServerStatus] = useState(false);
+  const [isStartingKokoroFromSettings, setIsStartingKokoroFromSettings] = useState(false);
+  const [isStartingSttFromSettings, setIsStartingSttFromSettings] = useState(false);
+  const [kokoroServerStatus, setKokoroServerStatus] = useState<{
+    healthy: boolean;
+    running: boolean;
+    mode?: string | null;
+    baseUrl?: string;
+  }>({ healthy: false, running: false, mode: null, baseUrl: settings.kokoroTtsBaseUrl || '' });
+  const [sttServerStatus, setSttServerStatus] = useState<{
+    healthy: boolean;
+    running: boolean;
+    managed?: boolean;
+    backend?: string;
+    error?: string;
+    baseUrl?: string;
+  }>({ healthy: false, running: false, managed: false, backend: '', error: '', baseUrl: settings.localSttBaseUrl || '' });
   const isDesktopRuntime =
     typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
 
@@ -111,6 +128,108 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     if (availableAiModels.includes(current)) return availableAiModels;
     return [current, ...availableAiModels];
   }, [availableAiModels, resolvedAiSettings.model]);
+
+  const refreshLocalServerStatus = useCallback(async () => {
+    if (!isDesktopRuntime) return;
+    const bridge = (window as any)?.studioDesktop;
+    if (!bridge) return;
+
+    setIsRefreshingLocalServerStatus(true);
+    try {
+      const kokoroBaseUrl = (settings.kokoroTtsBaseUrl || 'http://127.0.0.1:8880').trim();
+      const sttBaseUrl = (settings.localSttBaseUrl || 'http://127.0.0.1:9890').trim();
+      const [kokoroResult, sttResult] = await Promise.all([
+        bridge.kokoro?.status?.({ baseUrl: kokoroBaseUrl }),
+        bridge.stt?.status?.({ baseUrl: sttBaseUrl }),
+      ]);
+
+      setKokoroServerStatus({
+        healthy: Boolean(kokoroResult?.healthy),
+        running: Boolean(kokoroResult?.running),
+        mode: kokoroResult?.mode || null,
+        baseUrl: String(kokoroResult?.baseUrl || kokoroBaseUrl),
+      });
+      setSttServerStatus({
+        healthy: Boolean(sttResult?.healthy),
+        running: Boolean(sttResult?.running),
+        managed: Boolean(sttResult?.managed),
+        backend: String(sttResult?.backend || ''),
+        error: String(sttResult?.error || ''),
+        baseUrl: String(sttResult?.baseUrl || sttBaseUrl),
+      });
+
+      const resolvedSttBaseUrl = String(sttResult?.baseUrl || '').trim();
+      if (resolvedSttBaseUrl && resolvedSttBaseUrl !== (settings.localSttBaseUrl || '').trim()) {
+        setSettings((prev) => ({ ...prev, localSttBaseUrl: resolvedSttBaseUrl }));
+      }
+    } catch {
+      // keep last status on bridge failure
+    } finally {
+      setIsRefreshingLocalServerStatus(false);
+    }
+  }, [isDesktopRuntime, settings.kokoroTtsBaseUrl, settings.localSttBaseUrl, setSettings]);
+
+  const handleStartKokoroFromSettings = useCallback(async () => {
+    if (!isDesktopRuntime) return;
+    const bridge = (window as any)?.studioDesktop;
+    if (!bridge?.kokoro?.startServer) return;
+    setIsStartingKokoroFromSettings(true);
+    try {
+      const result = await bridge.kokoro.startServer({
+        baseUrl: (settings.kokoroTtsBaseUrl || 'http://127.0.0.1:8880').trim(),
+      });
+      if (!result?.success) {
+        throw new Error(String(result?.error || 'Failed to start Kokoro.'));
+      }
+      if (result?.baseUrl) {
+        setSettings((prev) => ({ ...prev, kokoroTtsBaseUrl: String(result.baseUrl) }));
+      }
+      toast({
+        title: 'Kokoro running',
+        description: String(result?.mode ? `Mode: ${result.mode}` : 'Server started.'),
+      });
+      await refreshLocalServerStatus();
+    } catch (error) {
+      toast({
+        title: 'Kokoro start failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsStartingKokoroFromSettings(false);
+    }
+  }, [isDesktopRuntime, refreshLocalServerStatus, setSettings, settings.kokoroTtsBaseUrl, toast]);
+
+  const handleStartSttFromSettings = useCallback(async () => {
+    if (!isDesktopRuntime) return;
+    const bridge = (window as any)?.studioDesktop;
+    if (!bridge?.stt?.startServer) return;
+    setIsStartingSttFromSettings(true);
+    try {
+      const result = await bridge.stt.startServer({
+        baseUrl: (settings.localSttBaseUrl || 'http://127.0.0.1:9890').trim(),
+      });
+      if (!result?.success) {
+        throw new Error(String(result?.error || 'Failed to start local STT server.'));
+      }
+      if (result?.baseUrl) {
+        setSettings((prev) => ({ ...prev, localSttBaseUrl: String(result.baseUrl) }));
+      }
+      toast({
+        title: 'Local STT running',
+        description: String(result?.managed ? 'Managed STT process started.' : 'Connected to existing STT server.'),
+      });
+      await refreshLocalServerStatus();
+    } catch (error) {
+      toast({
+        title: 'STT start failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsStartingSttFromSettings(false);
+    }
+  }, [isDesktopRuntime, refreshLocalServerStatus, setSettings, settings.localSttBaseUrl, toast]);
 
   // Drag state for non-modal popup
   const popupRef = React.useRef<HTMLDivElement | null>(null);
@@ -354,6 +473,11 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     if (!isOpen) return;
     refreshStorageHealth();
   }, [isOpen, refreshStorageHealth]);
+
+  useEffect(() => {
+    if (!isOpen || !isDesktopRuntime) return;
+    void refreshLocalServerStatus();
+  }, [isOpen, isDesktopRuntime, refreshLocalServerStatus]);
   
   const handleGithubSettingsSave = async () => {
     setSettings(prev => ({
@@ -486,6 +610,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
       };
     });
   };
+
   const loadAvailableAiModels = useCallback(async () => {
     if (resolvedAiSettings.provider === 'none') {
       setAvailableAiModels([]);
@@ -1049,6 +1174,91 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                               />
                             </div>
                           </>
+                        ) : null}
+                        {isDesktopRuntime ? (
+                          <div className="space-y-2 rounded-md border border-border/60 p-3">
+                            <Label htmlFor="kokoro-base-url">Kokoro Local TTS (Desktop only)</Label>
+                            <Input
+                              id="kokoro-base-url"
+                              placeholder="http://127.0.0.1:8880"
+                              value={settings.kokoroTtsBaseUrl || ''}
+                              onChange={(e) => handleSettingChange('kokoroTtsBaseUrl', e.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Used by PDF read-aloud when selecting Kokoro provider voices.
+                            </p>
+                          </div>
+                        ) : null}
+                        {isDesktopRuntime ? (
+                          <div className="space-y-2 rounded-md border border-border/60 p-3">
+                            <Label htmlFor="local-stt-base-url">Local STT Server (Desktop only)</Label>
+                            <Input
+                              id="local-stt-base-url"
+                              placeholder="http://127.0.0.1:9000"
+                              value={settings.localSttBaseUrl || ''}
+                              onChange={(e) => handleSettingChange('localSttBaseUrl', e.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Used by Shiv mic transcription before cloud fallback. Env fallback: <code>LOCAL_STT_BASE_URL=http://127.0.0.1:&lt;port&gt;</code>.
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Desktop auto-start uses Docker first; optional fallback command: <code>ELECTRON_STT_START_COMMAND</code>.
+                            </p>
+                          </div>
+                        ) : null}
+                        {isDesktopRuntime ? (
+                          <div className="space-y-3 rounded-md border border-border/60 p-3">
+                            <div className="flex items-center justify-between">
+                              <Label className="text-sm">Local Server Status</Label>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void refreshLocalServerStatus()}
+                                disabled={isRefreshingLocalServerStatus}
+                              >
+                                {isRefreshingLocalServerStatus ? 'Checking...' : 'Refresh'}
+                              </Button>
+                            </div>
+                            <div className="grid gap-2 text-xs">
+                              <div className="flex items-center justify-between rounded border border-border/60 px-2 py-1.5">
+                                <span className="text-muted-foreground">Kokoro</span>
+                                <span className={kokoroServerStatus.healthy ? 'text-emerald-400' : 'text-muted-foreground'}>
+                                  {kokoroServerStatus.healthy
+                                    ? `running${kokoroServerStatus.mode ? ` (${kokoroServerStatus.mode})` : ''}`
+                                    : 'offline'}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between rounded border border-border/60 px-2 py-1.5">
+                                <span className="text-muted-foreground">Local STT</span>
+                                <span className={sttServerStatus.healthy ? 'text-emerald-400' : 'text-muted-foreground'}>
+                                  {sttServerStatus.healthy
+                                    ? `running${sttServerStatus.backend ? ` (${sttServerStatus.backend})` : sttServerStatus.managed ? ' (managed)' : ''}`
+                                    : 'offline'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleStartKokoroFromSettings()}
+                                disabled={isStartingKokoroFromSettings}
+                              >
+                                {isStartingKokoroFromSettings ? 'Starting Kokoro...' : 'Start Kokoro'}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleStartSttFromSettings()}
+                                disabled={isStartingSttFromSettings}
+                              >
+                                {isStartingSttFromSettings ? 'Starting STT...' : 'Start STT'}
+                              </Button>
+                            </div>
+                            {sttServerStatus.error ? (
+                              <p className="text-[11px] text-destructive">{sttServerStatus.error}</p>
+                            ) : null}
+                          </div>
                         ) : null}
                       </div>
                     </AccordionContent>

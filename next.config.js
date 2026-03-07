@@ -2,7 +2,7 @@
 const nextConfig = {
   /* config options here */
   output: 'standalone',
-  distDir: process.env.NEXT_DIST_DIR || (process.env.VERCEL ? '.next' : '.next-local'),
+  distDir: process.env.NEXT_DIST_DIR || '.next-dev',
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -54,6 +54,14 @@ const nextConfig = {
         pathname: '/**',
       },
     ],
+  },
+  webpack: (config, { dev, isServer }) => {
+    // Large client chunks in this project can exceed webpack's default 120s
+    // timeout in Electron dev and cause ChunkLoadError for app/layout.
+    if (dev && !isServer && config?.output) {
+      config.output.chunkLoadTimeout = 10 * 60 * 1000; // 10 minutes
+    }
+    return config;
   },
 };
 

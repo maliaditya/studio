@@ -2,14 +2,122 @@
 
 "use client";
 
-const DB_NAME = 'LifeOSFileDB';
+const DB_NAME_BASE = 'LifeOSFileDB';
 const AUDIO_STORE_NAME = 'audioStore';
 const PDF_STORE_NAME = 'pdfStore';
 const BACKUP_STORE_NAME = 'backupStore';
 const EXCALIDRAW_STORE_NAME = 'excalidrawFileStore';
 const DB_VERSION = 4; // Incremented version
+const DB_NAME_STORAGE_KEY = 'lifeos.indexeddb.name';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+let dbInstance: IDBDatabase | null = null;
+let activeDbName: string | null = null;
+
+function getDbName(): string {
+  if (activeDbName) return activeDbName;
+  if (typeof window === 'undefined') {
+    activeDbName = DB_NAME_BASE;
+    return activeDbName;
+  }
+  try {
+    const stored = window.localStorage.getItem(DB_NAME_STORAGE_KEY);
+    activeDbName = stored?.trim() || DB_NAME_BASE;
+  } catch {
+    activeDbName = DB_NAME_BASE;
+  }
+  return activeDbName;
+}
+
+function persistDbName(name: string) {
+  activeDbName = name;
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(DB_NAME_STORAGE_KEY, name);
+  } catch {
+    // ignore localStorage write errors
+  }
+}
+
+function resetDbConnection() {
+  try {
+    dbInstance?.close();
+  } catch {
+    // ignore close errors
+  }
+  dbInstance = null;
+  dbPromise = null;
+}
+
+function isRecoverableIndexedDbError(error: unknown): boolean {
+  const message = String((error as any)?.message || error || "").toLowerCase();
+  const name = String((error as any)?.name || "").toLowerCase();
+  return (
+    message.includes("internal error") ||
+    message.includes("indexeddb error") ||
+    message.includes("blocked") ||
+    name.includes("unknownerror") ||
+    name.includes("invalidstateerror") ||
+    name.includes("transactioninactiveerror") ||
+    name.includes("aborterror") ||
+    name.includes("notfounderror") ||
+    name.includes("versionerror") ||
+    name.includes("datacloneerror") ||
+    name.includes("quotaexceedederror") ||
+    message.includes("quota")
+  );
+}
+
+async function rebuildDatabase(): Promise<void> {
+  resetDbConnection();
+  const dbName = getDbName();
+  await new Promise<void>((resolve, reject) => {
+    if (typeof window === 'undefined' || !window.indexedDB) {
+      reject(new Error('IndexedDB is not supported in this browser.'));
+      return;
+    }
+    const request = window.indexedDB.deleteDatabase(dbName);
+    request.onsuccess = () => resolve();
+    request.onblocked = () => reject(new Error('IndexedDB delete blocked by another tab/window.'));
+    request.onerror = (event) => {
+      reject((event.target as IDBOpenDBRequest).error || new Error('Failed to delete IndexedDB.'));
+    };
+  });
+}
+
+function rotateToFreshDatabase() {
+  resetDbConnection();
+  const freshName = `${DB_NAME_BASE}_${Date.now()}`;
+  persistDbName(freshName);
+  console.warn(`[audioDB] Switched to a fresh IndexedDB instance: ${freshName}`);
+}
+
+async function withIndexedDbRecovery<T>(
+  label: string,
+  operation: () => Promise<T>,
+  attempt = 0
+): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const canRecover = isRecoverableIndexedDbError(error) && attempt < 3;
+    if (!canRecover) throw error;
+    console.warn(`[audioDB] ${label} failed (attempt ${attempt + 1}), recovering IndexedDB...`, error);
+    if (attempt === 0) {
+      resetDbConnection();
+    } else if (attempt === 1) {
+      try {
+        await rebuildDatabase();
+      } catch (rebuildError) {
+        console.warn('[audioDB] Rebuild failed, rotating DB name.', rebuildError);
+        rotateToFreshDatabase();
+      }
+    } else {
+      rotateToFreshDatabase();
+    }
+    return withIndexedDbRecovery(label, operation, attempt + 1);
+  }
+}
 
 function getDB(): Promise<IDBDatabase> {
   if (dbPromise) {
@@ -22,7 +130,7 @@ function getDB(): Promise<IDBDatabase> {
       return;
     }
 
-    const request = window.indexedDB.open(DB_NAME, DB_VERSION);
+    const request = window.indexedDB.open(getDbName(), DB_VERSION);
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
@@ -41,12 +149,26 @@ function getDB(): Promise<IDBDatabase> {
     };
 
     request.onsuccess = (event) => {
-      resolve((event.target as IDBOpenDBRequest).result);
+      const db = (event.target as IDBOpenDBRequest).result;
+      db.onversionchange = () => {
+        try {
+          db.close();
+        } catch {
+          // ignore close errors
+        }
+        if (dbInstance === db) {
+          dbInstance = null;
+          dbPromise = null;
+        }
+      };
+      dbInstance = db;
+      resolve(db);
     };
 
     request.onerror = (event) => {
-      console.error('IndexedDB error:', (event.target as IDBOpenDBRequest).error);
-      reject(new Error('IndexedDB error'));
+      const error = (event.target as IDBOpenDBRequest).error;
+      console.error('IndexedDB error:', error);
+      reject(error || new Error('IndexedDB error'));
       dbPromise = null;
     };
 
@@ -61,93 +183,124 @@ function getDB(): Promise<IDBDatabase> {
 }
 
 async function storeItem(storeName: string, key: string, blob: Blob): Promise<void> {
-    const db = await getDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(storeName, 'readwrite');
-      const store = transaction.objectStore(storeName);
-      const request = store.put(blob, key);
-  
-      request.onsuccess = () => resolve();
-      request.onerror = (event) => {
-          console.error(`Error storing item in ${storeName}:`, (event.target as IDBRequest).error);
-          reject(new Error(`Failed to store item in ${storeName}.`));
-      };
+    return withIndexedDbRecovery(`store ${storeName}/${key}`, async () => {
+      const db = await getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(storeName, 'readwrite');
+        const store = transaction.objectStore(storeName);
+        const request = store.put(blob, key);
+
+        request.onsuccess = () => resolve();
+        request.onerror = (event) => {
+            const error = (event.target as IDBRequest).error;
+            console.error(`Error storing item in ${storeName}:`, error);
+            reject(error || new Error(`Failed to store item in ${storeName}.`));
+        };
+        transaction.onerror = (event) => {
+          const error = (event.target as IDBTransaction).error;
+          reject(error || new Error(`Transaction failed in ${storeName}.`));
+        };
+      });
     });
 }
 
 async function getItem(storeName: string, key: string): Promise<Blob | null> {
-    const db = await getDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(storeName, 'readonly');
-      const store = transaction.objectStore(storeName);
-      const request = store.get(key);
-  
-      request.onsuccess = () => {
-        resolve(request.result || null);
-      };
-      request.onerror = (event) => {
-        console.error(`Error fetching item from ${storeName}:`, (event.target as IDBRequest).error);
-        reject(new Error(`Failed to retrieve item from ${storeName}.`));
-      };
+    return withIndexedDbRecovery(`get ${storeName}/${key}`, async () => {
+      const db = await getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(storeName, 'readonly');
+        const store = transaction.objectStore(storeName);
+        const request = store.get(key);
+
+        request.onsuccess = () => {
+          resolve(request.result || null);
+        };
+        request.onerror = (event) => {
+          const error = (event.target as IDBRequest).error;
+          console.error(`Error fetching item from ${storeName}:`, error);
+          reject(error || new Error(`Failed to retrieve item from ${storeName}.`));
+        };
+        transaction.onerror = (event) => {
+          const error = (event.target as IDBTransaction).error;
+          reject(error || new Error(`Transaction failed in ${storeName}.`));
+        };
+      });
     });
 }
 
 async function deleteItem(storeName: string, key: string): Promise<void> {
-    const db = await getDB();
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readwrite');
-        const store = transaction.objectStore(storeName);
-        const request = store.delete(key);
-    
-        request.onsuccess = () => resolve();
-        request.onerror = (event) => {
-            console.error(`Error deleting item from ${storeName}:`, (event.target as IDBRequest).error);
-            reject(new Error(`Failed to delete item from ${storeName}.`));
-        };
+    return withIndexedDbRecovery(`delete ${storeName}/${key}`, async () => {
+      const db = await getDB();
+      return new Promise((resolve, reject) => {
+          const transaction = db.transaction(storeName, 'readwrite');
+          const store = transaction.objectStore(storeName);
+          const request = store.delete(key);
+
+          request.onsuccess = () => resolve();
+          request.onerror = (event) => {
+              const error = (event.target as IDBRequest).error;
+              console.error(`Error deleting item from ${storeName}:`, error);
+              reject(error || new Error(`Failed to delete item from ${storeName}.`));
+          };
+          transaction.onerror = (event) => {
+            const error = (event.target as IDBTransaction).error;
+            reject(error || new Error(`Transaction failed in ${storeName}.`));
+          };
+      });
     });
 }
 
 async function getAllKeys(storeName: string): Promise<string[]> {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(storeName, 'readonly');
-    const store = transaction.objectStore(storeName);
-    const request = store.getAllKeys();
-    request.onsuccess = () => resolve((request.result || []) as string[]);
-    request.onerror = (event) => {
-      console.error(`Error fetching keys from ${storeName}:`, (event.target as IDBRequest).error);
-      reject(new Error(`Failed to retrieve keys from ${storeName}.`));
-    };
+  return withIndexedDbRecovery(`getAllKeys ${storeName}`, async () => {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(storeName, 'readonly');
+      const store = transaction.objectStore(storeName);
+      const request = store.getAllKeys();
+      request.onsuccess = () => resolve((request.result || []) as string[]);
+      request.onerror = (event) => {
+        const error = (event.target as IDBRequest).error;
+        console.error(`Error fetching keys from ${storeName}:`, error);
+        reject(error || new Error(`Failed to retrieve keys from ${storeName}.`));
+      };
+      transaction.onerror = (event) => {
+        const error = (event.target as IDBTransaction).error;
+        reject(error || new Error(`Transaction failed in ${storeName}.`));
+      };
+    });
   });
 }
 
 export async function clearAllData(): Promise<void> {
-    const db = await getDB();
-    return new Promise((resolve, reject) => {
-      const storesToClear = [AUDIO_STORE_NAME, PDF_STORE_NAME, BACKUP_STORE_NAME, EXCALIDRAW_STORE_NAME];
-      if (storesToClear.every(store => !db.objectStoreNames.contains(store))) {
-        console.log('No object stores found to clear.');
-        resolve();
-        return;
-      }
-      
-      const transaction = db.transaction(storesToClear, 'readwrite');
-  
-      transaction.oncomplete = () => {
-        console.log('All IndexedDB object stores have been cleared.');
-        resolve();
-      };
-  
-      transaction.onerror = (event) => {
-        console.error('Error clearing IndexedDB:', (event.target as IDBRequest).error);
-        reject(new Error('Failed to clear IndexedDB.'));
-      };
-  
-      storesToClear.forEach(storeName => {
-        if (db.objectStoreNames.contains(storeName)) {
-            const store = transaction.objectStore(storeName);
-            store.clear();
+    return withIndexedDbRecovery("clearAllData", async () => {
+      const db = await getDB();
+      return new Promise((resolve, reject) => {
+        const storesToClear = [AUDIO_STORE_NAME, PDF_STORE_NAME, BACKUP_STORE_NAME, EXCALIDRAW_STORE_NAME];
+        if (storesToClear.every(store => !db.objectStoreNames.contains(store))) {
+          console.log('No object stores found to clear.');
+          resolve();
+          return;
         }
+
+        const transaction = db.transaction(storesToClear, 'readwrite');
+
+        transaction.oncomplete = () => {
+          console.log('All IndexedDB object stores have been cleared.');
+          resolve();
+        };
+
+        transaction.onerror = (event) => {
+          const error = (event.target as IDBTransaction).error;
+          console.error('Error clearing IndexedDB:', error);
+          reject(error || new Error('Failed to clear IndexedDB.'));
+        };
+
+        storesToClear.forEach(storeName => {
+          if (db.objectStoreNames.contains(storeName)) {
+              const store = transaction.objectStore(storeName);
+              store.clear();
+          }
+        });
       });
     });
 }

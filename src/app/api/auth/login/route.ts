@@ -19,8 +19,12 @@ export async function POST(request: Request) {
       user: { username: normalizedUsername },
     };
     if (process.env.BLOB_READ_WRITE_TOKEN) {
-      const tokens = await issueAuthTokens(normalizedUsername);
-      Object.assign(responsePayload, tokens);
+      try {
+        const tokens = await issueAuthTokens(normalizedUsername);
+        Object.assign(responsePayload, tokens);
+      } catch (error) {
+        console.error("Demo login token issuance failed; continuing without cloud tokens:", error);
+      }
     }
     const response = NextResponse.json(responsePayload);
     attachSessionCookie(response, normalizedUsername);
