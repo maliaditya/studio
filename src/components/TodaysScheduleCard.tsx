@@ -5,7 +5,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow, Target, Calendar, X, Wallet, Users, Wrench, Blocks, HandHeart, Sparkles, HeartPulse, Palette } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow, Target, Calendar, X, Wallet, Users, Wrench, Blocks, HandHeart, Sparkles, HeartPulse, Palette, Bug } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule, Resource, Stopper, MindsetPoint, CoreDomainId } from '@/types/workout';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,6 +43,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     mindset: <Brain className="h-4 w-4" />,
     'spaced-repetition': <Repeat className="h-4 w-4 text-blue-500" />,
     pomodoro: <Timer className="h-4 w-4" />,
+    bugs: <Bug className="h-4 w-4 text-rose-400" />,
 };
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
@@ -52,12 +53,27 @@ const AddActivityMenu = ({
     onAddRoutineToday,
     selectedSlotName,
 }: {
-    onAddActivity: (type: ActivityType, details: string) => void;
+    onAddActivity: (type: ActivityType, details: string, options?: { taskIds?: string[] }) => void;
     onAddRoutineToday: (routine: Activity) => void;
     selectedSlotName: string;
 }) => {
-    const { coreSkills, settings } = useAuth();
+    const { coreSkills, settings, kanbanBoards, projects } = useAuth();
     const specializations = coreSkills.filter(s => s.type === 'Specialization');
+    const openBugGroups = useMemo(() => {
+        const projectNameById = new Map((projects || []).map(project => [project.id, project.name] as const));
+        return (kanbanBoards || [])
+            .map((board) => {
+                const bugCards = (board.cards || []).filter(card => card.cardKind === 'bug' && !card.archived);
+                if (bugCards.length === 0) return null;
+                return {
+                    boardId: board.id,
+                    label: (board.projectId && projectNameById.get(board.projectId)) || board.name || 'Project bugs',
+                    cards: bugCards,
+                };
+            })
+            .filter((group): group is { boardId: string; label: string; cards: typeof kanbanBoards[number]['cards'] } => !!group)
+            .sort((a, b) => a.label.localeCompare(b.label));
+    }, [kanbanBoards, projects]);
     const groupedRoutines = useMemo(() => {
         const bySlot = new Map<string, Activity[]>();
         (settings.routines || []).forEach((routine) => {
@@ -159,7 +175,7 @@ const AddActivityMenu = ({
                 <span className="ml-2 capitalize">Pomodoro</span>
             </DropdownMenuItem>
             {Object.entries(activityIcons).map(([type, icon]) => {
-                if(type === 'pomodoro') return null;
+                if(type === 'pomodoro' || type === 'bugs') return null;
                 const activityType = type as ActivityType;
                 if (activityType === 'upskill' || activityType === 'deepwork') {
                     return (
@@ -193,6 +209,41 @@ const AddActivityMenu = ({
                     </DropdownMenuItem>
                 );
             })}
+            <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="w-full justify-start">
+                    {activityIcons.bugs}
+                    <span className="ml-2">Bugs</span>
+                    <span className="ml-auto text-[10px] text-muted-foreground">{openBugGroups.reduce((count, group) => count + group.cards.length, 0)}</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuPortal>
+                    <DropdownMenuSubContent className="w-72 p-1">
+                        {openBugGroups.length > 0 ? (
+                            <ScrollArea className="h-64">
+                                <div className="space-y-1 p-1">
+                                    {openBugGroups.map((group) => (
+                                        <React.Fragment key={group.boardId}>
+                                            <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                                {group.label}
+                                            </p>
+                                            {group.cards.map((card) => (
+                                                <DropdownMenuItem
+                                                    key={card.id}
+                                                    onClick={() => onAddActivity('bugs', `${group.label}: ${card.title}`, { taskIds: [card.id] })}
+                                                >
+                                                    <span className="truncate">{card.title}</span>
+                                                </DropdownMenuItem>
+                                            ))}
+                                            <DropdownMenuSeparator />
+                                        </React.Fragment>
+                                    ))}
+                                </div>
+                            </ScrollArea>
+                        ) : (
+                            <DropdownMenuItem disabled>No open bugs available</DropdownMenuItem>
+                        )}
+                    </DropdownMenuSubContent>
+                </DropdownMenuPortal>
+            </DropdownMenuSub>
         </DropdownMenuContent>
     );
 };
@@ -242,7 +293,7 @@ export const AgendaWidgetItem = React.memo(({
     } = useAuth();
     const router = useRouter();
 
-    const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition', 'spaced-repetition'].includes(activity.type);
+    const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition', 'spaced-repetition', 'bugs'].includes(activity.type);
     const isAgendaContext = context === 'agenda';
 
     const handleItemClick = (e: React.MouseEvent) => {
@@ -1254,6 +1305,7 @@ export function TodaysScheduleCard({
       mindset: 'Mindset',
       'spaced-repetition': 'Spaced Repetition',
       pomodoro: 'Pomodoro',
+      bugs: 'Bugs',
     };
   
     dailyActivities.forEach((activity) => {
@@ -1334,7 +1386,7 @@ export function TodaysScheduleCard({
     });
   };
   
-  const handleAddActivity = (type: ActivityType, details: string) => {
+  const handleAddActivity = (type: ActivityType, details: string, options?: { taskIds?: string[] }) => {
     let activityDetails = details;
     
     if (type === 'workout') {
@@ -1352,7 +1404,7 @@ export function TodaysScheduleCard({
         completed: false,
         slot: currentSlot,
         habitEquationIds: settings.defaultHabitLinks?.[type] ? [settings.defaultHabitLinks[type]!] : [],
-        taskIds: [],
+        taskIds: options?.taskIds || [],
         linkedEntityType: (type === 'deepwork' || type === 'upskill') ? 'specialization' : undefined,
     };
     setGlobalSchedule(prev => ({

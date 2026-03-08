@@ -72,8 +72,11 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
             (p.linkedUpskillIds?.includes(task.id))
         );
         
-        const linkedProject = parent?.linkedProjectIds && parent.linkedProjectIds.length > 0
-            ? projects.find(p => p.id === parent.linkedProjectIds![0]) 
+        const linkedProjectId =
+            parent?.primaryProjectId ||
+            (parent?.linkedProjectIds && parent.linkedProjectIds.length > 0 ? parent.linkedProjectIds[0] : null);
+        const linkedProject = linkedProjectId
+            ? projects.find(p => p.id === linkedProjectId) 
             : null;
 
         const microSkillId = Array.from(microSkillMap.entries()).find(([, v]) => v.microSkillName === task.category)?.[0];

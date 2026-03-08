@@ -278,7 +278,11 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
         setIsEditingName(false);
     };
 
-    const linkedProjects = (deepworkDef.linkedProjectIds || [])
+    const linkedProjectIds = Array.from(new Set([
+        ...(deepworkDef.primaryProjectId ? [deepworkDef.primaryProjectId] : []),
+        ...(deepworkDef.linkedProjectIds || []),
+    ]));
+    const linkedProjects = linkedProjectIds
         .map(pid => projects.find(p => p.id === pid))
         .filter((p): p is Project => !!p);
     

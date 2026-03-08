@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import type { SkillAcquisitionPlan, HabitEquation, Project, ProjectPlan, GapAnalysis, Release, Offer, ExerciseCategory, ExerciseDefinition, MicroSkill, CoreSkill, SkillArea, LearningPlan, LearningResourceAudio, LearningResourceBook, SkillTreePathPlan } from '@/types/workout';
+import type { SkillAcquisitionPlan, HabitEquation, Project, ProjectPlan, GapAnalysis, Release, Offer, ExerciseCategory, ExerciseDefinition, MicroSkill, CoreSkill, SkillArea, LearningPlan, LearningResourceAudio, LearningResourceBook, SkillTreePathPlan, KanbanCard } from '@/types/workout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { offerTypes, GAP_TYPES, productTypes } from '@/lib/constants';
@@ -41,6 +41,7 @@ function PlanningContent() {
     projects,
     setProjects,
     coreSkills,
+    skillDomains,
     mindsetCards,
     deepWorkDefinitions,
     upskillDefinitions,
@@ -57,6 +58,8 @@ function PlanningContent() {
   const [isProductPlanModalOpen, setIsProductPlanModalOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [currentProductPlan, setCurrentProductPlan] = useState<Partial<ProjectPlan>>({});
+  const [isRuleEquationPickerOpen, setIsRuleEquationPickerOpen] = useState(false);
+  const [isComponentProjectPickerOpen, setIsComponentProjectPickerOpen] = useState(false);
 
   const specializations = React.useMemo(() => {
     return coreSkills.filter(skill => skill.type === 'Specialization');
@@ -203,13 +206,16 @@ function PlanningContent() {
   
   const handleOpenProductPlanModal = (project: Project) => {
     setSelectedProjectId(project.id);
+    setIsRuleEquationPickerOpen(false);
+    setIsComponentProjectPickerOpen(false);
     if (project.productPlan) {
       setCurrentProductPlan({
         ...project.productPlan,
         targetDate: normalizeDateValue(project.productPlan.targetDate),
+        componentProjectIds: project.productPlan.componentProjectIds || [],
       });
     } else {
-      setCurrentProductPlan({ linkedRuleEquationIds: [] });
+      setCurrentProductPlan({ linkedRuleEquationIds: [], componentProjectIds: [] });
     }
     setIsProductPlanModalOpen(true);
   };
@@ -239,11 +245,33 @@ function PlanningContent() {
     });
   };
 
+  const handleProductComponentProjectToggle = (projectId: string) => {
+    setCurrentProductPlan(prev => {
+      const currentIds = prev.componentProjectIds || [];
+      const nextIds = currentIds.includes(projectId)
+        ? currentIds.filter(id => id !== projectId)
+        : [...currentIds, projectId];
+      return { ...prev, componentProjectIds: nextIds };
+    });
+  };
+
   const handleSaveProductPlan = () => {
     if (!selectedProjectId) return;
     setProjects(prev => prev.map(p => p.id === selectedProjectId ? { ...p, productPlan: currentProductPlan as ProjectPlan } : p));
+    setIsRuleEquationPickerOpen(false);
+    setIsComponentProjectPickerOpen(false);
     setIsProductPlanModalOpen(false);
   };
+
+  const selectedProductPlanProject = useMemo(
+    () => projects.find(p => p.id === selectedProjectId) || null,
+    [projects, selectedProjectId]
+  );
+
+  const selectableComponentProjects = useMemo(() => {
+    if (!selectedProductPlanProject) return [] as Project[];
+    return projects.filter(project => project.id !== selectedProductPlanProject.id);
+  }, [projects, selectedProductPlanProject]);
 
   return (
     <>
@@ -356,6 +384,9 @@ function PlanningContent() {
                           }
                           return null;
                       }).filter((eq): eq is HabitEquation => !!eq);
+                      const componentProjects = (plan.componentProjectIds || [])
+                        .map(id => projects.find(p => p.id === id))
+                        .filter((p): p is Project => !!p);
 
                       return (
                           <Card key={project.id}>
@@ -408,6 +439,19 @@ function PlanningContent() {
                                               <span className="font-medium">{plan.requiredHours != null ? `${plan.requiredHours} hrs` : 'Not set'}</span>
                                           </li>
                                       </ul>
+                                  </div>
+                                  <Separator />
+                                  <div>
+                                      <h4 className="font-semibold text-sm mb-2 flex items-center gap-2"><Briefcase className="h-4 w-4"/> Components</h4>
+                                      {componentProjects.length > 0 ? (
+                                          <div className="flex flex-wrap gap-2">
+                                              {componentProjects.map(component => (
+                                                  <Badge key={component.id} variant="secondary">{component.name}</Badge>
+                                              ))}
+                                          </div>
+                                      ) : (
+                                          <p className="text-xs text-muted-foreground">No component projects linked.</p>
+                                      )}
                                   </div>
                               </CardContent>
                           </Card>
@@ -551,27 +595,33 @@ function PlanningContent() {
                       <div className="space-y-4">
                           <h3 className="font-semibold flex items-center gap-2"><Target className="h-5 w-5"/> Required State</h3>
                           <p className="text-xs text-muted-foreground">Link the meta-rule equations that create the necessary mindset for this product.</p>
-                          <Popover>
-                              <PopoverTrigger asChild>
-                                  <Button variant="outline" className="w-full justify-start">Link Rule Equations...</Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-80">
-                                  <ScrollArea className="h-60">
-                                      <div className="space-y-2 p-1">
-                                          {Object.values(pillarEquations).flat().map(eq => (
-                                              <div key={eq.id} className="flex items-center space-x-2 p-1">
-                                                  <Checkbox 
-                                                      id={`prod-eq-${eq.id}`}
-                                                      checked={(currentProductPlan.linkedRuleEquationIds || []).includes(eq.id)}
-                                                      onCheckedChange={() => handleProductRuleLinkToggle(eq.id)}
-                                                  />
-                                                  <Label htmlFor={`prod-eq-${eq.id}`} className="font-normal w-full cursor-pointer">{eq.outcome}</Label>
-                                              </div>
-                                          ))}
-                                      </div>
-                                  </ScrollArea>
-                              </PopoverContent>
-                          </Popover>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start"
+                            onClick={() => setIsRuleEquationPickerOpen((prev) => !prev)}
+                          >
+                            {isRuleEquationPickerOpen ? 'Hide Rule Equations' : 'Link Rule Equations...'}
+                          </Button>
+                          {isRuleEquationPickerOpen && (
+                            <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                              <ScrollArea className="h-60">
+                                <div className="space-y-2 p-1">
+                                  {Object.values(pillarEquations).flat().map(eq => (
+                                    <div key={eq.id} className="flex items-center space-x-2 p-1">
+                                      <Checkbox
+                                        id={`prod-eq-${eq.id}`}
+                                        checked={(currentProductPlan.linkedRuleEquationIds || []).includes(eq.id)}
+                                        onCheckedChange={() => handleProductRuleLinkToggle(eq.id)}
+                                      />
+                                      <Label htmlFor={`prod-eq-${eq.id}`} className="font-normal w-full cursor-pointer">
+                                        {eq.outcome}
+                                      </Label>
+                                    </div>
+                                  ))}
+                                </div>
+                              </ScrollArea>
+                            </div>
+                          )}
                       </div>
                       <div className="space-y-4">
                           <h3 className="font-semibold flex items-center gap-2"><Package className="h-5 w-5"/> Required Resources</h3>
@@ -591,6 +641,59 @@ function PlanningContent() {
                               <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Clock className="h-4 w-4"/> Energy (Total Productive Hours)</Label>
                               <Input type="number" value={currentProductPlan.requiredHours || ''} onChange={(e) => handleProductPlanFieldChange('requiredHours', e.target.value === '' ? null : Number(e.target.value))} placeholder="e.g., 200" />
                           </div>
+                          <div className="space-y-2">
+                              <Label className="flex items-center gap-2 text-xs text-muted-foreground"><Briefcase className="h-4 w-4"/> Component Projects</Label>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-start"
+                                onClick={() => setIsComponentProjectPickerOpen((prev) => !prev)}
+                              >
+                                {(currentProductPlan.componentProjectIds || []).length > 0
+                                  ? `${(currentProductPlan.componentProjectIds || []).length} component project(s)`
+                                  : isComponentProjectPickerOpen
+                                    ? 'Hide component projects'
+                                    : 'Select component projects...'}
+                              </Button>
+                              {isComponentProjectPickerOpen && (
+                                <div className="rounded-md border border-border/60 bg-background/40 p-2">
+                                  <ScrollArea className="h-56">
+                                    <div className="space-y-2 p-1">
+                                      {selectableComponentProjects.length > 0 ? selectableComponentProjects.map(project => (
+                                        <div key={project.id} className="flex items-center space-x-2 p-1">
+                                          <Checkbox
+                                            id={`prod-component-${project.id}`}
+                                            checked={(currentProductPlan.componentProjectIds || []).includes(project.id)}
+                                            onCheckedChange={() => handleProductComponentProjectToggle(project.id)}
+                                          />
+                                          <Label htmlFor={`prod-component-${project.id}`} className="font-normal w-full cursor-pointer">
+                                            <div className="flex flex-col">
+                                              <span>{project.name}</span>
+                                              <span className="text-xs text-muted-foreground">
+                                                {skillDomains.find(domain => domain.id === project.domainId)?.name || 'Unknown domain'}
+                                              </span>
+                                            </div>
+                                          </Label>
+                                        </div>
+                                      )) : (
+                                        <p className="p-2 text-sm text-muted-foreground">No other projects available.</p>
+                                      )}
+                                    </div>
+                                  </ScrollArea>
+                                </div>
+                              )}
+                              {(currentProductPlan.componentProjectIds || []).length > 0 && (
+                                  <div className="flex flex-wrap gap-2">
+                                          {(currentProductPlan.componentProjectIds || []).map(componentId => {
+                                              const componentProject = projects.find(project => project.id === componentId);
+                                              return componentProject ? (
+                                                  <Badge key={componentId} variant="secondary">
+                                                      {componentProject.name}
+                                                  </Badge>
+                                              ) : null;
+                                          })}
+                                      </div>
+                              )}
+                          </div>
                       </div>
                   </div>
                 </ScrollArea>
@@ -606,7 +709,186 @@ function PlanningContent() {
 }
 
 function ProductizationContent() {
-    return <div>Productization Content Placeholder</div>;
+    const { projects, productizationPlans, pillarEquations } = useAuth();
+
+    const projectPlanCards = useMemo(() => {
+      return projects
+        .map((project) => {
+          const plan = project.productPlan;
+          const legacyPlan = productizationPlans?.[project.name];
+          if (!plan && !legacyPlan) return null;
+
+          const linkedEquations = (plan?.linkedRuleEquationIds || []).map((id) => {
+            for (const pillar in pillarEquations) {
+              const found = pillarEquations[pillar].find((eq) => eq.id === id);
+              if (found) return found;
+            }
+            return null;
+          }).filter((eq): eq is HabitEquation => !!eq);
+          const componentProjects = (plan?.componentProjectIds || [])
+            .map((id) => projects.find((project) => project.id === id))
+            .filter((project): project is Project => !!project);
+
+          return {
+            project,
+            plan,
+            legacyPlan,
+            linkedEquations,
+            componentProjects,
+          };
+        })
+        .filter((item): item is {
+          project: Project;
+          plan?: ProjectPlan;
+          legacyPlan?: Record<string, any>;
+          linkedEquations: HabitEquation[];
+          componentProjects: Project[];
+        } => !!item);
+    }, [projects, productizationPlans, pillarEquations]);
+
+    return (
+      <div className="space-y-6">
+        <Card className="border-primary/20 bg-card/70">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-3 text-xl">
+              <Package className="h-6 w-6 text-primary" />
+              Productization
+            </CardTitle>
+            <CardDescription>
+              Product plans created in Strategy appear here as execution-ready productization context.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+
+        {projectPlanCards.length > 0 ? (
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            {projectPlanCards.map(({ project, plan, legacyPlan, linkedEquations, componentProjects }) => (
+              <Card key={project.id} className="rounded-2xl border-border/60 bg-card/75">
+                <CardHeader className="space-y-3">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <CardTitle>{project.name}</CardTitle>
+                      <CardDescription>
+                        {plan ? 'Product plan from Strategy' : 'Legacy productization plan'}
+                      </CardDescription>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {legacyPlan?.productType ? (
+                        <Badge variant="secondary">{legacyPlan.productType}</Badge>
+                      ) : null}
+                      {plan ? <Badge variant="outline">Plan linked</Badge> : null}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div>
+                    <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                      <Target className="h-4 w-4" />
+                      Required State
+                    </h4>
+                    {linkedEquations.length > 0 ? (
+                      <ul className="space-y-1 text-sm text-muted-foreground">
+                        {linkedEquations.map((eq) => (
+                          <li key={eq.id}>• {eq.outcome}</li>
+                        ))}
+                      </ul>
+                    ) : legacyPlan?.gapAnalysis?.outcomeGoal ? (
+                      <p className="text-sm text-muted-foreground">{legacyPlan.gapAnalysis.outcomeGoal}</p>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No state linked yet.</p>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                      <Package className="h-4 w-4" />
+                      Required Resources
+                    </h4>
+                    <ul className="space-y-2 text-sm">
+                      <li className="flex items-center justify-between gap-4">
+                        <span className="flex items-center gap-2 text-muted-foreground">
+                          <CalendarIcon className="h-4 w-4" />
+                          Target Date
+                        </span>
+                        <span className="font-medium">
+                          {plan?.targetDate ? format(parseISO(plan.targetDate), 'PPP') : 'Not set'}
+                        </span>
+                      </li>
+                      <li className="flex items-center justify-between gap-4">
+                        <span className="flex items-center gap-2 text-muted-foreground">
+                          <Banknote className="h-4 w-4" />
+                          Money Needed
+                        </span>
+                        <span className="font-medium">
+                          {plan?.requiredMoney != null ? `$${plan.requiredMoney}` : 'Not set'}
+                        </span>
+                      </li>
+                      <li className="flex items-center justify-between gap-4">
+                        <span className="flex items-center gap-2 text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          Hours Needed
+                        </span>
+                        <span className="font-medium">
+                          {plan?.requiredHours != null ? `${plan.requiredHours} hrs` : 'Not set'}
+                        </span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <Separator />
+
+                  <div>
+                    <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                      <Briefcase className="h-4 w-4" />
+                      Components
+                    </h4>
+                    {componentProjects.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {componentProjects.map((component) => (
+                          <Badge key={component.id} variant="secondary">{component.name}</Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No component projects linked.</p>
+                    )}
+                  </div>
+
+                  {legacyPlan?.releases?.length > 0 ? (
+                    <>
+                      <Separator />
+                      <div>
+                        <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                          <CalendarIcon className="h-4 w-4" />
+                          Releases
+                        </h4>
+                        <div className="space-y-2">
+                          {legacyPlan.releases.slice(0, 3).map((release: Release) => (
+                            <div key={release.id} className="rounded-lg border border-border/50 bg-background/40 px-3 py-2 text-sm">
+                              <div className="font-medium">{release.name}</div>
+                              <div className="text-xs text-muted-foreground">
+                                Launch: {release.launchDate ? format(parseISO(release.launchDate), 'PPP') : 'Not set'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  ) : null}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="py-10 text-center text-muted-foreground">
+              No productization items found. Add a product plan in `Planning -> Product Plans` and it will appear here.
+            </CardContent>
+          </Card>
+        )}
+      </div>
+    );
 }
 
 // OfferizationContent component and others remain unchanged
@@ -707,6 +989,12 @@ function OfferizationContent() {
   const defaultWorkflowStages = useCallback(() => ({
     botheringPointId: null as string | null,
     botheringText: '',
+    stageLabels: {
+      idea: 'Idea -> pick simplest solution',
+      code: 'Code -> make it run',
+      break: 'Break -> observe failure',
+      fix: 'Fix -> improve system',
+    },
     ideaItems: [] as string[],
     codeItems: [] as string[],
     breakItems: [] as string[],
@@ -1701,20 +1989,20 @@ const ProjectForm = ({ specialization, editingRelease, handleUpdateEditingReleas
     handleSaveRelease: () => void,
     setEditingRelease: React.Dispatch<React.SetStateAction<{ specializationId: string; release: Partial<Release> } | null>>,
 }) => {
-    const { projects, coreSkills, mindsetCards } = useAuth();
+    const { projects, coreSkills, mindsetCards, kanbanBoards } = useAuth();
     const [selectedSpecForMicro, setSelectedSpecForMicro] = useState<CoreSkill | null>(specialization);
     const [selectedSkillAreaForMicro, setSelectedSkillAreaForMicro] = useState<SkillArea | null>(null);
-    const [newStageItems, setNewStageItems] = useState<Record<'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems', string>>({
-        ideaItems: '',
-        codeItems: '',
-        breakItems: '',
-        fixItems: '',
-    });
 
     const { release } = editingRelease;
     const workflowStages = useMemo(() => ({
         botheringPointId: release.workflowStages?.botheringPointId || null,
         botheringText: release.workflowStages?.botheringText || '',
+        stageLabels: {
+            idea: release.workflowStages?.stageLabels?.idea || 'Idea -> pick simplest solution',
+            code: release.workflowStages?.stageLabels?.code || 'Code -> make it run',
+            break: release.workflowStages?.stageLabels?.break || 'Break -> observe failure',
+            fix: release.workflowStages?.stageLabels?.fix || 'Fix -> improve system',
+        },
         ideaItems: release.workflowStages?.ideaItems || [],
         codeItems: release.workflowStages?.codeItems || [],
         breakItems: release.workflowStages?.breakItems || [],
@@ -1733,38 +2021,35 @@ const ProjectForm = ({ specialization, editingRelease, handleUpdateEditingReleas
     }, [mindsetCards]);
     const allMicroSkills = useMemo(() => selectedSkillAreaForMicro?.microSkills || [], [selectedSkillAreaForMicro]);
     const projectsInDomain = useMemo(() => projects.filter(p => p.domainId === specialization.domainId), [specialization.domainId, projects]);
+    const linkedKanbanBoard = useMemo(
+        () => kanbanBoards.find((board) => board.releaseId === release.id) || null,
+        [kanbanBoards, release.id]
+    );
+    const stageCardsByKey = useMemo(() => {
+        if (!linkedKanbanBoard) {
+            return {
+                ideaItems: [] as KanbanCard[],
+                codeItems: [] as KanbanCard[],
+                breakItems: [] as KanbanCard[],
+                fixItems: [] as KanbanCard[],
+            };
+        }
+        const cardsByListId = new Map<string, KanbanCard[]>();
+        linkedKanbanBoard.cards.forEach((card) => {
+            const bucket = cardsByListId.get(card.listId) || [];
+            bucket.push(card);
+            cardsByListId.set(card.listId, bucket);
+        });
+        return {
+            ideaItems: (cardsByListId.get(`${linkedKanbanBoard.id}_list_idea`) || []).sort((a, b) => a.position - b.position),
+            codeItems: (cardsByListId.get(`${linkedKanbanBoard.id}_list_code`) || []).sort((a, b) => a.position - b.position),
+            breakItems: (cardsByListId.get(`${linkedKanbanBoard.id}_list_break`) || []).sort((a, b) => a.position - b.position),
+            fixItems: (cardsByListId.get(`${linkedKanbanBoard.id}_list_fix`) || []).sort((a, b) => a.position - b.position),
+        };
+    }, [linkedKanbanBoard]);
 
     const updateWorkflowStages = (next: typeof workflowStages) => {
         handleUpdateEditingRelease('workflowStages' as keyof Release, next);
-    };
-
-    const addStageItem = (stageKey: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems') => {
-        const value = (newStageItems[stageKey] || '').trim();
-        if (!value) return;
-        updateWorkflowStages({
-            ...workflowStages,
-            [stageKey]: [...workflowStages[stageKey], { text: value, completed: false }],
-        });
-        setNewStageItems(prev => ({ ...prev, [stageKey]: '' }));
-    };
-
-    const updateStageItem = (stageKey: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems', index: number, value: string) => {
-        const items = [...workflowStages[stageKey]];
-        const normalized = normalizeStageItem(items[index]);
-        items[index] = { ...normalized, text: value };
-        updateWorkflowStages({ ...workflowStages, [stageKey]: items });
-    };
-
-    const toggleStageItemCompleted = (stageKey: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems', index: number, completed: boolean) => {
-        const items = [...workflowStages[stageKey]];
-        const normalized = normalizeStageItem(items[index]);
-        items[index] = { ...normalized, completed };
-        updateWorkflowStages({ ...workflowStages, [stageKey]: items });
-    };
-
-    const removeStageItem = (stageKey: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems', index: number) => {
-        const items = workflowStages[stageKey].filter((_, i) => i !== index);
-        updateWorkflowStages({ ...workflowStages, [stageKey]: items });
     };
     
     return (
@@ -1835,56 +2120,45 @@ const ProjectForm = ({ specialization, editingRelease, handleUpdateEditingReleas
                         )}
                     </div>
                     {[
-                        { key: 'ideaItems', label: 'Idea -> pick simplest solution' },
-                        { key: 'codeItems', label: 'Code -> make it run' },
-                        { key: 'breakItems', label: 'Break -> observe failure' },
-                        { key: 'fixItems', label: 'Fix -> improve system' },
+                        { key: 'ideaItems', labelKey: 'idea' },
+                        { key: 'codeItems', labelKey: 'code' },
+                        { key: 'breakItems', labelKey: 'break' },
+                        { key: 'fixItems', labelKey: 'fix' },
                     ].map(stage => (
                         <div key={stage.key} className="space-y-2">
-                            <Label>{stage.label}</Label>
-                            <div className="flex gap-2">
-                                <Input
-                                    value={newStageItems[stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems']}
-                                    onChange={(e) =>
-                                        setNewStageItems(prev => ({
-                                            ...prev,
-                                            [stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems']: e.target.value,
-                                        }))
-                                    }
-                                    placeholder="Add item..."
-                                />
-                                <Button type="button" variant="outline" onClick={() => addStageItem(stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems')}>
-                                    Add
-                                </Button>
-                            </div>
-                            <div className="space-y-2">
-                                {workflowStages[stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems'].map((item, index) => (
-                                    <div key={`${stage.key}-${index}`} className="flex items-center gap-2">
-                                        <Checkbox
-                                            checked={normalizeStageItem(item).completed}
-                                            onCheckedChange={(checked) =>
-                                                toggleStageItemCompleted(
-                                                    stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems',
-                                                    index,
-                                                    !!checked
-                                                )
-                                            }
-                                        />
-                                        <Input
-                                            value={normalizeStageItem(item).text}
-                                            className={cn(normalizeStageItem(item).completed && "line-through text-muted-foreground")}
-                                            onChange={(e) => updateStageItem(stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems', index, e.target.value)}
-                                        />
-                                        <Button type="button" variant="ghost" size="icon" onClick={() => removeStageItem(stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems', index)}>
-                                            <Trash2 className="h-4 w-4 text-destructive" />
-                                        </Button>
+                            <Input
+                                value={workflowStages.stageLabels[stage.labelKey as 'idea' | 'code' | 'break' | 'fix']}
+                                onChange={(e) =>
+                                    updateWorkflowStages({
+                                        ...workflowStages,
+                                        stageLabels: {
+                                            ...workflowStages.stageLabels,
+                                            [stage.labelKey]: e.target.value,
+                                        },
+                                    })
+                                }
+                                placeholder="Stage title"
+                            />
+                            <div className="space-y-2 rounded-md border border-dashed p-3">
+                                {stageCardsByKey[stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems'].length > 0 ? (
+                                    stageCardsByKey[stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems'].map((card) => (
+                                        <div key={card.id} className="rounded-md border bg-background/60 px-3 py-2">
+                                            <div className="text-sm font-medium">{card.title}</div>
+                                            {card.description && (
+                                                <div className="mt-1 text-xs text-muted-foreground line-clamp-2">{card.description}</div>
+                                            )}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="text-xs text-muted-foreground">
+                                        No Kanban cards in this stage yet. Add cards from the Kanban board.
                                     </div>
-                                ))}
+                                )}
                             </div>
                         </div>
                     ))}
                     <div className="rounded-md border border-dashed p-2 text-xs text-muted-foreground">
-                        Done -&gt; stop & ship (no items)
+                        Done -&gt; stop & ship. Kanban keeps this final column separate from the editable project-plan stages.
                     </div>
                 </div>
                  <div>
@@ -2033,11 +2307,228 @@ export default function StrategicPlanningPage() {
 }
 
 function OffersContent() {
-  return <div>Offers Content Placeholder</div>;
+  const { coreSkills, offerizationPlans, projects } = useAuth();
+
+  const specializations = useMemo(() => {
+    return coreSkills.filter((skill) => skill.type === 'Specialization');
+  }, [coreSkills]);
+
+  const offerRows = useMemo(() => {
+    return specializations.flatMap((spec) => {
+      const plan = offerizationPlans[spec.id] || {};
+      return (plan.offers || []).map((offer) => ({
+        spec,
+        offer,
+        releases: (plan.releases || []).filter((release) => release.name === offer.name),
+        projectMatch: projects.find((project) => project.name === offer.name) || null,
+      }));
+    });
+  }, [specializations, offerizationPlans, projects]);
+
+  const offerCount = offerRows.length;
+  const specializationCount = new Set(offerRows.map((row) => row.spec.id)).size;
+  const releasedCount = offerRows.filter((row) => row.releases.length > 0).length;
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-primary/20 bg-card/70">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3 text-xl">
+            <MessageCircle className="h-6 w-6 text-primary" />
+            Offers
+          </CardTitle>
+          <CardDescription>
+            Consolidated view of offers designed inside offerization plans.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Offers</div>
+            <div className="mt-2 text-3xl font-semibold">{offerCount}</div>
+          </div>
+          <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Specializations</div>
+            <div className="mt-2 text-3xl font-semibold">{specializationCount}</div>
+          </div>
+          <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Released / Planned</div>
+            <div className="mt-2 text-3xl font-semibold">{releasedCount}/{offerCount}</div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {offerRows.length > 0 ? (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          {offerRows.map(({ spec, offer, releases, projectMatch }) => (
+            <Card key={`${spec.id}-${offer.id}`} className="rounded-2xl border-border/60 bg-card/75">
+              <CardHeader className="space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>{offer.name}</CardTitle>
+                    <CardDescription>{spec.name}</CardDescription>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {projectMatch ? <Badge variant="outline">Project linked</Badge> : null}
+                    {releases.length > 0 ? <Badge variant="secondary">Release planned</Badge> : <Badge variant="secondary">Concept</Badge>}
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <h4 className="mb-1 text-sm font-semibold">Outcome</h4>
+                  <p className="text-sm text-muted-foreground">{offer.outcome || 'No outcome defined yet.'}</p>
+                </div>
+                <div>
+                  <h4 className="mb-1 text-sm font-semibold">Audience</h4>
+                  <p className="text-sm text-muted-foreground">{offer.audience || 'No audience defined yet.'}</p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-border/50 bg-background/40 p-3">
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Timeline</div>
+                    <div className="mt-1 text-sm font-medium">{offer.timeline || 'Not set'}</div>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-background/40 p-3">
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Price</div>
+                    <div className="mt-1 text-sm font-medium">{offer.price || 'Not set'}</div>
+                  </div>
+                </div>
+                {offer.deliverables ? (
+                  <div>
+                    <h4 className="mb-1 text-sm font-semibold">Deliverables</h4>
+                    <p className="whitespace-pre-wrap text-sm text-muted-foreground">{offer.deliverables}</p>
+                  </div>
+                ) : null}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            No offers found. Create offers in the `Offerization` tab and they will appear here.
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
 }
 
 function MatrixContent() {
-  return <div>Matrix Content Placeholder</div>;
+  const { coreSkills, offerizationPlans, projects } = useAuth();
+
+  const specializations = useMemo(() => {
+    return coreSkills.filter((skill) => skill.type === 'Specialization');
+  }, [coreSkills]);
+
+  const matrixRows = useMemo(() => {
+    return specializations.map((spec) => {
+      const plan = offerizationPlans[spec.id] || {};
+      const releases = plan.releases || [];
+      const offers = plan.offers || [];
+      const matchingProjects = projects.filter((project) =>
+        releases.some((release) => release.name === project.name) ||
+        offers.some((offer) => offer.name === project.name)
+      );
+      return {
+        spec,
+        offerTypes: plan.offerTypes || [],
+        gapTypes: plan.gapAnalysis?.gapTypes || [],
+        outcomeGoal: plan.gapAnalysis?.outcomeGoal || '',
+        releases,
+        offers,
+        matchingProjects,
+      };
+    }).filter((row) =>
+      row.offerTypes.length > 0 ||
+      row.gapTypes.length > 0 ||
+      row.releases.length > 0 ||
+      row.offers.length > 0 ||
+      row.matchingProjects.length > 0
+    );
+  }, [specializations, offerizationPlans, projects]);
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-primary/20 bg-card/70">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3 text-xl">
+            <DraftingCompass className="h-6 w-6 text-primary" />
+            Strategy Matrix
+          </CardTitle>
+          <CardDescription>
+            Cross-view of specialization, offer type, gap, offer, release, and project alignment.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
+      {matrixRows.length > 0 ? (
+        <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/75">
+          <div className="grid grid-cols-[220px_220px_220px_240px_220px_220px] gap-0 border-b border-border/60 bg-muted/20 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            <div className="px-4 py-3">Specialization</div>
+            <div className="px-4 py-3">Offer Types</div>
+            <div className="px-4 py-3">Gap Types</div>
+            <div className="px-4 py-3">Outcome Goal</div>
+            <div className="px-4 py-3">Offers / Releases</div>
+            <div className="px-4 py-3">Projects</div>
+          </div>
+          {matrixRows.map((row) => (
+            <div
+              key={row.spec.id}
+              className="grid grid-cols-[220px_220px_220px_240px_220px_220px] gap-0 border-b border-border/40 text-sm last:border-b-0"
+            >
+              <div className="px-4 py-4 font-medium">{row.spec.name}</div>
+              <div className="px-4 py-4">
+                <div className="flex flex-wrap gap-2">
+                  {row.offerTypes.length > 0 ? row.offerTypes.map((type) => (
+                    <Badge key={type} variant="secondary">{type}</Badge>
+                  )) : <span className="text-muted-foreground">None</span>}
+                </div>
+              </div>
+              <div className="px-4 py-4">
+                <div className="flex flex-wrap gap-2">
+                  {row.gapTypes.length > 0 ? row.gapTypes.map((type) => (
+                    <Badge key={type} variant="outline">{type}</Badge>
+                  )) : <span className="text-muted-foreground">None</span>}
+                </div>
+              </div>
+              <div className="px-4 py-4 text-muted-foreground">
+                {row.outcomeGoal || 'No outcome goal defined.'}
+              </div>
+              <div className="px-4 py-4 space-y-2">
+                {row.offers.length > 0 ? row.offers.map((offer) => (
+                  <div key={offer.id} className="rounded-lg border border-border/40 bg-background/30 px-3 py-2">
+                    <div className="font-medium">{offer.name}</div>
+                    <div className="text-xs text-muted-foreground">{offer.price || 'No price'}</div>
+                  </div>
+                )) : null}
+                {row.releases.length > 0 ? row.releases.map((release) => (
+                  <div key={release.id} className="rounded-lg border border-border/40 bg-background/30 px-3 py-2">
+                    <div className="font-medium">{release.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {release.launchDate ? format(parseISO(release.launchDate), 'PPP') : 'No launch date'}
+                    </div>
+                  </div>
+                )) : row.offers.length === 0 ? <span className="text-muted-foreground">None</span> : null}
+              </div>
+              <div className="px-4 py-4">
+                <div className="flex flex-wrap gap-2">
+                  {row.matchingProjects.length > 0 ? row.matchingProjects.map((project) => (
+                    <Badge key={project.id} variant="secondary">{project.name}</Badge>
+                  )) : <span className="text-muted-foreground">No linked projects</span>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            No strategy matrix data yet. Fill the `Offerization` tab first.
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
 }
 
 

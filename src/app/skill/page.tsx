@@ -192,6 +192,7 @@ function SkillPageContent() {
     selectedMicroSkill,
     setSelectedMicroSkill,
     offerizationPlans,
+    setOfferizationPlans,
     logSubTaskTime,
     mindsetCards,
     settings,
@@ -241,6 +242,8 @@ function SkillPageContent() {
 
   const [isDeepWorkModalOpen, setIsDeepWorkModalOpen] = useState(false);
   const [specializationFilter, setSpecializationFilter] = useState<'all' | 'linked'>('linked');
+  const [projectPlannerLinkSpecializationId, setProjectPlannerLinkSpecializationId] = useState<string>('');
+  const [projectPlannerLinkTargetDate, setProjectPlannerLinkTargetDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [isGeneratingFromLinkedPdf, setIsGeneratingFromLinkedPdf] = useState(false);
   const isDesktopRuntime = typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
   const isAiEnabled = normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== 'none';
@@ -1038,6 +1041,31 @@ function SkillPageContent() {
 
   const selectedCoreSkill = useMemo(() => coreSkills.find(s => s.id === selectedSkillId), [coreSkills, selectedSkillId]);
   const selectedProject = useMemo(() => projects.find(p => p.id === selectedProjectId), [projects, selectedProjectId]);
+  const selectedProjectSpecializationLinks = useMemo(() => {
+    if (!selectedProject) return [] as Array<{ specializationId: string; specializationName: string; releaseId: string; launchDate: string }>;
+    return coreSkills
+      .filter((skill): skill is CoreSkill => skill.type === 'Specialization')
+      .flatMap((spec) =>
+        (offerizationPlans[spec.id]?.releases || [])
+          .filter((release) => release.name === selectedProject.name)
+          .map((release) => ({
+            specializationId: spec.id,
+            specializationName: spec.name,
+            releaseId: release.id,
+            launchDate: release.launchDate,
+          }))
+      );
+  }, [selectedProject, coreSkills, offerizationPlans]);
+  const availableProjectPlannerSpecializations = useMemo(() => {
+    if (!selectedProject) return [] as CoreSkill[];
+    const linkedIds = new Set(selectedProjectSpecializationLinks.map((link) => link.specializationId));
+    return coreSkills.filter(
+      (skill): skill is CoreSkill =>
+        skill.type === 'Specialization' &&
+        !linkedIds.has(skill.id) &&
+        Boolean(offerizationPlans[skill.id])
+    );
+  }, [selectedProject, coreSkills, selectedProjectSpecializationLinks, offerizationPlans]);
   const selectedCompanyPositions = useMemo(() => positions.filter(p => p.companyId === selectedCompanyId), [positions, selectedCompanyId]);
   const pdfResources = useMemo(
     () =>
@@ -1056,6 +1084,25 @@ function SkillPageContent() {
     if (!selectedDomainId) return [];
     return coreSkills.filter(cs => cs.domainId === selectedDomainId);
   }, [coreSkills, selectedDomainId]);
+  useEffect(() => {
+    if (!selectedProject) {
+      if (projectPlannerLinkSpecializationId) setProjectPlannerLinkSpecializationId('');
+      if (projectPlannerLinkTargetDate !== new Date().toISOString().slice(0, 10)) {
+        setProjectPlannerLinkTargetDate(new Date().toISOString().slice(0, 10));
+      }
+      return;
+    }
+    if (
+      projectPlannerLinkSpecializationId &&
+      availableProjectPlannerSpecializations.some((skill) => skill.id === projectPlannerLinkSpecializationId)
+    ) {
+      return;
+    }
+    setProjectPlannerLinkSpecializationId(availableProjectPlannerSpecializations[0]?.id || '');
+    if (!projectPlannerLinkTargetDate) {
+      setProjectPlannerLinkTargetDate(new Date().toISOString().slice(0, 10));
+    }
+  }, [selectedProject, availableProjectPlannerSpecializations, projectPlannerLinkSpecializationId, projectPlannerLinkTargetDate]);
   
   const handleSelectDomain = (domainId: string) => {
       setSelectedDomainId(domainId);
@@ -1075,6 +1122,79 @@ function SkillPageContent() {
     setSelectedSkillId(null);
     setSelectedCompanyId(null);
   }
+
+  const handleUnlinkProjectFromSpecialization = (specializationId: string, releaseId: string) => {
+    if (!selectedProject) return;
+    setOfferizationPlans((prev) => {
+      const plan = prev[specializationId];
+      if (!plan) return prev;
+      const nextReleases = (plan.releases || []).filter((release) => release.id !== releaseId);
+      return {
+        ...prev,
+        [specializationId]: {
+          ...plan,
+          releases: nextReleases,
+        },
+      };
+    });
+    toast({
+      title: 'Project Unlinked',
+      description: `"${selectedProject.name}" was removed from that specialization's project planner.`,
+    });
+  };
+  const handleLinkProjectToSpecialization = () => {
+    if (!selectedProject || !projectPlannerLinkSpecializationId || !projectPlannerLinkTargetDate) return;
+    const specialization = coreSkills.find(
+      (skill): skill is CoreSkill =>
+        skill.type === 'Specialization' && skill.id === projectPlannerLinkSpecializationId
+    );
+    if (!specialization) return;
+    const launchDate = projectPlannerLinkTargetDate;
+    const releaseId = `release_${selectedProject.id}_${projectPlannerLinkSpecializationId}`;
+    setOfferizationPlans((prev) => {
+      const plan = prev[projectPlannerLinkSpecializationId] || { offers: [], releases: [] };
+      if ((plan.releases || []).some((release) => release.name === selectedProject.name)) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [projectPlannerLinkSpecializationId]: {
+          ...plan,
+          releases: [
+            ...(plan.releases || []),
+            {
+              id: releaseId,
+              name: selectedProject.name,
+              description: '',
+              launchDate,
+              focusAreaIds: [],
+              workflowStages: {
+                botheringPointId: null,
+                botheringText: '',
+                stageLabels: {
+                  idea: 'Idea -> pick simplest solution',
+                  code: 'Code -> make it run',
+                  break: 'Break -> observe failure',
+                  fix: 'Fix -> improve system',
+                },
+                ideaItems: [],
+                codeItems: [],
+                breakItems: [],
+                fixItems: [],
+              },
+              features: selectedProject.features.map((feature) => feature.name),
+            },
+          ],
+        },
+      };
+    });
+    setProjectPlannerLinkSpecializationId('');
+    setProjectPlannerLinkTargetDate(new Date().toISOString().slice(0, 10));
+    toast({
+      title: 'Project Linked',
+      description: `"${selectedProject.name}" was added to ${specialization.name}'s project planner.`,
+    });
+  };
   
   const handleSelectCompany = (companyId: string) => {
     setSelectedCompanyId(companyId);
@@ -1634,6 +1754,82 @@ function SkillPageContent() {
                 <div className="p-6">
               {selectedProject ? (
                   <div className="space-y-4">
+                      <Card>
+                          <CardHeader className="py-3">
+                              <CardTitle className="text-base">Project Planner Link</CardTitle>
+                              <CardDescription>
+                                  Shows which specialization project planner currently includes this project.
+                              </CardDescription>
+                          </CardHeader>
+                          <CardContent className="p-3 pt-0">
+                              {selectedProjectSpecializationLinks.length > 0 ? (
+                                  <div className="space-y-2">
+                                      {selectedProjectSpecializationLinks.map((link) => (
+                                          <div key={`${link.specializationId}-${link.releaseId}`} className="flex items-center justify-between gap-3 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                                              <div className="min-w-0">
+                                                  <div className="flex items-center gap-2">
+                                                      <Badge variant="secondary">Linked</Badge>
+                                                      <span className="font-medium truncate">{link.specializationName}</span>
+                                                  </div>
+                                                  <div className="text-xs text-muted-foreground">
+                                                      Project planner target date: {link.launchDate}
+                                                  </div>
+                                              </div>
+                                              <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  className="gap-2 shrink-0"
+                                                  onClick={() => handleUnlinkProjectFromSpecialization(link.specializationId, link.releaseId)}
+                                              >
+                                                  <Unlink className="h-3.5 w-3.5" />
+                                                  Unlink
+                                              </Button>
+                                          </div>
+                                      ))}
+                                  </div>
+                              ) : (
+                                  <div className="flex items-center gap-2 rounded-md border border-dashed px-3 py-3 text-sm text-muted-foreground">
+                                      <Badge variant="outline">Not linked</Badge>
+                                      <span>This project is not linked to any specialization project planner.</span>
+                                  </div>
+                              )}
+                              {availableProjectPlannerSpecializations.length > 0 && (
+                                  <div className="mt-3 rounded-md border border-border/60 bg-muted/10 p-3">
+                                      <div className="mb-2 text-sm font-medium">Link To Specialization Project Planner</div>
+                                      <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_180px_auto]">
+                                          <Select
+                                              value={projectPlannerLinkSpecializationId}
+                                              onValueChange={setProjectPlannerLinkSpecializationId}
+                                          >
+                                              <SelectTrigger>
+                                                  <SelectValue placeholder="Select specialization" />
+                                              </SelectTrigger>
+                                              <SelectContent>
+                                                  {availableProjectPlannerSpecializations.map((specialization) => (
+                                                      <SelectItem key={specialization.id} value={specialization.id}>
+                                                          {specialization.name}
+                                                      </SelectItem>
+                                                  ))}
+                                              </SelectContent>
+                                          </Select>
+                                          <Input
+                                              type="date"
+                                              value={projectPlannerLinkTargetDate}
+                                              onChange={(e) => setProjectPlannerLinkTargetDate(e.target.value)}
+                                          />
+                                          <Button
+                                              onClick={handleLinkProjectToSpecialization}
+                                              disabled={!projectPlannerLinkSpecializationId || !projectPlannerLinkTargetDate}
+                                              className="gap-2"
+                                          >
+                                              <Plus className="h-3.5 w-3.5" />
+                                              Link Project
+                                          </Button>
+                                      </div>
+                                  </div>
+                              )}
+                          </CardContent>
+                      </Card>
                       {Array.from(linkedTasksByCoreSkill.entries()).map(([coreSkillName, data]) => (
                           <Card key={coreSkillName}>
                               <CardHeader className="py-3">

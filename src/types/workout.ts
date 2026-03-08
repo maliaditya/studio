@@ -57,6 +57,7 @@ export interface ExerciseDefinition {
   name: string; // Subtopic for upskill
   category: ExerciseCategory; // Topic for upskill
   description?: string;
+  completed?: boolean;
   link?: string;
   iconUrl?: string;
   estimatedDuration?: number; // Total minutes
@@ -70,6 +71,7 @@ export interface ExerciseDefinition {
   linkedResourceIds?: string[];
   isReadyForBranding?: boolean;
   linkedProjectIds?: string[];
+  primaryProjectId?: string | null;
   nodeType?: NodeType;
   // Personal Branding
   brandingStatus?: 'converted' | 'published';
@@ -166,7 +168,7 @@ export interface EditableMealPlan {
 
 export type UserDietPlan = EditableMealPlan[];
 
-export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation' | 'interrupt' | 'essentials' | 'nutrition' | 'mindset' | 'distraction' | 'spaced-repetition' | 'pomodoro';
+export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation' | 'interrupt' | 'essentials' | 'nutrition' | 'mindset' | 'distraction' | 'spaced-repetition' | 'pomodoro' | 'bugs';
 
 export interface PauseEvent {
   pauseTime: number;
@@ -236,13 +238,20 @@ export interface Release {
   description: string;
   launchDate: string; // yyyy-MM-dd format
   focusAreaIds: string[];
+  workflowStageChecklistItems?: never;
   workflowStages?: {
     botheringPointId?: string | null;
     botheringText?: string;
-    ideaItems: Array<string | { text: string; completed?: boolean }>;
-    codeItems: Array<string | { text: string; completed?: boolean }>;
-    breakItems: Array<string | { text: string; completed?: boolean }>;
-    fixItems: Array<string | { text: string; completed?: boolean }>;
+    stageLabels?: {
+      idea: string;
+      code: string;
+      break: string;
+      fix: string;
+    };
+    ideaItems: Array<string | WorkflowStageCard>;
+    codeItems: Array<string | WorkflowStageCard>;
+    breakItems: Array<string | WorkflowStageCard>;
+    fixItems: Array<string | WorkflowStageCard>;
   };
   features?: string[];
   daysRemaining?: number;
@@ -253,6 +262,105 @@ export interface Release {
   githubLink?: string;
   demoLink?: string;
   addToPortfolio?: boolean;
+}
+
+export interface WorkflowStageChecklistItem {
+  id: string;
+  text: string;
+  completed?: boolean;
+}
+
+export interface WorkflowStageCard {
+  text: string;
+  completed?: boolean;
+  description?: string;
+  labels?: string[];
+  dueDate?: string | null;
+  checklist?: WorkflowStageChecklistItem[];
+  linkedIntentionIds?: string[];
+}
+
+export interface KanbanChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+  linkedIntentionId?: string;
+}
+
+export interface KanbanComment {
+  id: string;
+  cardId: string;
+  body: string;
+  createdAt: string;
+}
+
+export interface KanbanAttachment {
+  id: string;
+  cardId: string;
+  name: string;
+  url: string;
+  type?: string;
+}
+
+export interface KanbanLabel {
+  id: string;
+  boardId: string;
+  title: string;
+  color: string;
+}
+
+export interface KanbanCard {
+  id: string;
+  boardId: string;
+  listId: string;
+  cardKind?: 'standard' | 'bug';
+  title: string;
+  description: string;
+  labelIds: string[];
+  dueDate?: string | null;
+  checklist: KanbanChecklistItem[];
+  attachmentIds: string[];
+  commentIds: string[];
+  linkedIntentionIds: string[];
+  workflowStageKey?: 'idea' | 'code' | 'break' | 'fix' | null;
+  parentCardId?: string | null;
+  linkedBugIntentionId?: string | null;
+  parentIntentionWasCompleted?: boolean;
+  resolvedAt?: string | null;
+  linkedProjectId?: string | null;
+  linkedReleaseId?: string | null;
+  archived?: boolean;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface KanbanList {
+  id: string;
+  boardId: string;
+  title: string;
+  color?: string;
+  cardOrder: string[];
+  position: number;
+  archived?: boolean;
+}
+
+export interface KanbanBoard {
+  id: string;
+  name: string;
+  description?: string;
+  projectId?: string | null;
+  releaseId?: string | null;
+  specializationId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  listOrder: string[];
+  labels: KanbanLabel[];
+  lists: KanbanList[];
+  cards: KanbanCard[];
+  attachments: KanbanAttachment[];
+  comments: KanbanComment[];
+  migratedFromReleaseWorkflow?: boolean;
 }
 
 export interface Offer {
@@ -613,6 +721,7 @@ export interface ProjectPlan {
   targetDate: string;
   requiredMoney: number | null;
   requiredHours: number | null;
+  componentProjectIds?: string[];
 }
 
 export interface HabitEquation {
@@ -808,6 +917,23 @@ export type CoreDomainId =
   | 'contribution'
   | 'transcendence';
 
+export type MeansPillar = 'money' | 'method' | 'ability';
+export type MeansStatus = 'missing' | 'building' | 'ready';
+
+export interface MeansEntry {
+  id: string;
+  pillar: MeansPillar;
+  category: string;
+  title: string;
+  status: MeansStatus;
+  notes?: string;
+  linkedProjectIds?: string[];
+}
+
+export interface MeansState {
+  entries: MeansEntry[];
+}
+
 export interface UserSettings {
   ispSimpleMode?: boolean;
   ispSimpleKeepCanvasAndBotherings?: boolean;
@@ -890,6 +1016,7 @@ export interface UserSettings {
     sourceModel?: string;
     version?: number;
   };
+  means?: MeansState;
 }
 
 export interface LearningPerformanceLogEntry {

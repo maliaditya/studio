@@ -151,6 +151,7 @@ export function SkillLibrary({
     onToggleReadyForBranding,
     libraryView,
     setLibraryView,
+    navigationOnly = false,
 }: {
     selectedMicroSkill: MicroSkill | null;
     onSelectMicroSkill: (skill: MicroSkill | null) => void;
@@ -167,6 +168,7 @@ export function SkillLibrary({
     onToggleReadyForBranding: (defId: string) => void;
     libraryView: 'deepwork' | 'upskill';
     setLibraryView: React.Dispatch<React.SetStateAction<'deepwork' | 'upskill'>>;
+    navigationOnly?: boolean;
 }) {
   const { 
     skillDomains, 
@@ -406,6 +408,7 @@ export function SkillLibrary({
         <CardHeader>
            {renderHeader()}
         </CardHeader>
+        {!navigationOnly && (
         <CardContent>
              <Tabs value={libraryView} onValueChange={(value) => setLibraryView(value as 'deepwork' | 'upskill')} className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
@@ -428,6 +431,7 @@ export function SkillLibrary({
              </motion.div>
            </AnimatePresence>
         </CardContent>
+        )}
     </Card>
   );
 }

@@ -191,6 +191,10 @@ export function TodaysLearningModal({
 
     return (sourceDefs || []).filter(def => {
         if (getNodeType(def) !== targetType) return false;
+        if (pageType === 'deepwork') {
+          return (def.primaryProjectId || def.linkedProjectIds?.[0] || null) === selectedProject.id
+            || (def.linkedProjectIds || []).includes(selectedProject.id);
+        }
         return (def.linkedProjectIds || []).includes(selectedProject.id);
     });
   }, [deepWorkDefinitions, upskillDefinitions, selectedProject, pageType, getDeepWorkNodeType, getUpskillNodeType]);

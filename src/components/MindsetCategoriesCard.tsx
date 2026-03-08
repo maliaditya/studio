@@ -371,6 +371,7 @@ export function MindsetCategoriesCard() {
         upskillDefinitions,
         deepWorkDefinitions,
         offerizationPlans,
+        kanbanBoards,
         habitCards,
         mechanismCards,
         logStopperEncounter,
@@ -408,6 +409,66 @@ export function MindsetCategoriesCard() {
     const [selectedMismatchLinkId, setSelectedMismatchLinkId] = useState('');
     const [consistencyModal, setConsistencyModal] = useState<{ pointId: string; title: string; data: { date: string; fullDate: string; score: number }[] } | null>(null);
     const [isEditingBotheringTitle, setIsEditingBotheringTitle] = useState(false);
+
+    const buildProjectPlanStageRows = useCallback((plan: {
+        id: string;
+        workflowStages?: {
+            botheringText?: string;
+            ideaItems: Array<string | { text: string; completed?: boolean }>;
+            codeItems: Array<string | { text: string; completed?: boolean }>;
+            breakItems: Array<string | { text: string; completed?: boolean }>;
+            fixItems: Array<string | { text: string; completed?: boolean }>;
+        };
+    }, specializationId: string) => {
+        const normalizeStageItem = (item: string | { text: string; completed?: boolean }) =>
+            typeof item === 'string'
+                ? { text: item, completed: false }
+                : { text: item.text || '', completed: !!item.completed };
+
+        const fallbackRows = [
+            { key: 'idea' as const, label: 'Idea', items: (plan.workflowStages?.ideaItems || []).map(normalizeStageItem) },
+            { key: 'code' as const, label: 'Code', items: (plan.workflowStages?.codeItems || []).map(normalizeStageItem) },
+            { key: 'break' as const, label: 'Break', items: (plan.workflowStages?.breakItems || []).map(normalizeStageItem) },
+            { key: 'fix' as const, label: 'Fix', items: (plan.workflowStages?.fixItems || []).map(normalizeStageItem) },
+        ];
+
+        const linkedBoard = kanbanBoards.find(
+            (board) => board.releaseId === plan.id && board.specializationId === specializationId
+        );
+        if (!linkedBoard) return fallbackRows;
+
+        const listMap = new Map(linkedBoard.lists.map((list) => [list.id, list] as const));
+        const cardMap = new Map(linkedBoard.cards.filter((card) => !card.archived).map((card) => [card.id, card] as const));
+        const orderedLists = linkedBoard.listOrder
+            .map((listId) => listMap.get(listId))
+            .filter((list): list is NonNullable<typeof listMap extends Map<any, infer V> ? V : never> => !!list && !list.archived);
+
+        const stageKeys: Array<'idea' | 'code' | 'break' | 'fix'> = ['idea', 'code', 'break', 'fix'];
+        const doneList = orderedLists[4] || null;
+
+        return stageKeys.map((stageKey, index) => {
+            const stageList = orderedLists[index] || null;
+            const openItems = stageList
+                ? stageList.cardOrder
+                    .map((cardId) => cardMap.get(cardId))
+                    .filter((card): card is NonNullable<typeof cardMap extends Map<any, infer V> ? V : never> => !!card)
+                    .map((card) => ({ text: card.title || '', completed: false }))
+                : [];
+
+            const completedItems = doneList
+                ? doneList.cardOrder
+                    .map((cardId) => cardMap.get(cardId))
+                    .filter((card): card is NonNullable<typeof cardMap extends Map<any, infer V> ? V : never> => !!card && card.workflowStageKey === stageKey)
+                    .map((card) => ({ text: card.title || '', completed: true }))
+                : [];
+
+            return {
+                key: stageKey,
+                label: stageList?.title || fallbackRows[index].label,
+                items: [...completedItems, ...openItems],
+            };
+        });
+    }, [kanbanBoards]);
     const [botheringTitleDraft, setBotheringTitleDraft] = useState('');
     const [position, setPosition] = useState(() => ({
         x: typeof window !== 'undefined' ? window.innerWidth / 2 - 360 : 0,
@@ -2481,17 +2542,8 @@ export function MindsetCategoriesCard() {
                                                 ? Math.max(0, differenceInDays(startOfDay(parseISO(plan.launchDate)), startOfDay(new Date())))
                                                 : null;
                                             const stages = plan.workflowStages;
-                                            const stageRows = [
-                                                { label: 'Idea', items: stages?.ideaItems || [] },
-                                                { label: 'Code', items: stages?.codeItems || [] },
-                                                { label: 'Break', items: stages?.breakItems || [] },
-                                                { label: 'Fix', items: stages?.fixItems || [] },
-                                            ];
-                                            const normalizeStageItem = (item: string | { text: string; completed?: boolean }) =>
-                                                typeof item === 'string'
-                                                    ? { text: item, completed: false }
-                                                    : { text: item.text || '', completed: !!item.completed };
-                                            const allStageItems = stageRows.flatMap((stage) => stage.items.map(normalizeStageItem));
+                                            const stageRows = buildProjectPlanStageRows(plan, learningPlanMeta.specializationId);
+                                            const allStageItems = stageRows.flatMap((stage) => stage.items);
                                             const totalItems = allStageItems.length;
                                             const completedItems = allStageItems.filter((item) => item.completed).length;
                                             const remainingItems = Math.max(0, totalItems - completedItems);
@@ -2526,21 +2578,18 @@ export function MindsetCategoriesCard() {
                                                                 <span className="font-medium text-foreground/90">{stage.label}:</span>
                                                                 {stage.items.length > 0 ? (
                                                                     <div className="mt-1 space-y-1">
-                                                                        {stage.items.map((item, itemIndex) => {
-                                                                            const normalizedItem = normalizeStageItem(item);
-                                                                            return (
-                                                                                <div key={`${stage.label}-${itemIndex}`} className="flex items-center gap-1">
-                                                                                    {normalizedItem.completed ? (
-                                                                                        <Check className="h-3 w-3 text-emerald-400" />
-                                                                                    ) : (
-                                                                                        <div className="h-3 w-3 rounded-sm border border-white/30" />
-                                                                                    )}
-                                                                                    <span className={cn(normalizedItem.completed && "line-through text-muted-foreground")}>
-                                                                                        {normalizedItem.text}
-                                                                                    </span>
-                                                                                </div>
-                                                                            );
-                                                                        })}
+                                                                        {stage.items.map((item, itemIndex) => (
+                                                                            <div key={`${stage.label}-${itemIndex}`} className="flex items-center gap-1">
+                                                                                {item.completed ? (
+                                                                                    <Check className="h-3 w-3 text-emerald-400" />
+                                                                                ) : (
+                                                                                    <div className="h-3 w-3 rounded-sm border border-white/30" />
+                                                                                )}
+                                                                                <span className={cn(item.completed && "line-through text-muted-foreground")}>
+                                                                                    {item.text}
+                                                                                </span>
+                                                                            </div>
+                                                                        ))}
                                                                     </div>
                                                                 ) : (
                                                                     <span className="ml-1">No items</span>

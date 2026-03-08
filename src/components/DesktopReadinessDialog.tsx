@@ -374,21 +374,26 @@ export function DesktopReadinessDialog() {
     typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
   const [open, setOpen] = useState(false);
   const { settings } = useAuth();
+  const fetchEnvironmentStatus = useCallback(async () => {
+    if (!isDesktopRuntime) return null;
+    const bridge = (window as any)?.studioDesktop;
+    if (!bridge?.desktop?.environmentStatus) return null;
+    const microphone = await getMicrophoneStatus();
+    const status = await bridge.desktop.environmentStatus({
+      ollamaBaseUrl: getConfiguredOllamaBaseUrl(settings.ai?.ollamaBaseUrl),
+      ollamaModel: getConfiguredOllamaModel(settings.ai?.model),
+      kokoroBaseUrl: (settings.kokoroTtsBaseUrl || "http://127.0.0.1:8880").trim(),
+      sttBaseUrl: (settings.localSttBaseUrl || "http://127.0.0.1:9890").trim(),
+    });
+    return { microphone, status };
+  }, [isDesktopRuntime, settings.ai?.model, settings.ai?.ollamaBaseUrl, settings.kokoroTtsBaseUrl, settings.localSttBaseUrl]);
 
   useEffect(() => {
-    if (!isDesktopRuntime) return;
-    const bridge = (window as any)?.studioDesktop;
-    if (!bridge?.desktop?.environmentStatus) return;
-
     let cancelled = false;
     const run = async () => {
-      const microphone = await getMicrophoneStatus();
-      const status = await bridge.desktop.environmentStatus({
-        ollamaBaseUrl: getConfiguredOllamaBaseUrl(settings.ai?.ollamaBaseUrl),
-        ollamaModel: getConfiguredOllamaModel(settings.ai?.model),
-        kokoroBaseUrl: (settings.kokoroTtsBaseUrl || "http://127.0.0.1:8880").trim(),
-        sttBaseUrl: (settings.localSttBaseUrl || "http://127.0.0.1:9890").trim(),
-      });
+      const result = await fetchEnvironmentStatus();
+      if (!result) return;
+      const { microphone, status } = result;
       if (cancelled) return;
 
       const shouldOpen = shouldShowDesktopReadinessPrompt(status, microphone);
@@ -407,7 +412,31 @@ export function DesktopReadinessDialog() {
     return () => {
       cancelled = true;
     };
-  }, [isDesktopRuntime, settings.ai?.model, settings.ai?.ollamaBaseUrl, settings.kokoroTtsBaseUrl, settings.localSttBaseUrl]);
+  }, [fetchEnvironmentStatus]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    let cancelled = false;
+    const checkIfResolved = async () => {
+      const result = await fetchEnvironmentStatus();
+      if (!result || cancelled) return;
+      const { microphone, status } = result;
+      if (!shouldShowDesktopReadinessPrompt(status, microphone)) {
+        setOpen(false);
+      }
+    };
+
+    void checkIfResolved();
+    const timer = window.setInterval(() => {
+      void checkIfResolved();
+    }, 4000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [open, fetchEnvironmentStatus]);
 
   if (!isDesktopRuntime) return null;
 

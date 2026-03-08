@@ -34,6 +34,7 @@ const activityNameMap: Record<ActivityType, string> = {
     nutrition: 'Nutrition',
     'spaced-repetition': 'Spaced Repetition',
     pomodoro: 'Pomodoro',
+    bugs: 'Bugs',
 };
 
 const activityColorMapping: Record<string, string> = {

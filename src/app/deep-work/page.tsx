@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon, ChevronDown, Frame, History, ChevronLeft, CheckSquare, Search, Workflow, Zap, Upload, File as FileIcon, View } from 'lucide-react';
+import { PlusCircle, Trash2, ListChecks, Edit3, Save, X, CalendarIcon, TrendingUp, Loader2, Briefcase, BookCopy, MoreVertical, Link as LinkIcon, Folder, Library, Globe, ExternalLink, Youtube, Share2, ArrowRight, Expand, Filter as FilterIcon, LineChart as LineChartIcon, Unlink, GitMerge, Clock, Lightbulb, Flag, Bolt, Flashlight, Focus, GripVertical, PictureInPicture, Code, MessageSquare, BrainCircuit, Blocks, Sprout, ChevronRight as ChevronRightIcon, ChevronDown, Frame, History, ChevronLeft, CheckSquare, Search, Workflow, Zap, Upload, File as FileIcon, View, Star } from 'lucide-react';
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
@@ -407,6 +407,8 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleCreateResource: () => void;
     activeProjectIds: Set<string>;
     currentSlot: string;
+    canGoBack?: boolean;
+    onBack?: () => void;
 }>(({
     currentTask,
     deepWorkDefinitions,
@@ -444,6 +446,8 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
     handleCreateResource,
     activeProjectIds,
     currentSlot,
+    canGoBack = false,
+    onBack,
 }, ref) => {
 
     const { microSkillMap, coreSkills, skillDomains, projects, scheduleTaskFromMindMap, setUpskillDefinitions, setDeepWorkDefinitions, getDescendantLeafNodes, permanentlyLoggedTaskIds, openPdfViewer } = useAuth();
@@ -462,6 +466,13 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
         if (!domain) return [];
         return projects.filter(p => p.domainId === domain.id);
     }, [currentTask, getDomainForCategory, projects]);
+
+    const getPrimaryProjectId = useCallback((task: ExerciseDefinition & { type?: 'deepwork' | 'upskill' }) => {
+        if (task.type === 'deepwork' && getDeepWorkNodeType(task) === 'Intention') {
+            return task.primaryProjectId || task.linkedProjectIds?.[0] || null;
+        }
+        return task.primaryProjectId || null;
+    }, [getDeepWorkNodeType]);
     
     const nodeType = currentTask.type === 'deepwork' ? getDeepWorkNodeType(currentTask) : getUpskillNodeType(currentTask);
     const isHighLevelNode = nodeType === 'Intention' || nodeType === 'Curiosity';
@@ -475,14 +486,26 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
         const resource = resources.find(r => r.id === coreSkill.linkedPdfResourceId && r.type === 'pdf');
         return resource?.name || null;
     }, [currentTask, microSkillMap, coreSkills, resources]);
-    const linkedProjects = (currentTask.linkedProjectIds || [])
+    const primaryProjectId = getPrimaryProjectId(currentTask);
+    const displayProjectIds = Array.from(new Set([
+      ...(primaryProjectId ? [primaryProjectId] : []),
+      ...(currentTask.linkedProjectIds || []),
+    ]));
+    const linkedProjects = displayProjectIds
       .map(pid => projects.find(p => p.id === pid))
       .filter((p): p is Project => !!p);
 
     return (
         <div ref={ref} className="space-y-4">
             <div className="flex items-center gap-4 justify-between">
-                <h3 className="text-xl font-bold">{currentTask.name}</h3>
+                <div className="flex items-center gap-3 min-w-0">
+                    {canGoBack ? (
+                        <Button variant="ghost" size="icon" onClick={onBack}>
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                    ) : null}
+                    <h3 className="text-xl font-bold truncate">{currentTask.name}</h3>
+                </div>
                 <div className="flex items-center gap-1">
                     <TooltipProvider><Tooltip><TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" onClick={() => onEdit(currentTask)}><Edit3 className="h-4 w-4"/></Button>
@@ -512,10 +535,10 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
                                 {projectsInDomain.map(proj => (
                                     <DropdownMenuCheckboxItem
                                         key={proj.id}
-                                        checked={(currentTask.linkedProjectIds || []).includes(proj.id)}
+                                        checked={displayProjectIds.includes(proj.id)}
                                         onCheckedChange={() => linkProjectToTask(currentTask.id, proj.id)}
                                     >
-                                        {proj.name}
+                                        {proj.name}{primaryProjectId === proj.id ? ' (Primary)' : ''}
                                     </DropdownMenuCheckboxItem>
                                 ))}
                             </DropdownMenuContent>
@@ -661,6 +684,65 @@ const LibraryContent = React.forwardRef<HTMLDivElement, {
 });
 LibraryContent.displayName = 'LibraryContent';
 
+function ProjectTreeNode({
+  node,
+  allDefinitions,
+  getDeepWorkNodeType,
+  onSelect,
+  activeId,
+  depth = 0,
+}: {
+  node: ExerciseDefinition;
+  allDefinitions: ExerciseDefinition[];
+  getDeepWorkNodeType: (def: ExerciseDefinition) => string;
+  onSelect: (def: ExerciseDefinition) => void;
+  activeId?: string | null;
+  depth?: number;
+}) {
+  const children = (node.linkedDeepWorkIds || [])
+    .map((id) => allDefinitions.find((def) => def.id === id))
+    .filter((def): def is ExerciseDefinition => !!def);
+  const nodeType = getDeepWorkNodeType(node);
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => onSelect(node)}
+        className={cn(
+          "flex w-full items-center justify-between rounded-lg border border-border/60 bg-card/50 px-3 py-2 text-left transition-colors hover:bg-accent/40",
+          activeId === node.id && "border-primary/50 bg-primary/10",
+          depth > 0 && "ml-4"
+        )}
+      >
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            {depth === 0 ? <Flag className="h-4 w-4 text-amber-400" /> : <ChevronRightIcon className="h-4 w-4 text-muted-foreground" />}
+            <span className="truncate font-medium">{node.name}</span>
+          </div>
+          <div className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">{nodeType}</div>
+        </div>
+        {node.primaryProjectId ? <Badge variant="outline" className="ml-3 shrink-0">Primary</Badge> : null}
+      </button>
+      {children.length > 0 ? (
+        <div className="space-y-2">
+          {children.map((child) => (
+            <ProjectTreeNode
+              key={child.id}
+              node={child}
+              allDefinitions={allDefinitions}
+              getDeepWorkNodeType={getDeepWorkNodeType}
+              onSelect={onSelect}
+              activeId={activeId}
+              depth={depth + 1}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: boolean, onClose?: () => void }) {
   const { toast } = useToast();
   const { 
@@ -733,6 +815,7 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
   const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
   const [newFocusAreaType, setNewFocusAreaType] = useState<'deepwork' | 'upskill'>('deepwork');
   const [newFocusAreaData, setNewFocusAreaData] = useState({ name: '', description: '', hours: '', minutes: '', link: '' });
+  const [projectIntentionMicroSkillId, setProjectIntentionMicroSkillId] = useState<string>('');
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
@@ -851,9 +934,12 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
   };
   
   const handleOpenNewFocusAreaModal = (type: 'deepwork' | 'upskill') => {
-    if (!selectedMicroSkill) {
-        toast({ title: "Error", description: "Please select a micro-skill first.", variant: "destructive" });
+    if (!selectedMicroSkill && !(type === 'deepwork' && selectedProject)) {
+        toast({ title: "Error", description: "Select a micro-skill or project context first.", variant: "destructive" });
         return;
+    }
+    if (type === 'deepwork' && selectedProject && !selectedMicroSkill) {
+      setProjectIntentionMicroSkillId((prev) => prev || projectMicroSkills[0]?.id || '');
     }
     setNewFocusAreaType(type);
     setIsNewFocusAreaModalOpen(true);
@@ -877,6 +963,23 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
     if (!fallback) return null;
     return coreSkills.find((skill) => skill.name === fallback.coreSkillName) || null;
   }, [selectedMicroSkill, microSkillMap, coreSkills]);
+
+  const projectMicroSkills = useMemo(() => {
+    if (!selectedProject) return [] as MicroSkill[];
+    const domainCoreSkills = coreSkills.filter((skill) => skill.domainId === selectedProject.domainId);
+    return domainCoreSkills.flatMap((skill) => skill.skillAreas.flatMap((area) => area.microSkills));
+  }, [selectedProject, coreSkills]);
+
+  useEffect(() => {
+    if (!selectedProject) {
+      setProjectIntentionMicroSkillId('');
+      return;
+    }
+    setProjectIntentionMicroSkillId((prev) => {
+      if (prev && projectMicroSkills.some((skill) => skill.id === prev)) return prev;
+      return projectMicroSkills[0]?.id || '';
+    });
+  }, [selectedProject, projectMicroSkills]);
 
   const selectedMicroSkillLinkedPdfResource = useMemo(() => {
     if (!selectedMicroSkillCoreSkill?.linkedPdfResourceId) return null;
@@ -1216,11 +1319,44 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
             const newProjectIds = isLinked
                 ? currentProjectIds.filter(id => id !== projectId)
                 : [...currentProjectIds, projectId];
-            return { ...task, linkedProjectIds: newProjectIds };
+            const nodeType = isDeepWork ? getDeepWorkNodeType(task) : getUpskillNodeType(task);
+            const isProjectOwnedIntention = isDeepWork && nodeType === 'Intention';
+            let primaryProjectId = task.primaryProjectId || null;
+            if (isProjectOwnedIntention) {
+                if (!isLinked) {
+                    primaryProjectId = primaryProjectId || projectId;
+                } else if (primaryProjectId === projectId) {
+                    primaryProjectId = newProjectIds[0] || null;
+                }
+            }
+            return { ...task, linkedProjectIds: newProjectIds, primaryProjectId };
         }
         return task;
     }));
-  }, [deepWorkDefinitions, upskillDefinitions, setDeepWorkDefinitions, setUpskillDefinitions]);
+  }, [deepWorkDefinitions, setDeepWorkDefinitions, setUpskillDefinitions, getDeepWorkNodeType, getUpskillNodeType]);
+
+  const setPrimaryProjectForTask = useCallback((taskId: string, projectId: string) => {
+    setDeepWorkDefinitions((prev) =>
+      prev.map((task) => {
+        if (task.id !== taskId) return task;
+        const linkedProjectIds = Array.from(new Set([...(task.linkedProjectIds || []), projectId]));
+        return {
+          ...task,
+          linkedProjectIds,
+          primaryProjectId: projectId,
+        };
+      })
+    );
+    setLinkingTask((prev) =>
+      prev && prev.id === taskId
+        ? {
+            ...prev,
+            linkedProjectIds: Array.from(new Set([...(prev.linkedProjectIds || []), projectId])),
+            primaryProjectId: projectId,
+          }
+        : prev
+    );
+  }, [setDeepWorkDefinitions]);
 
   useEffect(() => {
     if (linkingTask) {
@@ -1242,6 +1378,39 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
     if (!domain) return [];
     return projects.filter(p => p.domainId === domain.id);
   }, [linkingTask, getDomainForCategory, projects]);
+
+  const selectedProjectIntentions = useMemo(() => {
+    if (!selectedProject) return [] as ExerciseDefinition[];
+    return deepWorkDefinitions.filter((def) => {
+      if (getDeepWorkNodeType(def) !== 'Intention') return false;
+      return (def.primaryProjectId || def.linkedProjectIds?.[0] || null) === selectedProject.id
+        || (def.linkedProjectIds || []).includes(selectedProject.id);
+    });
+  }, [selectedProject, deepWorkDefinitions, getDeepWorkNodeType]);
+
+  const selectedProjectDomain = useMemo(() => {
+    if (!selectedProject) return null;
+    return skillDomains.find((domain) => domain.id === selectedProject.domainId) || null;
+  }, [selectedProject, skillDomains]);
+
+  const selectedProjectActionCount = useMemo(() => {
+    const visited = new Set<string>();
+    const countChildren = (node: ExerciseDefinition): number => {
+      if (visited.has(node.id)) return 0;
+      visited.add(node.id);
+      const children = (node.linkedDeepWorkIds || [])
+        .map((id) => deepWorkDefinitions.find((def) => def.id === id))
+        .filter((def): def is ExerciseDefinition => !!def);
+      return children.length + children.reduce((sum, child) => sum + countChildren(child), 0);
+    };
+
+    return selectedProjectIntentions.reduce((sum, intention) => sum + countChildren(intention), 0);
+  }, [selectedProjectIntentions, deepWorkDefinitions]);
+
+  const selectedProjectPrimaryCount = useMemo(() => {
+    if (!selectedProject) return 0;
+    return selectedProjectIntentions.filter((intention) => intention.primaryProjectId === selectedProject.id).length;
+  }, [selectedProject, selectedProjectIntentions]);
   
   const calculateTotalEstimate = useCallback((def: ExerciseDefinition) => {
     let total = 0;
@@ -1346,7 +1515,13 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
   };
 
   const handleCreateFocusArea = () => {
-    if (!selectedMicroSkill || !newFocusAreaData.name.trim()) {
+    const targetMicroSkill =
+      selectedMicroSkill ||
+      (newFocusAreaType === 'deepwork' && selectedProject
+        ? projectMicroSkills.find((skill) => skill.id === projectIntentionMicroSkillId) || null
+        : null);
+
+    if (!targetMicroSkill || !newFocusAreaData.name.trim()) {
         toast({ title: "Error", description: "Name is required.", variant: "destructive" });
         return;
     }
@@ -1358,12 +1533,14 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
     const newDef: ExerciseDefinition = { 
         id: `def_${Date.now()}_${Math.random()}`, 
         name: newFocusAreaData.name.trim(), 
-        category: selectedMicroSkill.name as ExerciseCategory,
+        category: targetMicroSkill.name as ExerciseCategory,
         description: newFocusAreaData.description.trim(),
         estimatedDuration: totalMinutes > 0 ? totalMinutes : undefined,
         loggedDuration: 0,
         link: newFocusAreaData.link.trim(),
         iconUrl: getFaviconUrl(newFocusAreaData.link.trim()),
+        primaryProjectId: newFocusAreaType === 'deepwork' && selectedProject ? selectedProject.id : null,
+        linkedProjectIds: newFocusAreaType === 'deepwork' && selectedProject ? [selectedProject.id] : [],
     };
     
     if (newFocusAreaType === 'deepwork') {
@@ -1374,6 +1551,7 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
     
     setIsNewFocusAreaModalOpen(false);
     setNewFocusAreaData({ name: '', description: '', hours: '', minutes: '', link: '' });
+    setProjectIntentionMicroSkillId('');
     
     toast({ title: "Success", description: `Task "${newDef.name}" created.` });
   };
@@ -1700,6 +1878,8 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
           id: `def_${Date.now()}_${type}_${Math.random().toString(36).substring(2, 9)}`,
           name: 'New Task',
           category: parentDef.category,
+          primaryProjectId: type === 'deepwork' ? (parentDef.primaryProjectId || parentDef.linkedProjectIds?.[0] || null) : null,
+          linkedProjectIds: type === 'deepwork' ? (parentDef.linkedProjectIds || []) : (parentDef.linkedProjectIds || []),
       };
 
       if (type === 'deepwork') {
@@ -2055,54 +2235,59 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
   return (
     <DndContext sensors={sensors} onDragStart={(e) => setActiveId(e.active.id.toString())} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
         <div className={wrapperClass}>
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-            
+          <div className={cn("grid grid-cols-1 gap-8 items-start", selectedProject ? "lg:grid-cols-1" : "lg:grid-cols-4")}>
+             
+            {!selectedProject && (
             <aside className="lg:col-span-1 space-y-6 lg:sticky top-20">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2"><History />Recents</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {filteredRecentItems.length > 0 ? (
-                            <ul className="space-y-1">
-                                {filteredRecentItems.map(item => (
-                                    <li key={item.id}>
-                                        <Button
-                                            variant="ghost"
-                                            className="w-full justify-start h-auto py-2"
-                                            onClick={() => handleSelectRecentItem(item as (ExerciseDefinition | Project) & { type: 'deepwork' | 'upskill' | 'project' })}
-                                        >
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                {(item as any).type === 'deepwork' ? <Lightbulb className="h-4 w-4 text-amber-500" /> : (item as any).type === 'project' ? <Briefcase className="h-4 w-4 text-indigo-500" /> : <Flashlight className="h-4 w-4 text-cyan-500" />}
-                                                <span className="truncate" title={item.name}>{item.name}</span>
-                                            </div>
-                                        </Button>
-                                    </li>
-                                ))}
-                            </ul>
-                        ) : (
-                            <p className="text-sm text-muted-foreground text-center">No recent items.</p>
-                        )}
-                    </CardContent>
-                </Card>
+                {!selectedProject && (
+                  <Card>
+                      <CardHeader>
+                          <CardTitle className="flex items-center gap-2"><History />Recents</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                          {filteredRecentItems.length > 0 ? (
+                              <ul className="space-y-1">
+                                  {filteredRecentItems.map(item => (
+                                      <li key={item.id}>
+                                          <Button
+                                              variant="ghost"
+                                              className="w-full justify-start h-auto py-2"
+                                              onClick={() => handleSelectRecentItem(item as (ExerciseDefinition | Project) & { type: 'deepwork' | 'upskill' | 'project' })}
+                                          >
+                                              <div className="flex items-center gap-2 min-w-0">
+                                                  {(item as any).type === 'deepwork' ? <Lightbulb className="h-4 w-4 text-amber-500" /> : (item as any).type === 'project' ? <Briefcase className="h-4 w-4 text-indigo-500" /> : <Flashlight className="h-4 w-4 text-cyan-500" />}
+                                                  <span className="truncate" title={item.name}>{item.name}</span>
+                                              </div>
+                                          </Button>
+                                      </li>
+                                  ))}
+                              </ul>
+                          ) : (
+                              <p className="text-sm text-muted-foreground text-center">No recent items.</p>
+                          )}
+                      </CardContent>
+                  </Card>
+                )}
 
-                 <SkillLibrary
-                    selectedMicroSkill={selectedMicroSkill}
-                    onSelectMicroSkill={onSelectMicroSkill}
-                    onSelectFocusArea={handleSelectFocusArea}
-                    onOpenNewFocusArea={handleOpenNewFocusAreaModal}
-                    selectedProject={selectedProject}
-                    onSelectProject={handleProjectSelect}
-                    onDeleteFocusArea={handleDeleteFocusArea}
-                    onUpdateFocusAreaName={handleUpdateFocusAreaName}
-                    onOpenMindMap={onOpenMindMap}
-                    onEdit={setEditingFocusArea}
-                    addToRecents={addToRecents}
-                    onOpenLinkProjectModal={handleOpenLinkProjectModal}
-                    onToggleReadyForBranding={handleToggleReadyForBranding}
-                    libraryView={libraryView}
-                    setLibraryView={setLibraryView}
-                />
+                 {!selectedProject && (
+                   <SkillLibrary
+                      selectedMicroSkill={selectedMicroSkill}
+                      onSelectMicroSkill={onSelectMicroSkill}
+                      onSelectFocusArea={handleSelectFocusArea}
+                      onOpenNewFocusArea={handleOpenNewFocusAreaModal}
+                      selectedProject={selectedProject}
+                      onSelectProject={handleProjectSelect}
+                      onDeleteFocusArea={handleDeleteFocusArea}
+                      onUpdateFocusAreaName={handleUpdateFocusAreaName}
+                      onOpenMindMap={onOpenMindMap}
+                      onEdit={setEditingFocusArea}
+                      addToRecents={addToRecents}
+                      onOpenLinkProjectModal={handleOpenLinkProjectModal}
+                      onToggleReadyForBranding={handleToggleReadyForBranding}
+                      libraryView={libraryView}
+                      setLibraryView={setLibraryView}
+                  />
+                 )}
               {currentTask && (
                   <Card>
                       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -2125,8 +2310,9 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                   </Card>
               )}
             </aside>
+            )}
 
-            <section aria-labelledby="main-panel-heading" className="lg:col-span-3 space-y-6">
+            <section aria-labelledby="main-panel-heading" className={cn("space-y-6", selectedProject ? "lg:col-span-1" : "lg:col-span-3")}>
                 <Card>
                     {mainPanelHeader}
                     <CardContent className="p-4">
@@ -2189,10 +2375,16 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                                 handleCreateResource={() => setIsAddResourceModalOpen(true)}
                                 activeProjectIds={activeProjectIds}
                                 currentSlot={currentSlot}
+                                canGoBack={navigationStack.length > 0}
+                                onBack={() =>
+                                  setNavigationStack((prev) =>
+                                    prev.length > 1 ? prev.slice(0, -1) : []
+                                  )
+                                }
                             />
                         ) : (
                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                                {(selectedProject ? deepWorkDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject.id) && getDeepWorkNodeType(def) === 'Intention') : deepWorkDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => (
+                                {!selectedProject && deepWorkDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name).map(def => (
                                     <LinkedDeepWorkCard 
                                         key={def.id} 
                                         deepworkDef={def}
@@ -2219,7 +2411,7 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                                         currentSlot={currentSlot}
                                     />
                                 ))}
-                                {(selectedProject ? upskillDefinitions.filter(def => (def.linkedProjectIds || []).includes(selectedProject!.id) && getUpskillNodeType(def) === 'Curiosity') : upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name)).map(def => {
+                                {!selectedProject && upskillDefinitions.filter(def => !allChildIds.has(def.id) && def.category === selectedMicroSkill?.name).map(def => {
                                     const isComplete = permanentlyLoggedTaskIds.has(def.id);
                                     
                                     return (
@@ -2249,6 +2441,134 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                                         />
                                     );
                                 })}
+                                {selectedProject && (
+                                    <div className="col-span-1 md:col-span-2 xl:col-span-3">
+                                        <div className="space-y-6">
+                                            <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card/95 to-card p-6 shadow-[0_20px_80px_rgba(0,0,0,0.22)]">
+                                                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                                                    <div className="space-y-4">
+                                                        <Button
+                                                            variant="ghost"
+                                                            className="h-8 px-2 text-muted-foreground hover:text-foreground"
+                                                            onClick={() => handleProjectSelect(null)}
+                                                        >
+                                                            <ChevronLeft className="mr-2 h-4 w-4" />
+                                                            Back to Library
+                                                        </Button>
+                                                        <div className="space-y-2">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <Badge variant="outline" className="bg-background/60">
+                                                                    {selectedProjectDomain?.name || 'Project'}
+                                                                </Badge>
+                                                                <Badge variant="secondary" className="bg-primary/10 text-primary">
+                                                                    {selectedProjectIntentions.length} intention(s)
+                                                                </Badge>
+                                                            </div>
+                                                            <h2 className="text-3xl font-semibold tracking-tight">{selectedProject.name}</h2>
+                                                            <p className="max-w-2xl text-sm text-muted-foreground">
+                                                                Use this workspace for execution. Project intentions live here; independent learning stays in the skill tree.
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <Button size="sm" className="h-10 px-4 self-start" onClick={() => handleOpenNewFocusAreaModal('deepwork')}>
+                                                        <PlusCircle className="mr-2 h-4 w-4" />
+                                                        New Intention
+                                                    </Button>
+                                                </div>
+                                                <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                                    <div className="rounded-2xl border border-border/50 bg-background/60 p-4">
+                                                        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Primary Intentions</div>
+                                                        <div className="mt-2 text-3xl font-semibold">{selectedProjectPrimaryCount}</div>
+                                                    </div>
+                                                    <div className="rounded-2xl border border-border/50 bg-background/60 p-4">
+                                                        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Execution Nodes</div>
+                                                        <div className="mt-2 text-3xl font-semibold">{selectedProjectActionCount}</div>
+                                                    </div>
+                                                    <div className="rounded-2xl border border-border/50 bg-background/60 p-4">
+                                                        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Skill Contexts</div>
+                                                        <div className="mt-2 text-3xl font-semibold">{projectMicroSkills.length}</div>
+                                                    </div>
+                                                    <div className="rounded-2xl border border-border/50 bg-background/60 p-4">
+                                                        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Feature Tracks</div>
+                                                        <div className="mt-2 text-3xl font-semibold">{selectedProject.features.length}</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+                                                <Card className="h-fit rounded-3xl border-border/60 bg-card/75">
+                                                    <CardHeader className="pb-3">
+                                                        <CardTitle className="text-lg">Project Navigator</CardTitle>
+                                                        <CardDescription>
+                                                            The left rail carries context. The right rail is the execution tree.
+                                                        </CardDescription>
+                                                    </CardHeader>
+                                                    <CardContent className="space-y-4">
+                                                        <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
+                                                            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Domain</div>
+                                                            <div className="mt-2 font-medium">{selectedProjectDomain?.name || 'Unknown domain'}</div>
+                                                        </div>
+                                                        <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
+                                                            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Micro-skills</div>
+                                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                                {projectMicroSkills.length > 0 ? projectMicroSkills.map((skill) => (
+                                                                    <Badge key={skill.id} variant="secondary" className="bg-secondary/60">
+                                                                        {skill.name}
+                                                                    </Badge>
+                                                                )) : (
+                                                                    <span className="text-sm text-muted-foreground">No linked micro-skills yet.</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
+                                                            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Feature Tracks</div>
+                                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                                {selectedProject.features.length > 0 ? selectedProject.features.map((feature) => (
+                                                                    <Badge key={feature.id} variant="outline">
+                                                                        {feature.name}
+                                                                    </Badge>
+                                                                )) : (
+                                                                    <span className="text-sm text-muted-foreground">No features defined yet.</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+
+                                                <Card className="rounded-3xl border-primary/20 bg-card/75">
+                                                    <CardHeader className="flex flex-col gap-4 border-b border-border/50 pb-5 sm:flex-row sm:items-end sm:justify-between">
+                                                        <div>
+                                                            <CardTitle className="flex items-center gap-2 text-2xl">
+                                                                <Workflow className="h-5 w-5 text-primary" />
+                                                                Project Tree
+                                                            </CardTitle>
+                                                            <CardDescription className="mt-2 max-w-2xl">
+                                                                Select an intention to open its execution surface, actions, resources, and linked work.
+                                                            </CardDescription>
+                                                        </div>
+                                                        <Badge variant="outline">{selectedProjectIntentions.length} intention(s)</Badge>
+                                                    </CardHeader>
+                                                    <CardContent className="space-y-4 p-5">
+                                                        {selectedProjectIntentions.length > 0 ? selectedProjectIntentions.map((intention) => (
+                                                            <ProjectTreeNode
+                                                                key={intention.id}
+                                                                node={intention}
+                                                                allDefinitions={deepWorkDefinitions}
+                                                                getDeepWorkNodeType={getDeepWorkNodeType}
+                                                                onSelect={handleCardClick}
+                                                                activeId={currentTask?.id || null}
+                                                            />
+                                                        )) : (
+                                                            <div className="rounded-2xl border border-dashed border-border/60 px-6 py-12 text-center text-sm text-muted-foreground">
+                                                                No intentions are owned by this project yet. Create one directly from this project workspace.
+                                                            </div>
+                                                        )}
+                                                    </CardContent>
+                                                </Card>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                                 {selectedMicroSkill && (
                                     <Card
                                         onClick={() => handleOpenNewFocusAreaModal(libraryView)}
@@ -2304,10 +2624,27 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                 <DialogHeader>
                     <DialogTitle>Create New Task</DialogTitle>
                     <DialogDescription>
-                        This will create a new standalone task under the "{selectedMicroSkill?.name}" micro-skill.
+                        {selectedProject && !selectedMicroSkill && newFocusAreaType === 'deepwork'
+                          ? `Create a new intention under "${selectedProject.name}" and choose its micro-skill context.`
+                          : `This will create a new standalone task under the "${selectedMicroSkill?.name}" micro-skill.`}
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
+                    {selectedProject && !selectedMicroSkill && newFocusAreaType === 'deepwork' && (
+                       <div className="space-y-1">
+                          <Label htmlFor="project-intention-microskill">Micro-skill Context</Label>
+                          <Select value={projectIntentionMicroSkillId} onValueChange={setProjectIntentionMicroSkillId}>
+                            <SelectTrigger id="project-intention-microskill">
+                              <SelectValue placeholder="Select a micro-skill" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {projectMicroSkills.map((skill) => (
+                                <SelectItem key={skill.id} value={skill.id}>{skill.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                       </div>
+                    )}
                     <div className="space-y-1">
                         <Label htmlFor="new-subtopic-name">Task Name</Label>
                         <Input id="new-subtopic-name" value={newFocusAreaData.name} onChange={(e) => setNewFocusAreaData(d => ({ ...d, name: e.target.value }))} />
@@ -2449,19 +2786,37 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                 <DialogHeader>
                     <DialogTitle>Link "{linkingTask?.name}" to Projects</DialogTitle>
                     <DialogDescription>
-                        Select projects from the same domain to create strategic links.
+                        Select project memberships. For intentions, choose one primary owning project.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-4 space-y-2">
                     <ScrollArea className="h-60">
                         {projectsForLinking.length > 0 ? projectsForLinking.map(proj => (
-                            <div key={proj.id} className="flex items-center space-x-2">
-                                <Checkbox
-                                    id={`proj-check-${proj.id}`}
-                                    checked={(linkingTask?.linkedProjectIds || []).includes(proj.id)}
-                                    onCheckedChange={() => linkProjectToTask(linkingTask!.id, proj.id)}
-                                />
-                                <Label htmlFor={`proj-check-${proj.id}`} className="font-normal">{proj.name}</Label>
+                            <div key={proj.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/20 p-3">
+                                <div className="flex items-center space-x-3">
+                                    <Checkbox
+                                        id={`proj-check-${proj.id}`}
+                                        checked={Boolean((linkingTask?.linkedProjectIds || []).includes(proj.id) || linkingTask?.primaryProjectId === proj.id)}
+                                        onCheckedChange={() => linkProjectToTask(linkingTask!.id, proj.id)}
+                                    />
+                                    <div className="space-y-1">
+                                        <Label htmlFor={`proj-check-${proj.id}`} className="font-normal">{proj.name}</Label>
+                                        {linkingTask?.primaryProjectId === proj.id ? (
+                                            <div className="text-[11px] text-primary">Primary project owner</div>
+                                        ) : null}
+                                    </div>
+                                </div>
+                                {deepWorkDefinitions.some(d => d.id === linkingTask?.id) && getDeepWorkNodeType(linkingTask as ExerciseDefinition) === 'Intention' ? (
+                                    <Button
+                                        type="button"
+                                        variant={linkingTask?.primaryProjectId === proj.id ? "secondary" : "outline"}
+                                        size="sm"
+                                        onClick={() => setPrimaryProjectForTask(linkingTask!.id, proj.id)}
+                                    >
+                                        <Star className="mr-2 h-3.5 w-3.5" />
+                                        {linkingTask?.primaryProjectId === proj.id ? "Primary" : "Set Primary"}
+                                    </Button>
+                                ) : null}
                             </div>
                         )) : <p className="text-sm text-muted-foreground text-center">No projects in this domain.</p>}
                     </ScrollArea>

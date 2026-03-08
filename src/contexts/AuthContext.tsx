@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise, DrawingCanvasPopupState, PdfViewerPopupState, FormalizationItem, AbandonmentLog, RecurrenceRule } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise, DrawingCanvasPopupState, PdfViewerPopupState, FormalizationItem, AbandonmentLog, RecurrenceRule, KanbanBoard, KanbanList, KanbanCard, KanbanAttachment, KanbanComment, KanbanChecklistItem } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -218,6 +218,8 @@ interface AuthContextType {
   setProductizationPlans: React.Dispatch<React.SetStateAction<Record<string, ProductizationPlan>>>;
   offerizationPlans: Record<string, ProductizationPlan>;
   setOfferizationPlans: React.Dispatch<React.SetStateAction<Record<string, ProductizationPlan>>>;
+  kanbanBoards: KanbanBoard[];
+  setKanbanBoards: React.Dispatch<React.SetStateAction<KanbanBoard[]>>;
   addFeatureToRelease: (release: Release, topic: string, featureName: string, type: 'product' | 'service') => void;
   
   copyOffer: (topic: string, offerId: string) => void;
@@ -539,6 +541,273 @@ const normalizePersistedPayload = (payload: any): { main: any; ui: any } | null 
   return { main: payload, ui: {} };
 };
 
+const KANBAN_STAGE_MIGRATION: Array<{ key: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems'; title: string; color: string }> = [
+  { key: 'ideaItems', title: 'Idea', color: '#2563eb' },
+  { key: 'codeItems', title: 'Code', color: '#059669' },
+  { key: 'breakItems', title: 'Break', color: '#d97706' },
+  { key: 'fixItems', title: 'Fix', color: '#9333ea' },
+];
+
+const buildReleaseBoardId = (specializationId: string, releaseId: string) =>
+  `kanban_release_${specializationId}_${releaseId}`;
+
+const buildKanbanMigrationId = (prefix: string, boardId: string, suffix: string) =>
+  `${prefix}_${boardId}_${suffix}`;
+
+const normalizeKanbanBoards = (
+  rawBoards: unknown,
+  offerizationPlans: Record<string, ProductizationPlan>,
+  projects: Project[]
+): KanbanBoard[] => {
+  const now = new Date().toISOString();
+  const boards = Array.isArray(rawBoards) ? rawBoards : [];
+  const normalizedBoards: KanbanBoard[] = boards
+    .filter((board): board is Record<string, any> => !!board && typeof board === 'object' && typeof board.id === 'string')
+    .map((board, boardIndex) => {
+      const boardId = board.id;
+      const labels = Array.isArray(board.labels) ? board.labels : [];
+      const lists = Array.isArray(board.lists) ? board.lists : [];
+      const cards = Array.isArray(board.cards) ? board.cards : [];
+      const attachments = Array.isArray(board.attachments) ? board.attachments : [];
+      const comments = Array.isArray(board.comments) ? board.comments : [];
+      return {
+        id: boardId,
+        name: typeof board.name === 'string' && board.name.trim() ? board.name : `Board ${boardIndex + 1}`,
+        description: typeof board.description === 'string' ? board.description : '',
+        projectId: typeof board.projectId === 'string' ? board.projectId : null,
+        releaseId: typeof board.releaseId === 'string' ? board.releaseId : null,
+        specializationId: typeof board.specializationId === 'string' ? board.specializationId : null,
+        createdAt: typeof board.createdAt === 'string' ? board.createdAt : now,
+        updatedAt: typeof board.updatedAt === 'string' ? board.updatedAt : now,
+        listOrder: Array.isArray(board.listOrder) ? board.listOrder.filter((id: unknown) => typeof id === 'string') : [],
+        labels: labels
+          .filter((label): label is Record<string, any> => !!label && typeof label === 'object' && typeof label.id === 'string')
+          .map((label) => ({
+            id: label.id,
+            boardId,
+            title: typeof label.title === 'string' ? label.title : 'Label',
+            color: typeof label.color === 'string' ? label.color : '#64748b',
+          })),
+        lists: lists
+          .filter((list): list is Record<string, any> => !!list && typeof list === 'object' && typeof list.id === 'string')
+          .map((list, index) => ({
+            id: list.id,
+            boardId,
+            title: typeof list.title === 'string' ? list.title : `List ${index + 1}`,
+            color: typeof list.color === 'string' ? list.color : undefined,
+            cardOrder: Array.isArray(list.cardOrder) ? list.cardOrder.filter((id: unknown) => typeof id === 'string') : [],
+            position: typeof list.position === 'number' ? list.position : index,
+            archived: !!list.archived,
+          })),
+        cards: cards
+          .filter((card): card is Record<string, any> => !!card && typeof card === 'object' && typeof card.id === 'string')
+          .map((card, index) => ({
+            id: card.id,
+            boardId,
+            listId: typeof card.listId === 'string' ? card.listId : '',
+            title: typeof card.title === 'string' ? card.title : '',
+            description: typeof card.description === 'string' ? card.description : '',
+            labelIds: Array.isArray(card.labelIds) ? card.labelIds.filter((id: unknown) => typeof id === 'string') : [],
+            dueDate: typeof card.dueDate === 'string' ? card.dueDate : null,
+            checklist: Array.isArray(card.checklist)
+              ? card.checklist
+                  .filter((item): item is Record<string, any> => !!item && typeof item === 'object' && typeof item.id === 'string')
+                  .map((item) => ({
+                    id: item.id,
+                    text: typeof item.text === 'string' ? item.text : '',
+                    completed: !!item.completed,
+                    linkedIntentionId: typeof item.linkedIntentionId === 'string' ? item.linkedIntentionId : undefined,
+                  }))
+              : [],
+            attachmentIds: Array.isArray(card.attachmentIds) ? card.attachmentIds.filter((id: unknown) => typeof id === 'string') : [],
+            commentIds: Array.isArray(card.commentIds) ? card.commentIds.filter((id: unknown) => typeof id === 'string') : [],
+            linkedIntentionIds: Array.isArray(card.linkedIntentionIds)
+              ? card.linkedIntentionIds.filter((id: unknown) => typeof id === 'string')
+              : [],
+            workflowStageKey:
+              card.workflowStageKey === 'idea' ||
+              card.workflowStageKey === 'code' ||
+              card.workflowStageKey === 'break' ||
+              card.workflowStageKey === 'fix'
+                ? card.workflowStageKey
+                : null,
+            linkedProjectId: typeof card.linkedProjectId === 'string' ? card.linkedProjectId : null,
+            linkedReleaseId: typeof card.linkedReleaseId === 'string' ? card.linkedReleaseId : null,
+            archived: !!card.archived,
+            position: typeof card.position === 'number' ? card.position : index,
+            createdAt: typeof card.createdAt === 'string' ? card.createdAt : now,
+            updatedAt: typeof card.updatedAt === 'string' ? card.updatedAt : now,
+          })),
+        attachments: attachments
+          .filter((item): item is Record<string, any> => !!item && typeof item === 'object' && typeof item.id === 'string')
+          .map((item) => ({
+            id: item.id,
+            cardId: typeof item.cardId === 'string' ? item.cardId : '',
+            name: typeof item.name === 'string' ? item.name : 'Attachment',
+            url: typeof item.url === 'string' ? item.url : '',
+            type: typeof item.type === 'string' ? item.type : undefined,
+          })),
+        comments: comments
+          .filter((item): item is Record<string, any> => !!item && typeof item === 'object' && typeof item.id === 'string')
+          .map((item) => ({
+            id: item.id,
+            cardId: typeof item.cardId === 'string' ? item.cardId : '',
+            body: typeof item.body === 'string' ? item.body : '',
+            createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
+          })),
+        migratedFromReleaseWorkflow: !!board.migratedFromReleaseWorkflow,
+      };
+    });
+
+  const existingBoardIds = new Set(normalizedBoards.map((board) => board.id));
+
+  Object.entries(offerizationPlans || {}).forEach(([specializationId, plan]) => {
+    (plan?.releases || []).forEach((release) => {
+      const workflow = release.workflowStages;
+      if (!workflow) return;
+      const boardId = buildReleaseBoardId(specializationId, release.id);
+      if (existingBoardIds.has(boardId) || normalizedBoards.some((board) => board.releaseId === release.id)) return;
+
+      const nowStamp = new Date().toISOString();
+      const matchingProject = projects.find((project) => project.name === release.name) || null;
+      const labelsByTitle = new Map<string, string>();
+      const labels: KanbanBoard['labels'] = [];
+      const cards: KanbanCard[] = [];
+      const lists: KanbanList[] = [];
+      const listOrder: string[] = [];
+
+      const ensureLabelId = (title: string) => {
+        const trimmed = title.trim();
+        if (!trimmed) return null;
+        const existing = labelsByTitle.get(trimmed.toLowerCase());
+        if (existing) return existing;
+        const labelId = buildKanbanMigrationId('kanban_label', boardId, `${labels.length}`);
+        labelsByTitle.set(trimmed.toLowerCase(), labelId);
+        labels.push({
+          id: labelId,
+          boardId,
+          title: trimmed,
+          color: '#475569',
+        });
+        return labelId;
+      };
+
+      const pushCard = (
+        listId: string,
+        position: number,
+        workflowStageKey: 'idea' | 'code' | 'break' | 'fix',
+        rawCard: string | { text?: string; completed?: boolean; description?: string; labels?: string[]; dueDate?: string | null; checklist?: Array<{ id?: string; text?: string; completed?: boolean }>; linkedIntentionIds?: string[] }
+      ) => {
+        const normalized =
+          typeof rawCard === 'string'
+            ? { text: rawCard, completed: false, description: '', labels: [], dueDate: null, checklist: [], linkedIntentionIds: [] }
+            : {
+                text: rawCard.text || '',
+                completed: !!rawCard.completed,
+                description: rawCard.description || '',
+                labels: Array.isArray(rawCard.labels) ? rawCard.labels : [],
+                dueDate: typeof rawCard.dueDate === 'string' ? rawCard.dueDate : null,
+                checklist: Array.isArray(rawCard.checklist) ? rawCard.checklist : [],
+                linkedIntentionIds: Array.isArray(rawCard.linkedIntentionIds) ? rawCard.linkedIntentionIds.filter((id) => typeof id === 'string') : [],
+              };
+
+        const cardId = buildKanbanMigrationId('kanban_card', boardId, `${cards.length}`);
+        cards.push({
+          id: cardId,
+          boardId,
+          listId,
+          title: normalized.text,
+          description: normalized.description,
+          labelIds: normalized.labels.map(ensureLabelId).filter((id): id is string => !!id),
+          dueDate: normalized.dueDate,
+          checklist: normalized.checklist.map((item, itemIndex) => ({
+            id: item.id && item.id.trim() ? item.id : buildKanbanMigrationId('kanban_check', cardId, `${itemIndex}`),
+            text: item.text || '',
+            completed: !!item.completed,
+          })),
+          attachmentIds: [],
+          commentIds: [],
+          linkedIntentionIds: normalized.linkedIntentionIds,
+          workflowStageKey,
+          linkedProjectId: matchingProject?.id || null,
+          linkedReleaseId: release.id,
+          archived: false,
+          position,
+          createdAt: nowStamp,
+          updatedAt: nowStamp,
+        });
+      };
+
+      KANBAN_STAGE_MIGRATION.forEach((stage, stageIndex) => {
+        const listId = buildKanbanMigrationId('kanban_list', boardId, stage.key);
+        listOrder.push(listId);
+        const sourceCards = Array.isArray(workflow[stage.key]) ? workflow[stage.key] : [];
+        const openCards = sourceCards.filter((card) => !(typeof card === 'object' && card?.completed));
+        lists.push({
+          id: listId,
+          boardId,
+          title: stage.title,
+          color: stage.color,
+          cardOrder: [],
+          position: stageIndex,
+          archived: false,
+        });
+        openCards.forEach((card, cardIndex) => pushCard(listId, cardIndex, stage.key, card));
+      });
+
+      const doneListId = buildKanbanMigrationId('kanban_list', boardId, 'done');
+      listOrder.push(doneListId);
+      lists.push({
+        id: doneListId,
+        boardId,
+        title: 'Done',
+        color: '#0f766e',
+        cardOrder: [],
+        position: KANBAN_STAGE_MIGRATION.length,
+        archived: false,
+      });
+      KANBAN_STAGE_MIGRATION.forEach((stage) => {
+        const sourceCards = Array.isArray(workflow[stage.key]) ? workflow[stage.key] : [];
+        sourceCards
+          .filter((card) => typeof card === 'object' && !!card?.completed)
+          .forEach((card, cardIndex) => pushCard(doneListId, cardIndex, stage.key, card));
+      });
+
+      const cardsByListId = new Map<string, string[]>();
+      cards.forEach((card) => {
+        const order = cardsByListId.get(card.listId) || [];
+        order.push(card.id);
+        cardsByListId.set(card.listId, order);
+      });
+      const finalizedLists = lists.map((list) => ({
+        ...list,
+        cardOrder: cardsByListId.get(list.id) || [],
+      }));
+
+      normalizedBoards.push({
+        id: boardId,
+        name: release.name,
+        description: release.description || '',
+        projectId: matchingProject?.id || null,
+        releaseId: release.id,
+        specializationId,
+        createdAt: nowStamp,
+        updatedAt: nowStamp,
+        listOrder,
+        labels,
+        lists: finalizedLists,
+        cards,
+        attachments: [],
+        comments: [],
+        migratedFromReleaseWorkflow: true,
+      });
+      existingBoardIds.add(boardId);
+    });
+  });
+
+  return normalizedBoards;
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -599,6 +868,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     learningPerformanceDailyLogs: {},
     supabasePdfBucket: 'pdfs',
     localSttBaseUrl: '',
+    means: {
+      entries: [],
+    },
     ai: normalizeAiSettings(undefined, typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop)),
   });
   useEffect(() => {
@@ -641,6 +913,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [mindProgrammingPlanRotation, setMindProgrammingPlanRotation] = useState<boolean>(true);
   const [productizationPlans, setProductizationPlans] = useState<Record<string, ProductizationPlan>>({});
   const [offerizationPlans, setOfferizationPlans] = useState<Record<string, ProductizationPlan>>({});
+  const [kanbanBoards, setKanbanBoards] = useState<KanbanBoard[]>([]);
 
   // Resources State
   const [resources, setResources] = useState<Resource[]>([]);
@@ -1675,7 +1948,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan,
         schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs,
         workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
-        deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs,
+        deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, kanbanBoards, mindProgrammingDefinitions, allMindProgrammingLogs,
         resources, resourceFolders,
         canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
         purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
@@ -1700,7 +1973,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
   }, [
-    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, topPriorities, brainHacks, settings, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, selectedFormalizationSpecId, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pipState, spacedRepetitionData, dailyReviewLogs, abandonmentLogs
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, kanbanBoards, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, topPriorities, brainHacks, settings, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, selectedFormalizationSpecId, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pipState, spacedRepetitionData, dailyReviewLogs, abandonmentLogs
   ]);
 
   const stripLocalOnlySecretsFromPayload = useCallback((payload: any) => {
@@ -1860,6 +2133,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return value;
     };
 
+    const normalizeProjectOwnership = (definitions: any[], defaultNodeType: 'Intention' | 'Curiosity') => {
+      return (Array.isArray(definitions) ? definitions : []).map((def) => {
+        if (!def || typeof def !== 'object') return def;
+        const linkedProjectIds = Array.isArray(def.linkedProjectIds)
+          ? def.linkedProjectIds.filter((id: unknown) => typeof id === 'string' && id.trim().length > 0)
+          : [];
+        const nodeType = typeof def.nodeType === 'string' ? def.nodeType : defaultNodeType;
+        const primaryProjectId =
+          typeof def.primaryProjectId === 'string' && def.primaryProjectId.trim().length > 0
+            ? def.primaryProjectId
+            : nodeType === 'Intention' && linkedProjectIds.length > 0
+            ? linkedProjectIds[0]
+            : null;
+        return {
+          ...def,
+          linkedProjectIds,
+          primaryProjectId,
+        };
+      });
+    };
+
     const sanitizedMain = normalizeText(mainData || {});
     const sanitizedUi = normalizeText(uiData || {});
     setIsLoadingState(true);
@@ -1883,9 +2177,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setWorkoutPlanRotation(sanitizedMain.workoutPlanRotation === undefined ? true : sanitizedMain.workoutPlanRotation);
     setWorkoutPlans(sanitizedMain.workoutPlans || INITIAL_PLANS);
     setExerciseDefinitions(sanitizedMain.exerciseDefinitions || DEFAULT_EXERCISE_DEFINITIONS);
-    setUpskillDefinitions(sanitizedMain.upskillDefinitions || []);
+    setUpskillDefinitions(normalizeProjectOwnership(sanitizedMain.upskillDefinitions || [], 'Curiosity'));
     setTopicGoals(sanitizedMain.topicGoals || sanitizedMain.upskillTopicGoals || {});
-    setDeepWorkDefinitions(sanitizedMain.deepWorkDefinitions || []);
+    setDeepWorkDefinitions(normalizeProjectOwnership(sanitizedMain.deepWorkDefinitions || [], 'Intention'));
     setLeadGenDefinitions(sanitizedMain.leadGenDefinitions || LEAD_GEN_DEFINITIONS);
     setMindProgrammingDefinitions(sanitizedMain.mindProgrammingDefinitions || DEFAULT_MIND_PROGRAMMING_DEFINITIONS);
     setMindProgrammingCategories(sanitizedMain.mindProgrammingCategories || defaultMindsetCategories);
@@ -1894,6 +2188,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setMindProgrammingPlanRotation(sanitizedMain.mindProgrammingPlanRotation === undefined ? true : sanitizedMain.mindProgrammingPlanRotation);
     setProductizationPlans(sanitizedMain.productizationPlans || {});
     setOfferizationPlans(sanitizedMain.offerizationPlans || {});
+    setKanbanBoards(normalizeKanbanBoards(sanitizedMain.kanbanBoards || [], sanitizedMain.offerizationPlans || {}, sanitizedMain.projects || []));
     // Repair folder/resource relationships from imported payload.
     const rawFolders = Array.isArray(sanitizedMain.resourceFolders) ? sanitizedMain.resourceFolders : [];
     const rawResources = Array.isArray(sanitizedMain.resources) ? sanitizedMain.resources : [];
@@ -6849,7 +7144,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
     deepWorkDefinitions, setDeepWorkDefinitions, getDeepWorkNodeType, getUpskillNodeType, updateTaskDuration,
     leadGenDefinitions, setLeadGenDefinitions,
-    productizationPlans, setProductizationPlans, offerizationPlans, setOfferizationPlans,
+    productizationPlans, setProductizationPlans, offerizationPlans, setOfferizationPlans, kanbanBoards, setKanbanBoards,
     addFeatureToRelease,
     copyOffer,
     mindProgrammingDefinitions, setMindProgrammingDefinitions,

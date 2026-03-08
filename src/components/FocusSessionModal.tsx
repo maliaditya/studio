@@ -55,6 +55,9 @@ export function FocusSessionModal({
     expectedActivityDurations,
     offerizationPlans,
     setOfferizationPlans,
+    setDeepWorkDefinitions,
+    kanbanBoards,
+    setKanbanBoards,
     upskillDefinitions,
     deepWorkDefinitions,
     allUpskillLogs,
@@ -78,6 +81,8 @@ export function FocusSessionModal({
   const [selectedMicroSkillId, setSelectedMicroSkillId] = useState<string | null>(null);
   const [selectedParentTaskId, setSelectedParentTaskId] = useState<string>('new');
   const [createdTaskInfo, setCreatedTaskInfo] = useState<{ path: string[]; taskName: string } | null>(null);
+  const [markCurrentIntentionComplete, setMarkCurrentIntentionComplete] = useState(false);
+  const [completedBugIssueIds, setCompletedBugIssueIds] = useState<string[]>([]);
   
   const specializations = useMemo(() => {
     if (!selectedDomainId) return [];
@@ -238,6 +243,54 @@ export function FocusSessionModal({
       matchedMicroSkillReady: !!matchedMicro?.isReadyForRepetition,
     };
   }, [activity, allDeepWorkLogs, allUpskillLogs, coreSkills, deepWorkDefinitions, offerizationPlans, upskillDefinitions]);
+
+  const currentDeepWorkIntention = useMemo(() => {
+    if (!activity || activity.type !== 'deepwork') return null;
+
+    const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const stripInstanceDateSuffix = (value: string) => value.replace(/_(\d{4}-\d{2}-\d{2})$/, '');
+    const deepWorkInstanceMap = new Map(
+      allDeepWorkLogs.flatMap(log => (log.exercises || []).map(ex => [ex.id, ex.definitionId] as const))
+    );
+
+    const candidateIds = new Set<string>();
+    [activity.id, ...(activity.taskIds || [])].forEach((id) => {
+      if (!id) return;
+      candidateIds.add(id);
+      candidateIds.add(stripInstanceDateSuffix(id));
+      const mappedDefinitionId = deepWorkInstanceMap.get(id);
+      if (mappedDefinitionId) candidateIds.add(mappedDefinitionId);
+    });
+
+    let matchedDefinition =
+      deepWorkDefinitions.find((def) => candidateIds.has(def.id)) ||
+      deepWorkDefinitions.find((def) => normalizeText(def.name) === normalizeText(activity.details));
+
+    if (!matchedDefinition) return null;
+
+    let currentDefinition: ExerciseDefinition | undefined = matchedDefinition;
+    for (let depth = 0; depth < 5 && currentDefinition; depth += 1) {
+      if (getDeepWorkNodeType(currentDefinition) === 'Intention') {
+        return currentDefinition;
+      }
+      currentDefinition = deepWorkDefinitions.find((def) => (def.linkedDeepWorkIds || []).includes(currentDefinition!.id));
+    }
+
+    return matchedDefinition && getDeepWorkNodeType(matchedDefinition) === 'Intention' ? matchedDefinition : null;
+  }, [activity, allDeepWorkLogs, deepWorkDefinitions, getDeepWorkNodeType]);
+
+  const currentBugCard = useMemo(() => {
+    if (!activity || activity.type !== 'bugs') return null;
+    const bugCardId = activity.taskIds?.[0];
+    if (!bugCardId) return null;
+    for (const board of kanbanBoards) {
+      const card = (board.cards || []).find((entry) => entry.id === bugCardId && entry.cardKind === 'bug' && !entry.archived);
+      if (card) {
+        return { board, card };
+      }
+    }
+    return null;
+  }, [activity, kanbanBoards]);
 
   const deepworkStageContext = useMemo(() => {
     if (!activity || activity.type !== 'deepwork') {
@@ -460,12 +513,50 @@ export function FocusSessionModal({
     setCreatedTaskInfo(null);
     setItemsCompletedInput('');
     setHoursCompletedInput('');
+    setMarkCurrentIntentionComplete(false);
+    setCompletedBugIssueIds([]);
     const shouldPrefillPages =
       (activity?.type === 'upskill' || activity?.type === 'deepwork') &&
       learningContext.hasBooks &&
       autoPagesReadSuggestion > 0;
     setPagesCompletedInput(shouldPrefillPages ? String(autoPagesReadSuggestion) : '');
   }, [initialDuration, isOpen, activity, expectedActivityDurations, learningContext.hasBooks, autoPagesReadSuggestion]);
+
+  const syncKanbanChecklistForCompletedIntention = (intentionId: string) => {
+    setKanbanBoards((prevBoards) => {
+      let changed = false;
+      const nextBoards = prevBoards.map((board) => {
+        let boardChanged = false;
+        const nextCards = (board.cards || []).map((card) => {
+          let cardChanged = false;
+          const nextChecklist = (card.checklist || []).map((item) => {
+            if (item.linkedIntentionId !== intentionId || item.completed) return item;
+            cardChanged = true;
+            return { ...item, completed: true };
+          });
+          if (!cardChanged) return card;
+          boardChanged = true;
+          changed = true;
+          return { ...card, checklist: nextChecklist };
+        });
+        return boardChanged ? { ...board, cards: nextCards } : board;
+      });
+      return changed ? nextBoards : prevBoards;
+    });
+  };
+
+  const markIntentionComplete = () => {
+    if (!currentDeepWorkIntention || currentDeepWorkIntention.completed) return;
+
+    setDeepWorkDefinitions((prevDefs) =>
+      prevDefs.map((def) =>
+        def.id === currentDeepWorkIntention.id
+          ? { ...def, completed: true }
+          : def
+      )
+    );
+    syncKanbanChecklistForCompletedIntention(currentDeepWorkIntention.id);
+  };
 
   const handleDomainChange = (domainId: string) => {
     setSelectedDomainId(domainId);
@@ -547,6 +638,27 @@ export function FocusSessionModal({
   
   const handleLogDurationClick = () => {
     if (activity) {
+      if (markCurrentIntentionComplete && currentDeepWorkIntention && !currentDeepWorkIntention.completed) {
+        markIntentionComplete();
+      }
+      if (currentBugCard && completedBugIssueIds.length > 0) {
+        setKanbanBoards((prevBoards) =>
+          prevBoards.map((board) => {
+            if (board.id !== currentBugCard.board.id) return board;
+            const nextCards = (board.cards || []).map((card) => {
+              if (card.id !== currentBugCard.card.id) return card;
+              return {
+                ...card,
+                checklist: (card.checklist || []).map((item) =>
+                  completedBugIssueIds.includes(item.id) ? { ...item, completed: true } : item
+                ),
+                updatedAt: new Date().toISOString(),
+              };
+            });
+            return { ...board, cards: nextCards };
+          })
+        );
+      }
       const activityToLog: Activity = {
         ...activity,
         linkedActivityType: activity.type === 'pomodoro' ? (linkedActivityType as ActivityType) : undefined,
@@ -736,6 +848,70 @@ export function FocusSessionModal({
                 )}
               </div>
             )}
+            {activity.type === 'deepwork' && currentDeepWorkIntention && (
+              <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Current intention: <span className="text-foreground">{currentDeepWorkIntention.name}</span>
+                </p>
+                <div className="flex items-start gap-2 rounded border border-white/10 bg-background/40 px-2 py-2">
+                  <Checkbox
+                    id="focus-mark-intention-complete"
+                    checked={currentDeepWorkIntention.completed || markCurrentIntentionComplete}
+                    disabled={!!currentDeepWorkIntention.completed}
+                    onCheckedChange={(checked) => setMarkCurrentIntentionComplete(!!checked)}
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="focus-mark-intention-complete" className="text-sm leading-snug">
+                      Mark this intention complete when logging this session
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {currentDeepWorkIntention.completed
+                        ? 'This intention is already marked complete. Linked Kanban checklist items stay checked.'
+                        : 'If you complete it here, linked Kanban checklist items for this intention will also be checked.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {currentBugCard ? (
+              <div className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Bug issues for: <span className="text-foreground">{currentBugCard.card.title}</span>
+                </p>
+                <div className="space-y-2">
+                  {(currentBugCard.card.checklist || []).length > 0 ? (
+                    currentBugCard.card.checklist.map((item) => {
+                      const checked = item.completed || completedBugIssueIds.includes(item.id);
+                      return (
+                        <div key={item.id} className="flex items-start gap-2 rounded border border-white/10 bg-background/40 px-2 py-1.5">
+                          <Checkbox
+                            id={`focus-bug-issue-${item.id}`}
+                            checked={checked}
+                            onCheckedChange={(value) => {
+                              if (item.completed) return;
+                              setCompletedBugIssueIds((prev) =>
+                                value
+                                  ? [...prev, item.id]
+                                  : prev.filter((entry) => entry !== item.id)
+                              );
+                            }}
+                            disabled={item.completed}
+                          />
+                          <Label
+                            htmlFor={`focus-bug-issue-${item.id}`}
+                            className={`text-sm leading-snug ${checked ? 'line-through text-muted-foreground' : ''}`}
+                          >
+                            {item.text}
+                          </Label>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No issues added to this bug card yet.</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
             {(activity.type === 'upskill' || activity.type === 'deepwork') &&
               learningContext.microSkillName &&
               (learningContext.hasAudio || learningContext.hasBooks || learningContext.hasSkillTreePath) && (
