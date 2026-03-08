@@ -2,7 +2,7 @@ const { app, BrowserWindow, shell, dialog, ipcMain, safeStorage } = require("ele
 const path = require("path");
 const http = require("http");
 const net = require("net");
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 const fs = require("fs");
 
 const isDev = !app.isPackaged;
@@ -32,6 +32,8 @@ const KOKORO_FORCE_GPU = process.env.ELECTRON_KOKORO_FORCE_GPU === "1";
 const KOKORO_AUTO_START = process.env.ELECTRON_KOKORO_AUTO_START !== "0";
 const KOKORO_AUTO_START_BASE_URL = process.env.ELECTRON_KOKORO_BASE_URL || "http://127.0.0.1:8880";
 let kokoroAutoStartAttempted = false;
+let kokoroManagedByApp = false;
+let kokoroWarmingStartedAt = 0;
 
 const STT_AUTO_START = process.env.ELECTRON_STT_AUTO_START !== "0";
 const STT_AUTO_START_BASE_URL = process.env.LOCAL_STT_BASE_URL || process.env.STT_LOCAL_BASE_URL || "http://127.0.0.1:9890";
@@ -40,6 +42,8 @@ const STT_DOCKER_IMAGE = process.env.ELECTRON_STT_DOCKER_IMAGE || "onerahmet/ope
 const STT_DOCKER_CONTAINER_NAME = process.env.ELECTRON_STT_CONTAINER_NAME || "studio-local-stt";
 const STT_DOCKER_CONTAINER_PORT = Number(process.env.ELECTRON_STT_CONTAINER_PORT || 9000);
 const STT_MODEL = process.env.ELECTRON_STT_MODEL || "base.en";
+const STT_HEALTH_TIMEOUT_MS = Number(process.env.ELECTRON_STT_HEALTH_TIMEOUT_MS || 180000);
+const STT_INITIAL_HEALTH_TIMEOUT_MS = Number(process.env.ELECTRON_STT_INITIAL_HEALTH_TIMEOUT_MS || 8000);
 const STT_HOST = "127.0.0.1";
 const STT_MIN_PORT = 9300;
 const STT_MAX_PORT = 9700;
@@ -48,6 +52,9 @@ let sttServerProcess = null;
 let sttServerBaseUrl = "";
 let sttServerBackend = "";
 let sttLastError = "";
+let sttDockerManagedByApp = false;
+let sttWarmingStartedAt = 0;
+let shutdownCleanupStarted = false;
 
 function resolveAppIconPath() {
   for (const candidate of ICON_CANDIDATES) {
@@ -70,6 +77,161 @@ function logLine(message) {
     // ignore logging write errors
   }
   console.log(message);
+}
+
+async function getDockerStatus() {
+  const versionResult = await runCommand("docker", ["--version"], { timeoutMs: 10000 });
+  if (!versionResult.ok) {
+    return {
+      installed: false,
+      running: false,
+      healthy: false,
+      version: "",
+      error: "Docker CLI is not installed or not available in PATH.",
+    };
+  }
+  const infoResult = await runCommand("docker", ["info"], { timeoutMs: 15000 });
+  return {
+    installed: true,
+    running: infoResult.ok,
+    healthy: infoResult.ok,
+    version: (versionResult.stdout || versionResult.stderr || "").trim(),
+    error: infoResult.ok ? "" : (infoResult.stderr || infoResult.stdout || "Docker daemon is not reachable.").trim(),
+  };
+}
+
+function getDockerDesktopLaunchCandidates() {
+  if (process.platform === "win32") {
+    return [
+      path.join(process.env["ProgramFiles"] || "C:\\Program Files", "Docker", "Docker", "Docker Desktop.exe"),
+      path.join(process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)", "Docker", "Docker", "Docker Desktop.exe"),
+      path.join(process.env["LocalAppData"] || "", "Docker", "Docker Desktop.exe"),
+    ].filter(Boolean);
+  }
+  if (process.platform === "darwin") {
+    return ["/Applications/Docker.app"];
+  }
+  return ["docker-desktop", "docker"];
+}
+
+async function startDockerDesktop(options = {}) {
+  const candidates = getDockerDesktopLaunchCandidates();
+
+  if (process.platform === "win32") {
+    const launchPath = candidates.find((candidate) => {
+      try {
+        return candidate && fs.existsSync(candidate);
+      } catch {
+        return false;
+      }
+    });
+    if (!launchPath) {
+      return {
+        success: false,
+        started: false,
+        error: "Docker Desktop executable was not found. Install Docker Desktop first.",
+      };
+    }
+    const child = spawn(launchPath, [], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    child.unref();
+  } else if (process.platform === "darwin") {
+    const openResult = await runCommand("open", ["-a", "Docker"], { timeoutMs: 10000 });
+    if (!openResult.ok) {
+      return {
+        success: false,
+        started: false,
+        error: (openResult.stderr || openResult.stdout || "Failed to launch Docker.app").trim(),
+      };
+    }
+  } else {
+    const launchResult = await runCommand("sh", ["-lc", "docker-desktop >/dev/null 2>&1 &"], { timeoutMs: 5000 });
+    if (!launchResult.ok) {
+      return {
+        success: false,
+        started: false,
+        error: (launchResult.stderr || launchResult.stdout || "Failed to launch Docker Desktop.").trim(),
+      };
+    }
+  }
+
+  const waitMs = Math.max(10000, Number(options.waitMs || 60000));
+  const deadline = Date.now() + waitMs;
+  while (Date.now() < deadline) {
+    const status = await getDockerStatus();
+    if (status.running) {
+      return {
+        success: true,
+        started: true,
+        running: true,
+        ...status,
+      };
+    }
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+
+  const finalStatus = await getDockerStatus();
+  return {
+    success: finalStatus.running,
+    started: true,
+    running: finalStatus.running,
+    ...finalStatus,
+    error: finalStatus.running ? "" : (finalStatus.error || "Docker Desktop launch timed out."),
+  };
+}
+
+async function checkOllamaStatus(options = {}) {
+  const baseUrl = String(options.baseUrl || "http://127.0.0.1:11434").trim().replace(/\/+$/, "");
+  const configuredModel = String(options.model || "").trim();
+  const result = {
+    healthy: false,
+    running: false,
+    installed: false,
+    version: "",
+    error: "",
+    baseUrl,
+    models: [],
+    configuredModel,
+    hasConfiguredModel: false,
+  };
+
+  const versionResult = await runCommand("ollama", ["--version"], { timeoutMs: 10000 });
+  result.installed = versionResult.ok;
+  result.version = (versionResult.stdout || versionResult.stderr || "").trim();
+  if (!versionResult.ok) {
+    result.error = "Ollama CLI is not installed or not available in PATH.";
+    return result;
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
+  try {
+    const response = await fetch(`${baseUrl}/api/tags`, {
+      method: "GET",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      result.error = `Ollama server responded with ${response.status}.`;
+      return result;
+    }
+    const data = await response.json().catch(() => ({}));
+    result.models = Array.isArray(data?.models)
+      ? data.models.map((entry) => String(entry?.name || "").trim()).filter(Boolean)
+      : [];
+    result.running = true;
+    result.healthy = true;
+    result.hasConfiguredModel = configuredModel ? result.models.includes(configuredModel) : result.models.length > 0;
+    return result;
+  } catch (error) {
+    result.error = error instanceof Error ? error.message : "Failed to reach Ollama server.";
+    return result;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function waitForHttpReady(url, timeoutMs = 30000) {
@@ -160,6 +322,29 @@ function runCommand(command, args, options = {}) {
   });
 }
 
+function runCommandSync(command, args, options = {}) {
+  try {
+    const result = spawnSync(command, args, {
+      windowsHide: true,
+      encoding: "utf8",
+      ...options,
+    });
+    return {
+      ok: result.status === 0,
+      code: result.status ?? -1,
+      stdout: result.stdout || "",
+      stderr: result.stderr || "",
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      code: -1,
+      stdout: "",
+      stderr: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
 function normalizeLocalBaseUrl(value, fallback = "http://127.0.0.1:9890") {
   const raw = String(value || "").trim() || fallback;
   let parsed;
@@ -230,7 +415,7 @@ async function checkSttHealth(baseUrl, timeoutMs = 3000) {
   const base = String(baseUrl || "").replace(/\/+$/, "");
   if (!base) return false;
   const deadline = Date.now() + Math.max(1000, timeoutMs);
-  const endpoints = ["/health", "/", "/transcribe", "/asr"];
+  const endpoints = ["/health", "/openapi.json", "/", "/transcribe", "/asr"];
   while (Date.now() < deadline) {
     for (const endpoint of endpoints) {
       const controller = new AbortController();
@@ -241,7 +426,7 @@ async function checkSttHealth(baseUrl, timeoutMs = 3000) {
           signal: controller.signal,
         });
         if (response.ok) return true;
-        // Some STT servers expose /transcribe as POST-only and return 405 on GET when healthy.
+        // Some STT servers expose /transcribe or /asr as POST-only and return 400/405 on GET when healthy.
         if ((endpoint === "/transcribe" || endpoint === "/asr") && (response.status === 400 || response.status === 405)) {
           return true;
         }
@@ -257,6 +442,28 @@ async function checkSttHealth(baseUrl, timeoutMs = 3000) {
   return false;
 }
 
+async function waitForSttHealthyInBackground(baseUrl, timeoutMs = STT_HEALTH_TIMEOUT_MS) {
+  const healthy = await checkSttHealth(baseUrl, timeoutMs);
+  if (healthy) {
+    sttServerBaseUrl = String(baseUrl || "").trim() || sttServerBaseUrl;
+    if (!sttServerBackend) {
+      sttServerBackend = sttDockerManagedByApp ? "docker" : "existing";
+    }
+    sttLastError = "";
+    sttWarmingStartedAt = 0;
+    logLine(`[stt:auto] healthy at ${sttServerBaseUrl}`);
+    return true;
+  }
+  return false;
+}
+
+function computeWarmProgress(startedAt, expectedMs) {
+  if (!startedAt || !expectedMs) return 0;
+  const elapsed = Math.max(0, Date.now() - startedAt);
+  const ratio = elapsed / expectedMs;
+  return Math.max(6, Math.min(95, Math.round(ratio * 100)));
+}
+
 async function startManagedSttServer(options = {}) {
   const normalized = normalizeLocalBaseUrl(options.baseUrl || STT_AUTO_START_BASE_URL, STT_AUTO_START_BASE_URL);
   if (!normalized.ok) {
@@ -267,6 +474,7 @@ async function startManagedSttServer(options = {}) {
   if (preferredHealthy) {
     sttServerBaseUrl = normalized.baseUrl;
     sttServerBackend = "existing";
+    sttDockerManagedByApp = false;
     return {
       success: true,
       running: true,
@@ -289,6 +497,7 @@ async function startManagedSttServer(options = {}) {
     sttServerBaseUrl = selectedBaseUrl;
     sttServerBackend = "existing";
     sttLastError = "";
+    sttDockerManagedByApp = false;
     return {
       success: true,
       running: true,
@@ -325,11 +534,17 @@ async function startManagedSttServer(options = {}) {
       { timeoutMs: 120000 }
     );
     if (runResult.ok) {
-      const dockerHealthy = await checkSttHealth(selectedBaseUrl, Number(options.healthTimeoutMs || 40000));
+      sttWarmingStartedAt = Date.now();
+      const dockerHealthy = await checkSttHealth(
+        selectedBaseUrl,
+        Number(options.initialHealthTimeoutMs || STT_INITIAL_HEALTH_TIMEOUT_MS)
+      );
       if (dockerHealthy) {
         sttServerBaseUrl = selectedBaseUrl;
         sttServerBackend = "docker";
         sttLastError = "";
+        sttDockerManagedByApp = true;
+        sttWarmingStartedAt = 0;
         return {
           success: true,
           running: true,
@@ -340,8 +555,19 @@ async function startManagedSttServer(options = {}) {
           pid: null,
         };
       }
-      sttLastError = "STT Docker container started but health check timed out.";
-      await runCommand("docker", ["rm", "-f", STT_DOCKER_CONTAINER_NAME], { timeoutMs: 20000 });
+      sttServerBaseUrl = selectedBaseUrl;
+      sttServerBackend = "docker";
+      sttLastError = "STT Docker container is still warming up or downloading the model. Leave it running and refresh again in a minute.";
+      sttDockerManagedByApp = true;
+      return {
+        success: false,
+        running: true,
+        healthy: false,
+        managed: true,
+        baseUrl: selectedBaseUrl,
+        backend: "docker",
+        error: sttLastError,
+      };
     } else {
       sttLastError = (runResult.stderr || runResult.stdout || "docker run failed").trim();
     }
@@ -396,6 +622,7 @@ async function startManagedSttServer(options = {}) {
   sttServerProcess = child;
   sttServerBaseUrl = selectedBaseUrl;
   sttServerBackend = "command";
+  sttDockerManagedByApp = false;
   child.stdout?.on("data", (chunk) => {
     logLine(`[stt stdout] ${String(chunk).trim()}`);
   });
@@ -409,7 +636,7 @@ async function startManagedSttServer(options = {}) {
     }
   });
 
-  const becameHealthy = await checkSttHealth(selectedBaseUrl, Number(options.healthTimeoutMs || 30000));
+  const becameHealthy = await checkSttHealth(selectedBaseUrl, Number(options.healthTimeoutMs || STT_HEALTH_TIMEOUT_MS));
   if (!becameHealthy) {
     try {
       child.kill();
@@ -417,7 +644,7 @@ async function startManagedSttServer(options = {}) {
       // ignore
     }
     if (sttServerProcess === child) sttServerProcess = null;
-    sttLastError = "STT command process started but health check timed out.";
+    sttLastError = "STT command process is still warming up. Wait longer and retry.";
     return {
       success: false,
       running: false,
@@ -446,11 +673,30 @@ async function getSttStatus(baseUrlInput) {
     return { success: false, error: normalized.error };
   }
   const healthy = await checkSttHealth(normalized.baseUrl, 2200);
-  if (healthy) sttLastError = "";
+  let warming = false;
+  let warmingStartedAt = 0;
+  let warmingProgress = 0;
+  if (!healthy && sttServerBackend === "docker") {
+    const containerRunning = await runCommand("docker", ["ps", "--filter", `name=${STT_DOCKER_CONTAINER_NAME}`, "--format", "{{.Names}}"], {
+      timeoutMs: 8000,
+    });
+    warming = containerRunning.ok && String(containerRunning.stdout || "").split(/\r?\n/).some((line) => line.trim() === STT_DOCKER_CONTAINER_NAME);
+    if (warming) {
+      warmingStartedAt = sttWarmingStartedAt || 0;
+      warmingProgress = computeWarmProgress(warmingStartedAt, STT_HEALTH_TIMEOUT_MS);
+    }
+  }
+  if (healthy) {
+    sttLastError = "";
+    sttWarmingStartedAt = 0;
+  }
   return {
     success: true,
     healthy,
-    running: healthy,
+    running: healthy || warming,
+    warming,
+    warmingStartedAt,
+    warmingProgress,
     managed: Boolean(sttServerProcess && !sttServerProcess.killed),
     pid: sttServerProcess?.pid || null,
     baseUrl: normalized.baseUrl,
@@ -458,6 +704,27 @@ async function getSttStatus(baseUrlInput) {
     error: healthy ? "" : sttLastError,
     startCommandConfigured: Boolean(String(STT_START_COMMAND || "").trim()),
     autoStartEnabled: STT_AUTO_START,
+  };
+}
+
+async function getDesktopEnvironmentStatus(options = {}) {
+  const docker = await getDockerStatus();
+  const ollama = await checkOllamaStatus({
+    baseUrl: options.ollamaBaseUrl,
+    model: options.ollamaModel,
+  });
+  const kokoro = await getKokoroStatus(options.kokoroBaseUrl || KOKORO_AUTO_START_BASE_URL);
+  const stt = await getSttStatus(options.sttBaseUrl || STT_AUTO_START_BASE_URL);
+
+  return {
+    platform: process.platform,
+    isPackaged: app.isPackaged,
+    userDataPath: app.getPath("userData"),
+    logFilePath,
+    docker,
+    ollama,
+    kokoro,
+    stt,
   };
 }
 
@@ -478,10 +745,16 @@ async function autoStartSttInBackground() {
     const started = await startManagedSttServer({
       baseUrl: STT_AUTO_START_BASE_URL,
       startCommand: STT_START_COMMAND,
-      healthTimeoutMs: 35000,
+      healthTimeoutMs: STT_HEALTH_TIMEOUT_MS,
+      initialHealthTimeoutMs: STT_INITIAL_HEALTH_TIMEOUT_MS,
     });
     if (started.success) {
       logLine(`[stt:auto] started successfully at ${started.baseUrl}`);
+      return;
+    }
+    if (started.running && started.baseUrl) {
+      logLine(`[stt:auto] container running, continuing background warm-up check at ${started.baseUrl}`);
+      void waitForSttHealthyInBackground(String(started.baseUrl), STT_HEALTH_TIMEOUT_MS);
       return;
     }
     sttLastError = String(started.error || "");
@@ -585,6 +858,54 @@ async function checkKokoroHealth(baseUrl, timeoutMs = 5000) {
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
   return false;
+}
+
+async function getKokoroStatus(baseUrlInput) {
+  const requestedBaseUrl = String(baseUrlInput || "").trim() || "http://127.0.0.1:8880";
+  let parsed;
+  try {
+    parsed = new URL(requestedBaseUrl);
+  } catch {
+    return { success: false, error: "Invalid Kokoro base URL." };
+  }
+  const targetPort = Number(parsed.port || (parsed.protocol === "https:" ? 443 : 80));
+  if (!Number.isInteger(targetPort) || targetPort <= 0 || targetPort > 65535) {
+    return { success: false, error: "Invalid Kokoro port." };
+  }
+  const normalizedBaseUrl = `${parsed.protocol}//${parsed.hostname}:${targetPort}`;
+  const healthy = await checkKokoroHealth(normalizedBaseUrl, 3000);
+
+  const dockerVersion = await runCommand("docker", ["--version"], { timeoutMs: 10000 });
+  if (!dockerVersion.ok) {
+    return {
+      success: true,
+      healthy,
+      running: false,
+      mode: healthy ? "existing" : null,
+      image: "",
+      baseUrl: normalizedBaseUrl,
+    };
+  }
+
+  const inspected = await inspectKokoroContainer();
+  const mode = inspected.mode || (healthy ? "existing" : null);
+  const warming = Boolean(inspected.running && !healthy);
+  if (healthy) {
+    kokoroWarmingStartedAt = 0;
+  }
+
+  return {
+    success: true,
+    healthy,
+    running: inspected.running,
+    warming,
+    warmingStartedAt: warming ? kokoroWarmingStartedAt || 0 : 0,
+    warmingProgress: warming ? computeWarmProgress(kokoroWarmingStartedAt || 0, 45000) : 0,
+    mode,
+    image: inspected.image,
+    status: inspected.status,
+    baseUrl: normalizedBaseUrl,
+  };
 }
 
 async function detectKokoroGpuSupport() {
@@ -730,13 +1051,16 @@ async function autoStartKokoroInBackground() {
         continue;
       }
 
+      kokoroWarmingStartedAt = Date.now();
       const becameHealthy = await checkKokoroHealth(normalizedBaseUrl, Number(candidate.healthTimeoutMs || 45000));
       if (becameHealthy) {
+        kokoroWarmingStartedAt = 0;
         logLine(`[kokoro:auto] started successfully (${candidate.mode}) at ${normalizedBaseUrl}`);
         return;
       }
 
       logLine(`[kokoro:auto] health check timeout (${candidate.mode})`);
+      kokoroWarmingStartedAt = 0;
       await runCommand("docker", ["rm", "-f", KOKORO_CONTAINER_NAME], { timeoutMs: 20000 });
     }
 
@@ -882,6 +1206,8 @@ function registerSecureAuthIpc() {
       const alreadyHealthy = await checkKokoroHealth(normalizedBaseUrl, 4500);
       if (alreadyHealthy) {
         const existing = await inspectKokoroContainer();
+        kokoroManagedByApp = false;
+        kokoroWarmingStartedAt = 0;
         return {
           success: true,
           baseUrl: normalizedBaseUrl,
@@ -970,17 +1296,22 @@ function registerSecureAuthIpc() {
 
         if (!runResult.ok) {
           failures.push(`${candidate.mode}: ${(runResult.stderr || runResult.stdout || "unknown docker error").trim()}`);
+          kokoroWarmingStartedAt = 0;
           await runCommand("docker", ["rm", "-f", KOKORO_CONTAINER_NAME], { timeoutMs: 30000 });
           continue;
         }
 
+        kokoroWarmingStartedAt = Date.now();
         const becameHealthy = await checkKokoroHealth(normalizedBaseUrl, Number(candidate.healthTimeoutMs || 45000));
         if (!becameHealthy) {
           failures.push(`${candidate.mode}: container started but /health did not become ready in time`);
+          kokoroWarmingStartedAt = 0;
           await runCommand("docker", ["rm", "-f", KOKORO_CONTAINER_NAME], { timeoutMs: 30000 });
           continue;
         }
 
+        kokoroManagedByApp = true;
+        kokoroWarmingStartedAt = 0;
         return {
           success: true,
           baseUrl: normalizedBaseUrl,
@@ -1009,44 +1340,7 @@ function registerSecureAuthIpc() {
 
   ipcMain.handle("kokoro:status", async (_event, payload) => {
     try {
-      const requestedBaseUrl = String(payload?.baseUrl || "").trim() || "http://127.0.0.1:8880";
-      let parsed;
-      try {
-        parsed = new URL(requestedBaseUrl);
-      } catch {
-        return { success: false, error: "Invalid Kokoro base URL." };
-      }
-      const targetPort = Number(parsed.port || (parsed.protocol === "https:" ? 443 : 80));
-      if (!Number.isInteger(targetPort) || targetPort <= 0 || targetPort > 65535) {
-        return { success: false, error: "Invalid Kokoro port." };
-      }
-      const normalizedBaseUrl = `${parsed.protocol}//${parsed.hostname}:${targetPort}`;
-      const healthy = await checkKokoroHealth(normalizedBaseUrl, 3000);
-
-      const dockerVersion = await runCommand("docker", ["--version"], { timeoutMs: 10000 });
-      if (!dockerVersion.ok) {
-        return {
-          success: true,
-          healthy,
-          running: false,
-          mode: healthy ? "existing" : null,
-          image: "",
-          baseUrl: normalizedBaseUrl,
-        };
-      }
-
-      const inspected = await inspectKokoroContainer();
-      const mode = inspected.mode || (healthy ? "existing" : null);
-
-      return {
-        success: true,
-        healthy,
-        running: inspected.running,
-        mode,
-        image: inspected.image,
-        status: inspected.status,
-        baseUrl: normalizedBaseUrl,
-      };
+      return await getKokoroStatus(String(payload?.baseUrl || "").trim() || KOKORO_AUTO_START_BASE_URL);
     } catch (error) {
       return {
         success: false,
@@ -1060,22 +1354,28 @@ function registerSecureAuthIpc() {
       const startResult = await startManagedSttServer({
         baseUrl: String(payload?.baseUrl || "").trim() || STT_AUTO_START_BASE_URL,
         startCommand: String(payload?.startCommand || "").trim() || STT_START_COMMAND,
-        healthTimeoutMs: 35000,
+        healthTimeoutMs: STT_HEALTH_TIMEOUT_MS,
+        initialHealthTimeoutMs: STT_INITIAL_HEALTH_TIMEOUT_MS,
       });
-      if (!startResult.success) {
+      if (!startResult.success && !startResult.running) {
         return {
           success: false,
           error: startResult.error || "Failed to start local STT server.",
           baseUrl: startResult.baseUrl || STT_AUTO_START_BASE_URL,
         };
       }
+      if (!startResult.success && startResult.running) {
+        void waitForSttHealthyInBackground(String(startResult.baseUrl || STT_AUTO_START_BASE_URL), STT_HEALTH_TIMEOUT_MS);
+      }
       return {
         success: true,
         running: true,
-        healthy: true,
+        healthy: Boolean(startResult.healthy),
+        warming: !startResult.healthy,
         managed: Boolean(startResult.managed),
         pid: startResult.pid || null,
         baseUrl: String(startResult.baseUrl || STT_AUTO_START_BASE_URL),
+        error: startResult.healthy ? "" : String(startResult.error || ""),
       };
     } catch (error) {
       return {
@@ -1088,6 +1388,49 @@ function registerSecureAuthIpc() {
   ipcMain.handle("stt:status", async (_event, payload) => {
     try {
       return await getSttStatus(String(payload?.baseUrl || "").trim() || STT_AUTO_START_BASE_URL);
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
+  ipcMain.handle("desktop:environment-status", async (_event, payload) => {
+    try {
+      return await getDesktopEnvironmentStatus(payload || {});
+    } catch (error) {
+      return {
+        platform: process.platform,
+        isPackaged: app.isPackaged,
+        userDataPath: app.getPath("userData"),
+        logFilePath,
+        docker: { healthy: false, installed: false, running: false, error: error instanceof Error ? error.message : String(error) },
+        ollama: { healthy: false, installed: false, running: false, error: error instanceof Error ? error.message : String(error), models: [] },
+        kokoro: { healthy: false, running: false, error: error instanceof Error ? error.message : String(error) },
+        stt: { healthy: false, running: false, error: error instanceof Error ? error.message : String(error) },
+      };
+    }
+  });
+
+  ipcMain.handle("desktop:start-docker", async (_event, payload) => {
+    try {
+      return await startDockerDesktop(payload || {});
+    } catch (error) {
+      return {
+        success: false,
+        started: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+
+  ipcMain.handle("desktop:open-path", async (_event, payload) => {
+    try {
+      const targetPath = String(payload?.path || "").trim();
+      if (!targetPath) return { success: false, error: "Path is required." };
+      const error = await shell.openPath(targetPath);
+      return { success: !error, error };
     } catch (error) {
       return {
         success: false,
@@ -1244,6 +1587,37 @@ async function createWindow() {
   }
 }
 
+function cleanupManagedServicesSync() {
+  if (shutdownCleanupStarted) return;
+  shutdownCleanupStarted = true;
+
+  if (localServerProcess && !localServerProcess.killed) {
+    try {
+      localServerProcess.kill();
+    } catch {
+      // ignore
+    }
+    localServerProcess = null;
+  }
+
+  if (sttServerProcess && !sttServerProcess.killed) {
+    try {
+      sttServerProcess.kill();
+    } catch {
+      // ignore
+    }
+    sttServerProcess = null;
+  }
+
+  runCommandSync("docker", ["rm", "-f", STT_DOCKER_CONTAINER_NAME], { timeout: 30000 });
+  sttDockerManagedByApp = false;
+  sttWarmingStartedAt = 0;
+
+  runCommandSync("docker", ["rm", "-f", KOKORO_CONTAINER_NAME], { timeout: 30000 });
+  kokoroManagedByApp = false;
+  kokoroWarmingStartedAt = 0;
+}
+
 app.whenReady().then(() => {
   app.setName(APP_DISPLAY_NAME);
   app.setAppUserModelId("com.studio.desktop");
@@ -1258,24 +1632,10 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
-  if (localServerProcess && !localServerProcess.killed) {
-    localServerProcess.kill();
-    localServerProcess = null;
-  }
-  if (sttServerProcess && !sttServerProcess.killed) {
-    sttServerProcess.kill();
-    sttServerProcess = null;
-  }
+  cleanupManagedServicesSync();
   if (process.platform !== "darwin") app.quit();
 });
 
 app.on("before-quit", () => {
-  if (localServerProcess && !localServerProcess.killed) {
-    localServerProcess.kill();
-    localServerProcess = null;
-  }
-  if (sttServerProcess && !sttServerProcess.killed) {
-    sttServerProcess.kill();
-    sttServerProcess = null;
-  }
+  cleanupManagedServicesSync();
 });

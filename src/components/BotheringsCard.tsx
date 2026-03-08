@@ -534,7 +534,7 @@ export function BotheringsCard() {
                         <LineChartIcon className="h-3.5 w-3.5" />
                       </button>
 
-                      {isAiEnabled && (hasEgoIdentification(b.text) || isMalformedBotheringText(b.text)) ? (
+                      {isDesktopRuntime && isAiEnabled && (hasEgoIdentification(b.text) || isMalformedBotheringText(b.text)) ? (
                         <button
                           type="button"
                           className="mt-0.5 text-muted-foreground hover:text-foreground"

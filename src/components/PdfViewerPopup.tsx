@@ -1963,7 +1963,7 @@ export default function PdfViewerPopup() {
     const hasTextHighlights = (annotations[pageNumber] || []).some(
         (annotation) => isTextHighlight(annotation) && (annotation.rects || []).length > 0
     );
-    const hasExplainableSelection = hasSelectedText && isAiEnabled;
+    const hasExplainableSelection = isDesktopRuntime && hasSelectedText && isAiEnabled;
     const explainContextText = activeExplainText || selectedText;
 
     return (
@@ -2255,7 +2255,7 @@ export default function PdfViewerPopup() {
                        )}
                     </ScrollArea>
                 </CardContent>
-                {showExplainPanel && isAiEnabled && (
+                {isDesktopRuntime && showExplainPanel && isAiEnabled && (
                     <div className="absolute inset-0 z-50 bg-zinc-950 flex flex-col text-zinc-100">
                         <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900">
                             <div className="text-base font-semibold flex items-center gap-2">

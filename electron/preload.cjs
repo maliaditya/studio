@@ -20,4 +20,9 @@ contextBridge.exposeInMainWorld("studioDesktop", {
     startServer: (payload) => ipcRenderer.invoke("stt:start-server", payload),
     status: (payload) => ipcRenderer.invoke("stt:status", payload),
   },
+  desktop: {
+    environmentStatus: (payload) => ipcRenderer.invoke("desktop:environment-status", payload),
+    startDocker: (payload) => ipcRenderer.invoke("desktop:start-docker", payload),
+    openPath: (payload) => ipcRenderer.invoke("desktop:open-path", payload),
+  },
 });

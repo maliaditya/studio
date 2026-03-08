@@ -38,6 +38,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Progress } from './ui/progress';
 import { normalizeAiSettings, DEFAULT_OPENAI_MODEL, DEFAULT_OLLAMA_MODEL, DEFAULT_PERPLEXITY_MODEL, DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai/config';
 import type { AiProvider } from '@/types/ai';
+import { DesktopReadinessPanel } from '@/components/DesktopReadinessDialog';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -1021,6 +1022,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pb-4">
                       <div className="space-y-4 pt-4 border-t">
+                        {isDesktopRuntime ? <DesktopReadinessPanel compact /> : null}
                         <div className="space-y-1">
                           <Label htmlFor="ai-provider">Provider</Label>
                           <Select

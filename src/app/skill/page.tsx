@@ -1769,7 +1769,7 @@ function SkillPageContent() {
                                           </SelectContent>
                                         </Select>
                                       </div>
-                                      {linkedPdfResource && isAiEnabled ? (
+                                      {isDesktopRuntime && linkedPdfResource && isAiEnabled ? (
                                         <Button
                                           variant="secondary"
                                           onClick={handleGenerateFromLinkedPdf}

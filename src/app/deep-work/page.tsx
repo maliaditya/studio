@@ -2260,7 +2260,7 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                                         </p>
                                     </Card>
                                 )}
-                                {selectedMicroSkill && !selectedProject && selectedMicroSkillCuriosityCount === 0 && isAiEnabled && (
+                                {isDesktopRuntime && selectedMicroSkill && !selectedProject && selectedMicroSkillCuriosityCount === 0 && isAiEnabled && (
                                     <Card
                                         onClick={() => {
                                             if (!isGeneratingCuriositiesFromLinkedPdf) {

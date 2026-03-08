@@ -10,6 +10,7 @@ import { MatrixBackground } from '@/components/MatrixBackground';
 import { DefaultBackground } from '@/components/DefaultBackground';
 import { ClothBackground } from '@/components/ClothBackground';
 import { FloatingVideoPlayer } from '@/components/FloatingVideoPlayer';
+import { DesktopReadinessDialog } from '@/components/DesktopReadinessDialog';
 import { DndContext } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { createPortal } from 'react-dom';
@@ -58,6 +59,68 @@ const PdfViewerPopup = dynamic(() => import('@/components/PdfViewerPopup'), {
 const Header = dynamic(() => import('@/components/Header').then((mod) => mod.Header), {
   ssr: false,
 });
+
+const CHUNK_RECOVERY_KEY = 'dock.dev.chunk-recovery.v1';
+
+function ChunkRecovery() {
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const shouldRecover = (value: unknown) => {
+      const text =
+        value instanceof Error
+          ? `${value.name} ${value.message}`
+          : typeof value === 'string'
+          ? value
+          : value && typeof value === 'object' && 'message' in value
+          ? String((value as { message?: unknown }).message || '')
+          : '';
+      return /ChunkLoadError|Loading chunk .* failed|Loading CSS chunk .* failed/i.test(text);
+    };
+
+    const reloadOnce = () => {
+      try {
+        const alreadyRecovered = sessionStorage.getItem(CHUNK_RECOVERY_KEY) === '1';
+        if (alreadyRecovered) return;
+        sessionStorage.setItem(CHUNK_RECOVERY_KEY, '1');
+      } catch {
+        // ignore session storage failures
+      }
+      window.location.reload();
+    };
+
+    const handleError = (event: ErrorEvent) => {
+      if (shouldRecover(event.error || event.message)) {
+        reloadOnce();
+      }
+    };
+
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      if (shouldRecover(event.reason)) {
+        reloadOnce();
+      }
+    };
+
+    const clearRecoveryFlag = () => {
+      try {
+        sessionStorage.removeItem(CHUNK_RECOVERY_KEY);
+      } catch {
+        // ignore session storage failures
+      }
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleRejection);
+    window.addEventListener('load', clearRecoveryFlag, { once: true });
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleRejection);
+      window.removeEventListener('load', clearRecoveryFlag);
+    };
+  }, []);
+
+  return null;
+}
 
 
 const slotEndHours: Record<string, number> = {
@@ -461,9 +524,11 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
 
       {pathname !== '/canvas' && (
         <>
+          <ChunkRecovery />
           <main>{children}</main>
           <Toaster />
           <BackgroundAudioPlayer />
+          <DesktopReadinessDialog />
           <FloatingVideoPlayer />
           <MindsetCategoriesCard />
           {(shouldRenderFloatingWidgets && settings.widgetVisibility.pistons) && <PistonsHead />}

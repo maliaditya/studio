@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, parseISO, addDays, subDays, addWeeks, subWeeks, addMonths, subMonths, startOfDay, isAfter, isBefore, getDay, differenceInMonths, differenceInDays } from 'date-fns';
-import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide, Check, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronDown, Repeat, AlertTriangle, Trash2 } from 'lucide-react';
+import { CalendarIcon, Clock, Filter, BrainCircuit, Coffee, Timer, Moon, Sun, Sunset, MoonStar, CloudSun, Sunrise, Briefcase, BarChart as BarChartIcon, PieChart as PieChartIcon, LineChart as LineChartLucide, Check, CheckCircle, XCircle, ChevronLeft, ChevronRight, ChevronDown, Repeat, AlertTriangle, Trash2, Sparkles, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import type { Activity, PauseEvent, ActivityType as ActivityTypeType, MindsetPoint, CoreDomainId } from '@/types/workout';
@@ -21,6 +21,10 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/
 import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart as RechartsPieChart, Tooltip, Line, LineChart as RechartsLineChart, CartesianGrid, Legend, Pie } from 'recharts';
 import { TimeAllocationChart } from '@/components/ProductivitySnapshot';
 import { ProductivityInsights } from '@/components/ProductivityInsights';
+import { getAiConfigFromSettings, normalizeAiSettings } from '@/lib/ai/config';
+import { useToast } from '@/hooks/use-toast';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface TimesheetPageContentProps {
   isModal?: boolean;
@@ -36,6 +40,72 @@ type ActivityFilter = "all" | "deepwork" | "upskill" | "deepwork_upskill";
 type ViewMode = "day" | "week" | "month";
 type TimeAllocationView = "bar" | "pie";
 type BatchFilter = "all" | "external" | "mismatch";
+
+type AiBreakdownItem = {
+    label: string;
+    hours: number;
+    completionRate?: number;
+    note?: string;
+    count?: number;
+    pending?: number;
+    totalHours?: number;
+    missedDays?: number;
+    sourceType?: string;
+    text?: string;
+    id?: string;
+};
+
+type BotheringsAiStructuredReport = {
+    summary: {
+        headline: string;
+        periodLabel: string;
+        bestSlot: string;
+        monthHours: number;
+        avgDayHours: number;
+        avgWeekHours: number;
+    };
+    productivity: {
+        monthCompleted: number;
+        monthScheduled: number;
+        completionRate: number;
+        activeDays: number;
+        rolling30DayHours: number;
+    };
+    timePatterns: {
+        slotBreakdown: Array<AiBreakdownItem>;
+        bestSlotReason: string;
+        heavyDays: Array<AiBreakdownItem>;
+        weeklyBreakdown: Array<AiBreakdownItem>;
+    };
+    workload: {
+        monthHours: number;
+        avgDayHours: number;
+        avgWeekHours: number;
+        rolling30AvgDayHours: number;
+        rolling30AvgActiveDayHours: number;
+        note: string;
+    };
+    botherings: {
+        topByTime: Array<AiBreakdownItem>;
+        topByPending: Array<AiBreakdownItem>;
+        sourceDistribution: Array<AiBreakdownItem>;
+        predictions: Array<{
+            id: string;
+            text: string;
+            sourceType: string;
+            severity: string;
+            prediction: string;
+        }>;
+        keyPattern: string;
+    };
+    suggestions: {
+        timeUse: string[];
+        botheringActions: string[];
+    };
+    nextActions: {
+        items: string[];
+    };
+};
 
 type HabitDashboardMonthControlsProps = {
     month: Date;
@@ -67,6 +137,8 @@ const formatMinutes = (minutes: number) => {
     if (hours > 0) return `${hours}h`;
     return `${mins}m`;
 };
+
+const formatHours = (hours: number) => `${hours.toFixed(1)}h`;
 
 const slotOrder: {name: string, icon: React.ReactNode}[] = [
   { name: 'Late Night', icon: <Moon className="h-5 w-5 text-indigo-400" /> },
@@ -387,6 +459,8 @@ export function TimesheetPageContent({
         microSkillMap,
         mindsetCards,
     } = useAuth();
+    const { toast } = useToast();
+    const isDesktopRuntime = typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop);
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<ViewMode>("month");
     const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
@@ -399,11 +473,18 @@ export function TimesheetPageContent({
     const [habitDashboardTab, setHabitDashboardTab] = useState<'daily' | 'botherings'>('botherings');
     const [botheringTypeTab, setBotheringTypeTab] = useState<'all' | 'external' | 'mismatch' | 'constraint'>('all');
     const [collapsedBotherings, setCollapsedBotherings] = useState<Record<string, boolean>>({});
+    const [isBotheringsAiDialogOpen, setIsBotheringsAiDialogOpen] = useState(false);
+    const [isGeneratingBotheringsAiReport, setIsGeneratingBotheringsAiReport] = useState(false);
+    const [botheringsAiReport, setBotheringsAiReport] = useState<BotheringsAiStructuredReport | null>(null);
+    const [botheringsAiError, setBotheringsAiError] = useState('');
+    const [botheringsAiMeta, setBotheringsAiMeta] = useState<{ provider?: string; model?: string; warning?: string } | null>(null);
     const dashboardOuterRef = useRef<HTMLDivElement>(null);
     const dashboardInnerRef = useRef<HTMLDivElement>(null);
     const [dashboardScale, setDashboardScale] = useState(1);
     const effectiveDashboardMonth = dashboardMonth ?? localDashboardMonth;
     const setEffectiveDashboardMonth = onDashboardMonthChange ?? setLocalDashboardMonth;
+    const aiConfig = useMemo(() => getAiConfigFromSettings(settings, isDesktopRuntime), [settings, isDesktopRuntime]);
+    const isAiEnabled = normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== 'none';
 
     const handlePrev = () => {
         if (viewMode === 'day') {
@@ -451,6 +532,65 @@ export function TimesheetPageContent({
         observer.observe(inner);
         return () => observer.disconnect();
     }, [effectiveDashboardMonth]);
+
+    useEffect(() => {
+        setBotheringsAiReport(null);
+        setBotheringsAiError('');
+        setBotheringsAiMeta(null);
+    }, [effectiveDashboardMonth, habitDashboardTab, botheringTypeTab, mindsetCards, schedule]);
+
+    const handleGenerateBotheringsAiReport = async (payload: Record<string, unknown>) => {
+        if (!isAiEnabled) {
+            toast({
+                title: 'AI not configured',
+                description: 'Choose a provider in Settings > AI Settings first.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        setIsBotheringsAiDialogOpen(true);
+        setIsGeneratingBotheringsAiReport(true);
+        setBotheringsAiError('');
+
+        try {
+            const response = await fetch('/api/ai/botherings-report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+                },
+                body: JSON.stringify({
+                    aiConfig,
+                    dashboard: payload,
+                }),
+            });
+
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(String(result?.details || result?.error || 'Failed to generate botherings report.'));
+            }
+
+            setBotheringsAiReport((result?.report || null) as BotheringsAiStructuredReport | null);
+            setBotheringsAiMeta({
+                provider: typeof result?.provider === 'string' ? result.provider : undefined,
+                model: typeof result?.model === 'string' ? result.model : undefined,
+                warning: typeof result?.warning === 'string' ? result.warning : undefined,
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to generate botherings report.';
+            setBotheringsAiReport(null);
+            setBotheringsAiMeta(null);
+            setBotheringsAiError(message);
+            toast({
+                title: 'AI report failed',
+                description: message,
+                variant: 'destructive',
+            });
+        } finally {
+            setIsGeneratingBotheringsAiReport(false);
+        }
+    };
 
     const timeData = useMemo(() => {
         const filterActivity = (activity: Activity): boolean => {
@@ -1893,6 +2033,211 @@ export function TimesheetPageContent({
             return { date: day, totalMinutes };
         });
         const maxBotheringsDayMinutes = Math.max(1, ...botheringsDayTotals.map(d => d.totalMinutes));
+        const botheringsReportPayload = (() => {
+            const visibleMonthSlotMap = new Map<string, { minutes: number; scheduled: number; completed: number }>();
+            slotOrder.forEach((slot) => visibleMonthSlotMap.set(slot.name, { minutes: 0, scheduled: 0, completed: 0 }));
+
+            daysInMonth.forEach((day) => {
+                const dateKey = format(day, 'yyyy-MM-dd');
+                const daySchedule = schedule[dateKey] || {};
+                slotOrder.forEach((slot) => {
+                    const bucket = visibleMonthSlotMap.get(slot.name)!;
+                    const activities = (daySchedule[slot.name] || []) as Activity[];
+                    activities.forEach((activity) => {
+                        if (!activity || activity.type === 'interrupt') return;
+                        bucket.scheduled += 1;
+                        if (activity.completed) bucket.completed += 1;
+                        bucket.minutes += getLoggedMinutes(
+                            activity,
+                            allDeepWorkLogs,
+                            allUpskillLogs,
+                            brandingLogs,
+                            allLeadGenLogs,
+                            allWorkoutLogs,
+                            allMindProgrammingLogs,
+                            dateKey,
+                            true
+                        );
+                    });
+                });
+            });
+
+            const rolling30Start = addDays(endOfMonth(effectiveDashboardMonth), -29);
+            const rolling30Days = eachDayOfInterval({ start: rolling30Start, end: endOfMonth(effectiveDashboardMonth) });
+            const rolling30DailyTotals = rolling30Days.map((day) => {
+                const dateKey = format(day, 'yyyy-MM-dd');
+                const daySchedule = schedule[dateKey] || {};
+                const activities = Object.values(daySchedule).flat() as Activity[];
+                const scheduled = activities.filter((activity) => activity && activity.type !== 'interrupt').length;
+                const completed = activities.filter((activity) => activity && activity.type !== 'interrupt' && activity.completed).length;
+                const totalMinutes = activities.reduce((sum, activity) => {
+                    if (!activity || activity.type === 'interrupt') return sum;
+                    return sum + getLoggedMinutes(
+                        activity,
+                        allDeepWorkLogs,
+                        allUpskillLogs,
+                        brandingLogs,
+                        allLeadGenLogs,
+                        allWorkoutLogs,
+                        allMindProgrammingLogs,
+                        dateKey,
+                        true
+                    );
+                }, 0);
+                return { dateKey, totalMinutes, scheduled, completed };
+            });
+
+            const visibleMonthTotalHours = Number((dayTotals.reduce((sum, day) => sum + day.totalMinutes, 0) / 60).toFixed(1));
+            const visibleMonthActiveDays = dayTotals.filter((day) => day.totalMinutes > 0).length;
+            const rolling30TotalHours = Number((rolling30DailyTotals.reduce((sum, day) => sum + day.totalMinutes, 0) / 60).toFixed(1));
+            const rolling30ActiveDays = rolling30DailyTotals.filter((day) => day.totalMinutes > 0).length;
+            const avgDayHours = Number((visibleMonthTotalHours / Math.max(1, daysInMonth.length)).toFixed(1));
+            const avgWeekHours = Number((visibleMonthTotalHours / Math.max(1, Math.ceil(daysInMonth.length / 7))).toFixed(1));
+            const rolling30AvgDayHours = Number((rolling30TotalHours / Math.max(1, rolling30Days.length)).toFixed(1));
+            const rolling30AvgActiveDayHours = Number((rolling30TotalHours / Math.max(1, rolling30ActiveDays)).toFixed(1));
+
+            const weekMap = new Map<string, number>();
+            dayTotals.forEach((day) => {
+                const weekLabel = `Week of ${format(startOfWeek(day.date, { weekStartsOn: 1 }), 'MMM d')}`;
+                weekMap.set(weekLabel, (weekMap.get(weekLabel) || 0) + day.totalMinutes);
+            });
+            const weeklyBreakdown = Array.from(weekMap.entries()).map(([label, totalMinutes]) => ({
+                label,
+                hours: Number((totalMinutes / 60).toFixed(1)),
+            }));
+
+            const sourceSummary = filteredBotherings.reduce<Record<string, { botherings: number; tasks: number; scheduled: number; completed: number; totalMinutes: number }>>((acc, bothering) => {
+                const key = bothering.sourceType;
+                if (!acc[key]) {
+                    acc[key] = { botherings: 0, tasks: 0, scheduled: 0, completed: 0, totalMinutes: 0 };
+                }
+                const bucket = acc[key];
+                bucket.botherings += 1;
+                bucket.tasks += bothering.tasks.length;
+                bucket.totalMinutes += botheringTotals.find((entry) => entry.id === bothering.id)?.totalMinutes || 0;
+                daysInMonth.forEach((day) => {
+                    const dateKey = format(day, 'yyyy-MM-dd');
+                    const activityMap = dayActivityMaps.get(dateKey) || new Map();
+                    bothering.tasks.forEach((task) => {
+                        if (!isTaskDueOnDate(task, dateKey)) return;
+                        bucket.scheduled += 1;
+                        if (isTaskCompletedOnDate(task, dateKey, activityMap)) bucket.completed += 1;
+                    });
+                });
+                return acc;
+            }, {});
+
+            const rankedBotherings = filteredBotherings
+                .map((bothering) => {
+                    const totalMinutes = botheringTotals.find((entry) => entry.id === bothering.id)?.totalMinutes || 0;
+                    let scheduled = 0;
+                    let completed = 0;
+                    let activeDays = 0;
+                    let missedDays = 0;
+
+                    daysInMonth.forEach((day) => {
+                        const dateKey = format(day, 'yyyy-MM-dd');
+                        const activityMap = dayActivityMaps.get(dateKey) || new Map();
+                        const dueTasks = bothering.tasks.filter((task) => isTaskDueOnDate(task, dateKey));
+                        if (dueTasks.length === 0) return;
+                        activeDays += 1;
+                        scheduled += dueTasks.length;
+                        const completedCount = dueTasks.filter((task) => isTaskCompletedOnDate(task, dateKey, activityMap)).length;
+                        completed += completedCount;
+                        if (completedCount < dueTasks.length) missedDays += 1;
+                    });
+
+                    const pending = Math.max(0, scheduled - completed);
+                    const completionRate = scheduled > 0 ? completed / scheduled : 0;
+                    const compositeScore =
+                        pending * 2 +
+                        missedDays * 1.5 +
+                        activeDays * 0.4 +
+                        Math.min(12, totalMinutes / 30);
+
+                    return {
+                        id: bothering.id,
+                        text: bothering.text,
+                        sourceType: bothering.sourceType,
+                        taskCount: bothering.tasks.length,
+                        totalHours: Number((totalMinutes / 60).toFixed(1)),
+                        scheduled,
+                        completed,
+                        pending,
+                        completionRate: Number((completionRate * 100).toFixed(0)),
+                        activeDays,
+                        missedDays,
+                        deadline: bothering.endDate || null,
+                        linkedTasks: bothering.tasks.slice(0, 6).map((task) => task.details),
+                        note: `${Math.max(0, scheduled - completed)} pending across ${activeDays} active days.`,
+                        score: Number(compositeScore.toFixed(2)),
+                    };
+                })
+                .sort((a, b) => b.score - a.score);
+
+            const topBotheringsByTime = [...rankedBotherings]
+                .sort((a, b) => b.totalHours - a.totalHours || b.pending - a.pending)
+                .slice(0, 5);
+
+            const topBotheringsByPending = [...rankedBotherings]
+                .sort((a, b) => b.pending - a.pending || b.missedDays - a.missedDays || b.totalHours - a.totalHours)
+                .slice(0, 5);
+
+            const slotBreakdown = slotOrder.map((slot) => {
+                const bucket = visibleMonthSlotMap.get(slot.name)!;
+                return {
+                    label: slot.name,
+                    hours: Number((bucket.minutes / 60).toFixed(1)),
+                    completionRate: bucket.scheduled > 0 ? Math.round((bucket.completed / bucket.scheduled) * 100) : 0,
+                    note: `${bucket.completed}/${bucket.scheduled} completed in ${slot.name}.`,
+                };
+            }).sort((a, b) => b.hours - a.hours);
+
+            const bestSlot = slotBreakdown[0] || {
+                label: 'No active slot',
+                hours: 0,
+                completionRate: 0,
+                note: 'No logged work found for the visible period.',
+            };
+
+            return {
+                month: format(effectiveDashboardMonth, 'MMMM yyyy'),
+                view: 'botherings-month-dashboard',
+                typeFilter: botheringTypeTab,
+                totals: {
+                    completed: overallCompleted,
+                    scheduled: overallTotal,
+                    percent: overallPercent,
+                    loggedHours: Number((botheringsDayTotals.reduce((sum, day) => sum + day.totalMinutes, 0) / 60).toFixed(1)),
+                    activeBotherings: filteredBotherings.length,
+                    activeDays: visibleMonthActiveDays,
+                },
+                productivity: {
+                    monthHours: visibleMonthTotalHours,
+                    avgDayHours,
+                    avgWeekHours,
+                    rolling30DayHours: rolling30TotalHours,
+                    rolling30AvgDayHours,
+                    rolling30AvgActiveDayHours,
+                    activeDays: visibleMonthActiveDays,
+                },
+                bestSlot,
+                slotBreakdown,
+                weeklyBreakdown,
+                sourceSummary,
+                topBotherings: rankedBotherings.slice(0, 12),
+                topBotheringsByTime,
+                topBotheringsByPending,
+                dailyLoad: dayTotals.map((day) => ({
+                    label: format(day.date, 'MMM d'),
+                    date: format(day.date, 'yyyy-MM-dd'),
+                    hours: Number((day.totalMinutes / 60).toFixed(1)),
+                    completed: dayBotheringCompletion.find((entry) => format(entry.date, 'yyyy-MM-dd') === format(day.date, 'yyyy-MM-dd'))?.completed || 0,
+                    scheduled: dayBotheringCompletion.find((entry) => format(entry.date, 'yyyy-MM-dd') === format(day.date, 'yyyy-MM-dd'))?.total || 0,
+                    note: `All work: ${Number((day.totalMinutes / 60).toFixed(1))}h. Botherings completed ${dayBotheringCompletion.find((entry) => format(entry.date, 'yyyy-MM-dd') === format(day.date, 'yyyy-MM-dd'))?.completed || 0}/${dayBotheringCompletion.find((entry) => format(entry.date, 'yyyy-MM-dd') === format(day.date, 'yyyy-MM-dd'))?.total || 0}.`,
+                })),
+            };
+        })();
 
         const groupTotals = orderedTypes.map(type => {
             const groupHabits = habitsByType[type] || [];
@@ -2253,6 +2598,28 @@ export function TimesheetPageContent({
                                                 {tab.label}
                                             </button>
                                         ))}
+                                        {isDesktopRuntime ? (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                className="ml-auto h-7 border-emerald-400/35 bg-emerald-500/5 text-emerald-100 hover:bg-emerald-500/10"
+                                                onClick={() => {
+                                                    setIsBotheringsAiDialogOpen(true);
+                                                    if (!botheringsAiReport && !isGeneratingBotheringsAiReport) {
+                                                        void handleGenerateBotheringsAiReport(botheringsReportPayload);
+                                                    }
+                                                }}
+                                                disabled={isGeneratingBotheringsAiReport || botheringsReportPayload.topBotherings.length === 0}
+                                            >
+                                                {isGeneratingBotheringsAiReport ? (
+                                                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                                ) : (
+                                                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                                                )}
+                                                AI Report
+                                            </Button>
+                                        ) : null}
                                     </div>
                                     {filteredBotherings.length === 0 && (
                                         <div className="text-center text-muted-foreground py-12 col-span-full">
@@ -2403,7 +2770,7 @@ export function TimesheetPageContent({
                 </div>
             </div>
         );
-    }, [effectiveDashboardMonth, schedule, collapsedHabitGroups, collapsedSpecializations, collapsedBotherings, upskillDefinitions, deepWorkDefinitions, microSkillMap, mindsetCards, habitDashboardTab, botheringTypeTab, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs]);
+    }, [effectiveDashboardMonth, schedule, collapsedHabitGroups, collapsedSpecializations, collapsedBotherings, upskillDefinitions, deepWorkDefinitions, microSkillMap, mindsetCards, habitDashboardTab, botheringTypeTab, allDeepWorkLogs, allUpskillLogs, brandingLogs, allLeadGenLogs, allWorkoutLogs, allMindProgrammingLogs, botheringsAiReport, isGeneratingBotheringsAiReport, handleGenerateBotheringsAiReport]);
 
     const timesheetBody = (
         <>
@@ -2522,6 +2889,316 @@ export function TimesheetPageContent({
                     allActivitiesData={allActivitiesData}
                 />
             )}
+            <Dialog open={isBotheringsAiDialogOpen} onOpenChange={setIsBotheringsAiDialogOpen}>
+                <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Sparkles className="h-4 w-4 text-emerald-300" />
+                            Botherings AI Report
+                        </DialogTitle>
+                        <DialogDescriptionComponent>
+                            Report and suggestions for the currently visible botherings month view.
+                            {botheringsAiMeta?.provider || botheringsAiMeta?.model
+                                ? ` ${botheringsAiMeta?.provider || 'AI'}${botheringsAiMeta?.model ? ` (${botheringsAiMeta.model})` : ''}.`
+                                : ''}
+                        </DialogDescriptionComponent>
+                    </DialogHeader>
+                    <div className="min-h-0 flex-1 overflow-hidden">
+                        <div className="h-full overflow-y-auto pr-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                            {isGeneratingBotheringsAiReport ? (
+                                <div className="flex min-h-[280px] items-center justify-center text-sm text-muted-foreground">
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    Building report from the current botherings evidence pack.
+                                </div>
+                            ) : botheringsAiError ? (
+                                <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+                                    {botheringsAiError}
+                                </div>
+                            ) : botheringsAiReport ? (
+                                <div className="space-y-5">
+                                    {botheringsAiMeta?.warning ? (
+                                        <div className="rounded-lg border border-amber-400/35 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+                                            {botheringsAiMeta.warning}
+                                        </div>
+                                    ) : null}
+
+                                    <Card className="border-emerald-400/20 bg-emerald-500/[0.04]">
+                                        <CardContent className="p-4 space-y-3">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <div className="text-sm font-semibold text-foreground">
+                                                        {botheringsAiReport.summary.headline}
+                                                    </div>
+                                                    <div className="mt-1 text-xs text-muted-foreground">
+                                                        {botheringsAiReport.summary.periodLabel}
+                                                    </div>
+                                                </div>
+                                                <div className="rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-200">
+                                                    Best slot: {botheringsAiReport.summary.bestSlot}
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+                                                {[
+                                                    { label: 'Best slot', value: botheringsAiReport.summary.bestSlot },
+                                                    { label: 'Avg/day', value: formatHours(botheringsAiReport.summary.avgDayHours) },
+                                                    { label: 'Avg/week', value: formatHours(botheringsAiReport.summary.avgWeekHours) },
+                                                    { label: 'Month hours', value: formatHours(botheringsAiReport.summary.monthHours) },
+                                                    { label: 'Completion', value: `${botheringsAiReport.productivity.completionRate}%` },
+                                                ].map((item) => (
+                                                    <div key={item.label} className="rounded-lg border border-white/10 bg-background/30 p-3">
+                                                        <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{item.label}</div>
+                                                        <div className="mt-1 text-lg font-semibold">{item.value}</div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+                                        <Card className="border-white/10">
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-base">Time Patterns</CardTitle>
+                                                <CardDescription>{botheringsAiReport.timePatterns.bestSlotReason}</CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="space-y-4">
+                                                <div className="space-y-3">
+                                                    {botheringsAiReport.timePatterns.slotBreakdown.map((slot) => {
+                                                        const maxHours = Math.max(1, ...botheringsAiReport.timePatterns.slotBreakdown.map((item) => item.hours));
+                                                        return (
+                                                            <div key={slot.label} className="space-y-1">
+                                                                <div className="flex items-center justify-between text-sm">
+                                                                    <span className="font-medium">{slot.label}</span>
+                                                                    <span className="text-muted-foreground">
+                                                                        {formatHours(slot.hours)}
+                                                                        {typeof slot.completionRate === 'number' ? ` • ${slot.completionRate}%` : ''}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="h-2 rounded-full bg-muted/30 overflow-hidden">
+                                                                    <div
+                                                                        className="h-full rounded-full bg-sky-400/80"
+                                                                        style={{ width: `${Math.min(100, (slot.hours / maxHours) * 100)}%` }}
+                                                                    />
+                                                                </div>
+                                                                {slot.note ? (
+                                                                    <div className="prose prose-invert max-w-none text-xs prose-p:my-0 prose-p:text-muted-foreground">
+                                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{slot.note}</ReactMarkdown>
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                                <Separator />
+                                                <div className="grid gap-3 md:grid-cols-2">
+                                                    <div className="space-y-2">
+                                                        <div className="text-sm font-semibold">Heaviest Days</div>
+                                                        {botheringsAiReport.timePatterns.heavyDays.map((day) => (
+                                                            <div key={day.label} className="rounded-lg border border-white/10 bg-background/20 p-3">
+                                                                <div className="flex items-center justify-between text-sm">
+                                                                    <span className="font-medium">{day.label}</span>
+                                                                    <span className="text-muted-foreground">{formatHours(day.hours)}</span>
+                                                                </div>
+                                                                {day.note ? (
+                                                                    <div className="mt-1 prose prose-invert max-w-none text-xs prose-p:my-0 prose-p:text-muted-foreground">
+                                                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{day.note}</ReactMarkdown>
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <div className="text-sm font-semibold">Weekly Totals</div>
+                                                        {botheringsAiReport.timePatterns.weeklyBreakdown.map((week) => (
+                                                            <div key={week.label} className="flex items-center justify-between rounded-lg border border-white/10 bg-background/20 px-3 py-2 text-sm">
+                                                                <span>{week.label}</span>
+                                                                <span className="font-medium text-muted-foreground">{formatHours(week.hours)}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+
+                                        <Card className="border-white/10">
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-base">Workload</CardTitle>
+                                                <CardDescription>{botheringsAiReport.workload.note}</CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="space-y-3">
+                                                {[
+                                                    ['Month hours', formatHours(botheringsAiReport.workload.monthHours)],
+                                                    ['Avg/day', formatHours(botheringsAiReport.workload.avgDayHours)],
+                                                    ['Avg/week', formatHours(botheringsAiReport.workload.avgWeekHours)],
+                                                    ['30d total', formatHours(botheringsAiReport.productivity.rolling30DayHours)],
+                                                    ['30d avg/day', formatHours(botheringsAiReport.workload.rolling30AvgDayHours)],
+                                                    ['30d avg active day', formatHours(botheringsAiReport.workload.rolling30AvgActiveDayHours)],
+                                                    ['Active days', String(botheringsAiReport.productivity.activeDays)],
+                                                    ['Scheduled vs done', `${botheringsAiReport.productivity.monthCompleted}/${botheringsAiReport.productivity.monthScheduled}`],
+                                                ].map(([label, value]) => (
+                                                    <div key={label} className="flex items-center justify-between rounded-lg border border-white/10 bg-background/20 px-3 py-2 text-sm">
+                                                        <span className="text-muted-foreground">{label}</span>
+                                                        <span className="font-medium">{value}</span>
+                                                    </div>
+                                                ))}
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+
+                                    <div className="grid gap-5 lg:grid-cols-2">
+                                        <Card className="border-white/10">
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-base">Top Botherings By Time</CardTitle>
+                                                <CardDescription>{botheringsAiReport.botherings.keyPattern}</CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="space-y-3">
+                                                {botheringsAiReport.botherings.topByTime.map((item) => (
+                                                    <div key={`${item.id}-${item.text}`} className="rounded-lg border border-white/10 bg-background/20 p-3">
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div>
+                                                                <div className="font-medium">{item.text}</div>
+                                                                <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                                                                    <span className="rounded-full border border-white/10 px-2 py-0.5">{item.sourceType}</span>
+                                                                    <span className="rounded-full border border-white/10 px-2 py-0.5">{formatHours(item.totalHours || 0)}</span>
+                                                                    <span className="rounded-full border border-white/10 px-2 py-0.5">{item.completionRate || 0}% completion</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-sm text-amber-200">{item.pending || 0} pending</div>
+                                                        </div>
+                                                        {item.note ? (
+                                                            <div className="mt-2 prose prose-invert max-w-none text-xs prose-p:my-0 prose-p:text-muted-foreground">
+                                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.note}</ReactMarkdown>
+                                                            </div>
+                                                        ) : null}
+                                                    </div>
+                                                ))}
+                                            </CardContent>
+                                        </Card>
+
+                                        <Card className="border-white/10">
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-base">Bothering Pressure</CardTitle>
+                                                <CardDescription>Pending load, missed-day pressure, and source distribution.</CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="space-y-4">
+                                                <div className="space-y-3">
+                                                    {botheringsAiReport.botherings.topByPending.map((item) => (
+                                                        <div key={`${item.id}-${item.text}-pending`} className="rounded-lg border border-white/10 bg-background/20 p-3">
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div>
+                                                                    <div className="font-medium">{item.text}</div>
+                                                                    <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                                                                        <span className="rounded-full border border-white/10 px-2 py-0.5">{item.sourceType}</span>
+                                                                        <span className="rounded-full border border-white/10 px-2 py-0.5">{formatHours(item.totalHours || 0)}</span>
+                                                                        <span className="rounded-full border border-white/10 px-2 py-0.5">{item.missedDays || 0} missed days</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-sm text-rose-200">{item.pending || 0} pending</div>
+                                                            </div>
+                                                            {item.note ? (
+                                                                <div className="mt-2 prose prose-invert max-w-none text-xs prose-p:my-0 prose-p:text-muted-foreground">
+                                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.note}</ReactMarkdown>
+                                                                </div>
+                                                            ) : null}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <Separator />
+                                                <div className="space-y-2">
+                                                    <div className="text-sm font-semibold">Source Split</div>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {botheringsAiReport.botherings.sourceDistribution.map((source) => (
+                                                            <div key={source.label} className="rounded-full border border-white/10 bg-background/20 px-3 py-1 text-xs text-muted-foreground">
+                                                                <span className="font-medium text-foreground">{source.label}</span> • {source.count || 0} botherings • {formatHours(source.hours || 0)} • {source.completionRate || 0}%
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <Separator />
+                                                <div className="space-y-2">
+                                                    <div className="text-sm font-semibold">Predictions</div>
+                                                    {botheringsAiReport.botherings.predictions.map((item) => (
+                                                        <div key={`${item.id}-${item.text}-prediction`} className="rounded-lg border border-white/10 bg-background/20 p-3">
+                                                            <div className="mb-1 flex items-center justify-between gap-2">
+                                                                <div className="font-medium">{item.text}</div>
+                                                                <div
+                                                                    className={cn(
+                                                                        "rounded-full px-2 py-0.5 text-[11px] border",
+                                                                        item.severity === 'high'
+                                                                            ? "border-rose-400/40 bg-rose-500/10 text-rose-200"
+                                                                            : item.severity === 'medium'
+                                                                            ? "border-amber-400/40 bg-amber-500/10 text-amber-200"
+                                                                            : "border-sky-400/40 bg-sky-500/10 text-sky-200"
+                                                                    )}
+                                                                >
+                                                                    {item.severity} risk
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-[11px] text-muted-foreground mb-2">{item.sourceType}</div>
+                                                            <div className="text-sm text-muted-foreground">{item.prediction}</div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+
+                                    <div className="grid gap-5 lg:grid-cols-2">
+                                        <Card className="border-white/10">
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-base">Suggestions</CardTitle>
+                                                <CardDescription>Use strong slots better and reduce bothering drag.</CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="grid gap-4 md:grid-cols-2">
+                                                <div>
+                                                    <div className="mb-2 text-sm font-semibold">Time Use</div>
+                                                    <div className="space-y-2">
+                                                        {botheringsAiReport.suggestions.timeUse.map((item, index) => (
+                                                            <div key={`time-use-${index}`} className="rounded-lg border border-white/10 bg-background/20 p-3 text-sm text-muted-foreground">
+                                                                {item}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <div className="mb-2 text-sm font-semibold">Bothering Actions</div>
+                                                    <div className="space-y-2">
+                                                        {botheringsAiReport.suggestions.botheringActions.map((item, index) => (
+                                                            <div key={`bothering-action-${index}`} className="rounded-lg border border-white/10 bg-background/20 p-3 text-sm text-muted-foreground">
+                                                                {item}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+
+                                        <Card className="border-white/10">
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-base">Next Actions</CardTitle>
+                                                <CardDescription>Direct actions for the next few days.</CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="space-y-2">
+                                                {botheringsAiReport.nextActions.items.map((item, index) => (
+                                                    <div key={`next-action-${index}`} className="flex items-start gap-3 rounded-lg border border-white/10 bg-background/20 p-3 text-sm">
+                                                        <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full border border-emerald-400/30 bg-emerald-500/10 text-[11px] font-semibold text-emerald-200">
+                                                            {index + 1}
+                                                        </div>
+                                                        <div className="text-muted-foreground">{item}</div>
+                                                    </div>
+                                                ))}
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex min-h-[280px] items-center justify-center text-sm text-muted-foreground">
+                                    No report generated yet.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

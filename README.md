@@ -1,192 +1,218 @@
 # DOCK
-![alt text](image.png)
-A full-stack personal execution system that connects daily scheduling, botherings/mindset, skill growth, deep work, resources, and strategic planning into one operating loop.
 
-## What This App Does
+![DOCK banner](image.png)
+
+DOCK is a daily operating system for thinking and execution. It connects planning, botherings, routines, deep work, resources, review, and AI into one operating loop.
+
+## Live App
+
+- Web: https://vdock.vercel.app
+- Domain: https://dockflow.life
+
+## What DOCK Does
 
 DOCK helps you move from intention to execution:
-1. Capture friction (`Botherings`, urges/resistances, rules, priorities).
-2. Link friction to routines and actionable tasks.
-3. Execute in time slots across your day.
-4. Log completion and learning output.
-5. Review weekly signals and rebalance routines.
-6. Feed strategy layers (productization/offerization) from actual execution data.
 
-## Live Web App
+1. Capture friction with `Botherings`, urges, resistances, rules, and priorities.
+2. Connect friction to routines, tasks, and time slots.
+3. Execute work inside your daily schedule.
+4. Reuse resources, notes, PDFs, and canvases while working.
+5. Review misses, progress, and weekly pressure patterns.
+6. Feed learning back into strategy, systems, and planning.
 
-- https://vdock.vercel.app
+## Core Product Areas
 
-## Core Product Flow
+- Daily planning and slot-based execution
+- Botherings and mindset loop
+- Skill growth and deep work tracking
+- Resource vault with folders, markdown, code, media, PDF, and canvas
+- Weekly review and rebalance
+- AI-assisted explanation, rewriting, retrieval, and voice workflows
+- Web runtime with Next.js and desktop runtime with Electron
 
-### 1) Daily Planning and Execution
-- Plan your day by time slots (`Late Night`, `Dawn`, `Morning`, `Afternoon`, `Evening`, `Night`).
-- Add activities/tasks directly in slots.
-- Track completion and focus-session progress.
-- Keep schedule history by date.
+## Desktop Requirements
 
-### 2) Botherings and Mindset Loop
-- Create `External`, `Mismatch`, and `Constraint` botherings.
-- Link botherings to routine tasks.
-- View only botherings relevant to current schedule logic.
-- Track bothering consistency and completion pressure.
-- Open bothering details inline from card actions.
+These are the practical requirements for the full local desktop experience.
 
-### 3) Skill + Deep Work Integration
-- Define upskill and deep work tasks.
-- Connect tasks to broader domains/specializations.
-- Log time and outcomes.
-- Reuse resources during execution.
+### Required for full local desktop stack
 
-### 4) Resource System
-- Organize resources in folders.
-- Support cards/links/code/markdown/media/PDF/paint canvas.
-- Open resources in popup workflows.
-- Use in-context notes and references while executing tasks.
+- Windows desktop runtime of DOCK
+- `Docker Desktop`
+- `Ollama`
+- At least one Ollama model installed
+- Microphone permission for STT
 
-### 5) Weekly Review and Rebalance
-- Analyze misses, completion rates, and slot pressure.
-- Generate guarded routine rebalance suggestions.
-- Apply suggestions with safety checks.
-- Record learning history from applied changes.
+### Required services and default local URLs
 
-### 6) Strategic Planning Layer
-- Map execution to higher-level planning.
-- Maintain productization/offerization structures.
-- Connect tactical output to long-term goals.
+- Kokoro local TTS: `http://127.0.0.1:8880`
+- Local STT server: `http://127.0.0.1:9890`
+- Ollama API: `http://127.0.0.1:11434`
 
-## Major Feature Areas
+### What each requirement is used for
 
-- Authentication and local session ownership.
-- Persistent user state and backup flow.
-- Advanced schedule + recurrence handling.
-- Mindset/botherings with task linking and filtering.
-- Deep work and upskill logging.
-- Resource vault with rich content types.
-- Weekly review analytics and guarded apply.
-- AI-assisted features (provider-configurable).
-- Desktop runtime (Electron) and web runtime (Next.js).
+- `Docker Desktop`
+  - runs Kokoro TTS container
+  - runs local STT container by default
+- `Ollama`
+  - powers local AI features when provider is set to `Ollama`
+- Ollama model
+  - required for local explanation and chat flows
+- Microphone permission
+  - required for local STT / voice input
 
-## AI System
+### Notes
 
-AI settings support:
-- Provider: `Ollama` or `OpenAI`
-- Model selection
-- Provider endpoint/API key configuration
+- Kokoro is desktop-only in the current local setup.
+- STT is Docker-first, but can also use a custom local command if configured.
+- Ollama is required only if you want local LLM usage. If you use `OpenAI`, you need a valid API key instead.
 
-AI currently powers:
-- PDF selection explanation flow
-- Routine rebalance enhancement flow
-- Bothering sentence rephrase helpers
-- Ask Shiv (curated + open modes) with local-first retrieval pipeline
+## Quick Start
 
-### Shiv V2 (Offline-First) Upgrades
-
-- Hybrid retrieval:
-  - BM25-style lexical retrieval
-  - Local semantic vector retrieval (hashed embeddings, in-memory vector cache)
-  - Local reranker stage for top candidates
-- Strict citation mode:
-  - App-data answers include `Sources: ...`
-  - Weak evidence paths clarify/refuse instead of hallucinating
-- Structured output contracts:
-  - Critical intents (`schedule`, `days remaining`, `weight`, `tasks`) are validated
-  - Auto-retry once on weak AI fallback output
-  - Safe repair fallback if still invalid
-- Observability:
-  - Route: `GET /api/ai/shiv-observability`
-  - Page: `/shiv-observability`
-  - Tracks mode/path/confidence/latency + voice budget (`stt`, `llm`, `tts`)
-  - Includes simple open-vs-curated recommendation signal
-- Golden-eval quality gate:
-  - `src/lib/shiv/__tests__/golden-eval.test.ts`
-  - Fails if score drops below threshold
-
-## Tech Stack
-
-- Next.js 14 + React 18 + TypeScript
-- Tailwind + Radix UI components
-- Electron wrapper for desktop runtime
-- Local/browser persistence + backup utilities
-- Optional cloud sync modules (GitHub/Vercel Blob/Supabase integrations present in app settings)
-
-## Local Development
+### Web development
 
 Install dependencies:
+
 ```bash
 npm install
 ```
 
-Run web app:
+Run the web app:
+
 ```bash
 npm run dev
 ```
 
-Run desktop app (Next + Electron together):
+### Desktop development
+
+Run desktop app with Next.js + Electron:
+
 ```bash
 npm run desktop:dev
 ```
 
-## Kokoro Desktop TTS Setup (Docker)
+## AI System
 
-Use this to enable PDF read-aloud with Kokoro voices in the desktop app.
+AI provider settings support:
 
-### 1) Prerequisites
+- `Ollama`
+- `OpenAI`
 
-- Docker Desktop must be installed and fully running.
-- For GPU mode: NVIDIA GPU, recent NVIDIA driver, and Docker GPU support.
-- Keep Docker Desktop open while testing Kokoro startup from the app.
+Configurable items:
 
-Quick checks:
+- model selection
+- provider endpoint
+- API key where applicable
+
+AI currently powers:
+
+- PDF explanation
+- canvas diagram explanation
+- routine rebalance enhancement
+- bothering sentence rewriting
+- Ask Shiv retrieval and response flow
+- TTS and STT integrations
+
+### Shiv V2
+
+- Hybrid retrieval with lexical + local semantic search
+- Strict citation mode for app-data answers
+- Structured output validation for critical intents
+- Observability route and page
+- Golden eval quality gate
+
+## Local Desktop AI Setup
+
+## 1. Ollama setup
+
+Install and run Ollama, then pull at least one model.
+
+Check Ollama:
+
+```powershell
+ollama --version
+curl.exe http://127.0.0.1:11434/api/tags
+```
+
+Pull a model:
+
+```powershell
+ollama pull gemma3:4b
+```
+
+Useful checks:
+
+```powershell
+ollama list
+ollama ps
+```
+
+In DOCK:
+
+1. Open `Settings -> AI Settings`
+2. Set provider to `Ollama`
+3. Set base URL to `http://127.0.0.1:11434`
+4. Select an installed model such as `gemma3:4b`
+
+## 2. Kokoro desktop TTS setup
+
+Use this to enable local read-aloud with Kokoro voices in the desktop app.
+
+### Prerequisites
+
+- Docker Desktop installed and running
+- For GPU mode: NVIDIA GPU, recent driver, and Docker GPU support
+
+Checks:
+
 ```powershell
 docker --version
 docker info
 docker context show
 ```
 
-GPU checks:
+Optional GPU checks:
+
 ```powershell
 nvidia-smi -L
 docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
 ```
 
-If the GPU test container fails, Kokoro GPU will fail too. Use CPU mode first.
+### Pull required images
 
-### 2) Pull required images
+CPU image:
 
-CPU image (recommended baseline):
 ```powershell
 docker pull ghcr.io/remsky/kokoro-fastapi-cpu:latest
 ```
 
-GPU image (optional, very large, first pull can take a long time):
+GPU image:
+
 ```powershell
 docker pull ghcr.io/remsky/kokoro-fastapi-gpu:latest
 ```
 
-Verify pulls:
-```powershell
-docker image ls ghcr.io/remsky/kokoro-fastapi-cpu:latest
-docker image ls ghcr.io/remsky/kokoro-fastapi-gpu:latest
-```
+### Start manually for diagnostics
 
-### 3) Start one mode manually (diagnostics)
+Remove old container:
 
-Always stop/remove existing container before switching mode:
 ```powershell
 docker rm -f studio-kokoro-tts
 ```
 
 Start CPU:
+
 ```powershell
 docker run -d --name studio-kokoro-tts -p 127.0.0.1:8880:8880 ghcr.io/remsky/kokoro-fastapi-cpu:latest
 ```
 
 Start GPU:
+
 ```powershell
 docker run -d --gpus all --name studio-kokoro-tts -p 127.0.0.1:8880:8880 ghcr.io/remsky/kokoro-fastapi-gpu:latest
 ```
 
-Health + logs:
+Health and logs:
+
 ```powershell
 curl.exe http://127.0.0.1:8880/health
 docker logs --tail 200 studio-kokoro-tts
@@ -194,58 +220,34 @@ docker logs --tail 200 studio-kokoro-tts
 
 Expected `/health` response should include `healthy`.
 
-### 4) Use from desktop app
+### Use from DOCK desktop
 
-1. Launch desktop app (`npm run desktop:dev` in development).
-2. Open `Settings -> AI Settings`.
-3. Set `Kokoro Local TTS (Desktop only)` URL to `http://127.0.0.1:8880`.
-4. Open a PDF and select a `Kokoro_*` voice in the voice dropdown.
-5. Click `Read`.
+1. Launch desktop app
+2. Open `Settings -> AI Settings`
+3. Set `Kokoro Local TTS (Desktop only)` to `http://127.0.0.1:8880`
+4. Select a `Kokoro_*` voice in supported read-aloud UI
+5. Click `Read`
 
-Notes:
-- App auto-start attempts Kokoro on launch when Docker is reachable.
-- PDF toolbar shows Kokoro status with mode label (`kokoro-cpu` or `kokoro-gpu`).
+### Kokoro environment controls
 
-### 5) App startup controls (environment variables)
-
-Use PowerShell syntax:
-
-Force CPU:
 ```powershell
 $env:ELECTRON_KOKORO_FORCE_CPU="1"
-```
-
-Force GPU:
-```powershell
 $env:ELECTRON_KOKORO_FORCE_GPU="1"
-```
-
-Disable auto-start:
-```powershell
 $env:ELECTRON_KOKORO_AUTO_START="0"
-```
-
-Custom base URL:
-```powershell
 $env:ELECTRON_KOKORO_BASE_URL="http://127.0.0.1:8880"
 ```
 
-Then restart the desktop app process after changing env vars.
+### Common Kokoro failures
 
-### 6) Common failure cases
-
-- `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine`:
-  - Docker Desktop is not running, or engine is still starting.
-- `health check timeout`:
-  - Container started but model initialization is still in progress.
-  - Check logs and wait longer on first run.
-- GPU image appears stuck at `Pulling fs layer`:
-  - This is still downloading; GPU image is large.
-  - Keep terminal open until pull completes.
-- TTS API returns `500` from app:
-  - Kokoro URL is wrong, container is unhealthy, or no container running on `127.0.0.1:8880`.
+- `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine`
+  - Docker Desktop is not running
+- `health check timeout`
+  - container started but model init is still in progress
+- TTS API returns `500`
+  - Kokoro URL is wrong or service is unhealthy
 
 Quick diagnostics:
+
 ```powershell
 docker ps -a --filter "name=studio-kokoro-tts"
 docker inspect studio-kokoro-tts --format "{{.State.Status}}"
@@ -253,118 +255,95 @@ docker logs --tail 200 studio-kokoro-tts
 curl.exe http://127.0.0.1:8880/health
 ```
 
-## Local STT with faster-whisper (Offline)
+## 3. Local STT setup
 
-Shiv mic input is local-first and works with a local STT server.  
-`faster-whisper` is recommended for better speed/accuracy on CPU/GPU compared to baseline whisper implementations.
+Shiv mic input is local-first and works with a local STT server.
 
-### 1) Prerequisites
+### Prerequisites
 
-- Docker Desktop installed and running.
-- At least 4 GB free RAM for `tiny/base` models (more for larger models).
-- Keep Docker Desktop open while testing mic in desktop app.
+- Docker Desktop installed and running
+- At least 4 GB free RAM for smaller models
+- Microphone permission enabled
 
-Quick checks:
+Checks:
+
 ```powershell
 docker --version
 docker info
 docker context show
 ```
 
-### 2) Pull required image
+### Pull required image
 
-The desktop app default STT image is:
 ```powershell
 docker pull onerahmet/openai-whisper-asr-webservice:latest
 ```
 
-Verify:
-```powershell
-docker image ls onerahmet/openai-whisper-asr-webservice:latest
-```
+### Start manually for diagnostics
 
-### 3) Start STT container manually (diagnostics)
+Remove old container:
 
-Always remove old container first:
 ```powershell
 docker rm -f studio-local-stt
 ```
 
-Start CPU (stable baseline):
+Start CPU baseline:
+
 ```powershell
 docker run -d --name studio-local-stt -p 127.0.0.1:9890:9000 -e ASR_MODEL=base.en -e ASR_ENGINE=openai_whisper onerahmet/openai-whisper-asr-webservice:latest
 ```
 
-Start faster-whisper mode (if your image tag supports it):
+Start faster-whisper mode:
+
 ```powershell
 docker run -d --name studio-local-stt -p 127.0.0.1:9890:9000 -e ASR_MODEL=base.en -e ASR_ENGINE=faster_whisper onerahmet/openai-whisper-asr-webservice:latest
 ```
 
-Health + logs:
+Health and logs:
+
 ```powershell
 docker ps -a --filter "name=studio-local-stt"
 docker logs --tail 200 studio-local-stt
 curl.exe -X POST "http://127.0.0.1:9890/asr?output=json" -F "audio_file=@C:\Windows\Media\ding.wav" -F "task=transcribe" -F "language=en"
 ```
 
-### 4) Use from desktop app
+### Use from DOCK desktop
 
-1. Launch desktop app (`npm run desktop:dev`).
-2. Open `Settings -> AI Settings`.
-3. Set `Local STT Server URL` to `http://127.0.0.1:9890`.
-4. Open Ask Shiv and click mic.
-5. Check Shiv Voice popup status shows Local STT `running(...)`.
+1. Launch desktop app
+2. Open `Settings -> AI Settings`
+3. Set `Local STT Server URL` to `http://127.0.0.1:9890`
+4. Open Ask Shiv and click mic
+5. Verify status shows local STT running
 
 DOCK STT route auto-tries:
+
 - `/transcribe`
 - `/v1/audio/transcriptions`
 - `/asr`
 
-### 5) App startup controls (environment variables)
+### STT environment controls
 
-Use PowerShell syntax:
-
-Disable STT auto-start:
 ```powershell
 $env:ELECTRON_STT_AUTO_START="0"
-```
-
-Set preferred base URL:
-```powershell
 $env:LOCAL_STT_BASE_URL="http://127.0.0.1:9890"
-```
-
-Override Docker image:
-```powershell
 $env:ELECTRON_STT_DOCKER_IMAGE="onerahmet/openai-whisper-asr-webservice:latest"
-```
-
-Override model used by auto-start:
-```powershell
 $env:ELECTRON_STT_MODEL="base.en"
-```
-
-Use custom local start command instead of Docker:
-```powershell
 $env:ELECTRON_STT_START_COMMAND="your_stt_server_command_using_$env:STT_PORT"
 ```
 
-Then restart desktop app process after changing env vars.
+### Common STT failures
 
-### 6) Common failure cases
-
-- `No STT container exists` / `offline`:
-  - STT container not running yet.
-- `Local STT endpoint returned 404`:
-  - Wrong base URL or endpoint path mismatch.
-- `Local STT endpoint returned 500`:
-  - STT backend crashed or model missing.
-- `Local STT returned empty transcript`:
-  - Very short/noisy audio, mic permissions denied, or server returned empty text.
-- `fetch failed`:
-  - STT server not reachable on configured host/port.
+- `offline`
+  - STT service is not running yet
+- `404`
+  - wrong base URL or wrong endpoint path
+- `500`
+  - backend crashed or model missing
+- empty transcript
+  - noisy audio, denied mic permission, or server returned empty text
 
 Quick diagnostics:
+
 ```powershell
 docker ps -a --filter "name=studio-local-stt"
 docker inspect studio-local-stt --format "{{.State.Status}}"
@@ -372,63 +351,60 @@ docker logs --tail 200 studio-local-stt
 curl.exe -X POST "http://127.0.0.1:9890/asr?output=json" -F "audio_file=@C:\Windows\Media\ding.wav" -F "task=transcribe" -F "language=en"
 ```
 
-### Request compatibility
+### STT request compatibility
 
-DOCK sends multipart form-data with broad compatibility keys:
-- audio file fields: `audio`, `file`, `audio_file`
+DOCK sends multipart form-data with:
+
+- audio fields: `audio`, `file`, `audio_file`
 - optional hints: `task=transcribe`, `language=en`, `output=json`, `temperature=0`, `best_of=5`, `beam_size=5`
-
-### Desktop behavior
-
-- Desktop auto-checks STT health and can auto-start managed STT.
-- If local STT is offline or misconfigured, mic transcription returns a clear error.
-- OpenAI STT fallback is disabled; only local STT is used.
 
 ## Production Builds
 
 Web build:
+
 ```bash
 npm run build
 npm run start
 ```
 
 Desktop distributable:
+
 ```bash
 npm run desktop:dist
 ```
 
 Desktop packaging notes:
-- Uses bundled local Next server for runtime.
-- Supports optional startup URL fallback with `ELECTRON_START_URL`.
-- To force desktop to use hosted web origin (recommended for shared cloud auth/session):
-  - Set `ELECTRON_START_URL=https://vdock.vercel.app`
-  - Set `ELECTRON_FORCE_REMOTE=1`
-- To keep local desktop runtime but use hosted cloud auth APIs (recommended hybrid mode):
-  - Set `ELECTRON_AUTH_BASE_URL=https://vdock.vercel.app`
-  - (Optional for web builds) set `NEXT_PUBLIC_AUTH_BASE_URL=https://vdock.vercel.app`
 
-## Data and Sync Notes
+- uses bundled local Next server for runtime
+- supports optional startup URL fallback with `ELECTRON_START_URL`
+- to force desktop to use hosted web origin:
+  - `ELECTRON_START_URL=https://vdock.vercel.app`
+  - `ELECTRON_FORCE_REMOTE=1`
+- to keep local desktop runtime but use hosted auth APIs:
+  - `ELECTRON_AUTH_BASE_URL=https://vdock.vercel.app`
 
-- App state is auto-persisted per user.
-- Export/import JSON backup is supported.
-- Sync-related settings can be configured from the Settings modal.
-- Secrets/API keys are managed according to runtime and configured providers.
+## Data and Sync
 
-## Repository Structure (high level)
+- App state is auto-persisted per user
+- Export/import JSON backup is supported
+- Sync-related settings are configurable in app settings
+- Secrets and provider keys depend on runtime and provider choice
 
-- `src/app/*`: route pages and API routes
-- `src/components/*`: UI modules and cards
-- `src/contexts/AuthContext.tsx`: central app state and actions
-- `src/types/*`: shared type contracts
-- `electron/*`: desktop entry/runtime scripts
+## Repository Structure
+
+- `src/app/*` route pages and API routes
+- `src/components/*` UI modules and panels
+- `src/contexts/AuthContext.tsx` central app state and actions
+- `src/lib/*` AI, storage, and utility logic
+- `src/types/*` shared types
+- `electron/*` desktop runtime scripts
 
 ## Scripts
 
-- `npm run dev` - web development server
-- `npm run build` - production web build
-- `npm run start` - run production web build
-- `npm run typecheck` - TypeScript no-emit checks
-- `npm run desktop:dev` - desktop development runtime
-- `npm run desktop:build` - desktop Next build target
-- `npm run desktop:dist` - desktop installer/distribution build
-
+- `npm run dev` web development server
+- `npm run build` production web build
+- `npm run start` run production build
+- `npm run typecheck` TypeScript no-emit checks
+- `npm run desktop:dev` desktop development runtime
+- `npm run desktop:build` desktop Next build target
+- `npm run desktop:dist` desktop installer build

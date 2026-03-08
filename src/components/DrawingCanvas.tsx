@@ -4,7 +4,7 @@
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush, Plus, Library, ArrowUpRight, Copy, Edit3 } from 'lucide-react';
+import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush, Plus, Library, ArrowUpRight, Copy, Edit3, Sparkles, Loader2, Volume2, VolumeX, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ExcalidrawElement, NonDeleted, AppState, PointerDownState, OnLinkOpen } from "@excalidraw/excalidraw";
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +17,10 @@ import dynamic from 'next/dynamic';
 import { loadExcalidrawFiles, saveExcalidrawFiles, type ExcalidrawFilesMetaMap } from '@/lib/excalidrawFileStore';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 import { parseJsonWithRecovery } from '@/lib/jsonRecovery';
+import { getAiConfigFromSettings } from '@/lib/ai/config';
+import { cleanSpeechText, getKokoroLocalVoices, getOpenAiCloudVoices, loadSpeechPrefs, parseCloudVoiceURI, pickBestVoice, saveSpeechPrefs } from '@/lib/tts';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -29,6 +33,128 @@ const Excalidraw = dynamic(
 
 // Self-contained random ID generator to avoid dependency issues.
 const randomId = () => Math.random().toString(36).slice(2, 11);
+const DEFAULT_KOKORO_BASE_URL = 'http://127.0.0.1:8880';
+const DIAGRAM_EXPLANATION_STORAGE_KEY_PREFIX = 'dock-diagram-explanation:';
+type DiagramLaserLine = { id: number; left: number; top: number; width: number; height: number; startChar?: number; endChar?: number };
+
+const normalizeDiagramText = (value: string) => value.replace(/\s+/g, ' ').trim();
+
+const getElementReadableLabel = (
+  element: ExcalidrawElement | undefined,
+  byId: Map<string, ExcalidrawElement>,
+  textByContainerId: Map<string, string>,
+  textById: Map<string, string>
+) => {
+  if (!element) return 'unknown';
+  const ownText = textById.get(element.id);
+  if (ownText) return ownText;
+  const containerText = textByContainerId.get(element.id);
+  if (containerText) return containerText;
+  if ((element as any).type === 'frame') return 'frame';
+  return (element as any).type || 'element';
+};
+
+const buildCanvasDiagramSummary = (elements: readonly ExcalidrawElement[]) => {
+  const scene = elements.filter((element) => !element.isDeleted);
+  if (scene.length === 0) return '';
+
+  const byId = new Map(scene.map((element) => [element.id, element] as const));
+  const textElements = scene.filter(
+    (element): element is NonDeleted<ExcalidrawElement> & { type: 'text'; text: string; containerId?: string | null } =>
+      element.type === 'text' && typeof (element as any).text === 'string' && normalizeDiagramText((element as any).text).length > 0
+  );
+  const sortedTexts = [...textElements].sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  const textById = new Map(sortedTexts.map((element) => [element.id, normalizeDiagramText(element.text)]));
+  const textByContainerId = new Map(
+    sortedTexts
+      .filter((element) => element.containerId)
+      .map((element) => [String(element.containerId), normalizeDiagramText(element.text)] as const)
+  );
+
+  const arrows = scene.filter((element) => element.type === 'arrow');
+  const arrowDescriptions = arrows
+    .map((arrow) => {
+      const startId = (arrow as any).startBinding?.elementId as string | undefined;
+      const endId = (arrow as any).endBinding?.elementId as string | undefined;
+      if (!startId || !endId) return null;
+      const start = getElementReadableLabel(byId.get(startId), byId, textByContainerId, textById);
+      const end = getElementReadableLabel(byId.get(endId), byId, textByContainerId, textById);
+      if (!start || !end || start === 'unknown' || end === 'unknown') return null;
+      return `${start} -> ${end}`;
+    })
+    .filter((value): value is string => Boolean(value));
+
+  const nonTextTypes = scene
+    .filter((element) => element.type !== 'text')
+    .reduce<Record<string, number>>((acc, element) => {
+      acc[element.type] = (acc[element.type] || 0) + 1;
+      return acc;
+    }, {});
+
+  const sections = [
+    `Canvas contains ${scene.length} elements.`,
+    sortedTexts.length > 0 ? `Text labels:\n${sortedTexts.slice(0, 120).map((element) => `- ${normalizeDiagramText(element.text)}`).join('\n')}` : '',
+    arrowDescriptions.length > 0 ? `Explicit arrow relationships:\n${arrowDescriptions.slice(0, 60).map((line) => `- ${line}`).join('\n')}` : '',
+    Object.keys(nonTextTypes).length > 0
+      ? `Element counts by type:\n${Object.entries(nonTextTypes).map(([type, count]) => `- ${type}: ${count}`).join('\n')}`
+      : '',
+  ].filter(Boolean);
+
+  return sections.join('\n\n');
+};
+
+const getDiagramExplanationStorageKey = (canvasId: string) => `${DIAGRAM_EXPLANATION_STORAGE_KEY_PREFIX}${canvasId}`;
+
+const buildDiagramLaserLines = (container: HTMLElement | null): DiagramLaserLine[] => {
+  if (!container) return [];
+  const containerRect = container.getBoundingClientRect();
+  const lines: DiagramLaserLine[] = [];
+  let runningChar = 0;
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const parent = node.parentElement;
+      if (!parent) return NodeFilter.FILTER_REJECT;
+      const text = (node.textContent || '').replace(/\s+/g, ' ').trim();
+      if (!text) return NodeFilter.FILTER_REJECT;
+      const style = window.getComputedStyle(parent);
+      if (style.display === 'none' || style.visibility === 'hidden') return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+
+  let currentNode = walker.nextNode();
+  while (currentNode) {
+    const textNode = currentNode as Text;
+    const rawText = textNode.textContent || '';
+    const matches = Array.from(rawText.matchAll(/\S+/g));
+    matches.forEach((match) => {
+      const word = match[0];
+      const startOffset = match.index || 0;
+      const endOffset = startOffset + word.length;
+      const range = document.createRange();
+      range.setStart(textNode, startOffset);
+      range.setEnd(textNode, endOffset);
+      const rect = Array.from(range.getClientRects()).find((candidate) => candidate.width > 1 && candidate.height > 1);
+      range.detach?.();
+      if (!rect) return;
+      const startChar = runningChar;
+      const endChar = runningChar + word.length;
+      lines.push({
+        id: lines.length,
+        left: rect.left - containerRect.left,
+        top: rect.top - containerRect.top + Math.max(1, Math.round(rect.height * 0.72)),
+        width: rect.width,
+        height: 2,
+        startChar,
+        endChar,
+      });
+      runningChar = endChar + 1;
+    });
+    currentNode = walker.nextNode();
+  }
+
+  return lines;
+};
 
 const SearchContent = React.memo(({ onSelect }: { onSelect: (resource: Resource, point: ResourcePoint) => void }) => {
   const { resources } = useAuth();
@@ -529,6 +655,16 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const contextMenuRef = useRef<HTMLDivElement>(null);
   
   const excalidrawAPIRef = useRef<any>(null);
+  const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const speechAudioRef = useRef<HTMLAudioElement | null>(null);
+  const speechAudioUrlRef = useRef<string | null>(null);
+  const diagramExplainScrollRef = useRef<HTMLDivElement | null>(null);
+  const diagramExplainContentRef = useRef<HTMLDivElement | null>(null);
+  const diagramLaserLinesRef = useRef<DiagramLaserLine[]>([]);
+  const diagramLaserWeightsRef = useRef<number[]>([]);
+  const diagramLaserCurrentIndexRef = useRef(-1);
+  const diagramAutoScrollFrameRef = useRef<number | null>(null);
+  const diagramAutoScrollLastTsRef = useRef<number | null>(null);
   const { toast } = useToast();
   
   const [isDirty, setIsDirty] = useState(false);
@@ -537,6 +673,18 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [loadedFiles, setLoadedFiles] = useState<Record<string, any>>({});
   const [loadedFilesCanvasId, setLoadedFilesCanvasId] = useState<string | null>(null);
+  const [showDiagramExplainPanel, setShowDiagramExplainPanel] = useState(false);
+  const [isExplainingDiagram, setIsExplainingDiagram] = useState(false);
+  const [diagramExplanation, setDiagramExplanation] = useState('');
+  const [diagramExplainError, setDiagramExplainError] = useState('');
+  const [isReadingDiagram, setIsReadingDiagram] = useState(false);
+  const [ttsVoices, setTtsVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [ttsVoiceURI, setTtsVoiceURI] = useState<string | undefined>(undefined);
+  const [isKokoroHealthy, setIsKokoroHealthy] = useState(false);
+  const [kokoroMode, setKokoroMode] = useState<'cpu' | 'gpu' | 'custom' | 'existing' | null>(null);
+  const [diagramLaserCurrentLine, setDiagramLaserCurrentLine] = useState<DiagramLaserLine | null>(null);
+  const [diagramLaserTrailLines, setDiagramLaserTrailLines] = useState<DiagramLaserLine[]>([]);
+  const [diagramLaserCurrentLineProgress, setDiagramLaserCurrentLineProgress] = useState(1);
 
   useEffect(() => {
     if (!editingCanvasId) return;
@@ -672,11 +820,305 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   }, []);
   
   const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
+  const isDesktopRuntime = typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop);
+  const aiConfig = useMemo(() => getAiConfigFromSettings(settings, isDesktopRuntime), [settings, isDesktopRuntime]);
+  const isAiEnabled = aiConfig.provider !== 'none';
+  const kokoroBaseUrl = (settings.kokoroTtsBaseUrl || DEFAULT_KOKORO_BASE_URL).trim();
+  const kokoroEnabled = isDesktopRuntime && (isKokoroHealthy || Boolean(kokoroBaseUrl));
+  const cloudVoices = useMemo(
+    () => [...getOpenAiCloudVoices(aiConfig), ...getKokoroLocalVoices(kokoroEnabled)],
+    [aiConfig, kokoroEnabled]
+  );
+  const kokoroStatusLabel = !isDesktopRuntime
+    ? 'web'
+    : isKokoroHealthy
+    ? kokoroMode
+      ? `kokoro-${kokoroMode}`
+      : 'kokoro-ready'
+    : 'kokoro-offline';
 
   useEffect(() => {
     isUserChange.current = false;
     setIsDirty(false);
   }, [drawingCanvasState?.activeCanvasId]);
+
+  useEffect(() => {
+    setShowDiagramExplainPanel(false);
+    setIsExplainingDiagram(false);
+    setDiagramExplainError('');
+    setIsReadingDiagram(false);
+    const canvasId = activeCanvas?.id;
+    if (!canvasId || typeof window === 'undefined') {
+      setDiagramExplanation('');
+      return;
+    }
+    try {
+      const saved = localStorage.getItem(getDiagramExplanationStorageKey(canvasId));
+      setDiagramExplanation(saved || '');
+    } catch {
+      setDiagramExplanation('');
+    }
+  }, [activeCanvas?.id]);
+
+  useEffect(() => {
+    const canvasId = activeCanvas?.id;
+    if (!canvasId || typeof window === 'undefined') return;
+    try {
+      const storageKey = getDiagramExplanationStorageKey(canvasId);
+      if (diagramExplanation.trim()) {
+        safeSetLocalStorageItem(storageKey, diagramExplanation);
+      } else {
+        localStorage.removeItem(storageKey);
+      }
+    } catch {
+      // ignore
+    }
+  }, [activeCanvas?.id, diagramExplanation]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      setTtsVoices(Array.isArray(voices) ? voices : []);
+    };
+    loadVoices();
+    window.speechSynthesis.addEventListener('voiceschanged', loadVoices);
+    return () => window.speechSynthesis.removeEventListener('voiceschanged', loadVoices);
+  }, []);
+
+  useEffect(() => {
+    const prefs = loadSpeechPrefs();
+    if (prefs.voiceURI) setTtsVoiceURI(prefs.voiceURI);
+  }, []);
+
+  useEffect(() => {
+    if (ttsVoiceURI) return;
+    const best = pickBestVoice(ttsVoices);
+    if (best?.voiceURI) {
+      setTtsVoiceURI(best.voiceURI);
+      return;
+    }
+    if (cloudVoices.length > 0) {
+      setTtsVoiceURI(cloudVoices[0].voiceURI);
+    }
+  }, [cloudVoices, ttsVoiceURI, ttsVoices]);
+
+  useEffect(() => {
+    saveSpeechPrefs({ voiceURI: ttsVoiceURI });
+  }, [ttsVoiceURI]);
+
+  const stopDiagramLaserGuide = useCallback(() => {
+    diagramLaserLinesRef.current = [];
+    diagramLaserWeightsRef.current = [];
+    diagramLaserCurrentIndexRef.current = -1;
+    setDiagramLaserCurrentLine(null);
+    setDiagramLaserTrailLines([]);
+    setDiagramLaserCurrentLineProgress(0);
+  }, []);
+
+  const syncDiagramLaserProgress = useCallback((progress: number) => {
+    const lines = diagramLaserLinesRef.current;
+    if (!lines.length) return;
+    const linesWithChars = lines.filter((line) => typeof line.startChar === 'number' && typeof line.endChar === 'number');
+    const totalChars =
+      linesWithChars.length > 0
+        ? Math.max(1, (linesWithChars[linesWithChars.length - 1].endChar || 1))
+        : Math.max(1, diagramLaserWeightsRef.current.reduce((sum, value) => sum + value, 0));
+    const targetChar = Math.max(0, Math.min(totalChars - 1, Math.floor(progress * totalChars)));
+    let idx = 0;
+    let lineProgress = Math.max(0.04, Math.min(0.96, progress));
+
+    if (linesWithChars.length > 0) {
+      idx = lines.findIndex((line) => {
+        const start = line.startChar ?? 0;
+        const end = line.endChar ?? start + 1;
+        return targetChar >= start && targetChar < end;
+      });
+      if (idx < 0) idx = lines.length - 1;
+      const targetLine = lines[idx];
+      const start = targetLine.startChar ?? 0;
+      const end = targetLine.endChar ?? start + 1;
+      lineProgress = Math.max(0.04, Math.min(0.96, (targetChar - start) / Math.max(1, end - start)));
+    } else {
+      const weights = diagramLaserWeightsRef.current;
+      if (!weights.length) return;
+      const totalWeight = weights.reduce((sum, value) => sum + value, 0);
+      if (totalWeight <= 0) return;
+      const target = Math.max(0, Math.min(0.9999, progress)) * totalWeight;
+      let acc = 0;
+      for (let i = 0; i < lines.length; i += 1) {
+        const next = acc + weights[i];
+        if (target <= next) {
+          idx = i;
+          lineProgress = Math.max(0.04, Math.min(0.96, (target - acc) / Math.max(1, weights[i])));
+          break;
+        }
+        acc = next;
+        idx = i;
+      }
+    }
+
+    if (diagramLaserCurrentIndexRef.current !== idx) {
+      diagramLaserCurrentIndexRef.current = idx;
+      setDiagramLaserCurrentLine(lines[idx]);
+      setDiagramLaserTrailLines([]);
+    }
+    setDiagramLaserCurrentLineProgress(lineProgress);
+  }, []);
+
+  const startDiagramLaserGuide = useCallback(() => {
+    const lines = buildDiagramLaserLines(diagramExplainContentRef.current);
+    if (!lines.length) {
+      stopDiagramLaserGuide();
+      return;
+    }
+    diagramLaserLinesRef.current = lines;
+    diagramLaserWeightsRef.current = lines.map((line) => Math.max(8, (line.endChar ?? 0) - (line.startChar ?? 0), line.width * 0.08));
+    diagramLaserCurrentIndexRef.current = 0;
+    setDiagramLaserTrailLines([]);
+    setDiagramLaserCurrentLine(lines[0]);
+    setDiagramLaserCurrentLineProgress(0.04);
+  }, [stopDiagramLaserGuide]);
+
+  useEffect(() => {
+    if (!isReadingDiagram) {
+      if (diagramAutoScrollFrameRef.current !== null) {
+        cancelAnimationFrame(diagramAutoScrollFrameRef.current);
+        diagramAutoScrollFrameRef.current = null;
+      }
+      diagramAutoScrollLastTsRef.current = null;
+      return;
+    }
+
+    const scrollHost = diagramExplainScrollRef.current;
+    if (!scrollHost) return;
+
+    const pixelsPerSecond = 14;
+    const step = (timestamp: number) => {
+      const host = diagramExplainScrollRef.current;
+      if (!host) return;
+      const lastTs = diagramAutoScrollLastTsRef.current ?? timestamp;
+      const deltaMs = Math.max(0, timestamp - lastTs);
+      diagramAutoScrollLastTsRef.current = timestamp;
+
+      const maxScrollTop = Math.max(0, host.scrollHeight - host.clientHeight);
+      if (host.scrollTop < maxScrollTop) {
+        const nextTop = Math.min(maxScrollTop, host.scrollTop + (pixelsPerSecond * deltaMs) / 1000);
+        host.scrollTop = nextTop;
+      }
+
+      diagramAutoScrollFrameRef.current = requestAnimationFrame(step);
+    };
+
+    diagramAutoScrollFrameRef.current = requestAnimationFrame(step);
+    return () => {
+      if (diagramAutoScrollFrameRef.current !== null) {
+        cancelAnimationFrame(diagramAutoScrollFrameRef.current);
+        diagramAutoScrollFrameRef.current = null;
+      }
+      diagramAutoScrollLastTsRef.current = null;
+    };
+  }, [isReadingDiagram]);
+
+  const stopDiagramSpeech = useCallback(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (speechAudioRef.current) {
+      speechAudioRef.current.pause();
+      speechAudioRef.current.src = '';
+      speechAudioRef.current = null;
+    }
+    if (speechAudioUrlRef.current) {
+      URL.revokeObjectURL(speechAudioUrlRef.current);
+      speechAudioUrlRef.current = null;
+    }
+    speechUtteranceRef.current = null;
+    stopDiagramLaserGuide();
+    setIsReadingDiagram(false);
+  }, [stopDiagramLaserGuide]);
+
+  useEffect(() => {
+    return () => {
+      stopDiagramSpeech();
+    };
+  }, [stopDiagramSpeech]);
+
+  useEffect(() => {
+    if (!showDiagramExplainPanel || !diagramExplanation) {
+      stopDiagramLaserGuide();
+      return;
+    }
+    const refresh = () => startDiagramLaserGuide();
+    const timeoutId = window.setTimeout(refresh, 0);
+    const resizeObserver =
+      typeof ResizeObserver !== 'undefined' && diagramExplainContentRef.current
+        ? new ResizeObserver(() => startDiagramLaserGuide())
+        : null;
+    if (resizeObserver && diagramExplainContentRef.current) {
+      resizeObserver.observe(diagramExplainContentRef.current);
+    }
+    return () => {
+      window.clearTimeout(timeoutId);
+      resizeObserver?.disconnect();
+    };
+  }, [diagramExplanation, showDiagramExplainPanel, startDiagramLaserGuide, stopDiagramLaserGuide]);
+
+  useEffect(() => {
+    if (showDiagramExplainPanel) return;
+    stopDiagramSpeech();
+  }, [showDiagramExplainPanel, stopDiagramSpeech]);
+
+  const checkKokoroServerHealth = useCallback(async () => {
+    if (!isDesktopRuntime) {
+      setIsKokoroHealthy(false);
+      setKokoroMode(null);
+      return;
+    }
+    const bridge = (window as any)?.studioDesktop?.kokoro;
+    const baseUrl = kokoroBaseUrl.replace(/\/+$/, '');
+    if (!baseUrl) {
+      setIsKokoroHealthy(false);
+      setKokoroMode(null);
+      return;
+    }
+    if (bridge?.status) {
+      try {
+        const status = await Promise.resolve(bridge.status({ baseUrl }));
+        if (status?.success) {
+          setIsKokoroHealthy(Boolean(status.healthy));
+          const modeText = String(status.mode || '').toLowerCase();
+          if (modeText === 'gpu') setKokoroMode('gpu');
+          else if (modeText === 'cpu') setKokoroMode('cpu');
+          else if (modeText === 'custom') setKokoroMode('custom');
+          else if (modeText === 'existing') setKokoroMode('existing');
+          else setKokoroMode(null);
+          return;
+        }
+      } catch {
+        // fallback below
+      }
+    }
+    try {
+      const response = await fetch(`${baseUrl}/health`);
+      const text = response.ok ? await response.text().catch(() => '') : '';
+      const healthy = response.ok && /healthy|ok/i.test(text || '');
+      setIsKokoroHealthy(healthy);
+      setKokoroMode(healthy ? 'existing' : null);
+    } catch {
+      setIsKokoroHealthy(false);
+      setKokoroMode(null);
+    }
+  }, [isDesktopRuntime, kokoroBaseUrl]);
+
+  useEffect(() => {
+    if (!isDesktopRuntime) return;
+    void checkKokoroServerHealth();
+    const timerId = setInterval(() => {
+      void checkKokoroServerHealth();
+    }, 5000);
+    return () => clearInterval(timerId);
+  }, [checkKokoroServerHealth, isDesktopRuntime]);
 
   useEffect(() => {
     const loadFiles = async () => {
@@ -843,6 +1285,167 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
       toast({ title: "Failed to copy", description: "Could not copy link to clipboard.", variant: "destructive" });
     });
   }, [drawingCanvasState?.openCanvases, toast]);
+
+  const handleExplainDiagram = useCallback(async (forceRegenerate = false) => {
+    if (!activeCanvas?.id || !excalidrawAPIRef.current) return;
+    if (!isAiEnabled) {
+      toast({
+        title: 'AI not configured',
+        description: 'Choose a provider in Settings > AI Settings first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!forceRegenerate && diagramExplanation.trim()) {
+      setShowDiagramExplainPanel(true);
+      setDiagramExplainError('');
+      return;
+    }
+
+    const sceneElements = excalidrawAPIRef.current.getSceneElements?.() || [];
+    const diagramText = buildCanvasDiagramSummary(sceneElements);
+    if (!diagramText.trim()) {
+      toast({
+        title: 'Canvas is empty',
+        description: 'Add some diagram content first, then ask AI to explain it.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setShowDiagramExplainPanel(true);
+    setIsExplainingDiagram(true);
+    setDiagramExplainError('');
+    try {
+      const response = await fetch('/api/ai/explain', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+        },
+        body: JSON.stringify({
+          text: diagramText,
+          context: `Canvas diagram: ${activeCanvas.name || 'Untitled Canvas'}`,
+          question:
+            'Explain this diagram in plain language. Identify the core logic, key clusters, important relationships, causal flow, and likely intended meaning. If some relationships are ambiguous, say that clearly.',
+          aiConfig,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(String(result?.details || result?.error || 'Failed to explain diagram.'));
+      }
+      setDiagramExplanation(String(result?.explanation || ''));
+    } catch (error) {
+      setDiagramExplanation('');
+      setDiagramExplainError(error instanceof Error ? error.message : 'Failed to explain diagram.');
+    } finally {
+      setIsExplainingDiagram(false);
+    }
+  }, [activeCanvas?.id, activeCanvas?.name, aiConfig, diagramExplanation, isAiEnabled, isDesktopRuntime, toast]);
+
+  const handleReadDiagramExplanation = useCallback(() => {
+    const run = async () => {
+      if (isReadingDiagram) {
+        stopDiagramSpeech();
+        return;
+      }
+      const text = cleanSpeechText(diagramExplanation);
+      if (!text) return;
+      stopDiagramSpeech();
+      startDiagramLaserGuide();
+
+      const selectedCloudVoice = parseCloudVoiceURI(ttsVoiceURI);
+      if (selectedCloudVoice) {
+        try {
+          setIsReadingDiagram(true);
+          const response = await fetch('/api/ai/tts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+            },
+            body: JSON.stringify({
+              text,
+              provider: selectedCloudVoice.provider,
+              voice: selectedCloudVoice.id,
+              speed: 1,
+              kokoroBaseUrl,
+              aiConfig,
+            }),
+          });
+          if (!response.ok) {
+            const result = await response.json().catch(() => ({}));
+            throw new Error(result?.details || result?.error || 'TTS failed.');
+          }
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          speechAudioUrlRef.current = url;
+          const audio = new Audio(url);
+          speechAudioRef.current = audio;
+          audio.onloadedmetadata = () => syncDiagramLaserProgress(0.02);
+          audio.ontimeupdate = () => {
+            if (!Number.isFinite(audio.duration) || audio.duration <= 0) return;
+            syncDiagramLaserProgress(Math.max(0.02, Math.min(1, audio.currentTime / audio.duration)));
+          };
+          audio.onended = () => {
+            syncDiagramLaserProgress(1);
+            stopDiagramSpeech();
+          };
+          audio.onerror = () => stopDiagramSpeech();
+          await audio.play();
+          return;
+        } catch (error) {
+          stopDiagramSpeech();
+          toast({
+            title: 'Read aloud failed',
+            description: error instanceof Error ? error.message : 'Could not generate speech.',
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+
+      if (typeof window === 'undefined' || !window.speechSynthesis) {
+        toast({
+          title: 'Read aloud unavailable',
+          description: 'Speech synthesis is not supported in this browser.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(text);
+      const selectedVoice = pickBestVoice(ttsVoices, ttsVoiceURI);
+      const totalChars = Math.max(1, text.length);
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+      utterance.onstart = () => {
+        syncDiagramLaserProgress(0.02);
+      };
+      utterance.onboundary = (event: SpeechSynthesisEvent) => {
+        if (typeof event.charIndex !== 'number') return;
+        const charLength = typeof (event as any).charLength === 'number' ? Number((event as any).charLength) : 1;
+        const progress = (event.charIndex + Math.max(1, charLength) * 0.8) / totalChars;
+        syncDiagramLaserProgress(Math.max(0.02, Math.min(1, progress)));
+      };
+      utterance.onend = () => {
+        syncDiagramLaserProgress(1);
+        setIsReadingDiagram(false);
+        stopDiagramLaserGuide();
+      };
+      utterance.onerror = () => {
+        setIsReadingDiagram(false);
+        stopDiagramLaserGuide();
+      };
+      speechUtteranceRef.current = utterance;
+      window.speechSynthesis.cancel();
+      setIsReadingDiagram(true);
+      window.speechSynthesis.speak(utterance);
+    };
+    void run();
+  }, [aiConfig, diagramExplanation, isDesktopRuntime, isReadingDiagram, kokoroBaseUrl, startDiagramLaserGuide, stopDiagramLaserGuide, stopDiagramSpeech, syncDiagramLaserProgress, toast, ttsVoiceURI, ttsVoices]);
 
   const handleCreateSubCanvas = useCallback((canvasId: string) => {
     const targetCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
@@ -1093,6 +1696,17 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
+                    {isDesktopRuntime ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5"
+                        onClick={() => void handleExplainDiagram()}
+                        title={isAiEnabled ? "Explain this diagram with AI" : "Configure AI provider first"}
+                      >
+                        {isExplainingDiagram ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Sparkles className="h-2.5 w-2.5" />}
+                      </Button>
+                    ) : null}
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={openCanvasResourceCard}><Plus className="h-2.5 w-2.5"/></Button>
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-2.5 w-2.5"/></Button>
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-2.5 w-2.5"/></Button>
@@ -1105,16 +1719,152 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
               </CardHeader>
               <CardContent className="p-0 flex-grow relative">
                 {isMounted && activeCanvas ? (
-                  <ExcalidrawWrapper 
-                      activeCanvas={activeCanvas}
-                      theme={theme}
-                      apiRef={excalidrawAPIRef}
-                      onChange={handleCanvasChange}
-                      onPointerDown={handlePointerDown}
-                      onKeyDown={handleKeyDown}
-                      onLinkOpen={onLinkOpen}
-                      files={loadedFilesCanvasId === activeCanvas.id ? loadedFiles : {}}
-                  />
+                  <>
+                    <ExcalidrawWrapper 
+                        activeCanvas={activeCanvas}
+                        theme={theme}
+                        apiRef={excalidrawAPIRef}
+                        onChange={handleCanvasChange}
+                        onPointerDown={handlePointerDown}
+                        onKeyDown={handleKeyDown}
+                        onLinkOpen={onLinkOpen}
+                        files={loadedFilesCanvasId === activeCanvas.id ? loadedFiles : {}}
+                    />
+                    {isDesktopRuntime && showDiagramExplainPanel && (
+                      <div className="absolute right-3 top-3 z-20 w-[380px] max-w-[calc(100%-1.5rem)] max-h-[calc(100%-1.5rem)] overflow-hidden rounded-2xl border bg-background/95 shadow-2xl backdrop-blur">
+                        <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 text-sm font-semibold">
+                              <Sparkles className="h-4 w-4 text-primary" />
+                              Diagram Explanation
+                            </div>
+                            <p className="mt-1 truncate text-xs text-muted-foreground">
+                              {activeCanvas.name || 'Untitled Canvas'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0"
+                              onClick={() => void handleExplainDiagram(true)}
+                              disabled={isExplainingDiagram}
+                              title="Regenerate explanation"
+                            >
+                              <RefreshCw className={cn("h-4 w-4", isExplainingDiagram && "animate-spin")} />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0"
+                              onClick={handleReadDiagramExplanation}
+                              disabled={!diagramExplanation}
+                              title={isReadingDiagram ? 'Stop read aloud' : 'Read aloud'}
+                            >
+                              {isReadingDiagram ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0"
+                              onClick={() => {
+                                stopDiagramSpeech();
+                                setShowDiagramExplainPanel(false);
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div ref={diagramExplainScrollRef} className="max-h-[calc(100vh-13rem)] overflow-y-auto px-4 py-3">
+                          <div className="mb-3 rounded-xl border bg-muted/30 p-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-xs font-medium">Read Aloud</div>
+                              <div className={cn(
+                                'rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide',
+                                isKokoroHealthy ? 'bg-emerald-500/15 text-emerald-400' : 'bg-muted text-muted-foreground'
+                              )}>
+                                {kokoroStatusLabel}
+                              </div>
+                            </div>
+                            <div className="mt-2">
+                              <label className="mb-1 block text-[11px] text-muted-foreground">Voice</label>
+                              <select
+                                className="w-full rounded-md border bg-background px-2 py-1.5 text-xs"
+                                value={ttsVoiceURI || ''}
+                                onChange={(event) => setTtsVoiceURI(event.target.value || undefined)}
+                              >
+                                {ttsVoices.length === 0 && cloudVoices.length === 0 && (
+                                  <option value="">Default voice</option>
+                                )}
+                                {ttsVoices.length > 0 && (
+                                  <optgroup label="System voices">
+                                    {ttsVoices.map((voice) => (
+                                      <option key={voice.voiceURI} value={voice.voiceURI}>
+                                        {voice.name} {voice.lang ? `(${voice.lang})` : ''}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                                {cloudVoices.length > 0 && (
+                                  <optgroup label="Cloud voices">
+                                    {cloudVoices.map((voice) => (
+                                      <option key={voice.voiceURI} value={voice.voiceURI}>
+                                        {voice.name}
+                                      </option>
+                                    ))}
+                                  </optgroup>
+                                )}
+                              </select>
+                            </div>
+                          </div>
+                          {isExplainingDiagram ? (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              Analyzing the current diagram...
+                            </div>
+                          ) : diagramExplainError ? (
+                            <div className="text-sm text-destructive">{diagramExplainError}</div>
+                          ) : diagramExplanation ? (
+                            <div ref={diagramExplainContentRef} className="relative prose prose-sm dark:prose-invert max-w-none">
+                              {diagramLaserCurrentLine && (
+                                <div
+                                  key={`diagram-laser-current-${diagramLaserCurrentLine.id}`}
+                                  className="pointer-events-none absolute z-10 transition-[top,left] duration-100"
+                                  style={{
+                                    left: `${diagramLaserCurrentLine.left + Math.max(0, diagramLaserCurrentLine.width * diagramLaserCurrentLineProgress - 42)}px`,
+                                    top: `${diagramLaserCurrentLine.top - 2}px`,
+                                    width: `${Math.min(54, Math.max(18, diagramLaserCurrentLine.width * 0.22))}px`,
+                                    height: `8px`,
+                                    background:
+                                      'linear-gradient(90deg, rgba(34,211,238,0) 0%, rgba(34,211,238,0.14) 38%, rgba(34,211,238,0.45) 72%, rgba(165,243,252,0.95) 100%)',
+                                    filter: 'drop-shadow(0 0 5px rgba(34,211,238,0.45))',
+                                    borderRadius: '999px',
+                                  }}
+                                >
+                                  <div
+                                    className="absolute right-0 top-1/2 -translate-y-1/2 rounded-full bg-cyan-200"
+                                    style={{
+                                      width: '6px',
+                                      height: '2px',
+                                      boxShadow: '0 0 7px rgba(165,243,252,0.95)',
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                {diagramExplanation}
+                              </ReactMarkdown>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-muted-foreground">
+                              Click the AI icon to generate an explanation for this diagram.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">Select a canvas to start drawing.</div>
                 )}
