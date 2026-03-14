@@ -34,7 +34,6 @@ import {
   DropdownMenuPortal,
 } from "@/components/ui/dropdown-menu";
 import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 
 
 interface TaskItemProps {
@@ -97,12 +96,6 @@ const TaskItem: React.FC<TaskItemProps> = ({
                         <DropdownMenuItem onSelect={() => onEdit(task)}><Edit3 className="mr-2 h-4 w-4" />Edit Task</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => onOpenMindMap(task.id)}><GitMerge className="mr-2 h-4 w-4" />View Mind Map</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => onOpenLinkProjectModal(task)}><PackageCheck className="mr-2 h-4 w-4" />Link Project</DropdownMenuItem>
-                        {libraryView === 'deepwork' && (
-                            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); onToggleReadyForBranding(task.id); }}>
-                                <Checkbox className="mr-2" checked={!!task.isReadyForBranding} />
-                                <span>Mark as Ready for Branding</span>
-                            </DropdownMenuItem>
-                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onSelect={() => onDeleteFocusArea(task.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete Task</DropdownMenuItem>
                     </DropdownMenuContent>
@@ -149,6 +142,7 @@ export function SkillLibrary({
     addToRecents,
     onOpenLinkProjectModal,
     onToggleReadyForBranding,
+    onOpenCanvasLinker,
     libraryView,
     setLibraryView,
     navigationOnly = false,
@@ -166,6 +160,7 @@ export function SkillLibrary({
     addToRecents: (item: (ExerciseDefinition | Project) & { type: string }) => void;
     onOpenLinkProjectModal: (task: ExerciseDefinition) => void;
     onToggleReadyForBranding: (defId: string) => void;
+    onOpenCanvasLinker?: () => void;
     libraryView: 'deepwork' | 'upskill';
     setLibraryView: React.Dispatch<React.SetStateAction<'deepwork' | 'upskill'>>;
     navigationOnly?: boolean;
@@ -271,10 +266,24 @@ export function SkillLibrary({
                     {title}
                 </button>
             </div>
-             {selectedMicroSkill && (
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onOpenNewFocusArea(libraryView)}>
-                    <PlusCircle className="h-4 w-4 text-green-500" />
-                </Button>
+             {(selectedProject || (selectedMicroSkill && libraryView === 'upskill')) && (
+                <div className="flex items-center gap-1">
+                    {selectedMicroSkill && libraryView === 'upskill' && onOpenCanvasLinker ? (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onOpenCanvasLinker}>
+                                        <Frame className="h-4 w-4 text-primary" />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Link Canvas</TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    ) : null}
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onOpenNewFocusArea(libraryView)}>
+                        <PlusCircle className="h-4 w-4 text-green-500" />
+                    </Button>
+                </div>
             )}
         </div>
     );
@@ -349,29 +358,50 @@ export function SkillLibrary({
     }
 
     if (selectedProject) {
+        const projectIntentions = deepWorkDefinitions.filter((definition) => {
+            if (getDeepWorkNodeType(definition) !== 'Intention') return false;
+            return definition.primaryProjectId === selectedProject.id || Boolean(definition.linkedProjectIds?.includes(selectedProject.id));
+        });
+        const microSkillNameById = new Map(
+            coreSkills.flatMap((skill) => skill.skillAreas.flatMap((area) => area.microSkills.map((microSkill) => [microSkill.id, microSkill.name] as const)))
+        );
+        const allDefsMap = new Map(deepWorkDefinitions.map(def => [def.id, def]));
         return (
             <div className="space-y-2">
-                {selectedProject.features.map(feature => (
-                    <Accordion key={feature.id} type="single" collapsible>
-                        <AccordionItem value={feature.id} className="border-b-0">
-                            <AccordionTrigger className="p-2 rounded-md hover:no-underline hover:bg-muted font-semibold text-base">{feature.name}</AccordionTrigger>
-                            <AccordionContent className="pl-4 pt-1">
-                                <ul className="space-y-1">
-                                {feature.linkedSkills.map(link => {
-                                    const microSkill = coreSkills.flatMap(cs => cs.skillAreas).flatMap(sa => sa.microSkills).find(ms => ms.id === link.microSkillId);
-                                    return microSkill ? (
-                                        <li key={microSkill.id}>
-                                            <Button variant="ghost" size="sm" className="w-full justify-start" onClick={() => handleSelect(microSkill, 'microSkill')}>
-                                                {microSkill.name}
-                                            </Button>
-                                        </li>
-                                    ) : null;
-                                })}
-                                </ul>
-                            </AccordionContent>
-                        </AccordionItem>
-                    </Accordion>
-                ))}
+                {projectIntentions.length > 0 ? projectIntentions.map(task => (
+                    <div key={task.id} className="space-y-2 rounded-xl border border-border/60 bg-background/40 p-2">
+                        <TaskItem
+                            task={task}
+                            allDefinitions={allDefsMap}
+                            getIcon={(def) => {
+                                const nodeType = getDeepWorkNodeType(def);
+                                switch (nodeType) {
+                                    case 'Intention': return <Lightbulb className="h-4 w-4 text-amber-500" />;
+                                    case 'Objective': return <Flag className="h-4 w-4 text-green-500" />;
+                                    case 'Action': return <Bolt className="h-4 w-4 text-blue-500" />;
+                                    default: return <Briefcase className="h-4 w-4" />;
+                                }
+                            }}
+                            onSelectFocusArea={onSelectFocusArea}
+                            addToRecents={addToRecents}
+                            libraryView="deepwork"
+                            onDeleteFocusArea={onDeleteFocusArea}
+                            onOpenMindMap={onOpenMindMap}
+                            onEdit={onEdit}
+                            onOpenLinkProjectModal={onOpenLinkProjectModal}
+                            onToggleReadyForBranding={onToggleReadyForBranding}
+                        />
+                        {(task.linkedMicroSkillIds || []).length > 0 ? (
+                            <div className="ml-7 flex flex-wrap gap-1.5">
+                                {(task.linkedMicroSkillIds || []).map((microSkillId) => (
+                                    <span key={`${task.id}-${microSkillId}`} className="rounded-full border border-border/60 bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
+                                        {microSkillNameById.get(microSkillId) || 'Micro-skill'}
+                                    </span>
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
+                )) : <p className="text-xs text-muted-foreground text-center py-2">No project intentions yet.</p>}
             </div>
         )
     }
@@ -410,12 +440,6 @@ export function SkillLibrary({
         </CardHeader>
         {!navigationOnly && (
         <CardContent>
-             <Tabs value={libraryView} onValueChange={(value) => setLibraryView(value as 'deepwork' | 'upskill')} className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="deepwork">Deep Work</TabsTrigger>
-                    <TabsTrigger value="upskill">Upskill</TabsTrigger>
-                </TabsList>
-            </Tabs>
            <AnimatePresence mode="wait">
              <motion.div
                key={(selectedDomainId || '') + (selectedCoreSkill?.id || '') + (selectedProject?.id || '') + (selectedMicroSkill?.id || '') + libraryView}

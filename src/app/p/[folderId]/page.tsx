@@ -19,6 +19,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { ModelViewer } from '@/components/ModelViewer';
+import { FlashcardResourceTile } from '@/components/FlashcardResourceTile';
+import { FlashcardMcqPanel } from '@/components/FlashcardMcqPanel';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -121,34 +123,38 @@ const ResourcePopupCard = ({ popupState, allResources, onOpenNestedPopup, onClos
                 </CardHeader>
                 <div className="flex-grow min-h-0 overflow-y-auto">
                     <CardContent className="p-3 pt-0">
-                        <ul className="space-y-2 text-sm text-muted-foreground pr-2">
-                            {(resource.points || []).map(point => (
-                                <li key={point.id} className="flex items-start gap-2">
-                                    {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                    point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
-                                    <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
-                                    }
-                                    {point.type === 'card' && point.resourceId ? (
-                                        <button
-                                            onClick={(e) => handleLinkClick(e, point.resourceId!)}
-                                            className="text-left font-medium text-primary hover:underline"
-                                        >
-                                            {point.text}
-                                        </button>
-                                    ) : point.type === 'markdown' ? (
-                                        <div className="w-full prose dark:prose-invert prose-sm">
-                                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
-                                        </div>
-                                    ) : point.type === 'code' ? (
-                                        <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
-                                            {point.text || ""}
-                                        </SyntaxHighlighter>
-                                    ) : (
-                                        <span className="break-words w-full" title={point.text}>{point.text}</span>
-                                    )}
-                                </li>
-                            ))}
-                        </ul>
+                        {resource.type === 'flashcard' && resource.flashcard ? (
+                            <FlashcardMcqPanel flashcard={resource.flashcard} />
+                        ) : (
+                            <ul className="space-y-2 text-sm text-muted-foreground pr-2">
+                                {(resource.points || []).map(point => (
+                                    <li key={point.id} className="flex items-start gap-2">
+                                        {point.type === 'code' ? <Code className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                        point.type === 'markdown' ? <MessageSquare className="h-4 w-4 mt-0.5 text-primary/70 flex-shrink-0" /> :
+                                        <ArrowRight className="h-4 w-4 mt-0.5 text-primary/50 flex-shrink-0" />
+                                        }
+                                        {point.type === 'card' && point.resourceId ? (
+                                            <button
+                                                onClick={(e) => handleLinkClick(e, point.resourceId!)}
+                                                className="text-left font-medium text-primary hover:underline"
+                                            >
+                                                {point.text}
+                                            </button>
+                                        ) : point.type === 'markdown' ? (
+                                            <div className="w-full prose dark:prose-invert prose-sm">
+                                              <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text || ""}</ReactMarkdown>
+                                            </div>
+                                        ) : point.type === 'code' ? (
+                                            <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
+                                                {point.text || ""}
+                                            </SyntaxHighlighter>
+                                        ) : (
+                                            <span className="break-words w-full" title={point.text}>{point.text}</span>
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </CardContent>
                 </div>
                 <CardFooter className="p-2 flex justify-end flex-shrink-0 relative">
@@ -170,6 +176,10 @@ const ResourceCardComponent = ({ resource, onOpenNestedPopup, playingAudio, setP
   setFloatingVideoUrl: (url: string | null) => void;
   onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
 }) => {
+    if (resource.type === 'flashcard') {
+        return <FlashcardResourceTile resource={resource} />;
+    }
+
     const hasMarkdownContent = resource.type === 'card' && (resource.points || []).some(p => p.type === 'markdown' || p.type === 'code');
     const [embedUrl, setEmbedUrl] = useState<string | null>(null);
     const [showModelViewer, setShowModelViewer] = useState(false);

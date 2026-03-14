@@ -21,6 +21,7 @@ import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from "rec
 import { getAiConfigFromSettings, normalizeAiSettings } from "@/lib/ai/config";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { getEffectiveConstraintTasks } from "@/lib/botheringUtils";
 
 type BotheringSourceType = "External" | "Mismatch" | "Constraint";
 type BotheringTask = NonNullable<MindsetPoint["tasks"]>[number];
@@ -102,6 +103,10 @@ export function BotheringsCard() {
     const mismatchPoints = mindsetCards.find((c) => c.id === "mindset_botherings_mismatch")?.points || [];
     return new Map(mismatchPoints.map((point) => [point.id, point] as const));
   }, [mindsetCards]);
+  const externalPointById = useMemo(() => {
+    const externalPoints = mindsetCards.find((c) => c.id === "mindset_botherings_external")?.points || [];
+    return new Map(externalPoints.map((point) => [point.id, point] as const));
+  }, [mindsetCards]);
 
   const routineDetailById = useMemo(() => {
     const map = new Map<string, string>();
@@ -123,27 +128,9 @@ export function BotheringsCard() {
     (point: MindsetPoint, sourceType: BotheringSourceType): BotheringTask[] => {
       const directTasks = point.tasks || [];
       if (sourceType !== "Constraint") return directTasks;
-
-      const merged: BotheringTask[] = [...directTasks];
-      const seen = new Set<string>();
-      merged.forEach((task) => {
-        seen.add(task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`);
-      });
-
-      (point.linkedMismatchIds || []).forEach((mismatchId) => {
-        const mismatch = mismatchPointById.get(mismatchId);
-        if (!mismatch?.tasks?.length) return;
-        mismatch.tasks.forEach((task) => {
-          const key = task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`;
-          if (seen.has(key)) return;
-          seen.add(key);
-          merged.push(task);
-        });
-      });
-
-      return merged;
+      return getEffectiveConstraintTasks(point, mismatchPointById, externalPointById);
     },
-    [mismatchPointById]
+    [externalPointById, mismatchPointById]
   );
 
   const todayScheduleContext = useMemo(() => {

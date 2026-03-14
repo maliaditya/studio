@@ -320,7 +320,6 @@ export const LinkedDeepWorkCard = React.forwardRef<HTMLDivElement, {
                             <DropdownMenuItem onSelect={() => handleCreateBrainHack(deepworkDef.id, 'deepwork')}>
                                 <BrainCircuit className="mr-2 h-4 w-4" /> Create Brain Hack
                             </DropdownMenuItem>
-                            {isActionable && <DropdownMenuItem onSelect={() => handleToggleReadyForBranding(deepworkDef.id)}><Checkbox className="mr-2" checked={!!deepworkDef.isReadyForBranding} /><span>Mark as Ready for Branding</span></DropdownMenuItem>}
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onSelect={() => handleUnlinkItem('deepwork', deepworkDef.id)} className="text-yellow-600"><Unlink className="mr-2 h-4 w-4"/>Unlink</DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => handleDeleteFocusArea(deepworkDef.id)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete Permanently</DropdownMenuItem>

@@ -1,477 +1,378 @@
-
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import { useToast } from '@/hooks/use-toast';
-import { ListChecks, ChevronRight, CalendarIcon, GripVertical, Briefcase, Share2, Loader2, Check, ChevronDown, ChevronUp, Linkedin, PlusCircle, Package, Info } from 'lucide-react';
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { format, isMonday, getYear, getISOWeek } from 'date-fns';
-import { ExerciseDefinition, WorkoutExercise, LoggedSet, DatedWorkout, ExerciseCategory, SharingStatus } from '@/types/workout';
-import { WorkoutExerciseCard } from '@/components/WorkoutExerciseCard';
-import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import React, { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { safeSetLocalStorageItem } from '@/lib/safeStorage';
+import { Share2, Library, FileText, Video, ArrowRight } from 'lucide-react';
+import type { KanbanBoard, KanbanCard, KanbanList, Project, Resource } from '@/types/workout';
+import { useToast } from '@/hooks/use-toast';
 
-const TwitterIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
-        <title>X</title>
-        <path d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/>
-    </svg>
-);
-
-const DevToIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" {...props}>
-        <title>DEV Community</title>
-        <path d="M11.472 24a1.5 1.5 0 0 1-1.06-.44L.439 13.587a1.5 1.5 0 0 1 0-2.12l9.97-9.97a1.5 1.5 0 0 1 2.12 0L22.503 11.47a1.5 1.5 0 0 1 0 2.121l-9.972 9.971a1.5 1.5 0 0 1-1.06.44Zm-8.485-11.25 8.485 8.485 8.485-8.485-8.485-8.485-8.485 8.485ZM19.5 18h-3V9h3v9Z"/>
-    </svg>
-);
-
+const BRANDING_LIST_TEMPLATES = [
+  { key: 'script', title: 'Creating Script', color: '#2563eb' },
+  { key: 'final', title: 'Finalizing Script', color: '#7c3aed' },
+  { key: 'audio', title: 'Audio Recording', color: '#0891b2' },
+  { key: 'video', title: 'Video Recording', color: '#db2777' },
+  { key: 'social', title: 'Post on Social Media', color: '#ea580c' },
+  { key: 'done', title: 'Done', color: '#0f766e' },
+] as const;
 
 function PersonalBrandingPageContent() {
+  const router = useRouter();
   const { toast } = useToast();
-  const { 
-    currentUser, 
-    exportData,
-    brandingLogs, setBrandingLogs,
-    deepWorkDefinitions, setDeepWorkDefinitions,
+  const {
+    projects,
+    resources,
+    resourceFolders,
+    kanbanBoards,
+    setKanbanBoards,
+    openGeneralPopup,
   } = useAuth();
-  
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  
-  const [isLoadingPage, setIsLoadingPage] = useState(true);
-  const [showBackupPrompt, setShowBackupPrompt] = useState(false);
-  const [isPublishedExpanded, setIsPublishedExpanded] = useState(false);
 
-  // State for bundle creation
-  const [newBundleName, setNewBundleName] = useState('');
-  const [selectedFocusAreaIds, setSelectedFocusAreaIds] = useState<string[]>([]);
+  const [draftProjectId, setDraftProjectId] = useState('');
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftType, setDraftType] = useState<'blog' | 'video'>('blog');
+  const [draftFeatureIds, setDraftFeatureIds] = useState<string[]>([]);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
-  useEffect(() => {
-    setIsLoadingPage(false);
-  }, []);
-  
-  useEffect(() => {
-    if (!currentUser) return;
-    const today = new Date();
-    const year = getYear(today);
-    const week = getISOWeek(today);
-    const backupPromptKey = `backupPrompt_branding_${year}-${week}`;
-    const hasBeenPrompted = localStorage.getItem(backupPromptKey);
-    if (isMonday(today) && !hasBeenPrompted) setShowBackupPrompt(true);
-  }, [currentUser]);
+  const featureFolderId = useMemo(
+    () => resourceFolders.find((folder) => folder.name === 'Kanban Features' && folder.parentId === null)?.id || null,
+    [resourceFolders]
+  );
 
-  const { activeBundles, publishedBundles, eligibleFocusAreas } = useMemo(() => {
-    const allDefinitions = deepWorkDefinitions || [];
+  const getFeatureResourceForProject = (project: Project) =>
+    resources.find(
+      (resource) =>
+        resource.type === 'card' &&
+        resource.name === `${project.name} Features` &&
+        (!featureFolderId || resource.folderId === featureFolderId)
+    ) || null;
 
-    // Eligible areas are individual focus areas (not bundles) marked as ready.
-    const eligible = allDefinitions.filter(def => def.isReadyForBranding && !def.focusAreaIds);
+  const ensureBrandingBoard = (project: Project): KanbanBoard => {
+    const existingBoard = kanbanBoards.find((board) => board.boardType === 'branding' && board.projectId === project.id);
+    if (existingBoard) return existingBoard;
 
-    // Bundles are items that HAVE a focusAreaIds array.
-    const allBundles = allDefinitions.filter(def => Array.isArray(def.focusAreaIds));
+    const projectBoard =
+      kanbanBoards.find((board) => board.projectId === project.id && board.boardType !== 'branding') || null;
+    const timestamp = new Date().toISOString();
+    const boardId = `branding_board_${project.id}`;
+    const lists: KanbanList[] = BRANDING_LIST_TEMPLATES.map((list, index) => ({
+      id: `${boardId}_${list.key}`,
+      boardId,
+      title: list.title,
+      color: list.color,
+      cardOrder: [],
+      position: index,
+      archived: false,
+    }));
 
-    const isFullyShared = (task: ExerciseDefinition) => 
-        task.sharingStatus && 
-        task.sharingStatus.twitter && 
-        task.sharingStatus.linkedin && 
-        task.sharingStatus.devto;
-
-    const active: ExerciseDefinition[] = [];
-    const published: ExerciseDefinition[] = [];
-
-    allBundles.forEach(bundle => {
-        if (isFullyShared(bundle)) {
-            published.push(bundle);
-        } else {
-            active.push(bundle);
-        }
-    });
-    
-    return { activeBundles: active, publishedBundles: published, eligibleFocusAreas: eligible };
-  }, [deepWorkDefinitions]);
-
-
-  const markBackupPromptAsHandled = () => {
-    const today = new Date();
-    const year = getYear(today);
-    const week = getISOWeek(today);
-    const backupPromptKey = `backupPrompt_branding_${year}-${week}`;
-    safeSetLocalStorageItem(backupPromptKey, 'true');
-    setShowBackupPrompt(false);
-  };
-
-  const handleBackupConfirm = () => {
-    exportData();
-    markBackupPromptAsHandled();
-  };
-  
-  const currentDatedLog = useMemo(() => {
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    return brandingLogs.find(log => log.id === dateKey);
-  }, [selectedDate, brandingLogs]);
-
-  const currentSessionTasks = useMemo(() => {
-    return currentDatedLog?.exercises || [];
-  }, [currentDatedLog]);
-
-  const updateOrAddLog = (updatedLog: DatedWorkout) => {
-    setBrandingLogs(prevLogs => {
-      const existingLogIndex = prevLogs.findIndex(log => log.id === updatedLog.id);
-      if (existingLogIndex > -1) {
-        const newLogs = [...prevLogs];
-        newLogs[existingLogIndex] = updatedLog;
-        return newLogs;
-      }
-      return [...prevLogs, updatedLog];
-    });
-  };
-
-  const handleCreateBundle = () => {
-    if (newBundleName.trim() === '') {
-      toast({ title: "Error", description: "Please provide a name for the bundle.", variant: "destructive" });
-      return;
-    }
-    if (selectedFocusAreaIds.length === 0) {
-      toast({ title: "Error", description: "Please select at least one focus area for the bundle.", variant: "destructive" });
-      return;
-    }
-
-    const newBundle: ExerciseDefinition = {
-      id: `bundle_${Date.now()}_${Math.random()}`,
-      name: newBundleName.trim(),
-      category: "Content Bundle",
-      focusAreaIds: selectedFocusAreaIds,
-      isReadyForBranding: false, // Bundles aren't "ready" themselves, they just exist.
-      sharingStatus: { twitter: false, linkedin: false, devto: false }
+    const nextBoard: KanbanBoard = {
+      id: boardId,
+      name: `${project.name} Branding`,
+      description: `${project.name} feature branding pipeline`,
+      projectId: project.id,
+      releaseId: projectBoard?.releaseId || null,
+      specializationId: projectBoard?.specializationId || null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      listOrder: lists.map((list) => list.id),
+      labels: [],
+      lists,
+      cards: [],
+      attachments: [],
+      comments: [],
+      boardType: 'branding',
+      migratedFromReleaseWorkflow: false,
     };
 
-    setDeepWorkDefinitions(prevDefs => {
-      // Mark constituent focus areas as no longer "ready" so they don't show up in the list
-      const updatedDefs = prevDefs.map(def => {
-        if (selectedFocusAreaIds.includes(def.id)) {
-          return { ...def, isReadyForBranding: false };
-        }
-        return def;
-      });
-      // Add the new bundle
-      return [...updatedDefs, newBundle];
-    });
-
-    toast({ title: "Bundle Created!", description: `"${newBundle.name}" is now in your pipeline.` });
-    setNewBundleName('');
-    setSelectedFocusAreaIds([]);
+    setKanbanBoards((prev) => (prev.some((board) => board.id === nextBoard.id) ? prev : [...prev, nextBoard]));
+    return nextBoard;
   };
 
-  const handleAddTaskToSession = (definition: ExerciseDefinition) => {
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const newSessionTask: WorkoutExercise = {
-      id: `${definition.id}-${Date.now()}-${Math.random()}`,
-      definitionId: definition.id,
-      name: definition.name,
-      category: definition.category,
-      loggedSets: [],
-      targetSets: 4,
-      targetReps: "4 stages",
-      focusAreaIds: definition.focusAreaIds,
+  const brandingProjects = useMemo(() => {
+    return projects
+      .map((project) => {
+        const featureResource = getFeatureResourceForProject(project);
+        const readyFeatures = (featureResource?.points || []).filter(
+          (point) => point.type === 'todo' && point.text.trim() && point.readyForBranding
+        );
+        const brandingBoard = kanbanBoards.find((board) => board.boardType === 'branding' && board.projectId === project.id) || null;
+        const brandingCards = (brandingBoard?.cards || []).filter((card) => !card.archived);
+
+        return {
+          project,
+          featureResource,
+          readyFeatures,
+          brandingBoard,
+          brandingCards,
+        };
+      })
+      .filter((entry) => entry.readyFeatures.length > 0 || entry.brandingCards.length > 0);
+  }, [kanbanBoards, projects, resources, featureFolderId]);
+
+  const selectedDraftProject = useMemo(
+    () => brandingProjects.find((entry) => entry.project.id === draftProjectId) || null,
+    [brandingProjects, draftProjectId]
+  );
+
+  const handleOpenCreate = (projectId: string) => {
+    const projectEntry = brandingProjects.find((entry) => entry.project.id === projectId) || null;
+    setDraftProjectId(projectId);
+    setDraftTitle('');
+    setDraftType('blog');
+    setDraftFeatureIds(projectEntry?.readyFeatures.map((feature) => feature.id) || []);
+    setIsCreateOpen(true);
+  };
+
+  const handleCreateBrandingCard = () => {
+    if (!selectedDraftProject) return;
+    if (!draftTitle.trim()) {
+      toast({ title: 'Title required', description: 'Enter a branding card title.', variant: 'destructive' });
+      return;
+    }
+    if (draftFeatureIds.length === 0) {
+      toast({ title: 'No features selected', description: 'Select at least one ready feature.', variant: 'destructive' });
+      return;
+    }
+
+    const board = ensureBrandingBoard(selectedDraftProject.project);
+    const firstListId = board.listOrder[0];
+    const timestamp = new Date().toISOString();
+    const newCardId = `branding_card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const newCard: KanbanCard = {
+      id: newCardId,
+      boardId: board.id,
+      listId: firstListId,
+      cardKind: 'standard',
+      title: draftTitle.trim(),
+      description: '',
+      labelIds: [],
+      dueDate: null,
+      checklist: [],
+      attachmentIds: [],
+      commentIds: [],
+      linkedIntentionIds: [],
+      linkedProjectId: selectedDraftProject.project.id,
+      linkedReleaseId: board.releaseId || null,
+      linkedFeatureResourceId: selectedDraftProject.featureResource?.id || null,
+      linkedFeaturePointId: draftFeatureIds[0] || null,
+      linkedFeaturePointIds: draftFeatureIds,
+      brandingType: draftType,
+      archived: false,
+      position: (board.cards.filter((card) => card.listId === firstListId && !card.archived).length) + 1,
+      createdAt: timestamp,
+      updatedAt: timestamp,
     };
-    const existingLog = brandingLogs.find(log => log.id === dateKey);
-    if (existingLog) {
-      if (existingLog.exercises.some(ex => ex.definitionId === definition.id)) {
-        toast({ title: "Info", description: "This bundle is already in today's session." });
-        return;
-      }
-      updateOrAddLog({ ...existingLog, exercises: [...existingLog.exercises, newSessionTask] });
-    } else {
-      updateOrAddLog({ id: dateKey, date: dateKey, exercises: [newSessionTask] });
-    }
-    toast({ title: "Added to Session", description: `"${definition.name}" added for ${format(selectedDate, 'PPP')}.` });
-  };
 
-  const handleRemoveTaskFromSession = (exerciseId: string) => {
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingLog = brandingLogs.find(log => log.id === dateKey);
-    if (existingLog) {
-      const updatedExercises = existingLog.exercises.filter(ex => ex.id !== exerciseId);
-      if (updatedExercises.length === 0) setBrandingLogs(prevLogs => prevLogs.filter(log => log.id !== dateKey));
-      else updateOrAddLog({ ...existingLog, exercises: updatedExercises });
-    }
-  };
-
-  const handleLogStage = (exerciseId: string, stageIndex: number) => {
-    const dateKey = format(selectedDate, 'yyyy-MM-dd');
-    const existingLog = brandingLogs.find(log => log.id === dateKey);
-    if (existingLog) {
-      const newSet: LoggedSet = { id: `${Date.now()}-${Math.random()}`, reps: stageIndex, weight: 1, timestamp: Date.now() };
-      const updatedExercises = existingLog.exercises.map(ex => {
-        if (ex.id === exerciseId) {
-          if (ex.loggedSets.some(s => s.reps === stageIndex)) return ex;
-          return { ...ex, loggedSets: [...ex.loggedSets, newSet] };
-        }
-        return ex;
-      });
-      updateOrAddLog({ ...existingLog, exercises: updatedExercises });
-      toast({ title: "Stage Logged!" });
-    }
-  };
-
-  const handleUpdateSharingStatus = (definitionId: string, newStatus: SharingStatus) => {
-    setDeepWorkDefinitions(prevDefs => 
-      prevDefs.map(def => 
-        def.id === definitionId ? { ...def, sharingStatus: { ...(def.sharingStatus || {}), ...newStatus } } : def
-      )
+    setKanbanBoards((prev) =>
+      prev.map((entry) => {
+        if (entry.id !== board.id) return entry;
+        return {
+          ...entry,
+          cards: [...entry.cards, newCard],
+          lists: entry.lists.map((list) =>
+            list.id === firstListId ? { ...list, cardOrder: [...list.cardOrder, newCardId] } : list
+          ),
+          updatedAt: timestamp,
+        };
+      })
     );
+
+    setIsCreateOpen(false);
+    toast({ title: 'Branding card created', description: `"${draftTitle.trim()}" was added to the branding pipeline.` });
   };
-  
-  if (isLoadingPage) {
-    return (
-      <div className="flex flex-col justify-center items-center min-h-[calc(100vh-8rem)]">
-        <Loader2 className="h-16 w-16 text-primary animate-spin mb-4" />
-        <p className="text-muted-foreground">Loading your branding pipeline...</p>
-      </div>
-    );
-  }
 
   return (
     <>
-      <div className="container mx-auto p-4 sm:p-6 lg:p-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-          <section aria-labelledby="branding-pipeline-heading" className="md:col-span-1 space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg text-primary"><Package /> Create New Bundle</CardTitle>
-                    <CardDescription>Select ready focus areas to group them into a content bundle.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {eligibleFocusAreas.length === 0 ? (
-                        <div className="text-center py-4 text-sm text-muted-foreground">
-                            <Info className="mx-auto h-8 w-8 mb-2" />
-                            No focus areas are ready for bundling. Go to the Deep Work page and mark items as 'Ready for Branding' to see them here.
-                        </div>
-                    ) : (
-                        <>
-                            <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                                {eligibleFocusAreas.map(area => (
-                                    <div key={area.id} className="flex items-center space-x-2 p-2 rounded-md border">
-                                        <Checkbox
-                                            id={`check-${area.id}`}
-                                            checked={selectedFocusAreaIds.includes(area.id)}
-                                            onCheckedChange={(checked) => {
-                                                setSelectedFocusAreaIds(prev => 
-                                                    checked ? [...prev, area.id] : prev.filter(id => id !== area.id)
-                                                )
-                                            }}
-                                        />
-                                        <Label htmlFor={`check-${area.id}`} className="font-normal w-full cursor-pointer">
-                                            {area.name} <span className="text-muted-foreground">({area.category})</span>
-                                        </Label>
-                                    </div>
-                                ))}
-                            </div>
-                            <Input 
-                                placeholder="Name your new bundle"
-                                value={newBundleName}
-                                onChange={(e) => setNewBundleName(e.target.value)}
-                            />
-                            <Button className="w-full" onClick={handleCreateBundle}>
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Create Bundle
-                            </Button>
-                        </>
-                    )}
-                </CardContent>
-            </Card>
+      <div className="container mx-auto space-y-6 p-4 sm:p-6 lg:p-8">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Branding</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Ready project features become branding cards. Each branding card can bundle one or more features as a blog or video demonstration.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => router.push('/kanban')}>
+            <ArrowRight className="mr-2 h-4 w-4" />
+            Open Kanban
+          </Button>
+        </div>
 
-            <Card>
-              <CardHeader>
-                  <CardTitle id="branding-pipeline-heading" className="flex items-center gap-2 text-lg text-primary">
-                    <Share2 /> Branding Pipeline
-                  </CardTitle>
-                  <CardDescription>
-                    Content bundles you've created. Add them to a session to start working.
-                  </CardDescription>
-              </CardHeader>
-              <CardContent className="p-4">
-                  <div className="max-h-[calc(100vh-20rem)] overflow-y-auto pr-1">
-                    {activeBundles.length === 0 ? (
-                      <div className="text-center py-10">
-                        <Briefcase className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-                        <p className="text-muted-foreground">Your pipeline is empty.</p>
-                        <p className="text-sm text-muted-foreground/80">
-                         Create a content bundle to get started.
-                        </p>
+        {brandingProjects.length === 0 ? (
+          <Card>
+            <CardContent className="py-16 text-center text-muted-foreground">
+              No features are ready for branding yet. Complete a feature in its feature resource card, then click the branding icon on that feature.
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-6 xl:grid-cols-2">
+            {brandingProjects.map(({ project, featureResource, readyFeatures, brandingBoard, brandingCards }) => {
+              const stageById = new Map((brandingBoard?.lists || []).map((list) => [list.id, list.title]));
+              return (
+                <Card key={project.id} className="border-border/60 bg-card/70">
+                  <CardHeader>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <CardTitle className="text-xl">{project.name}</CardTitle>
+                        <CardDescription>
+                          {readyFeatures.length} ready feature{readyFeatures.length === 1 ? '' : 's'} • {brandingCards.length} branding card{brandingCards.length === 1 ? '' : 's'}
+                        </CardDescription>
                       </div>
-                    ) : (
-                      <ul className="space-y-3">
-                        {activeBundles.map(task => (
-                          <motion.li key={task.id} layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.2 }} className="p-3 bg-card border rounded-lg shadow-sm">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex-grow min-w-0">
-                                  <span className="font-medium text-foreground block" title={task.name}>{task.name}</span>
-                                   <Badge variant="secondary" className="text-xs">{task.category}</Badge>
-                              </div>
-                              <div className="flex-shrink-0 flex items-center">
-                                <Button variant="ghost" size="icon" onClick={() => handleAddTaskToSession(task)} className="h-8 w-8 text-muted-foreground hover:text-accent" aria-label={`Add ${task.name} to session`}>
-                                    <ChevronRight className="h-5 w-5" />
-                                </Button>
-                              </div>
-                            </div>
-                          </motion.li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader className="cursor-pointer p-4" onClick={() => setIsPublishedExpanded(!isPublishedExpanded)}>
-                    <div className="flex justify-between items-center">
-                        <div className='flex-grow'>
-                            <CardTitle className="flex items-center gap-2 text-lg text-primary">
-                                <Check /> Published Content
-                            </CardTitle>
-                            <CardDescription className='mt-1'>
-                                A log of your successfully published bundles.
-                            </CardDescription>
-                        </div>
-                        {isPublishedExpanded ? <ChevronUp className="h-5 w-5 text-primary" /> : <ChevronDown className="h-5 w-5 text-primary" />}
-                    </div>
-                </CardHeader>
-                <AnimatePresence>
-                    {isPublishedExpanded && (
-                    <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: "auto" }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.3 }}
-                        style={{ overflow: 'hidden' }}
-                    >
-                        <CardContent className="p-4 pt-0">
-                        <div className="max-h-[300px] overflow-y-auto pr-1">
-                            {publishedBundles.length === 0 ? (
-                            <p className="text-muted-foreground text-sm text-center py-4">No published content yet.</p>
-                            ) : (
-                            <ul className="space-y-3">
-                                {publishedBundles.map(task => (
-                                <li key={task.id} className="p-3 bg-card border rounded-lg">
-                                    <p className="font-semibold text-foreground">{task.name}</p>
-                                    <div className="mt-2 flex flex-wrap gap-1">
-                                        <Badge variant="outline" className="text-xs">{task.category}</Badge>
-                                    </div>
-                                    <div className="mt-3 pt-2 border-t flex items-center gap-4 text-muted-foreground">
-                                        <span className="text-xs font-semibold">SHARED ON:</span>
-                                        <div className="flex items-center gap-3">
-                                          {task.sharingStatus?.twitter && <TwitterIcon className="h-4 w-4" title="Shared on X/Twitter"/>}
-                                          {task.sharingStatus?.linkedin && <Linkedin className="h-4 w-4" title="Shared on LinkedIn" />}
-                                          {task.sharingStatus?.devto && <DevToIcon className="h-4 w-4" title="Shared on DEV.to" />}
-                                        </div>
-                                    </div>
-                                </li>
-                                ))}
-                            </ul>
-                            )}
-                        </div>
-                        </CardContent>
-                    </motion.div>
-                    )}
-                </AnimatePresence>
-            </Card>
-
-          </section>
-
-          <section aria-labelledby="branding-session-heading" className="md:col-span-2 space-y-6">
-              <Card>
-                  <CardHeader className="flex flex-row items-center justify-between p-4">
-                      <div className="flex-grow">
-                          <CardTitle id="branding-session-heading" className="flex items-center gap-2 text-lg text-primary">
-                              <ListChecks /> Branding Session for: {format(selectedDate, 'PPP')}
-                          </CardTitle>
-                      </div>
-                      <Popover>
-                          <PopoverTrigger asChild>
-                          <Button variant={"outline"} className={cn("w-[200px] justify-start text-left font-normal h-10",!selectedDate && "text-muted-foreground")}>
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                      <div className="flex gap-2">
+                        {featureResource ? (
+                          <Button variant="outline" size="sm" onClick={() => openGeneralPopup(featureResource.id, null)}>
+                            <Library className="mr-2 h-4 w-4" />
+                            Feature Card
                           </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0">
-                          <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus />
-                          </PopoverContent>
-                      </Popover>
+                        ) : null}
+                        <Button size="sm" onClick={() => handleOpenCreate(project.id)} disabled={readyFeatures.length === 0}>
+                          <Share2 className="mr-2 h-4 w-4" />
+                          Create Branding Card
+                        </Button>
+                      </div>
+                    </div>
                   </CardHeader>
-                  <CardContent className="p-4">
-                    <div className="max-h-[calc(100vh-16rem)] overflow-y-auto pr-2">
-                      {currentSessionTasks.length === 0 ? (
-                        <div className="text-center py-10">
-                            <GripVertical className="mx-auto h-16 w-16 text-muted-foreground/50 mb-4" />
-                            <p className="text-muted-foreground">No content creation tasks for {format(selectedDate, 'PPP')}.</p>
-                            <p className="text-sm text-muted-foreground/80">Add bundles from the pipeline to get started!</p>
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                          <AnimatePresence>
-                          {currentSessionTasks.map(task => {
-                              const definition = deepWorkDefinitions.find(def => def.id === task.definitionId);
-                              return (
-                                <WorkoutExerciseCard 
-                                  key={task.id} 
-                                  exercise={{...task, sharingStatus: definition?.sharingStatus}}
-                                  onLogSet={handleLogStage} 
-                                  onDeleteSet={() => {}} 
-                                  onUpdateSet={() => {}}
-                                  onUpdateSharingStatus={handleUpdateSharingStatus}
-                                  onRemoveExercise={handleRemoveTaskFromSession}
-                                  pageType="branding"
-                                  deepWorkDefinitions={deepWorkDefinitions}
-                                />
-                              );
-                          })}
-                          </AnimatePresence>
-                        </div>
-                      )}
+                  <CardContent className="space-y-5">
+                    <div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Ready Features</div>
+                      <div className="flex flex-wrap gap-2">
+                        {readyFeatures.length > 0 ? readyFeatures.map((feature) => (
+                          <Badge key={feature.id} variant="secondary" className="max-w-full truncate">
+                            {feature.text}
+                          </Badge>
+                        )) : (
+                          <div className="text-sm text-muted-foreground">No ready features yet.</div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Branding Cards</div>
+                      <div className="space-y-3">
+                        {brandingCards.length > 0 ? brandingCards.map((card) => {
+                          const featureNames = (card.linkedFeaturePointIds?.length ? card.linkedFeaturePointIds : (card.linkedFeaturePointId ? [card.linkedFeaturePointId] : []))
+                            .map((pointId) => featureResource?.points.find((point) => point.id === pointId)?.text?.trim() || '')
+                            .filter(Boolean);
+                          return (
+                            <div key={card.id} className="rounded-xl border border-border/60 bg-background/40 p-3">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="font-medium text-foreground">{card.title}</div>
+                                  <div className="mt-1 flex flex-wrap gap-2">
+                                    <Badge variant="outline">{card.brandingType === 'video' ? 'Video' : 'Blog'}</Badge>
+                                    <Badge variant="secondary">{stageById.get(card.listId) || 'Pipeline'}</Badge>
+                                  </div>
+                                </div>
+                              </div>
+                              {featureNames.length > 0 ? (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {featureNames.map((name) => (
+                                    <Badge key={`${card.id}-${name}`} variant="secondary">{name}</Badge>
+                                  ))}
+                                </div>
+                              ) : null}
+                            </div>
+                          );
+                        }) : (
+                          <div className="rounded-xl border border-dashed border-border/60 px-3 py-8 text-center text-sm text-muted-foreground">
+                            No branding cards created for this project yet.
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
-              </Card>
-          </section>
-        </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      <AlertDialog open={showBackupPrompt} onOpenChange={setShowBackupPrompt}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Weekly Backup Reminder</AlertDialogTitle>
-            <AlertDialogDescription>
-              It's Monday! Would you like to back up your branding data? This will download a file to your computer.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={markBackupPromptAsHandled}>Maybe Later</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBackupConfirm}>Yes, Back Up Now</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Create Branding Card</DialogTitle>
+            <DialogDescription>Bundle ready features into a blog or video branding card.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <select
+              value={draftProjectId}
+              onChange={(event) => {
+                const projectId = event.target.value;
+                const entry = brandingProjects.find((item) => item.project.id === projectId) || null;
+                setDraftProjectId(projectId);
+                setDraftFeatureIds(entry?.readyFeatures.map((feature) => feature.id) || []);
+              }}
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+            >
+              <option value="">Select project</option>
+              {brandingProjects.map((entry) => (
+                <option key={entry.project.id} value={entry.project.id}>
+                  {entry.project.name}
+                </option>
+              ))}
+            </select>
+
+            <Input
+              value={draftTitle}
+              onChange={(event) => setDraftTitle(event.target.value)}
+              placeholder="Branding card title"
+            />
+
+            <select
+              value={draftType}
+              onChange={(event) => setDraftType(event.target.value === 'video' ? 'video' : 'blog')}
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+            >
+              <option value="blog">Blog</option>
+              <option value="video">Video</option>
+            </select>
+
+            <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+              <div className="mb-3 text-sm font-semibold text-foreground">Features</div>
+              <div className="max-h-64 space-y-2 overflow-y-auto">
+                {selectedDraftProject?.readyFeatures.length ? selectedDraftProject.readyFeatures.map((feature) => (
+                  <label key={feature.id} className="flex items-start gap-3 rounded-lg border border-border/50 bg-background/40 px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={draftFeatureIds.includes(feature.id)}
+                      onChange={(event) =>
+                        setDraftFeatureIds((prev) =>
+                          event.target.checked ? [...prev, feature.id] : prev.filter((id) => id !== feature.id)
+                        )
+                      }
+                      className="mt-0.5 h-4 w-4"
+                    />
+                    <span>{feature.text}</span>
+                  </label>
+                )) : (
+                  <div className="text-sm text-muted-foreground">No ready features for the selected project.</div>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateBrandingCard}>
+              {draftType === 'video' ? <Video className="mr-2 h-4 w-4" /> : <FileText className="mr-2 h-4 w-4" />}
+              Create Branding Card
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
 
 export default function PersonalBrandingPage() {
-  return ( <AuthGuard> <PersonalBrandingPageContent /> </AuthGuard> );
+  return (
+    <AuthGuard>
+      <PersonalBrandingPageContent />
+    </AuthGuard>
+  );
 }

@@ -1,4 +1,4 @@
-export type Domain = "task" | "routine" | "bothering" | "resource" | "skill" | "health" | "canvas";
+export type Domain = "task" | "routine" | "bothering" | "resource" | "skill" | "health" | "canvas" | "journal";
 
 export type ShivPath = "deterministic" | "ai_fallback" | "clarify";
 

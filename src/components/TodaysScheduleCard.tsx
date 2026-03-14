@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow, Target, Calendar, X, Wallet, Users, Wrench, Blocks, HandHeart, Sparkles, HeartPulse, Palette, Bug } from 'lucide-react';
-import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule, Resource, Stopper, MindsetPoint, CoreDomainId } from '@/types/workout';
+import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule, Resource, Stopper, MindsetPoint, CoreDomainId, SlotName } from '@/types/workout';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { Textarea } from './ui/textarea';
@@ -26,6 +26,9 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { useDraggable } from '@dnd-kit/core';
+import { getEffectiveConstraintTasks } from '@/lib/botheringUtils';
+import { buildFlashcardTaskKey, getFlashcardSessionsForTask } from '@/lib/flashcards';
+import { FlashcardReviewModal } from './FlashcardReviewModal';
 
 
 const activityIcons: Record<ActivityType, React.ReactNode> = {
@@ -289,9 +292,11 @@ export const AgendaWidgetItem = React.memo(({
         offerizationPlans,
         upskillDefinitions,
         deepWorkDefinitions,
+        kanbanBoards,
         settings,
     } = useAuth();
     const router = useRouter();
+    const [isFlashcardReviewOpen, setIsFlashcardReviewOpen] = useState(false);
 
     const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition', 'spaced-repetition', 'bugs'].includes(activity.type);
     const isAgendaContext = context === 'agenda';
@@ -301,6 +306,15 @@ export const AgendaWidgetItem = React.memo(({
             onActivityClick(activity, e);
         }
     };
+
+    const hasLinkedKanbanCard = useMemo(() => {
+        if (activity.type !== 'deepwork' || activity.completed) return false;
+        const candidateIds = new Set(activity.taskIds || []);
+        if (candidateIds.size === 0) return false;
+        return (kanbanBoards || []).some((board) =>
+            (board.cards || []).some((card) => !card.archived && candidateIds.has(card.id))
+        );
+    }, [activity.completed, activity.taskIds, activity.type, kanbanBoards]);
     
     const isPlanningTask = (activity.type === 'upskill' || activity.type === 'deepwork') && activity.linkedEntityType === 'specialization';
     const baseMatch = activity.id.match(/_(\d{4}-\d{2}-\d{2})$/);
@@ -312,6 +326,18 @@ export const AgendaWidgetItem = React.memo(({
     const linkedActivityName = activity.type === 'pomodoro' && activity.linkedActivityType
         ? activity.linkedActivityType.charAt(0).toUpperCase() + activity.linkedActivityType.slice(1).replace('-', ' ')
         : null;
+    const flashcardReviewTaskKey = useMemo(() => {
+        if (activity.type !== 'spaced-repetition') return null;
+        const reviewActivityType =
+            activity.linkedActivityType === 'deepwork' || activity.linkedActivityType === 'upskill'
+                ? activity.linkedActivityType
+                : null;
+        return buildFlashcardTaskKey(reviewActivityType, activity.taskIds?.[0] || null);
+    }, [activity.linkedActivityType, activity.taskIds, activity.type]);
+    const flashcardReviewSessionCount = useMemo(
+        () => getFlashcardSessionsForTask(settings, flashcardReviewTaskKey).length,
+        [flashcardReviewTaskKey, settings]
+    );
     const shouldStrike = activity.completed || !!hasLoggedStopper;
     const learningTargetLabel = useMemo(() => {
         if (!(activity.type === 'upskill' || activity.type === 'deepwork')) return null;
@@ -544,6 +570,7 @@ export const AgendaWidgetItem = React.memo(({
     };
 
     return (
+        <>
         <li 
             className={cn(
                 "flex items-start gap-2 p-2 rounded-lg group transition-all",
@@ -554,7 +581,16 @@ export const AgendaWidgetItem = React.memo(({
             onClick={handleItemClick}
         >
             <div className="mt-0.5 flex flex-col items-center gap-1">
-                <button onClick={(e) => { e.stopPropagation(); onToggleComplete(activity.slot, activity.id); }}>
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (hasLinkedKanbanCard && onStartFocus) {
+                            onStartFocus(activity, e);
+                            return;
+                        }
+                        onToggleComplete(activity.slot, activity.id);
+                    }}
+                >
                     {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
                 </button>
                 {isPastSlot && (
@@ -603,8 +639,32 @@ export const AgendaWidgetItem = React.memo(({
                         <Badge variant="secondary">{loggedDuration}</Badge>
                     )}
                 </div>
+                {flashcardReviewSessionCount > 0 && flashcardReviewTaskKey && (
+                    <div className="mt-1 flex justify-end">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setIsFlashcardReviewOpen(true);
+                            }}
+                        >
+                            <BookOpenCheck className="mr-1.5 h-3.5 w-3.5" />
+                            Review Flashcards
+                        </Button>
+                    </div>
+                )}
             </div>
         </li>
+        <FlashcardReviewModal
+            open={isFlashcardReviewOpen}
+            onOpenChange={setIsFlashcardReviewOpen}
+            taskKey={flashcardReviewTaskKey}
+            title={activity.details}
+        />
+        </>
     );
 });
 AgendaWidgetItem.displayName = 'AgendaWidgetItem';
@@ -712,30 +772,16 @@ export function TodaysScheduleCard({
     const mismatchPoints = mindsetCards.find((c) => c.id === "mindset_botherings_mismatch")?.points || [];
     return new Map(mismatchPoints.map((point) => [point.id, point] as const));
   }, [mindsetCards]);
+  const externalPointById = useMemo(() => {
+    const externalPoints = mindsetCards.find((c) => c.id === "mindset_botherings_external")?.points || [];
+    return new Map(externalPoints.map((point) => [point.id, point] as const));
+  }, [mindsetCards]);
 
   const getEffectiveBotheringTasks = useCallback((point: MindsetPoint, sourceType: BotheringSourceType): BotheringTask[] => {
     const directTasks = point.tasks || [];
     if (sourceType !== "Constraint") return directTasks;
-
-    const merged: BotheringTask[] = [...directTasks];
-    const seen = new Set<string>();
-    merged.forEach((task) => {
-      seen.add(task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`);
-    });
-
-    (point.linkedMismatchIds || []).forEach((mismatchId) => {
-      const mismatch = mismatchPointById.get(mismatchId);
-      if (!mismatch?.tasks?.length) return;
-      mismatch.tasks.forEach((task) => {
-        const key = task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        merged.push(task);
-      });
-    });
-
-    return merged;
-  }, [mismatchPointById]);
+    return getEffectiveConstraintTasks(point, mismatchPointById, externalPointById);
+  }, [externalPointById, mismatchPointById]);
 
   const isBotheringTaskDueOnDate = useCallback((task: BotheringTask, dateKey: string) => {
     const startKey = task.startDate || task.dateKey;
@@ -1926,15 +1972,15 @@ type BotheringTask = NonNullable<MindsetPoint["tasks"]>[number];
 type CoreStateId = "S0" | "S1" | "S2" | "S3" | "S4" | "S5" | "S6";
 
 const CORE_DEFS: Array<{ id: CoreDomainId; label: string; icon: React.ReactNode; dominantType: BotheringSourceType }> = [
+  { id: "autonomy", label: "Autonomy", icon: <Blocks className="h-3.5 w-3.5" />, dominantType: "Constraint" },
+  { id: "competence", label: "Competence", icon: <Wrench className="h-3.5 w-3.5" />, dominantType: "Mismatch" },
+  { id: "transcendence", label: "Relatedness", icon: <Sparkles className="h-3.5 w-3.5" />, dominantType: "Mismatch" },
   { id: "health", label: "Health", icon: <HeartPulse className="h-3.5 w-3.5" />, dominantType: "External" },
   { id: "wealth", label: "Wealth", icon: <Wallet className="h-3.5 w-3.5" />, dominantType: "Constraint" },
   { id: "relations", label: "Relations", icon: <Users className="h-3.5 w-3.5" />, dominantType: "External" },
   { id: "meaning", label: "Meaning", icon: <Compass className="h-3.5 w-3.5" />, dominantType: "Mismatch" },
-  { id: "competence", label: "Competence", icon: <Wrench className="h-3.5 w-3.5" />, dominantType: "Mismatch" },
-  { id: "autonomy", label: "Autonomy", icon: <Blocks className="h-3.5 w-3.5" />, dominantType: "Constraint" },
   { id: "creativity", label: "Creativity", icon: <Palette className="h-3.5 w-3.5" />, dominantType: "External" },
   { id: "contribution", label: "Contribution", icon: <HandHeart className="h-3.5 w-3.5" />, dominantType: "Constraint" },
-  { id: "transcendence", label: "Transcendence", icon: <Sparkles className="h-3.5 w-3.5" />, dominantType: "Mismatch" },
 ];
 
 const CORE_GROUP_BY_TYPE: Record<BotheringSourceType, CoreDomainId[]> = {

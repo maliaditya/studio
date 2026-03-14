@@ -11,7 +11,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "desktop:sync-icon": "node electron/sync-icon.cjs",
-    "desktop:dev": "concurrently -k \"npm run dev\" \"wait-on tcp:9002 && electron .\"",
+    "desktop:dev": "concurrently \"npm run dev\" \"wait-on tcp:9002 && electron .\"",
     "desktop:build": "cross-env NEXT_DIST_DIR=.next-desktop next build",
     "desktop:prepare": "npm run desktop:sync-icon && node electron/prepare-standalone.cjs .next-desktop",
     "desktop:pack": "npm run desktop:build && npm run desktop:prepare && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir",

@@ -4,7 +4,7 @@ import type { Domain, ShivEntity, ShivIndex } from "@/lib/shiv/types";
 
 type AnyRecord = Record<string, unknown>;
 
-const domainList: Domain[] = ["task", "routine", "bothering", "resource", "skill", "health", "canvas"];
+const domainList: Domain[] = ["task", "routine", "bothering", "resource", "skill", "health", "canvas", "journal"];
 
 const asArray = <T = AnyRecord>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
 const asObject = (value: unknown): AnyRecord => (value && typeof value === "object" ? (value as AnyRecord) : {});
@@ -92,6 +92,7 @@ export const buildShivIndex = (appContext: AnyRecord): ShivIndex => {
   const botherings = (appContext.botherings || {}) as AnyRecord;
   const data = (appContext.data || {}) as AnyRecord;
   const mindset = (appContext.mindsetTaskLinks || {}) as AnyRecord;
+  const journal = (appContext.journal || {}) as AnyRecord;
   const settings = (appContext.settings || {}) as AnyRecord;
   const meta = (appContext.meta || {}) as AnyRecord;
   const mergedTaskAliases = mergeTaskAliasMaps(
@@ -483,6 +484,56 @@ export const buildShivIndex = (appContext: AnyRecord): ShivIndex => {
     );
   });
 
+  const recentJournalSessions = asArray<AnyRecord>(journal.recentSessions);
+  recentJournalSessions.slice(0, 20).forEach((entry, index) => {
+    const name = safeString(entry.date) || `Journal ${index + 1}`;
+    const text = [
+      safeString(entry.date),
+      safeString(entry.status),
+      safeString(entry.note),
+      safeString((entry.topCauses || []).join(" ")),
+      safeString(entry.unresolvedBotherings),
+      safeString(entry.moodRating),
+      safeString(entry.energyRating),
+      safeString(entry.stressRating),
+      "journal",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    entities.push(
+      buildEntity(
+        "journal",
+        `journal-session-${safeString(entry.date) || index}`,
+        `Journal ${safeString(entry.date) || index + 1}`,
+        text,
+        [safeString(entry.date), "journal", "daily journal", ...(asArray<string>(entry.topCauses) || [])],
+        {
+          ...entry,
+          source: "journal.recentSessions",
+        }
+      )
+    );
+  });
+
+  const journalPatterns = asArray<AnyRecord>(journal.patterns);
+  journalPatterns.slice(0, 20).forEach((entry, index) => {
+    const cause = safeString(entry.cause) || `pattern-${index + 1}`;
+    const count = safeString(entry.count);
+    entities.push(
+      buildEntity(
+        "journal",
+        `journal-pattern-${cause || index}`,
+        `Journal pattern: ${cause}`,
+        `${cause} ${count} journal pattern`,
+        [cause, "journal pattern", "journal"],
+        {
+          ...entry,
+          source: "journal.patterns",
+        }
+      )
+    );
+  });
+
   const byDomain = {
     task: [] as ShivEntity[],
     routine: [] as ShivEntity[],
@@ -491,6 +542,7 @@ export const buildShivIndex = (appContext: AnyRecord): ShivIndex => {
     skill: [] as ShivEntity[],
     health: [] as ShivEntity[],
     canvas: [] as ShivEntity[],
+    journal: [] as ShivEntity[],
   };
 
   for (const entity of entities) {

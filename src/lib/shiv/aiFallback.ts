@@ -22,7 +22,8 @@ const buildEvidenceBundle = (evidence: ShivEvidence[]) =>
 export const runShivAiFallback = async (
   query: ShivQuery,
   evidence: ShivEvidence[],
-  aiConfig: AiRequestConfig
+  aiConfig: AiRequestConfig,
+  options?: { languageInstructionOverride?: string }
 ): Promise<
   | { ok: true; answer: string; provider: string; model: string }
   | { ok: false; error: string; details?: string }
@@ -33,7 +34,7 @@ export const runShivAiFallback = async (
 
   const bundle = buildEvidenceBundle(evidence);
 
-  const systemPrompt = `You are Shiv, a grounded assistant for Dock app.
+  const systemPrompt = `You are Astra, a grounded assistant for Dock app.
 You must answer ONLY using the provided evidence JSON.
 Rules:
 1. Do not invent facts.
@@ -44,7 +45,8 @@ Rules:
 6. Never explain JSON structure, field names, IDs, or metadata unless user explicitly asks for debug/structure.
 7. Answer the user question directly first. Do not summarize all evidence unless asked.
 8. Never include evidence IDs (E1, E2...) in the answer.
-${languageInstruction(query.language)}`;
+${languageInstruction(query.language)}
+${options?.languageInstructionOverride ? `\n${options.languageInstructionOverride}` : ""}`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },

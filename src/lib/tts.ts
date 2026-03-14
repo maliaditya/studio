@@ -8,17 +8,25 @@ export type SpeechPrefs = {
   pitch?: number;
 };
 
+export type AstraVoicePrefs = {
+  systemVoiceUri?: string;
+  kokoroVoiceUri?: string;
+  rate?: number;
+};
+
 export type CloudTtsVoice = {
   id: string;
-  provider: "openai" | "kokoro";
+  provider: "openai" | "kokoro" | "xtts";
   name: string;
   lang: string;
   voiceURI: string;
 };
 
 const PREFS_KEY = "studio_tts_prefs_v1";
+const ASTRA_VOICE_PREFS_KEY = "shiv_chat_voice_settings";
 const CLOUD_VOICE_PREFIX = "cloud:openai:";
 const KOKORO_VOICE_PREFIX = "cloud:kokoro:";
+const XTTS_VOICE_PREFIX = "cloud:xtts:";
 const OPENAI_TTS_VOICES = [
   "alloy",
   "ash",
@@ -79,6 +87,18 @@ export const getKokoroLocalVoices = (enabled: boolean): CloudTtsVoice[] => {
   }));
 };
 
+export const getXttsLocalVoices = (enabled: boolean, voiceName?: string, language = "en"): CloudTtsVoice[] => {
+  if (!enabled) return [];
+  const id = String(voiceName || "my_voice").trim().toLowerCase().replace(/\s+/g, "_") || "my_voice";
+  return [{
+    id,
+    provider: "xtts",
+    name: `XTTS ${String(voiceName || "My Voice").trim() || "My Voice"}`,
+    lang: language || "en",
+    voiceURI: `${XTTS_VOICE_PREFIX}${id}`,
+  }];
+};
+
 export const parseCloudVoiceURI = (voiceURI?: string): CloudTtsVoice | null => {
   if (!voiceURI) return null;
   if (voiceURI.startsWith(CLOUD_VOICE_PREFIX)) {
@@ -101,6 +121,17 @@ export const parseCloudVoiceURI = (voiceURI?: string): CloudTtsVoice | null => {
       name: `Kokoro ${id}`,
       lang: "multi",
       voiceURI: `${KOKORO_VOICE_PREFIX}${id}`,
+    };
+  }
+  if (voiceURI.startsWith(XTTS_VOICE_PREFIX)) {
+    const id = voiceURI.slice(XTTS_VOICE_PREFIX.length).trim().toLowerCase();
+    if (!id) return null;
+    return {
+      id,
+      provider: "xtts",
+      name: `XTTS ${id}`,
+      lang: "multi",
+      voiceURI: `${XTTS_VOICE_PREFIX}${id}`,
     };
   }
   return null;
@@ -152,5 +183,29 @@ export const saveSpeechPrefs = (prefs: SpeechPrefs) => {
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
   } catch {
     // ignore storage issues
+  }
+};
+
+export const loadAstraVoicePrefs = (): AstraVoicePrefs => {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(ASTRA_VOICE_PREFS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return {
+      systemVoiceUri: typeof parsed.systemVoiceUri === "string"
+        ? parsed.systemVoiceUri
+        : typeof parsed.voiceUri === "string" && !parseCloudVoiceURI(parsed.voiceUri)
+          ? parsed.voiceUri
+          : undefined,
+      kokoroVoiceUri: typeof parsed.kokoroVoiceUri === "string"
+        ? parsed.kokoroVoiceUri
+        : typeof parsed.voiceUri === "string" && parseCloudVoiceURI(parsed.voiceUri)?.provider === "kokoro"
+          ? parsed.voiceUri
+          : undefined,
+      rate: typeof parsed.rate === "number" ? parsed.rate : undefined,
+    };
+  } catch {
+    return {};
   }
 };

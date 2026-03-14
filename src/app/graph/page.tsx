@@ -9,21 +9,36 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { parseJsonWithRecovery } from "@/lib/jsonRecovery";
+import { useToast } from "@/hooks/use-toast";
+import { getAiConfigFromSettings, normalizeAiSettings } from "@/lib/ai/config";
+import { cleanSpeechText, getKokoroLocalVoices, getOpenAiCloudVoices, loadSpeechPrefs, parseCloudVoiceURI, pickBestVoice, saveSpeechPrefs } from "@/lib/tts";
 
-type GraphNodeType = "bothering-type" | "bothering" | "routine" | "specialization" | "resource" | "canvas";
+type GraphNodeType =
+  | "bothering-type"
+  | "bothering"
+  | "routine"
+  | "specialization"
+  | "pattern"
+  | "project"
+  | "kanban-card"
+  | "resource"
+  | "canvas";
 type GraphEdgeType =
   | "contains"
+  | "mismatch-link"
   | "linked-task"
   | "routine-source"
   | "specialization-fit"
+  | "pattern-flow"
+  | "project-board"
   | "resource-canvas"
-  | "canvas-link"
-  | "spec-canvas";
+  | "canvas-link";
 
 type GraphNode = {
   id: string;
   label: string;
   type: GraphNodeType;
+  mode?: "threat" | "growth";
 };
 
 type GraphEdge = {
@@ -31,6 +46,30 @@ type GraphEdge = {
   source: string;
   target: string;
   type: GraphEdgeType;
+  mode?: "threat" | "growth";
+  chainKey?: string;
+  chainKeys?: string[];
+};
+
+type NodeInsight = {
+  id: string;
+  label: string;
+  type: GraphNodeType;
+  degree: number;
+};
+
+type PathInsightSection = {
+  key: string;
+  label: string;
+  nodes: GraphNode[];
+};
+
+type AiGraphInsights = {
+  overview: string;
+  clusters: Array<{ label: string; summary: string; nodeLabels: string[] }>;
+  leverageNodes: Array<{ label: string; reason: string }>;
+  blindSpots: string[];
+  nextActions: string[];
 };
 
 type Position = { x: number; y: number; vx: number; vy: number };
@@ -44,6 +83,21 @@ const BOTHERING_CARDS: Array<{ id: string; label: "External" | "Mismatch" | "Con
   { id: "mindset_botherings_mismatch", label: "Mismatch" },
   { id: "mindset_botherings_constraint", label: "Constraint" },
 ];
+const THREAT_TO_GROWTH_PATTERN: Record<string, string> = {
+  Resistance: "Initiative",
+  Avoidance: "Mastery",
+  "Emotional Distress": "Connection",
+};
+const THREAT_INTERPRETATION_BY_STATE: Record<string, string> = {
+  Autonomy: "My freedom or control is being restricted",
+  Competence: "I am not capable enough",
+  Relatedness: "I may be rejected or not valued",
+};
+const GROWTH_INTERPRETATION_BY_STATE: Record<string, string> = {
+  Autonomy: "I can choose my response.",
+  Competence: "I can learn this.",
+  Relatedness: "I can connect.",
+};
 
 const normalizeText = (value: string) =>
   String(value || "")
@@ -52,32 +106,106 @@ const normalizeText = (value: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
-const colorForNode = (type: GraphNodeType, lightTheme = false) => {
+const hashString = (value: string) => {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+};
+
+const seededUnit = (seed: string) => (hashString(seed) % 10000) / 10000;
+
+const estimateLabelWidth = (label: string) => Math.min(240, Math.max(44, label.length * 6.4));
+const labelLinesForNode = (node: GraphNode) => {
+  if (node.type === "pattern" && node.label.includes("\n")) return node.label.split("\n").map((line) => line.trim()).filter(Boolean);
+  const maxLength = node.type === "pattern" ? 54 : 42;
+  return [node.label.length > maxLength ? `${node.label.slice(0, maxLength)}...` : node.label];
+};
+
+const isHierarchicalEdge = (type: GraphEdgeType) =>
+  type === "contains" ||
+  type === "linked-task" ||
+  type === "pattern-flow" ||
+  type === "project-board" ||
+  type === "resource-canvas";
+
+const edgeForceMultiplier = (type: GraphEdgeType) => {
+  if (type === "contains") return 0.32;
+  if (type === "mismatch-link") return 0.42;
+  if (type === "linked-task") return 0.48;
+  if (type === "pattern-flow") return 0.5;
+  if (type === "project-board" || type === "resource-canvas") return 0.38;
+  return 1;
+};
+
+const logicalColumnForType = (type: GraphNodeType) => {
+  if (type === "bothering-type" || type === "bothering") return 0;
+  if (type === "routine") return 1;
+  if (type === "specialization") return 2;
+  if (type === "pattern") return 3;
+  return 4;
+};
+
+const nodeTypeLabel = (type: GraphNodeType) => {
+  if (type === "bothering-type") return "Bothering Group";
+  if (type === "bothering") return "Bothering";
+  if (type === "routine") return "Routine Task";
+  if (type === "specialization") return "Specialization";
+  if (type === "pattern") return "Pattern Chain";
+  if (type === "project") return "Project";
+  if (type === "kanban-card") return "Kanban Task";
+  if (type === "resource") return "Resource Card";
+  return "Canvas";
+};
+
+const pathAccentForType = (type: GraphNodeType, mode?: GraphNode["mode"]) => {
+  if (type === "bothering-type" || type === "bothering") return "#f97316";
+  if (type === "routine") return "#22c55e";
+  if (type === "specialization") return "#38bdf8";
+  if (type === "pattern") return mode === "growth" ? "#34d399" : "#fb7185";
+  if (type === "project") return "#a78bfa";
+  if (type === "kanban-card") return "#34d399";
+  if (type === "resource") return "#f59e0b";
+  return "#e5e7eb";
+};
+
+const colorForNode = (type: GraphNodeType, lightTheme = false, mode?: GraphNode["mode"]) => {
   if (type === "bothering-type") return "#a855f7";
   if (type === "bothering") return "#f97316";
   if (type === "routine") return "#22c55e";
   if (type === "specialization") return lightTheme ? "#0284c7" : "#38bdf8";
+  if (type === "pattern") return mode === "growth" ? "#10b981" : "#ef4444";
+  if (type === "project") return lightTheme ? "#7c3aed" : "#a78bfa";
+  if (type === "kanban-card") return lightTheme ? "#10b981" : "#34d399";
   if (type === "resource") return "#f59e0b";
   return lightTheme ? "#475569" : "#e5e7eb";
 };
 
-const strokeForEdge = (type: GraphEdgeType, lightTheme = false) => {
+const strokeForEdge = (type: GraphEdgeType, lightTheme = false, mode?: GraphEdge["mode"]) => {
   if (lightTheme) {
+    if (type === "pattern-flow") return mode === "growth" ? "rgba(52, 211, 153, 0.58)" : "rgba(244, 114, 182, 0.58)";
     if (type === "canvas-link") return "rgba(71, 85, 105, 0.65)";
     if (type === "resource-canvas") return "rgba(217, 119, 6, 0.6)";
-    if (type === "specialization-fit" || type === "spec-canvas") return "rgba(2, 132, 199, 0.55)";
+    if (type === "project-board") return "rgba(124, 58, 237, 0.55)";
+    if (type === "mismatch-link") return "rgba(168, 85, 247, 0.65)";
+    if (type === "specialization-fit") return "rgba(2, 132, 199, 0.55)";
     if (type === "routine-source") return "rgba(124, 58, 237, 0.6)";
     return "rgba(71, 85, 105, 0.38)";
   }
+  if (type === "pattern-flow") return mode === "growth" ? "rgba(52, 211, 153, 0.68)" : "rgba(244, 114, 182, 0.68)";
   if (type === "canvas-link") return "rgba(148, 163, 184, 0.75)";
   if (type === "resource-canvas") return "rgba(245, 158, 11, 0.65)";
-  if (type === "specialization-fit" || type === "spec-canvas") return "rgba(56, 189, 248, 0.65)";
+  if (type === "project-board") return "rgba(167, 139, 250, 0.65)";
+  if (type === "mismatch-link") return "rgba(168, 85, 247, 0.78)";
+  if (type === "specialization-fit") return "rgba(56, 189, 248, 0.65)";
   if (type === "routine-source") return "rgba(168, 85, 247, 0.65)";
   return "rgba(163, 163, 163, 0.45)";
 };
 
 const renderNodeIcon = (type: GraphNodeType, radius: number, dimmed: boolean) => {
-  if (type !== "canvas" && type !== "resource" && type !== "specialization") return null;
+  if (type !== "canvas" && type !== "resource" && type !== "specialization" && type !== "project" && type !== "kanban-card" && type !== "pattern") return null;
 
   const scale = Math.max(0.85, Math.min(1.6, radius / 4.8));
   const iconColor = type === "canvas" ? "rgba(15, 23, 42, 0.92)" : "rgba(250, 250, 250, 0.95)";
@@ -87,6 +215,34 @@ const renderNodeIcon = (type: GraphNodeType, radius: number, dimmed: boolean) =>
     return (
       <g transform={`scale(${scale})`} fill={iconColor} opacity={baseOpacity} pointerEvents="none">
         <path d="M0 -3.7 L1.1 -1.2 L3.8 -1.2 L1.7 0.5 L2.4 3.1 L0 1.8 L-2.4 3.1 L-1.7 0.5 L-3.8 -1.2 L-1.1 -1.2 Z" />
+      </g>
+    );
+  }
+
+  if (type === "project") {
+    return (
+      <g transform={`scale(${scale})`} fill={iconColor} opacity={baseOpacity} pointerEvents="none">
+        <rect x={-3.6} y={-2.6} width={7.2} height={5.2} rx={0.9} />
+      </g>
+    );
+  }
+
+  if (type === "pattern") {
+    return (
+      <g transform={`scale(${scale})`} fill={iconColor} opacity={baseOpacity} pointerEvents="none">
+        <circle cx={-2.3} cy={0} r={1} />
+        <circle cx={0} cy={0} r={1} />
+        <circle cx={2.3} cy={0} r={1} />
+        <rect x={-1.3} y={-0.3} width={2.6} height={0.6} rx={0.3} />
+      </g>
+    );
+  }
+
+  if (type === "kanban-card") {
+    return (
+      <g transform={`scale(${scale})`} fill={iconColor} opacity={baseOpacity} pointerEvents="none">
+        <rect x={-3.7} y={-2.8} width={7.4} height={5.6} rx={0.8} />
+        <rect x={-2.3} y={-1.3} width={4.6} height={0.8} rx={0.4} fill="rgba(15, 23, 42, 0.45)" />
       </g>
     );
   }
@@ -139,39 +295,78 @@ const parseCanvasLink = (value?: string) => {
   return { resourceId, pointId };
 };
 
-const GRAPH_PREFS_KEY = "graphView:filterPrefs:v1";
+const getPatternPathSummary = (pattern: any) => {
+  const parts = String(pattern?.name || "").split(" -> ").map((part) => part.trim());
+  return {
+    threatSignal: pattern?.threatSignal || parts[0] || "",
+    threatAction: pattern?.threatAction || parts[1] || "",
+    threatOutcome: pattern?.threatOutcome || parts[2] || "",
+    growthSignal: pattern?.growthSignal || parts[3] || "",
+    growthAction: pattern?.growthAction || parts[4] || "",
+    growthOutcome: pattern?.growthOutcome || parts[5] || "",
+  };
+};
+
+const GRAPH_PREFS_KEY = "graphView:filterPrefs:v5";
 
 export default function GraphPage() {
-  const { mindsetCards, settings, coreSkills, resources } = useAuth();
+  const { mindsetCards, settings, coreSkills, resources, projects, kanbanBoards, patterns } = useAuth();
+  const { toast } = useToast();
   const [query, setQuery] = useState("");
   const [showBotherings, setShowBotherings] = useState(true);
   const [showRoutines, setShowRoutines] = useState(true);
-  const [showSpecializations, setShowSpecializations] = useState(false);
+  const [showSpecializations, setShowSpecializations] = useState(true);
+  const [showPatterns, setShowPatterns] = useState(true);
+  const [showProjects, setShowProjects] = useState(false);
   const [showResources, setShowResources] = useState(true);
   const [showCanvases, setShowCanvases] = useState(true);
-  const [showOrphans, setShowOrphans] = useState(true);
+  const [showOrphans, setShowOrphans] = useState(false);
   const [animate, setAnimate] = useState(true);
-  const [repel, setRepel] = useState(1800);
-  const [linkDistance, setLinkDistance] = useState(110);
-  const [center, setCenter] = useState(0.002);
-  const [nodeSize, setNodeSize] = useState(5);
+  const [repel, setRepel] = useState(450);
+  const [linkDistance, setLinkDistance] = useState(60);
+  const [center, setCenter] = useState(0.001);
+  const [nodeSize, setNodeSize] = useState(3);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [showLabels, setShowLabels] = useState(true);
   const [showArrows, setShowArrows] = useState(true);
-  const [labelFadeZoom, setLabelFadeZoom] = useState(1.12);
-  const [linkThickness, setLinkThickness] = useState(1.5);
-  const [linkForce, setLinkForce] = useState(0.0045);
+  const [pathMode, setPathMode] = useState(true);
+  const [labelFadeZoom, setLabelFadeZoom] = useState(0.7);
+  const [linkThickness, setLinkThickness] = useState(0.8);
+  const [linkForce, setLinkForce] = useState(0.015);
   const [panelOpen, setPanelOpen] = useState(true);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [aiInsights, setAiInsights] = useState<AiGraphInsights | null>(null);
+  const [isGeneratingAiInsights, setIsGeneratingAiInsights] = useState(false);
+  const [aiInsightsError, setAiInsightsError] = useState<string | null>(null);
+  const [isSpeakingAiInsights, setIsSpeakingAiInsights] = useState(false);
+  const [ttsVoices, setTtsVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [ttsVoiceURI, setTtsVoiceURI] = useState<string | undefined>(undefined);
+  const [ttsRate, setTtsRate] = useState(0.96);
+  const [hasMounted, setHasMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ width: 1200, height: 760 });
   const positionsRef = useRef<Map<string, Position>>(new Map());
   const dragStateRef = useRef<DragMode>({ mode: "none" });
   const lastStepTimeRef = useRef(0);
   const hasLoadedPrefsRef = useRef(false);
-  const [, setFrame] = useState(0);
+  const hasRestoredGraphViewRef = useRef(false);
+  const shouldSkipInitialFitRef = useRef(false);
+  const [frame, setFrame] = useState(0);
+  const speechRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const speechAudioRef = useRef<HTMLAudioElement | null>(null);
+  const speechAudioUrlRef = useRef<string | null>(null);
+  const isDesktopRuntime = typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
+  const showDesktopOnlyUi = hasMounted && isDesktopRuntime;
+  const aiConfig = useMemo(() => getAiConfigFromSettings(settings, isDesktopRuntime), [settings, isDesktopRuntime]);
+  const isAiEnabled = useMemo(() => normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== "none", [settings.ai, isDesktopRuntime]);
+  const kokoroEnabled = isDesktopRuntime && Boolean(settings.kokoroTtsBaseUrl?.trim());
+  const cloudVoices = useMemo(() => [...getOpenAiCloudVoices(aiConfig), ...getKokoroLocalVoices(kokoroEnabled)], [aiConfig, kokoroEnabled]);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -194,12 +389,15 @@ export default function GraphPage() {
       if (typeof prefs.showBotherings === "boolean") setShowBotherings(prefs.showBotherings);
       if (typeof prefs.showRoutines === "boolean") setShowRoutines(prefs.showRoutines);
       if (typeof prefs.showSpecializations === "boolean") setShowSpecializations(prefs.showSpecializations);
+      if (typeof prefs.showPatterns === "boolean") setShowPatterns(prefs.showPatterns);
+      if (typeof prefs.showProjects === "boolean") setShowProjects(prefs.showProjects);
       if (typeof prefs.showResources === "boolean") setShowResources(prefs.showResources);
       if (typeof prefs.showCanvases === "boolean") setShowCanvases(prefs.showCanvases);
       if (typeof prefs.showOrphans === "boolean") setShowOrphans(prefs.showOrphans);
       if (typeof prefs.animate === "boolean") setAnimate(prefs.animate);
       if (typeof prefs.showLabels === "boolean") setShowLabels(prefs.showLabels);
       if (typeof prefs.showArrows === "boolean") setShowArrows(prefs.showArrows);
+      if (typeof prefs.pathMode === "boolean") setPathMode(prefs.pathMode);
       if (typeof prefs.labelFadeZoom === "number") setLabelFadeZoom(prefs.labelFadeZoom);
       if (typeof prefs.nodeSize === "number") setNodeSize(prefs.nodeSize);
       if (typeof prefs.linkThickness === "number") setLinkThickness(prefs.linkThickness);
@@ -208,12 +406,73 @@ export default function GraphPage() {
       if (typeof prefs.linkDistance === "number") setLinkDistance(prefs.linkDistance);
       if (typeof prefs.center === "number") setCenter(prefs.center);
       if (typeof prefs.panelOpen === "boolean") setPanelOpen(prefs.panelOpen);
+      if (typeof prefs.zoom === "number") setZoom(Math.max(0.3, Math.min(2.6, prefs.zoom)));
+      if (typeof prefs.panX === "number" && typeof prefs.panY === "number") {
+        setPan({ x: prefs.panX, y: prefs.panY });
+        shouldSkipInitialFitRef.current = true;
+      }
+      if (typeof prefs.selectedNodeId === "string" || prefs.selectedNodeId === null) {
+        setSelectedNodeId((prefs.selectedNodeId as string | null) ?? null);
+      }
     } catch {
       // Ignore malformed saved preferences.
     } finally {
       hasLoadedPrefsRef.current = true;
     }
   }, []);
+
+  useEffect(() => {
+    if (!hasLoadedPrefsRef.current || hasRestoredGraphViewRef.current) return;
+    try {
+      const raw = window.localStorage.getItem(GRAPH_PREFS_KEY);
+      if (!raw) {
+        hasRestoredGraphViewRef.current = true;
+        return;
+      }
+      const prefs = JSON.parse(raw) as { positions?: Array<{ id: string; x: number; y: number }> };
+      const storedPositions = Array.isArray(prefs.positions) ? prefs.positions : [];
+      if (storedPositions.length > 0) {
+        shouldSkipInitialFitRef.current = true;
+        const map = positionsRef.current;
+        storedPositions.forEach((item) => {
+          if (!item || typeof item.id !== "string" || typeof item.x !== "number" || typeof item.y !== "number") return;
+          map.set(item.id, { x: item.x, y: item.y, vx: 0, vy: 0 });
+        });
+      }
+    } catch {
+      // Ignore malformed saved graph layout.
+    } finally {
+      hasRestoredGraphViewRef.current = true;
+      setFrame((v) => (v + 1) % 100000);
+    }
+  }, []);
+
+  useEffect(() => {
+    const prefs = loadSpeechPrefs();
+    setTtsVoiceURI(prefs.voiceURI);
+    setTtsRate(typeof prefs.rate === "number" ? Math.min(1.2, Math.max(0.8, prefs.rate)) : 0.96);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      setTtsVoices(Array.isArray(voices) ? voices : []);
+    };
+    loadVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", loadVoices);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", loadVoices);
+  }, []);
+
+  useEffect(() => {
+    if (ttsVoiceURI || ttsVoices.length === 0) return;
+    const best = pickBestVoice(ttsVoices);
+    if (best?.voiceURI) setTtsVoiceURI(best.voiceURI);
+  }, [ttsVoiceURI, ttsVoices]);
+
+  useEffect(() => {
+    saveSpeechPrefs({ voiceURI: ttsVoiceURI, rate: ttsRate });
+  }, [ttsVoiceURI, ttsRate]);
 
   useEffect(() => {
     if (!hasLoadedPrefsRef.current) return;
@@ -225,12 +484,15 @@ export default function GraphPage() {
           showBotherings,
           showRoutines,
           showSpecializations,
+          showPatterns,
+          showProjects,
           showResources,
           showCanvases,
           showOrphans,
           animate,
           showLabels,
           showArrows,
+          pathMode,
           labelFadeZoom,
           nodeSize,
           linkThickness,
@@ -239,6 +501,15 @@ export default function GraphPage() {
           linkDistance,
           center,
           panelOpen,
+          zoom,
+          panX: pan.x,
+          panY: pan.y,
+          selectedNodeId,
+          positions: Array.from(positionsRef.current.entries()).map(([id, pos]) => ({
+            id,
+            x: Number(pos.x.toFixed(2)),
+            y: Number(pos.y.toFixed(2)),
+          })),
         })
       );
     } catch {
@@ -249,12 +520,15 @@ export default function GraphPage() {
     showBotherings,
     showRoutines,
     showSpecializations,
+    showPatterns,
+    showProjects,
     showResources,
     showCanvases,
     showOrphans,
     animate,
     showLabels,
     showArrows,
+    pathMode,
     labelFadeZoom,
     nodeSize,
     linkThickness,
@@ -263,17 +537,37 @@ export default function GraphPage() {
     linkDistance,
     center,
     panelOpen,
+    zoom,
+    pan.x,
+    pan.y,
+    selectedNodeId,
   ]);
 
   const graph = useMemo(() => {
     const nodes = new Map<string, GraphNode>();
     const edges = new Map<string, GraphEdge>();
+    const botheringNodeIdByPointId = new Map<string, string>();
+    const botheringNodeIdsByNormalizedText = new Map<string, string[]>();
+    const botheringTypeByPointId = new Map<string, "External" | "Mismatch" | "Constraint">();
+    const botheringPointByPointId = new Map<string, { sourceType: "External" | "Mismatch" | "Constraint"; linkedMismatchIds?: string[] }>();
 
     const addNode = (node: GraphNode) => {
       if (!nodes.has(node.id)) nodes.set(node.id, node);
     };
     const addEdge = (edge: GraphEdge) => {
-      if (!edges.has(edge.id) && edge.source !== edge.target) edges.set(edge.id, edge);
+      if (edge.source === edge.target) return;
+      const existing = edges.get(edge.id);
+      if (!existing) {
+        edges.set(edge.id, edge.chainKey
+          ? { ...edge, chainKeys: [edge.chainKey] }
+          : edge
+        );
+        return;
+      }
+      if (edge.chainKey) {
+        const mergedChainKeys = new Set([...(existing.chainKeys || []), ...(existing.chainKey ? [existing.chainKey] : []), edge.chainKey]);
+        existing.chainKeys = Array.from(mergedChainKeys);
+      }
     };
 
     const routineMap = new Map((settings.routines || []).map((r) => [r.id, r] as const));
@@ -288,7 +582,17 @@ export default function GraphPage() {
       const card = (mindsetCards || []).find((c) => c.id === group.id);
       (card?.points || []).forEach((point) => {
         const pid = `bp:${group.label}:${point.id}`;
-        addNode({ id: pid, label: point.text || `${group.label} point`, type: "bothering" });
+        const pointLabel = point.text || `${group.label} point`;
+        addNode({ id: pid, label: pointLabel, type: "bothering" });
+        botheringNodeIdByPointId.set(point.id, pid);
+        const normalizedPointLabel = normalizeText(pointLabel);
+        if (normalizedPointLabel) {
+          const existing = botheringNodeIdsByNormalizedText.get(normalizedPointLabel) || [];
+          existing.push(pid);
+          botheringNodeIdsByNormalizedText.set(normalizedPointLabel, existing);
+        }
+        botheringTypeByPointId.set(point.id, group.label);
+        botheringPointByPointId.set(point.id, { sourceType: group.label, linkedMismatchIds: point.linkedMismatchIds });
         addEdge({
           id: `edge:${typeId}->${pid}`,
           source: typeId,
@@ -316,6 +620,22 @@ export default function GraphPage() {
       });
     });
 
+    botheringPointByPointId.forEach((point, pointId) => {
+      if (point.sourceType === "Mismatch") return;
+      (point.linkedMismatchIds || []).forEach((mismatchId) => {
+        const sourceId = botheringNodeIdByPointId.get(pointId);
+        const targetId = botheringNodeIdByPointId.get(mismatchId);
+        if (!sourceId || !targetId) return;
+        if (botheringTypeByPointId.get(mismatchId) !== "Mismatch") return;
+        addEdge({
+          id: `edge:${sourceId}->${targetId}:mismatch-link`,
+          source: sourceId,
+          target: targetId,
+          type: "mismatch-link",
+        });
+      });
+    });
+
     (settings.routines || []).forEach((routine) => {
       const rid = `routine:${routine.id}`;
       addNode({ id: rid, label: routine.details || "Routine", type: "routine" });
@@ -334,6 +654,162 @@ export default function GraphPage() {
     specializationList.forEach((spec) => {
       const sid = `spec:${spec.id}`;
       addNode({ id: sid, label: spec.name, type: "specialization" });
+      (spec.linkedResourceIds || []).forEach((resourceId) => {
+        const resource = (resources || []).find((item) => item.id === resourceId);
+        if (!resource) return;
+        const resourceNodeId = `resource:${resource.id}`;
+        addNode({ id: resourceNodeId, label: resource.name || "Resource", type: "resource" });
+        addEdge({
+          id: `edge:${sid}->${resourceNodeId}:linked-resource`,
+          source: sid,
+          target: resourceNodeId,
+          type: "specialization-fit",
+        });
+      });
+    });
+
+    const addPatternChain = ({
+      chainKey,
+      mode,
+      state,
+      patternName,
+      interpretation,
+      causeNodeIds,
+      signal,
+      actionType,
+      action,
+      outcome,
+    }: {
+      chainKey: string;
+      mode: "threat" | "growth";
+      state?: string;
+      patternName?: string;
+      interpretation?: string;
+      causeNodeIds?: string[];
+      signal?: string;
+      actionType?: string;
+      action?: string;
+      outcome?: string;
+    }) => {
+      const safeState = String(state || "").trim();
+      const safePattern = String(patternName || "").trim();
+      const safeInterpretation = String(interpretation || "").trim();
+      const safeSignal = String(signal || "").trim();
+      const safeAction = String(action || "").trim();
+      const safeOutcome = String(outcome || "").trim();
+      if (!safeState || !safePattern || !safeInterpretation || !safeSignal || !safeAction || !safeOutcome) return;
+
+      const safeActionType = String(actionType || "").trim();
+      const stage1Id = `pattern:${mode}:core:${normalizeText(`${safeState}|${safePattern}|${safeInterpretation}`)}`;
+      const stage2Id = `pattern:${mode}:signal:${normalizeText(safeSignal)}`;
+      const stage3Id = `pattern:${mode}:action:${normalizeText(`${safeActionType}|${safeAction}`)}`;
+      const stage4Id = `pattern:${mode}:outcome:${normalizeText(safeOutcome)}`;
+
+      addNode({
+        id: stage1Id,
+        label: `${safeState}\n${safePattern}\n${safeInterpretation}`,
+        type: "pattern",
+        mode,
+      });
+      addNode({ id: stage2Id, label: safeSignal, type: "pattern", mode });
+      addNode({
+        id: stage3Id,
+        label: safeActionType ? `${safeActionType} + ${safeAction}` : safeAction,
+        type: "pattern",
+        mode,
+      });
+      addNode({ id: stage4Id, label: safeOutcome, type: "pattern", mode });
+
+      (causeNodeIds || []).forEach((causeNodeId) => {
+        addEdge({
+          id: `edge:${causeNodeId}->${stage1Id}:pattern-cause`,
+          source: causeNodeId,
+          target: stage1Id,
+          type: "pattern-flow",
+          mode,
+          chainKey,
+        });
+      });
+      addEdge({ id: `edge:${stage1Id}->${stage2Id}`, source: stage1Id, target: stage2Id, type: "pattern-flow", mode, chainKey });
+      addEdge({ id: `edge:${stage2Id}->${stage3Id}`, source: stage2Id, target: stage3Id, type: "pattern-flow", mode, chainKey });
+      addEdge({ id: `edge:${stage3Id}->${stage4Id}`, source: stage3Id, target: stage4Id, type: "pattern-flow", mode, chainKey });
+    };
+
+    (patterns || []).forEach((pattern) => {
+      const summary = getPatternPathSummary(pattern);
+      const state = String(pattern.state || "").trim();
+      const threatPattern = String(pattern.patternCategory || "").trim();
+      const growthPattern = THREAT_TO_GROWTH_PATTERN[threatPattern] || "";
+      const linkedCauseNodeIds = botheringNodeIdsByNormalizedText.get(normalizeText(String(pattern.sharedCause || ""))) || [];
+      addPatternChain({
+        chainKey: `${pattern.id}:threat`,
+        mode: "threat",
+        state,
+        patternName: threatPattern,
+        interpretation: THREAT_INTERPRETATION_BY_STATE[state] || "",
+        causeNodeIds: linkedCauseNodeIds,
+        signal: summary.threatSignal,
+        actionType: pattern.actionType,
+        action: summary.threatAction,
+        outcome: summary.threatOutcome,
+      });
+      addPatternChain({
+        chainKey: `${pattern.id}:growth`,
+        mode: "growth",
+        state,
+        patternName: growthPattern,
+        interpretation: GROWTH_INTERPRETATION_BY_STATE[state] || "",
+        causeNodeIds: linkedCauseNodeIds,
+        signal: summary.growthSignal,
+        actionType: pattern.growthActionType,
+        action: summary.growthAction,
+        outcome: summary.growthOutcome,
+      });
+    });
+
+    const projectById = new Map((projects || []).map((project) => [project.id, project] as const));
+    const specById = new Map(specializationList.map((spec) => [spec.id, spec] as const));
+    (kanbanBoards || []).forEach((board) => {
+      const project =
+        (board.projectId ? projectById.get(board.projectId) : undefined) ||
+        (projects || []).find((item) => item.name === board.name);
+      if (!project) return;
+
+      const projectNodeId = `project:${project.id}`;
+      addNode({ id: projectNodeId, label: project.name, type: "project" });
+
+      if (board.specializationId && specById.has(board.specializationId)) {
+        addEdge({
+          id: `edge:spec:${board.specializationId}->${projectNodeId}:project`,
+          source: `spec:${board.specializationId}`,
+          target: projectNodeId,
+          type: "project-board",
+        });
+      }
+
+      const orderedLists = board.listOrder
+        .map((listId) => board.lists.find((list) => list.id === listId))
+        .filter((list): list is NonNullable<typeof board.lists[number]> => !!list)
+        .concat(board.lists.filter((list) => !board.listOrder.includes(list.id)))
+        .filter((list) => !list.archived)
+        .sort((a, b) => a.position - b.position);
+
+      orderedLists.forEach((list, index) => {
+        const cardsForList = board.cards
+          .filter((card) => card.listId === list.id && !card.archived)
+          .sort((a, b) => a.position - b.position);
+
+        cardsForList.forEach((card) => {
+          const cardNodeId = `kanban-card:${board.id}:${card.id}`;
+          addNode({ id: cardNodeId, label: `${list.title}: ${card.title || "Kanban Task"}`, type: "kanban-card" });
+          addEdge({
+            id: `edge:${projectNodeId}->${cardNodeId}:card`,
+            source: projectNodeId,
+            target: cardNodeId,
+            type: "project-board",
+          });
+        });
+      });
     });
 
     (settings.routines || []).forEach((routine) => {
@@ -393,26 +869,11 @@ export default function GraphPage() {
       }
     });
 
-    canvasNodes.forEach((canvas) => {
-      const canvasName = normalizeText(canvas.label);
-      specializationList.forEach((spec) => {
-        const specName = normalizeText(spec.name || "");
-        if (!specName) return;
-        if (!canvasName.includes(specName) && !specName.includes(canvasName)) return;
-        addEdge({
-          id: `edge:spec:${spec.id}->${canvas.id}:name-fit`,
-          source: `spec:${spec.id}`,
-          target: canvas.id,
-          type: "spec-canvas",
-        });
-      });
-    });
-
     return {
       nodes: Array.from(nodes.values()),
       edges: Array.from(edges.values()),
     };
-  }, [mindsetCards, settings.routines, settings.routineSourceOverrides, coreSkills, resources]);
+  }, [mindsetCards, settings.routines, settings.routineSourceOverrides, coreSkills, resources, projects, kanbanBoards, patterns]);
 
   const filtered = useMemo(() => {
     const q = normalizeText(query);
@@ -420,6 +881,8 @@ export default function GraphPage() {
       if (type === "bothering" || type === "bothering-type") return showBotherings;
       if (type === "routine") return showRoutines;
       if (type === "specialization") return showSpecializations;
+      if (type === "pattern") return showPatterns;
+      if (type === "project" || type === "kanban-card") return showProjects;
       if (type === "resource") return showResources;
       return showCanvases;
     };
@@ -440,7 +903,7 @@ export default function GraphPage() {
     const finalSet = new Set(byQuery.map((n) => n.id));
     const finalEdges = edges.filter((e) => finalSet.has(e.source) && finalSet.has(e.target));
     return { nodes: byQuery, edges: finalEdges };
-  }, [graph, query, showBotherings, showRoutines, showSpecializations, showResources, showCanvases, showOrphans]);
+  }, [graph, query, showBotherings, showRoutines, showSpecializations, showPatterns, showProjects, showResources, showCanvases, showOrphans]);
 
   const filteredNodeById = useMemo(() => new Map(filtered.nodes.map((n) => [n.id, n] as const)), [filtered.nodes]);
   const filteredDegreeById = useMemo(() => {
@@ -453,6 +916,352 @@ export default function GraphPage() {
     return degree;
   }, [filtered.nodes, filtered.edges]);
 
+  const graphInsights = useMemo(() => {
+    const adjacency = new Map<string, Set<string>>();
+    filtered.nodes.forEach((node) => adjacency.set(node.id, new Set()));
+    filtered.edges.forEach((edge) => {
+      adjacency.get(edge.source)?.add(edge.target);
+      adjacency.get(edge.target)?.add(edge.source);
+    });
+
+    const ranked: NodeInsight[] = filtered.nodes
+      .map((node) => ({
+        id: node.id,
+        label: node.label,
+        type: node.type,
+        degree: filteredDegreeById.get(node.id) || 0,
+      }))
+      .sort((a, b) => b.degree - a.degree || a.label.localeCompare(b.label));
+
+    const hubs = ranked.filter((node) => node.degree > 0).slice(0, 4);
+    const looseEnds = ranked.filter((node) => node.degree <= 1).slice(0, 5);
+    const orphans = ranked.filter((node) => node.degree === 0);
+
+    const visited = new Set<string>();
+    const components: Array<{ size: number; focus: string[] }> = [];
+    filtered.nodes.forEach((node) => {
+      if (visited.has(node.id)) return;
+      const stack = [node.id];
+      const component: string[] = [];
+      visited.add(node.id);
+      while (stack.length) {
+        const current = stack.pop()!;
+        component.push(current);
+        (adjacency.get(current) || new Set()).forEach((neighbor) => {
+          if (visited.has(neighbor)) return;
+          visited.add(neighbor);
+          stack.push(neighbor);
+        });
+      }
+      components.push({
+        size: component.length,
+        focus: component
+          .map((id) => filteredNodeById.get(id)?.label || id)
+          .sort((a, b) => a.localeCompare(b))
+          .slice(0, 3),
+      });
+    });
+    components.sort((a, b) => b.size - a.size);
+
+    const routinesWithoutSpec = filtered.nodes.filter((node) => {
+      if (node.type !== "routine") return false;
+      return !filtered.edges.some(
+        (edge) =>
+          edge.type === "specialization-fit" &&
+          (edge.source === node.id || edge.target === node.id)
+      );
+    });
+
+    const botheringsWithoutRoutine = filtered.nodes.filter((node) => {
+      if (node.type !== "bothering") return false;
+      return !filtered.edges.some(
+        (edge) => edge.type === "linked-task" && (edge.source === node.id || edge.target === node.id)
+      );
+    });
+
+    const specializationWithoutCanvas = filtered.nodes.filter((node) => {
+      if (node.type !== "specialization") return false;
+      return !filtered.edges.some(
+        (edge) =>
+          (edge.type === "spec-canvas" || edge.type === "specialization-fit") &&
+          (edge.source === node.id || edge.target === node.id)
+      );
+    });
+
+    const suggestions = [
+      routinesWithoutSpec.length > 0
+        ? `${routinesWithoutSpec.length} routines are not tied to any specialization, so the graph can't show whether your calendar reinforces your long-term bets.`
+        : null,
+      botheringsWithoutRoutine.length > 0
+        ? `${botheringsWithoutRoutine.length} botherings have no linked routine, which means pain points are still sitting as observations instead of becoming interventions.`
+        : null,
+      specializationWithoutCanvas.length > 0
+        ? `${specializationWithoutCanvas.length} specializations have no canvas/resource trail, so the graph shows intent but not working knowledge artifacts.`
+        : null,
+      components.length > 1
+        ? `${components.length} disconnected clusters exist, which suggests your system is fragmented rather than forming a usable chain from issue -> routine -> specialization -> resource.`
+        : null,
+    ].filter(Boolean) as string[];
+
+    return {
+      hubs,
+      looseEnds,
+      orphans,
+      components,
+      suggestions,
+    };
+  }, [filtered.nodes, filtered.edges, filteredDegreeById, filteredNodeById]);
+
+  const selectedNodeInsight = useMemo(() => {
+    if (!selectedNodeId) return null;
+    const node = filteredNodeById.get(selectedNodeId);
+    if (!node) return null;
+    const neighborEdges = filtered.edges.filter((edge) => edge.source === selectedNodeId || edge.target === selectedNodeId);
+    const neighbors = neighborEdges
+      .map((edge) => (edge.source === selectedNodeId ? edge.target : edge.source))
+      .map((id) => filteredNodeById.get(id))
+      .filter(Boolean) as GraphNode[];
+    const byType = new Map<GraphNodeType, number>();
+    neighbors.forEach((neighbor) => byType.set(neighbor.type, (byType.get(neighbor.type) || 0) + 1));
+
+    let takeaway = `${node.label} has ${neighborEdges.length} visible connection${neighborEdges.length === 1 ? "" : "s"}.`;
+    if (node.type === "bothering" && neighborEdges.every((edge) => edge.type !== "linked-task")) {
+      takeaway = "This bothering is not connected to any routine, so it is diagnosis without an execution path.";
+    } else if (node.type === "routine" && neighborEdges.every((edge) => edge.type !== "specialization-fit")) {
+      takeaway = "This routine is active in the graph but not tied to a specialization, so it looks operational rather than strategic.";
+    } else if (node.type === "specialization" && neighborEdges.every((edge) => edge.type !== "spec-canvas")) {
+      takeaway = "This specialization has weak artifact coverage; it is named, but not backed by canvases or resource flow.";
+    } else if (node.type === "resource" && neighborEdges.length <= 1) {
+      takeaway = "This resource card is barely connected, so it is acting more like storage than part of a learning or execution chain.";
+    }
+
+    return {
+      node,
+      degree: filteredDegreeById.get(selectedNodeId) || 0,
+      neighbors: neighbors.slice(0, 5),
+      byType: Array.from(byType.entries()).sort((a, b) => b[1] - a[1]),
+      takeaway,
+    };
+  }, [filtered.edges, filteredDegreeById, filteredNodeById, selectedNodeId]);
+
+  const aiMatchedNodeIds = useMemo(() => {
+    if (!aiInsights) return new Set<string>();
+    const targetLabels = new Set(
+      [
+        ...aiInsights.clusters.flatMap((cluster) => cluster.nodeLabels || []),
+        ...aiInsights.leverageNodes.map((item) => item.label),
+      ]
+        .map((label) => normalizeText(label))
+        .filter(Boolean)
+    );
+    const matched = new Set<string>();
+    filtered.nodes.forEach((node) => {
+      const normalizedNodeLabel = normalizeText(node.label);
+      for (const candidate of targetLabels) {
+        if (
+          normalizedNodeLabel === candidate ||
+          normalizedNodeLabel.includes(candidate) ||
+          candidate.includes(normalizedNodeLabel)
+        ) {
+          matched.add(node.id);
+          break;
+        }
+      }
+    });
+    return matched;
+  }, [aiInsights, filtered.nodes]);
+
+  const aiMatchedEdgeIds = useMemo(() => {
+    if (!aiInsights || aiMatchedNodeIds.size === 0) return new Set<string>();
+    return new Set(
+      filtered.edges
+        .filter((edge) => aiMatchedNodeIds.has(edge.source) && aiMatchedNodeIds.has(edge.target))
+        .map((edge) => edge.id)
+    );
+  }, [aiInsights, aiMatchedNodeIds, filtered.edges]);
+
+  const handleGenerateAiInsights = useCallback(async () => {
+    if (!isDesktopRuntime) return;
+    if (!isAiEnabled) {
+      toast({
+        title: "AI not configured",
+        description: "Choose a provider in Settings > AI Settings before generating graph insights.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGeneratingAiInsights(true);
+    setAiInsightsError(null);
+    try {
+      const response = await fetch("/api/ai/graph-insights", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-studio-desktop": "1",
+        },
+        body: JSON.stringify({
+          aiConfig,
+          graph: {
+            nodeCount: filtered.nodes.length,
+            edgeCount: filtered.edges.length,
+            nodes: filtered.nodes.slice(0, 140).map((node) => ({
+              id: node.id,
+              label: node.label,
+              type: node.type,
+              degree: filteredDegreeById.get(node.id) || 0,
+            })),
+            edges: filtered.edges.slice(0, 220).map((edge) => ({
+              source: filteredNodeById.get(edge.source)?.label || edge.source,
+              target: filteredNodeById.get(edge.target)?.label || edge.target,
+              type: edge.type,
+            })),
+            structuralFindings: {
+              hubs: graphInsights.hubs.map((node) => ({ label: node.label, degree: node.degree })),
+              looseEnds: graphInsights.looseEnds.map((node) => node.label),
+              disconnectedClusters: graphInsights.components.length,
+              systemGaps: graphInsights.suggestions,
+            },
+          },
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(String(result?.details || result?.error || "Failed to generate AI graph insights."));
+      }
+      setAiInsights(result.insights as AiGraphInsights);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to generate AI graph insights.";
+      setAiInsightsError(message);
+      toast({
+        title: "AI graph analysis failed",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingAiInsights(false);
+    }
+  }, [aiConfig, filtered.nodes, filtered.edges, filteredDegreeById, filteredNodeById, graphInsights, isAiEnabled, isDesktopRuntime, toast]);
+
+  const aiNarrationText = useMemo(() => {
+    if (!aiInsights) return "";
+    return cleanSpeechText(
+      [
+        aiInsights.overview,
+        aiInsights.clusters.length
+          ? `Main clusters: ${aiInsights.clusters
+              .slice(0, 3)
+              .map((cluster) => `${cluster.label}. ${cluster.summary}`)
+              .join(" ")}`
+          : "",
+        aiInsights.leverageNodes.length
+          ? `Key leverage nodes: ${aiInsights.leverageNodes
+              .slice(0, 3)
+              .map((item) => `${item.label}. ${item.reason}`)
+              .join(" ")}`
+          : "",
+        aiInsights.blindSpots.length
+          ? `Blind spots: ${aiInsights.blindSpots.slice(0, 3).join(" ")}`
+          : "",
+        aiInsights.nextActions.length
+          ? `Recommended next actions: ${aiInsights.nextActions.slice(0, 3).join(" ")}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" ")
+    );
+  }, [aiInsights]);
+
+  const stopAiNarration = useCallback(() => {
+    if (typeof window !== "undefined" && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (speechAudioRef.current) {
+      speechAudioRef.current.pause();
+      speechAudioRef.current.currentTime = 0;
+      speechAudioRef.current = null;
+    }
+    if (speechAudioUrlRef.current) {
+      URL.revokeObjectURL(speechAudioUrlRef.current);
+      speechAudioUrlRef.current = null;
+    }
+    speechRef.current = null;
+    setIsSpeakingAiInsights(false);
+  }, []);
+
+  const readAiInsightsAloud = useCallback(async () => {
+    if (!isDesktopRuntime) return;
+    if (!aiNarrationText) return;
+    const selectedCloudVoice = parseCloudVoiceURI(ttsVoiceURI);
+    const hasExplicitSystemVoice = Boolean(ttsVoiceURI) && !selectedCloudVoice;
+    const shouldUseCloud =
+      Boolean(selectedCloudVoice) ||
+      (!hasExplicitSystemVoice && ttsVoices.length === 0 && cloudVoices.length > 0);
+
+    if (shouldUseCloud) {
+      const cloudVoice = selectedCloudVoice || cloudVoices[0];
+      if (!cloudVoice) return;
+      stopAiNarration();
+      setIsSpeakingAiInsights(true);
+      try {
+        const response = await fetch("/api/ai/tts", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-studio-desktop": "1",
+          },
+          body: JSON.stringify({
+            text: aiNarrationText,
+            provider: cloudVoice.provider,
+            voice: cloudVoice.id,
+            speed: ttsRate,
+            kokoroBaseUrl: settings.kokoroTtsBaseUrl,
+            aiConfig,
+          }),
+        });
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(String(result?.details || result?.error || "Cloud TTS failed."));
+        }
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        speechAudioUrlRef.current = url;
+        const audio = new Audio(url);
+        speechAudioRef.current = audio;
+        audio.onended = () => stopAiNarration();
+        audio.onerror = () => stopAiNarration();
+        await audio.play();
+        return;
+      } catch (error) {
+        stopAiNarration();
+        toast({
+          title: "Read aloud failed",
+          description: error instanceof Error ? error.message : "Unable to read AI insights aloud.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+    stopAiNarration();
+    const utterance = new SpeechSynthesisUtterance(aiNarrationText);
+    const selectedVoice = pickBestVoice(ttsVoices, ttsVoiceURI);
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+      utterance.lang = selectedVoice.lang;
+    } else {
+      utterance.lang = "en-US";
+    }
+    utterance.rate = ttsRate;
+    utterance.pitch = 1;
+    utterance.onstart = () => setIsSpeakingAiInsights(true);
+    utterance.onend = () => stopAiNarration();
+    utterance.onerror = () => stopAiNarration();
+    speechRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  }, [aiConfig, aiNarrationText, cloudVoices, isDesktopRuntime, settings.kokoroTtsBaseUrl, stopAiNarration, toast, ttsRate, ttsVoiceURI, ttsVoices]);
+
   const highlighted = useMemo(() => {
     if (!selectedNodeId) {
       return {
@@ -460,6 +1269,142 @@ export default function GraphPage() {
         nodeIds: new Set<string>(),
       };
     }
+
+    const selectedNode = filteredNodeById.get(selectedNodeId);
+    if (pathMode && selectedNode?.type === "bothering") {
+      const outgoing = new Map<string, GraphEdge[]>();
+      filtered.edges.forEach((edge) => {
+        const list = outgoing.get(edge.source);
+        if (list) list.push(edge);
+        else outgoing.set(edge.source, [edge]);
+      });
+
+      const edgeIds = new Set<string>();
+      const nodeIds = new Set<string>([selectedNodeId]);
+      const queue: Array<{ nodeId: string; chainKey: string | null }> = [{ nodeId: selectedNodeId, chainKey: null }];
+      const visited = new Set<string>([`${selectedNodeId}|root`]);
+
+      while (queue.length > 0) {
+        const current = queue.shift()!;
+        const nextEdges = outgoing.get(current.nodeId) || [];
+        nextEdges.forEach((edge) => {
+          if (edge.type === "pattern-flow") {
+            const nextChainKeys = edge.chainKeys?.length
+              ? edge.chainKeys
+              : edge.chainKey
+                ? [edge.chainKey]
+                : [];
+            if (nextChainKeys.length === 0) return;
+            const allowedChainKeys = current.chainKey
+              ? nextChainKeys.filter((key) => key === current.chainKey)
+              : nextChainKeys;
+            if (allowedChainKeys.length === 0) return;
+            edgeIds.add(edge.id);
+            nodeIds.add(edge.source);
+            nodeIds.add(edge.target);
+            allowedChainKeys.forEach((allowedChainKey) => {
+              const visitKey = `${edge.target}|${allowedChainKey}`;
+              if (!visited.has(visitKey)) {
+                visited.add(visitKey);
+                queue.push({ nodeId: edge.target, chainKey: allowedChainKey });
+              }
+            });
+            return;
+          }
+
+          if (current.chainKey) return;
+          edgeIds.add(edge.id);
+          nodeIds.add(edge.source);
+          nodeIds.add(edge.target);
+          const visitKey = `${edge.target}|root`;
+          if (!visited.has(visitKey)) {
+            visited.add(visitKey);
+            queue.push({ nodeId: edge.target, chainKey: null });
+          }
+        });
+      }
+
+      return { edgeIds, nodeIds };
+    }
+
+    if (pathMode && selectedNode?.type === "bothering-type") {
+      const outgoing = new Map<string, GraphEdge[]>();
+      filtered.edges.forEach((edge) => {
+        const list = outgoing.get(edge.source);
+        if (list) list.push(edge);
+        else outgoing.set(edge.source, [edge]);
+      });
+
+      const edgeIds = new Set<string>();
+      const nodeIds = new Set<string>([selectedNodeId]);
+      const queue = [selectedNodeId];
+      const visited = new Set<string>([selectedNodeId]);
+
+      while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        const nextEdges = outgoing.get(currentId) || [];
+        nextEdges.forEach((edge) => {
+          edgeIds.add(edge.id);
+          nodeIds.add(edge.source);
+          nodeIds.add(edge.target);
+          if (!visited.has(edge.target)) {
+            visited.add(edge.target);
+            queue.push(edge.target);
+          }
+        });
+      }
+
+      return { edgeIds, nodeIds };
+    }
+
+    if (pathMode && selectedNode?.type === "pattern") {
+      const outgoing = new Map<string, GraphEdge[]>();
+      const incoming = new Map<string, GraphEdge[]>();
+      filtered.edges.forEach((edge) => {
+        const out = outgoing.get(edge.source);
+        if (out) out.push(edge);
+        else outgoing.set(edge.source, [edge]);
+
+        const inc = incoming.get(edge.target);
+        if (inc) inc.push(edge);
+        else incoming.set(edge.target, [edge]);
+      });
+
+      const edgeIds = new Set<string>();
+      const nodeIds = new Set<string>([selectedNodeId]);
+      const queue = [selectedNodeId];
+      const visited = new Set<string>([selectedNodeId]);
+      const selectedMode = selectedNode.mode;
+
+      while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        const nextEdges = [...(outgoing.get(currentId) || []), ...(incoming.get(currentId) || [])];
+        nextEdges.forEach((edge) => {
+          if (edge.type !== "pattern-flow") return;
+          if (selectedMode && edge.mode && edge.mode !== selectedMode) return;
+          edgeIds.add(edge.id);
+          nodeIds.add(edge.source);
+          nodeIds.add(edge.target);
+          const neighborId = edge.source === currentId ? edge.target : edge.source;
+          if (!visited.has(neighborId)) {
+            visited.add(neighborId);
+            queue.push(neighborId);
+          }
+        });
+      }
+
+      Array.from(nodeIds).forEach((nodeId) => {
+        (incoming.get(nodeId) || []).forEach((edge) => {
+          if (edge.type === "pattern-flow") return;
+          edgeIds.add(edge.id);
+          nodeIds.add(edge.source);
+          nodeIds.add(edge.target);
+        });
+      });
+
+      return { edgeIds, nodeIds };
+    }
+
     const edgeIds = new Set<string>();
     const nodeIds = new Set<string>([selectedNodeId]);
     filtered.edges.forEach((edge) => {
@@ -470,20 +1415,188 @@ export default function GraphPage() {
       }
     });
     return { edgeIds, nodeIds };
-  }, [filtered.edges, selectedNodeId]);
+  }, [filtered.edges, filteredNodeById, pathMode, selectedNodeId]);
+
+  const selectedPathInsight = useMemo(() => {
+    if (!selectedNodeId) return null;
+    const selectedNode = filteredNodeById.get(selectedNodeId);
+    if (!selectedNode) return null;
+    if (!(pathMode && (selectedNode.type === "bothering" || selectedNode.type === "bothering-type" || selectedNode.type === "pattern"))) return null;
+
+    const collect = (type: GraphNodeType) =>
+      Array.from(highlighted.nodeIds)
+        .map((id) => filteredNodeById.get(id))
+        .filter((node): node is GraphNode => !!node && node.type === type)
+        .sort((a, b) => a.label.localeCompare(b.label));
+
+    const sections: PathInsightSection[] = [
+      { key: "botherings", label: "Botherings", nodes: collect("bothering") },
+      { key: "routines", label: "Routine Tasks", nodes: collect("routine") },
+      { key: "specializations", label: "Specializations", nodes: collect("specialization") },
+      { key: "patterns", label: "Patterns", nodes: collect("pattern") },
+      { key: "projects", label: "Projects", nodes: collect("project") },
+      { key: "tasks", label: "Kanban Tasks", nodes: collect("kanban-card") },
+      { key: "resources", label: "Resource Cards", nodes: collect("resource") },
+      { key: "canvases", label: "Canvases", nodes: collect("canvas") },
+    ].filter((section) => section.nodes.length > 0);
+
+    const takeawayParts = [
+      sections.find((section) => section.key === "routines")?.nodes.length
+        ? `${sections.find((section) => section.key === "routines")!.nodes.length} routines activated`
+        : null,
+      sections.find((section) => section.key === "specializations")?.nodes.length
+        ? `${sections.find((section) => section.key === "specializations")!.nodes.length} specializations touched`
+        : null,
+      sections.find((section) => section.key === "patterns")?.nodes.length
+        ? `${sections.find((section) => section.key === "patterns")!.nodes.length} pattern nodes in chain`
+        : null,
+      sections.find((section) => section.key === "projects")?.nodes.length
+        ? `${sections.find((section) => section.key === "projects")!.nodes.length} projects affected`
+        : null,
+      sections.find((section) => section.key === "tasks")?.nodes.length
+        ? `${sections.find((section) => section.key === "tasks")!.nodes.length} delivery tasks visible`
+        : null,
+      sections.find((section) => section.key === "resources")?.nodes.length
+        ? `${sections.find((section) => section.key === "resources")!.nodes.length} resources in play`
+        : null,
+      sections.find((section) => section.key === "canvases")?.nodes.length
+        ? `${sections.find((section) => section.key === "canvases")!.nodes.length} canvases downstream`
+        : null,
+    ].filter(Boolean);
+
+    return {
+      root: selectedNode,
+      sections,
+      takeaway: takeawayParts.length > 0 ? takeawayParts.join(" | ") : "No downstream chain is visible for this selection yet.",
+    };
+  }, [filteredNodeById, highlighted.nodeIds, pathMode, selectedNodeId]);
 
   const anchorForType = useCallback(
     (type: GraphNodeType) => {
       const w = size.width;
       const h = size.height;
-      if (type === "bothering-type") return { x: w * 0.15, y: h * 0.18 };
-      if (type === "bothering") return { x: w * 0.18, y: h * 0.48 };
-      if (type === "routine") return { x: w * 0.35, y: h * 0.48 };
-      if (type === "specialization") return { x: w * 0.55, y: h * 0.45 };
-      if (type === "resource") return { x: w * 0.72, y: h * 0.45 };
-      return { x: w * 0.82, y: h * 0.52 };
+      const xByColumn = [w * 0.1, w * 0.28, w * 0.46, w * 0.66, w * 0.86];
+      const column = logicalColumnForType(type);
+      const centerY = h * 0.48;
+      if (type === "bothering-type") return { x: xByColumn[column], y: centerY - h * 0.06 };
+      if (type === "bothering") return { x: xByColumn[column], y: centerY };
+      if (type === "routine") return { x: xByColumn[column], y: centerY };
+      if (type === "specialization") return { x: xByColumn[column], y: centerY };
+      if (type === "pattern") return { x: xByColumn[column], y: centerY };
+      if (type === "project") return { x: xByColumn[column], y: centerY - h * 0.035 };
+      if (type === "kanban-card") return { x: xByColumn[column], y: centerY };
+      if (type === "resource") return { x: xByColumn[column], y: centerY + h * 0.035 };
+      return { x: xByColumn[column], y: centerY + h * 0.07 };
     },
     [size.width, size.height]
+  );
+
+  const hierarchicalParentByNodeId = useMemo(() => {
+    const parents = new Map<string, string>();
+    filtered.edges.forEach((edge) => {
+      if (!isHierarchicalEdge(edge.type)) return;
+      const parent = filteredNodeById.get(edge.source);
+      const child = filteredNodeById.get(edge.target);
+      if (!parent || !child) return;
+      if (logicalColumnForType(parent.type) !== logicalColumnForType(child.type)) return;
+      if (!parents.has(edge.target)) parents.set(edge.target, edge.source);
+    });
+    return parents;
+  }, [filtered.edges, filteredNodeById]);
+
+  const hierarchicalChildrenByParentId = useMemo(() => {
+    const children = new Map<string, GraphNode[]>();
+    hierarchicalParentByNodeId.forEach((parentId, childId) => {
+      const child = filteredNodeById.get(childId);
+      if (!child) return;
+      const list = children.get(parentId) || [];
+      list.push(child);
+      children.set(parentId, list);
+    });
+    children.forEach((list, parentId) => {
+      children.set(parentId, [...list].sort((a, b) => a.label.localeCompare(b.label)));
+    });
+    return children;
+  }, [filteredNodeById, hierarchicalParentByNodeId]);
+
+  const getBranchTarget = useCallback(
+    (node: GraphNode) => {
+      const parentId = hierarchicalParentByNodeId.get(node.id);
+      if (!parentId) return null;
+      const parentNode = filteredNodeById.get(parentId);
+      const siblings = hierarchicalChildrenByParentId.get(parentId) || [];
+      if (!parentNode || siblings.length === 0) return null;
+
+      const siblingCount = siblings.length;
+      const index = siblings.findIndex((child) => child.id === node.id);
+      if (index < 0) return null;
+
+      const parentPos = positionsRef.current.get(parentNode.id);
+      const parentAnchor = parentPos || anchorForType(parentNode.type);
+      const baseRotation = seededUnit(`${parentNode.id}:rotation`) * Math.PI * 2;
+      const firstRingCount = Math.min(8, siblingCount);
+      const ringIndex = index < firstRingCount ? 0 : 1 + Math.floor((index - firstRingCount) / 10);
+      const ringStart = ringIndex === 0 ? 0 : firstRingCount + (ringIndex - 1) * 10;
+      const nodesInRing = ringIndex === 0 ? firstRingCount : Math.min(10, siblingCount - ringStart);
+      const slotIndex = index - ringStart;
+      const angle = baseRotation + (slotIndex / Math.max(1, nodesInRing)) * Math.PI * 2;
+      const radius =
+        (node.type === "bothering"
+          ? 118
+          : node.type === "routine"
+            ? 102
+            : node.type === "kanban-card" || node.type === "canvas"
+              ? 92
+              : 96) + ringIndex * 56;
+      const radialJitter = (seededUnit(`${parentNode.id}:${node.id}:radius`) - 0.5) * 12;
+
+      const target = {
+        x: parentAnchor.x + Math.cos(angle) * (radius + radialJitter),
+        y: parentAnchor.y + Math.sin(angle) * (radius + radialJitter),
+      };
+      if (!Number.isFinite(target.x) || !Number.isFinite(target.y)) return null;
+      return target;
+    },
+    [anchorForType, filteredNodeById, hierarchicalChildrenByParentId, hierarchicalParentByNodeId]
+  );
+
+  const laneOffsetForNode = useCallback(
+    (node: GraphNode) => {
+      const branchTarget = getBranchTarget(node);
+      if (branchTarget) {
+        return branchTarget;
+      }
+      const anchor = anchorForType(node.type);
+      const ux = seededUnit(`${node.id}:x`) - 0.5;
+      const uy = seededUnit(`${node.id}:y`) - 0.5;
+      const bandX =
+        node.type === "bothering-type"
+          ? size.width * 0.04
+          : node.type === "bothering" || node.type === "routine" || node.type === "specialization"
+            ? size.width * 0.055
+            : size.width * 0.06;
+      const bandY =
+        node.type === "bothering-type"
+          ? size.height * 0.08
+          : node.type === "bothering" || node.type === "routine"
+            ? size.height * 0.24
+            : node.type === "specialization"
+              ? size.height * 0.2
+              : size.height * 0.18;
+
+      const target = {
+        x: anchor.x + ux * bandX * 2,
+        y: anchor.y + uy * bandY * 2,
+      };
+      if (!Number.isFinite(target.x) || !Number.isFinite(target.y)) {
+        return {
+          x: Number.isFinite(anchor.x) ? anchor.x : size.width / 2,
+          y: Number.isFinite(anchor.y) ? anchor.y : size.height / 2,
+        };
+      }
+      return target;
+    },
+    [anchorForType, getBranchTarget, size.height, size.width]
   );
 
   const fitGraphToViewport = useCallback(() => {
@@ -519,11 +1632,12 @@ export default function GraphPage() {
     const map = positionsRef.current;
     filtered.nodes.forEach((node, i) => {
       if (map.has(node.id)) return;
+      const target = laneOffsetForNode(node);
       const angle = (i / Math.max(1, filtered.nodes.length)) * Math.PI * 2;
-      const radius = Math.min(size.width, size.height) * 0.3 + (i % 7) * 8;
+      const orbit = 34 + (hashString(`${node.id}:orbit`) % 56);
       map.set(node.id, {
-        x: size.width / 2 + Math.cos(angle) * radius + (Math.random() - 0.5) * 20,
-        y: size.height / 2 + Math.sin(angle) * radius + (Math.random() - 0.5) * 20,
+        x: target.x + Math.cos(angle) * orbit,
+        y: target.y + Math.sin(angle) * orbit,
         vx: 0,
         vy: 0,
       });
@@ -540,7 +1654,7 @@ export default function GraphPage() {
         pos.y = size.height / 2;
       }
     });
-  }, [filtered.nodes, size.width, size.height]);
+  }, [filtered.nodes, laneOffsetForNode, size.width, size.height]);
 
   useEffect(() => {
     let raf = 0;
@@ -588,7 +1702,7 @@ export default function GraphPage() {
         const dy = b.y - a.y;
         const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy));
         const diff = dist - linkDistance;
-        const k = linkForce;
+        const k = linkForce * edgeForceMultiplier(edge.type);
         const fx = (dx / dist) * diff * k;
         const fy = (dy / dist) * diff * k;
         a.vx += fx;
@@ -613,7 +1727,8 @@ export default function GraphPage() {
           const dx = b.x - a.x;
           const dy = b.y - a.y;
           const dist = Math.max(0.001, Math.sqrt(dx * dx + dy * dy));
-          const minDist = aR + bR + 10;
+          const sameTypeBoost = aNode?.type === bNode?.type ? 28 : 16;
+          const minDist = aR + bR + sameTypeBoost;
           if (dist >= minDist) continue;
           const overlap = (minDist - dist) * 0.5;
           const nx = dx / dist;
@@ -640,14 +1755,51 @@ export default function GraphPage() {
           return;
         }
         const anchor = anchorForType(node.type);
-        p.vx += (anchor.x - p.x) * 0.0009;
-        p.vy += (anchor.y - p.y) * 0.0009;
-        p.vx += (cx - p.x) * center;
-        p.vy += (cy - p.y) * center;
-        p.vx *= 0.86;
-        p.vy *= 0.86;
+        const laneTarget = laneOffsetForNode(node);
+        const hasHierarchicalParent = hierarchicalParentByNodeId.has(node.id);
+        const hierarchicalChildren = hierarchicalChildrenByParentId.get(node.id) || [];
+        const isHierarchicalParent = hierarchicalChildren.length > 0;
+        const anchorStrength = hasHierarchicalParent ? 0.00004 : 0.00018;
+        const laneStrength = hasHierarchicalParent ? 0.00175 : 0.00072;
+        const centerStrength = hasHierarchicalParent ? center * 0.1 : center;
+
+        if (isHierarchicalParent) {
+          const childTargets = hierarchicalChildren
+            .map((child) => getBranchTarget(child))
+            .filter((target): target is { x: number; y: number } => !!target);
+          if (childTargets.length > 0) {
+            const centroid = childTargets.reduce(
+              (acc, target) => ({ x: acc.x + target.x, y: acc.y + target.y }),
+              { x: 0, y: 0 }
+            );
+            centroid.x /= childTargets.length;
+            centroid.y /= childTargets.length;
+            p.vx += (p.x - centroid.x) * 0.0009;
+            p.vy += (p.y - centroid.y) * 0.0009;
+          }
+        }
+
+        if (!isHierarchicalParent) {
+          p.vx += (anchor.x - p.x) * anchorStrength;
+          p.vy += (anchor.y - p.y) * anchorStrength;
+        }
+        p.vx += (laneTarget.x - p.x) * laneStrength;
+        p.vy += (laneTarget.y - p.y) * laneStrength;
+        if (!isHierarchicalParent) {
+          p.vx += (cx - p.x) * centerStrength;
+          p.vy += (cy - p.y) * centerStrength;
+        }
+        p.vx *= 0.9;
+        p.vy *= 0.9;
         p.x += p.vx;
         p.y += p.vy;
+        if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.vx) || !Number.isFinite(p.vy)) {
+          const fallback = laneOffsetForNode(node);
+          p.x = Number.isFinite(fallback.x) ? fallback.x : cx;
+          p.y = Number.isFinite(fallback.y) ? fallback.y : cy;
+          p.vx = 0;
+          p.vy = 0;
+        }
       });
 
       setFrame((v) => (v + 1) % 100000);
@@ -655,9 +1807,94 @@ export default function GraphPage() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [animate, filtered.nodes, filtered.edges, filteredNodeById, repel, linkDistance, center, size.width, size.height, nodeSize, anchorForType, linkForce]);
+  }, [animate, filtered.nodes, filtered.edges, filteredNodeById, getBranchTarget, repel, linkDistance, center, size.width, size.height, nodeSize, anchorForType, hierarchicalChildrenByParentId, hierarchicalParentByNodeId, laneOffsetForNode, linkForce]);
+
+  const visibleLabelIds = useMemo(() => {
+    if (!showLabels) return new Set<string>();
+
+    const ordered = filtered.nodes
+      .map((node) => {
+        const pos = positionsRef.current.get(node.id);
+        const degree = filteredDegreeById.get(node.id) || 0;
+        const active = highlighted.nodeIds.has(node.id);
+        const aiActive = aiMatchedNodeIds.has(node.id);
+        const forced = active || aiActive || selectedNodeId === node.id || hoveredNodeId === node.id;
+        return { node, pos, degree, active, aiActive, forced };
+      })
+      .filter((entry): entry is typeof entry & { pos: Position } => !!entry.pos)
+      .sort((a, b) => {
+        const priorityA = (a.forced ? 1000 : 0) + a.degree;
+        const priorityB = (b.forced ? 1000 : 0) + b.degree;
+        return priorityB - priorityA;
+      });
+
+    const placed: Array<{ left: number; right: number; top: number; bottom: number }> = [];
+    const visible = new Set<string>();
+
+    ordered.forEach(({ node, pos, degree, forced }) => {
+      const neighborCount = filtered.nodes.reduce((count, other) => {
+        if (other.id === node.id) return count;
+        const otherPos = positionsRef.current.get(other.id);
+        if (!otherPos) return count;
+        const dx = (otherPos.x - pos.x) * zoom;
+        const dy = (otherPos.y - pos.y) * zoom;
+        return dx * dx + dy * dy < 110 * 110 ? count + 1 : count;
+      }, 0);
+      const shouldConsider = forced || zoom >= labelFadeZoom || (degree >= 7 && neighborCount <= 4);
+      if (!shouldConsider) return;
+
+      const radius = nodeSize + (node.type === "bothering-type" ? 3 : 0);
+      const screenX = pos.x * zoom + pan.x;
+      const screenY = pos.y * zoom + pan.y;
+      const labelAbove = screenY < size.height / 2;
+      const text = node.label.length > 42 ? `${node.label.slice(0, 42)}...` : node.label;
+      const width = estimateLabelWidth(text) + 18;
+      const height = 24;
+      const offsetY = labelAbove ? -(radius + 24) : radius + 10;
+      const bounds = {
+        left: screenX - width / 2,
+        right: screenX + width / 2,
+        top: screenY + offsetY - (labelAbove ? height : 0),
+        bottom: screenY + offsetY + (labelAbove ? 0 : height),
+      };
+
+      const overlaps = placed.some(
+        (placedBounds) =>
+          bounds.left < placedBounds.right &&
+          bounds.right > placedBounds.left &&
+          bounds.top < placedBounds.bottom &&
+          bounds.bottom > placedBounds.top
+      );
+
+      if ((!overlaps && neighborCount <= 6) || forced) {
+        visible.add(node.id);
+        placed.push(bounds);
+      }
+    });
+
+    return visible;
+  }, [
+    aiMatchedNodeIds,
+    filtered.nodes,
+    filteredDegreeById,
+    highlighted.nodeIds,
+    hoveredNodeId,
+    labelFadeZoom,
+    nodeSize,
+    pan.x,
+    pan.y,
+    selectedNodeId,
+    showLabels,
+    size.height,
+    zoom,
+  ]);
 
   useEffect(() => {
+    if (!hasRestoredGraphViewRef.current) return;
+    if (shouldSkipInitialFitRef.current) {
+      shouldSkipInitialFitRef.current = false;
+      return;
+    }
     const t = window.setTimeout(() => {
       fitGraphToViewport();
     }, 60);
@@ -743,16 +1980,34 @@ export default function GraphPage() {
               <Button size="sm" variant="ghost" onClick={fitGraphToViewport}>
                 Fit
               </Button>
+              {aiInsights ? (
+                <div className="rounded-md border border-cyan-400/20 bg-cyan-500/10 px-2 py-1 text-[11px] text-cyan-100">
+                  AI overlay
+                </div>
+              ) : null}
             </div>
             <div className="absolute right-3 top-3 z-20">
-              <Button
-                size="sm"
-                variant="secondary"
-                className="border border-white/15 bg-black/70 text-zinc-100 hover:bg-black/80"
-                onClick={() => setPanelOpen((open) => !open)}
-              >
-                {panelOpen ? "Hide Filters" : "Show Filters"}
-              </Button>
+              <div className="flex items-center gap-2">
+                {showDesktopOnlyUi ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="border border-cyan-400/20 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-500/20"
+                    onClick={handleGenerateAiInsights}
+                    disabled={isGeneratingAiInsights}
+                  >
+                    {isGeneratingAiInsights ? "Thinking..." : "AI"}
+                  </Button>
+                ) : null}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="border border-white/15 bg-black/70 text-zinc-100 hover:bg-black/80"
+                  onClick={() => setPanelOpen((open) => !open)}
+                >
+                  {panelOpen ? "Hide Filters" : "Show Filters"}
+                </Button>
+              </div>
             </div>
             {panelOpen ? (
               <div className="absolute right-3 top-14 z-20 max-h-[calc(100%-1.5rem)] w-[300px] overflow-auto rounded-xl border border-white/15 bg-black/72 p-4 backdrop-blur-md">
@@ -783,6 +2038,14 @@ export default function GraphPage() {
                       <Label htmlFor="f-s">Specializations</Label>
                     </div>
                     <div className="flex items-center gap-2">
+                      <Checkbox checked={showPatterns} onCheckedChange={(v) => setShowPatterns(!!v)} id="f-pt" />
+                      <Label htmlFor="f-pt">Patterns</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox checked={showProjects} onCheckedChange={(v) => setShowProjects(!!v)} id="f-pj" />
+                      <Label htmlFor="f-pj">Projects + Kanban</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
                       <Checkbox checked={showResources} onCheckedChange={(v) => setShowResources(!!v)} id="f-rs" />
                       <Label htmlFor="f-rs">Resource Cards</Label>
                     </div>
@@ -806,7 +2069,14 @@ export default function GraphPage() {
                       <Checkbox checked={showArrows} onCheckedChange={(v) => setShowArrows(!!v)} id="f-ar" />
                       <Label htmlFor="f-ar">Arrows</Label>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox checked={pathMode} onCheckedChange={(v) => setPathMode(!!v)} id="f-pm" />
+                      <Label htmlFor="f-pm">Path mode</Label>
+                    </div>
                   </div>
+                  <p className="text-xs leading-5 text-zinc-400">
+                    Path mode highlights the downstream chain when the selected node is a bothering or pattern node.
+                  </p>
 
                   <div className="space-y-3 text-zinc-200">
                     <div>
@@ -843,6 +2113,200 @@ export default function GraphPage() {
                     <div>Nodes: {filtered.nodes.length}</div>
                     <div>Links: {filtered.edges.length}</div>
                   </div>
+
+                  <div className="space-y-3 rounded-md border border-white/20 bg-black/25 p-3 text-sm text-zinc-200">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">Insights</div>
+                    <div>
+                      <div className="mb-1 text-xs text-zinc-400">Top hubs</div>
+                      <div className="space-y-1 text-xs">
+                        {graphInsights.hubs.length > 0 ? graphInsights.hubs.map((node) => (
+                          <div key={node.id} className="flex items-start justify-between gap-2">
+                            <span className="min-w-0 truncate">{node.label}</span>
+                            <span className="flex-shrink-0 text-zinc-500">{node.degree}</span>
+                          </div>
+                        )) : <div className="text-zinc-500">No connected hubs yet.</div>}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="mb-1 text-xs text-zinc-400">Loose ends</div>
+                      <div className="space-y-1 text-xs">
+                        {graphInsights.looseEnds.length > 0 ? graphInsights.looseEnds.map((node) => (
+                          <div key={node.id} className="truncate text-zinc-300">
+                            {node.label}
+                          </div>
+                        )) : <div className="text-zinc-500">No loose ends in current view.</div>}
+                      </div>
+                    </div>
+                    <div className="text-xs text-zinc-300">
+                      {graphInsights.components.length} clusters
+                      {graphInsights.components[0]?.focus.length ? ` | largest cluster starts around ${graphInsights.components[0].focus.join(", ")}` : ""}
+                    </div>
+                    <div>
+                      <div className="mb-1 text-xs text-zinc-400">What this graph is saying</div>
+                      <div className="space-y-2 text-xs leading-5 text-zinc-300">
+                        {graphInsights.suggestions.length > 0 ? graphInsights.suggestions.slice(0, 3).map((item, index) => (
+                          <p key={index}>{item}</p>
+                        )) : <p>The current graph is well-connected enough that no obvious structural gaps stand out in this filtered view.</p>}
+                      </div>
+                    </div>
+                  </div>
+
+                  {showDesktopOnlyUi ? (
+                    <div className="space-y-3 rounded-md border border-cyan-500/20 bg-cyan-500/5 p-3 text-sm text-zinc-200">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200/80">AI Analysis</div>
+                        <div className="flex items-center gap-2">
+                          {aiInsights ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 px-2 text-cyan-100 hover:bg-cyan-500/10"
+                              onClick={() => {
+                                if (isSpeakingAiInsights) {
+                                  stopAiNarration();
+                                } else {
+                                  void readAiInsightsAloud();
+                                }
+                              }}
+                            >
+                              {isSpeakingAiInsights ? "Stop" : "Read aloud"}
+                            </Button>
+                          ) : null}
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 px-2 text-cyan-100 hover:bg-cyan-500/10"
+                            onClick={handleGenerateAiInsights}
+                            disabled={isGeneratingAiInsights}
+                          >
+                            {isGeneratingAiInsights ? "Thinking..." : aiInsights ? "Refresh" : "Generate"}
+                          </Button>
+                        </div>
+                      </div>
+                      {aiInsightsError ? (
+                        <p className="text-xs leading-5 text-rose-300">{aiInsightsError}</p>
+                      ) : aiInsights ? (
+                        <div className="space-y-3">
+                          <p className="text-xs leading-5 text-zinc-300">{aiInsights.overview}</p>
+                          {aiInsights.clusters.length > 0 ? (
+                            <div>
+                              <div className="mb-1 text-xs text-zinc-400">Clusters</div>
+                              <div className="space-y-2">
+                                {aiInsights.clusters.slice(0, 3).map((cluster, index) => (
+                                  <div key={`${cluster.label}-${index}`} className="rounded-md border border-white/10 bg-black/20 p-2">
+                                    <div className="text-xs font-medium text-zinc-100">{cluster.label}</div>
+                                    <p className="mt-1 text-xs leading-5 text-zinc-300">{cluster.summary}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                          {aiInsights.leverageNodes.length > 0 ? (
+                            <div>
+                              <div className="mb-1 text-xs text-zinc-400">Leverage nodes</div>
+                              <div className="space-y-2">
+                                {aiInsights.leverageNodes.slice(0, 3).map((item, index) => (
+                                  <div key={`${item.label}-${index}`} className="text-xs leading-5 text-zinc-300">
+                                    <span className="font-medium text-zinc-100">{item.label}:</span> {item.reason}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                          {aiInsights.blindSpots.length > 0 ? (
+                            <div>
+                              <div className="mb-1 text-xs text-zinc-400">Blind spots</div>
+                              <div className="space-y-1">
+                                {aiInsights.blindSpots.slice(0, 3).map((item, index) => (
+                                  <p key={index} className="text-xs leading-5 text-zinc-300">{item}</p>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                          {aiInsights.nextActions.length > 0 ? (
+                            <div>
+                              <div className="mb-1 text-xs text-zinc-400">Suggested next actions</div>
+                              <div className="space-y-1">
+                                {aiInsights.nextActions.slice(0, 3).map((item, index) => (
+                                  <p key={index} className="text-xs leading-5 text-zinc-300">{item}</p>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <p className="text-xs leading-5 text-zinc-400">
+                          Generate a desktop-only AI read of this graph to surface latent clusters, leverage nodes, and structural blind spots.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {selectedNodeInsight ? (
+                    <div className="space-y-2 rounded-md border border-white/20 bg-black/25 p-3 text-sm text-zinc-200">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">Selected Node</div>
+                      <div className="font-medium text-zinc-100">{selectedNodeInsight.node.label}</div>
+                      <div className="text-xs text-zinc-400">
+                        {selectedNodeInsight.degree} visible links
+                      </div>
+                      <p className="text-xs leading-5 text-zinc-300">{selectedNodeInsight.takeaway}</p>
+                      {selectedNodeInsight.byType.length > 0 ? (
+                        <div className="flex flex-wrap gap-2 text-[11px] text-zinc-300">
+                          {selectedNodeInsight.byType.map(([type, count]) => (
+                            <span key={type} className="rounded-md border border-white/15 px-2 py-1">
+                              {type}: {count}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      {selectedNodeInsight.neighbors.length > 0 ? (
+                        <div className="space-y-1 text-xs text-zinc-300">
+                          <div className="text-zinc-400">Connected to</div>
+                          {selectedNodeInsight.neighbors.map((neighbor) => (
+                            <div key={neighbor.id} className="truncate">
+                              {neighbor.label}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {selectedPathInsight ? (
+                    <div className="space-y-3 rounded-md border border-cyan-400/20 bg-cyan-500/5 p-3 text-sm text-zinc-200">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Path Insight</div>
+                      <div>
+                        <div className="font-medium text-zinc-100">{selectedPathInsight.root.label}</div>
+                        <p className="mt-1 text-xs leading-5 text-zinc-300">{selectedPathInsight.takeaway}</p>
+                      </div>
+                      <div className="space-y-2">
+                        {selectedPathInsight.sections.map((section) => (
+                          <div key={section.key} className="rounded-md border border-white/10 bg-black/20 p-2">
+                            <div className="mb-1 flex items-center justify-between text-xs">
+                              <span className="text-zinc-200">{section.label}</span>
+                              <span className="text-zinc-500">{section.nodes.length}</span>
+                            </div>
+                            <div className="space-y-1">
+                              {section.nodes.slice(0, 6).map((node) => (
+                                <button
+                                  key={node.id}
+                                  type="button"
+                                  className="block w-full truncate text-left text-xs text-zinc-300 hover:text-cyan-200"
+                                  onClick={() => setSelectedNodeId(node.id)}
+                                  title={node.label}
+                                >
+                                  {node.label}
+                                </button>
+                              ))}
+                              {section.nodes.length > 6 ? (
+                                <div className="text-[11px] text-zinc-500">+{section.nodes.length - 6} more</div>
+                              ) : null}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
 
                   <Button
                     variant="outline"
@@ -889,8 +2353,24 @@ export default function GraphPage() {
                   <path d="M0,0 L8,4 L0,8 z" fill="rgba(163, 163, 163, 0.72)" />
                 </marker>
                 <marker id="arrow-active" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" orient="auto">
-                  <path d="M0,0 L8,4 L0,8 z" fill="rgba(250, 250, 250, 0.95)" />
+                  <path d="M0,0 L8,4 L0,8 z" fill="rgba(226, 232, 240, 0.78)" />
                 </marker>
+                <filter id="path-glow" x="-80%" y="-80%" width="260%" height="260%">
+                  <feGaussianBlur stdDeviation="3.2" result="blur" />
+                  <feColorMatrix
+                    in="blur"
+                    type="matrix"
+                    values="1 0 0 0 0
+                            0 1 0 0 0
+                            0 0 1 0 0
+                            0 0 0 0.9 0"
+                    result="glow"
+                  />
+                  <feMerge>
+                    <feMergeNode in="glow" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
               </defs>
 
               <g transform={`translate(${pan.x},${pan.y}) scale(${zoom})`}>
@@ -898,32 +2378,66 @@ export default function GraphPage() {
                   const s = positionsRef.current.get(edge.source);
                   const t = positionsRef.current.get(edge.target);
                   if (!s || !t) return null;
+                  if (!Number.isFinite(s.x) || !Number.isFinite(s.y) || !Number.isFinite(t.x) || !Number.isFinite(t.y)) return null;
                   const active = highlighted.edgeIds.has(edge.id);
+                  const aiActive = aiMatchedEdgeIds.has(edge.id);
+                  const aiDimmed = !!aiInsights && !aiActive;
+                  const sourceNode = filteredNodeById.get(edge.source);
+                  const targetNode = filteredNodeById.get(edge.target);
+                  const pathAccent = pathAccentForType(
+                    targetNode?.type || sourceNode?.type || "canvas",
+                    targetNode?.mode || sourceNode?.mode
+                  );
+                  const pathPulse = 0.76 + ((frame % 48) / 48) * 0.18;
+                  const dashOffset = -((frame * 0.9) % 24);
                   return (
-                    <line
-                      key={edge.id}
-                      x1={s.x}
-                      y1={s.y}
-                      x2={t.x}
-                      y2={t.y}
-                      stroke={active ? "rgba(250, 250, 250, 0.95)" : strokeForEdge(edge.type, false)}
-                      strokeOpacity={selectedNodeId ? (active ? 1 : 0.18) : 1}
-                      strokeWidth={active ? Math.max(2.2, linkThickness + 0.8) : edge.type === "canvas-link" ? linkThickness + 0.5 : linkThickness}
-                      markerEnd={showArrows ? (active ? "url(#arrow-active)" : "url(#arrow-default)") : undefined}
-                    />
+                    <g key={edge.id}>
+                      {active ? (
+                        <line
+                          x1={s.x}
+                          y1={s.y}
+                          x2={t.x}
+                          y2={t.y}
+                          stroke={pathAccent}
+                          strokeOpacity={0.18 * pathPulse}
+                          strokeWidth={Math.max(7.5, linkThickness + 5.5)}
+                          filter="url(#path-glow)"
+                        />
+                      ) : null}
+                      <line
+                        x1={s.x}
+                        y1={s.y}
+                        x2={t.x}
+                        y2={t.y}
+                        stroke={active ? pathAccent : aiActive ? "rgba(34, 211, 238, 0.82)" : strokeForEdge(edge.type, false, edge.mode)}
+                        strokeOpacity={selectedNodeId ? (active ? 0.94 : 0.24) : aiDimmed ? 0.14 : 1}
+                        strokeWidth={active ? Math.max(2.15, linkThickness + 0.7) : aiActive ? Math.max(2.1, linkThickness + 0.75) : edge.type === "canvas-link" ? linkThickness + 0.5 : linkThickness}
+                        strokeDasharray={active ? "10 8" : undefined}
+                        strokeDashoffset={active ? dashOffset : undefined}
+                        markerEnd={showArrows ? (active ? "url(#arrow-active)" : "url(#arrow-default)") : undefined}
+                      />
+                    </g>
                   );
                 })}
 
                 {filtered.nodes.map((node) => {
                   const p = positionsRef.current.get(node.id);
                   if (!p) return null;
+                  if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
                   const active = highlighted.nodeIds.has(node.id);
+                  const aiActive = aiMatchedNodeIds.has(node.id);
+                  const aiDimmed = !!aiInsights && !aiActive;
                   const deg = filteredDegreeById.get(node.id) || 0;
-                  const showLabel = showLabels && (active || selectedNodeId === node.id || hoveredNodeId === node.id || zoom >= labelFadeZoom || deg >= 3);
+                  const showLabel = visibleLabelIds.has(node.id);
                   const radius = nodeSize + (node.type === "bothering-type" ? 3 : 0);
                   const screenY = p.y * zoom + pan.y;
                   const labelAbove = screenY < size.height / 2;
                   const labelY = labelAbove ? -(radius + 7) : radius + 7;
+                  const tooltipY = labelAbove ? -(radius + 28) : radius + 24;
+                  const hovered = hoveredNodeId === node.id;
+                  const pathAccent = pathAccentForType(node.type, node.mode);
+                  const labelLines = labelLinesForNode(node);
+                  const pulse = 0.88 + ((frame % 42) / 42) * 0.18;
                   return (
                     <g
                       key={node.id}
@@ -943,25 +2457,103 @@ export default function GraphPage() {
                     >
                       <circle
                         r={radius}
-                        fill={colorForNode(node.type, false)}
-                        stroke={active ? "#fafafa" : "rgba(255,255,255,0.2)"}
-                        strokeWidth={active ? 2 : 0.8}
-                        opacity={selectedNodeId && !active ? 0.35 : 1}
+                        fill={aiActive ? "#06b6d4" : colorForNode(node.type, false, node.mode)}
+                        stroke={active ? pathAccent : aiActive ? "rgba(165, 243, 252, 0.9)" : "rgba(255,255,255,0.2)"}
+                        strokeWidth={active ? 1.8 : aiActive ? 2.2 : 0.8}
+                        opacity={selectedNodeId && !active ? 0.42 : aiDimmed ? 0.28 : 1}
                       />
-                      {renderNodeIcon(node.type, radius, !!selectedNodeId && !active)}
+                      {active ? (
+                        <circle
+                          r={radius + 4.5}
+                          fill="none"
+                          stroke={pathAccent}
+                          strokeOpacity={0.42 * pulse}
+                          strokeWidth={2}
+                          filter="url(#path-glow)"
+                          pointerEvents="none"
+                        />
+                      ) : null}
+                      {active ? (
+                        <circle
+                          r={radius + 8}
+                          fill={pathAccent}
+                          opacity={0.07 * pulse}
+                          pointerEvents="none"
+                        />
+                      ) : null}
+                      {renderNodeIcon(node.type, radius, (!!selectedNodeId && !active) || aiDimmed)}
+                      {aiActive ? (
+                        <circle
+                          r={radius + 4}
+                          fill="none"
+                          stroke="rgba(34, 211, 238, 0.45)"
+                          strokeWidth={1.5}
+                          pointerEvents="none"
+                        />
+                      ) : null}
                       {showLabel ? (
-                        <text
-                          x={0}
-                          y={labelY}
-                          fill="#e5e7eb"
-                          fontSize={11}
-                          textAnchor="middle"
-                          dominantBaseline={labelAbove ? "auto" : "hanging"}
-                          opacity={selectedNodeId && !active ? 0.4 : 1}
-                          style={{ userSelect: "none", pointerEvents: "none" }}
-                        >
-                          {node.label.length > 42 ? `${node.label.slice(0, 42)}...` : node.label}
-                        </text>
+                        active ? (
+                          <g transform={`translate(0, ${labelY + (labelAbove ? -8 : 8)})`} pointerEvents="none">
+                            <text
+                              x={0}
+                              y={labelAbove ? -7 : 7}
+                              fill={pathAccent}
+                              fontSize={10.5}
+                              fontWeight={600}
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                              style={{ userSelect: "none" }}
+                            >
+                              {labelLines.map((line, index) => (
+                                <tspan key={`${node.id}-active-${index}`} x={0} dy={index === 0 ? 0 : 12}>
+                                  {line}
+                                </tspan>
+                              ))}
+                            </text>
+                          </g>
+                        ) : (
+                          <text
+                            x={0}
+                            y={labelY}
+                            fill={aiActive ? "#cffafe" : "#e5e7eb"}
+                            fontSize={11}
+                            textAnchor="middle"
+                            dominantBaseline={labelAbove ? "auto" : "hanging"}
+                            opacity={selectedNodeId && !active ? 0.5 : aiDimmed ? 0.34 : 0.95}
+                            style={{ userSelect: "none", pointerEvents: "none" }}
+                          >
+                            {labelLines.map((line, index) => (
+                              <tspan key={`${node.id}-idle-${index}`} x={0} dy={index === 0 ? 0 : 12}>
+                                {line}
+                              </tspan>
+                            ))}
+                          </text>
+                        )
+                      ) : null}
+                      {hovered ? (
+                        <g transform={`translate(0, ${tooltipY})`} pointerEvents="none">
+                          <rect
+                            x={-46}
+                            y={-9}
+                            width={92}
+                            height={18}
+                            rx={8}
+                            fill="rgba(9, 12, 20, 0.9)"
+                            stroke="rgba(255,255,255,0.16)"
+                            strokeWidth={0.8}
+                          />
+                          <text
+                            x={0}
+                            y={0}
+                            fill="#e5e7eb"
+                            fontSize={10}
+                            textAnchor="middle"
+                            dominantBaseline="middle"
+                            style={{ userSelect: "none" }}
+                          >
+                            {nodeTypeLabel(node.type)}
+                          </text>
+                        </g>
                       ) : null}
                     </g>
                   );

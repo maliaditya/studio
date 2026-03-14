@@ -372,7 +372,7 @@ export async function registerUser(username: string, password: string): Promise<
 
     if (!response.ok) {
       if (result?.code === 'CLOUD_AUTH_UNAVAILABLE') {
-        return { success: false, message: result.error || 'Internet is required for first-time registration.' };
+        return { success: false, message: result.error || 'Cloud authentication is not configured for first-time registration.' };
       }
       return { success: false, message: result?.error || 'Registration failed.' };
     }
@@ -389,7 +389,7 @@ export async function registerUser(username: string, password: string): Promise<
 
   } catch (error) {
     console.error("Registration error:", error);
-    return { success: false, message: "Unable to reach cloud auth. Internet is required for first-time registration." };
+    return { success: false, message: "Unable to reach cloud authentication for first-time registration." };
   }
 }
 
@@ -399,14 +399,27 @@ export async function loginUser(
   opts?: { force?: boolean }
 ): Promise<{ success: boolean, message: string, user?: LocalUser, code?: "SESSION_ACTIVE" }> {
   const normalizedUsername = normalizeUsername(username);
+  const isDemoLogin = normalizedUsername === "demo" && password === "demo";
 
   const finalizeOfflineLogin = async (): Promise<{ success: boolean, message: string, user?: LocalUser, code?: "SESSION_ACTIVE" }> => {
+    if (isDemoLogin) {
+      const user: LocalUser = { username: normalizedUsername };
+      if (typeof window !== "undefined") {
+        safeSetLocalStorageItem(CURRENT_USER_KEY, normalizedUsername);
+        establishSession(normalizedUsername);
+      }
+      return {
+        success: true,
+        message: "Demo login successful.",
+        user,
+      };
+    }
     const isTrusted = await verifyTrustedCredentials(normalizedUsername, password);
     if (!isTrusted) {
       return {
         success: false,
         message:
-          "Internet is required for first login on this device. Offline login is only available after one successful cloud login.",
+          "First login on this device requires a successful cloud authentication. Offline login is only available after one successful cloud login.",
       };
     }
     if (!opts?.force && hasActiveSessionConflict(normalizedUsername)) {

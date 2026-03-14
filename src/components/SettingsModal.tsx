@@ -29,7 +29,7 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Copy, Trash2, RefreshCw, Github, HardDrive, Sparkles } from 'lucide-react';
+import { Copy, Trash2, RefreshCw, Github, HardDrive, Sparkles, Mic, Square, Play, Save, RotateCcw } from 'lucide-react';
 import type { Activity, ActivityType, WorkoutSchedulingMode, WidgetVisibility, SlotName } from '@/types/workout';
 import { initSupabasePdfStorage } from '@/lib/supabasePdfStorage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -63,6 +63,94 @@ const WIDGET_NAMES: { id: keyof WidgetVisibility, label: string }[] = [
 const SLOT_NAMES: SlotName[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
 const LOCAL_STORAGE_BUDGET_BYTES = 5 * 1024 * 1024; // Practical browser limit target for localStorage.
 const USER_SCOPED_KEY_PREFIXES = ['lifeos_data_', 'lifeos_ui_state_', 'lifeos_data_ref_'];
+const DEFAULT_XTTS_BASE_URL = 'http://127.0.0.1:8020';
+const XTTS_SAMPLE_SCRIPT = `Hello. This is my voice sample for XTTS v2.
+I am speaking clearly at a natural pace.
+This recording will be used as the reference voice for Astra.`;
+
+const downmixToMono = (buffer: AudioBuffer) => {
+  const { numberOfChannels, length } = buffer;
+  if (numberOfChannels === 1) return buffer.getChannelData(0);
+  const mono = new Float32Array(length);
+  for (let channel = 0; channel < numberOfChannels; channel += 1) {
+    const input = buffer.getChannelData(channel);
+    for (let index = 0; index < length; index += 1) {
+      mono[index] += input[index] / numberOfChannels;
+    }
+  }
+  return mono;
+};
+
+const resampleMonoChannel = (samples: Float32Array, sourceRate: number, targetRate: number) => {
+  if (sourceRate === targetRate) return samples;
+  const ratio = sourceRate / targetRate;
+  const nextLength = Math.max(1, Math.round(samples.length / ratio));
+  const next = new Float32Array(nextLength);
+  for (let index = 0; index < nextLength; index += 1) {
+    const sourceIndex = index * ratio;
+    const lower = Math.floor(sourceIndex);
+    const upper = Math.min(samples.length - 1, lower + 1);
+    const mix = sourceIndex - lower;
+    next[index] = samples[lower] * (1 - mix) + samples[upper] * mix;
+  }
+  return next;
+};
+
+const encodeMonoWav = (samples: Float32Array, sampleRate: number) => {
+  const bytesPerSample = 2;
+  const blockAlign = bytesPerSample;
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = samples.length * bytesPerSample;
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  const writeString = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index += 1) {
+      view.setUint8(offset + index, value.charCodeAt(index));
+    }
+  };
+
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, dataSize, true);
+
+  let offset = 44;
+  for (let index = 0; index < samples.length; index += 1) {
+    const clamped = Math.max(-1, Math.min(1, samples[index]));
+    view.setInt16(offset, clamped < 0 ? clamped * 0x8000 : clamped * 0x7fff, true);
+    offset += 2;
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+};
+
+const convertBlobToWav = async (blob: Blob) => {
+  const AudioContextCtor =
+    typeof window !== 'undefined'
+      ? window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      : undefined;
+  if (!AudioContextCtor) {
+    throw new Error('Audio conversion is not supported in this runtime.');
+  }
+  const arrayBuffer = await blob.arrayBuffer();
+  const audioContext = new AudioContextCtor();
+  try {
+    const decoded = await audioContext.decodeAudioData(arrayBuffer.slice(0));
+    const mono = downmixToMono(decoded);
+    const resampled = resampleMonoChannel(mono, decoded.sampleRate, 24000);
+    return encodeMonoWav(resampled, 24000);
+  } finally {
+    void audioContext.close().catch(() => undefined);
+  }
+};
 
 type StorageHealthSnapshot = {
   totalBytes: number;
@@ -99,12 +187,18 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const [aiModelsError, setAiModelsError] = useState<string | null>(null);
   const [isRefreshingLocalServerStatus, setIsRefreshingLocalServerStatus] = useState(false);
   const [isStartingKokoroFromSettings, setIsStartingKokoroFromSettings] = useState(false);
+  const [isStoppingKokoroFromSettings, setIsStoppingKokoroFromSettings] = useState(false);
+  const [isStartingXttsFromSettings, setIsStartingXttsFromSettings] = useState(false);
+  const [isStoppingXttsFromSettings, setIsStoppingXttsFromSettings] = useState(false);
+  const [isInstallingXttsFromSettings, setIsInstallingXttsFromSettings] = useState(false);
   const [isStartingSttFromSettings, setIsStartingSttFromSettings] = useState(false);
+  const [isStoppingSttFromSettings, setIsStoppingSttFromSettings] = useState(false);
   const [kokoroServerStatus, setKokoroServerStatus] = useState<{
     healthy: boolean;
     running: boolean;
     mode?: string | null;
     baseUrl?: string;
+    upgradeAvailable?: boolean;
   }>({ healthy: false, running: false, mode: null, baseUrl: settings.kokoroTtsBaseUrl || '' });
   const [sttServerStatus, setSttServerStatus] = useState<{
     healthy: boolean;
@@ -114,8 +208,31 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     error?: string;
     baseUrl?: string;
   }>({ healthy: false, running: false, managed: false, backend: '', error: '', baseUrl: settings.localSttBaseUrl || '' });
+  const [xttsServerStatus, setXttsServerStatus] = useState<{
+    healthy: boolean;
+    running: boolean;
+    managed?: boolean;
+    backend?: string;
+    mode?: string | null;
+    error?: string;
+    baseUrl?: string;
+    warming?: boolean;
+    details?: string[];
+  }>({ healthy: false, running: false, managed: false, backend: '', mode: null, error: '', baseUrl: settings.xttsTtsBaseUrl || '' });
+  const [isXttsBridgeSupported, setIsXttsBridgeSupported] = useState(true);
+  const [isRecordingXttsSample, setIsRecordingXttsSample] = useState(false);
+  const [isPlayingXttsSample, setIsPlayingXttsSample] = useState(false);
+  const [isSavingXttsSample, setIsSavingXttsSample] = useState(false);
+  const [xttsSampleBlob, setXttsSampleBlob] = useState<Blob | null>(null);
+  const [xttsSampleUrl, setXttsSampleUrl] = useState<string>('');
+  const xttsNeedsRecreate = Boolean(xttsServerStatus.error?.includes('needs to be recreated'));
+  const xttsCanRecreate = Boolean(xttsServerStatus.healthy && xttsServerStatus.running);
   const isDesktopRuntime =
     typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
+  const xttsSampleRecorderRef = React.useRef<MediaRecorder | null>(null);
+  const xttsSampleStreamRef = React.useRef<MediaStream | null>(null);
+  const xttsSampleChunksRef = React.useRef<BlobPart[]>([]);
+  const xttsSampleAudioRef = React.useRef<HTMLAudioElement | null>(null);
 
   // State for GitHub settings inputs
   const [localSettings, setLocalSettings] = useState(settings);
@@ -133,22 +250,32 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const refreshLocalServerStatus = useCallback(async () => {
     if (!isDesktopRuntime) return;
     const bridge = (window as any)?.studioDesktop;
-    if (!bridge) return;
+    if (!bridge?.desktop?.environmentStatus) return;
 
     setIsRefreshingLocalServerStatus(true);
     try {
       const kokoroBaseUrl = (settings.kokoroTtsBaseUrl || 'http://127.0.0.1:8880').trim();
+      const xttsBaseUrl = (settings.xttsTtsBaseUrl || DEFAULT_XTTS_BASE_URL).trim();
       const sttBaseUrl = (settings.localSttBaseUrl || 'http://127.0.0.1:9890').trim();
-      const [kokoroResult, sttResult] = await Promise.all([
-        bridge.kokoro?.status?.({ baseUrl: kokoroBaseUrl }),
-        bridge.stt?.status?.({ baseUrl: sttBaseUrl }),
-      ]);
+      const nextStatus = await bridge.desktop.environmentStatus({
+        kokoroBaseUrl,
+        xttsBaseUrl,
+        sttBaseUrl,
+      });
+      const kokoroResult = nextStatus?.kokoro || {};
+      const xttsSupported = Object.prototype.hasOwnProperty.call(nextStatus || {}, 'xtts');
+      const xttsResult = xttsSupported
+        ? (nextStatus?.xtts || {})
+        : { healthy: false, running: false, managed: false, backend: '', error: 'Restart desktop app to enable XTTS controls.', baseUrl: xttsBaseUrl };
+      const sttResult = nextStatus?.stt || {};
+      setIsXttsBridgeSupported(xttsSupported);
 
       setKokoroServerStatus({
         healthy: Boolean(kokoroResult?.healthy),
         running: Boolean(kokoroResult?.running),
         mode: kokoroResult?.mode || null,
         baseUrl: String(kokoroResult?.baseUrl || kokoroBaseUrl),
+        upgradeAvailable: Boolean(kokoroResult?.upgradeAvailable),
       });
       setSttServerStatus({
         healthy: Boolean(sttResult?.healthy),
@@ -158,6 +285,21 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
         error: String(sttResult?.error || ''),
         baseUrl: String(sttResult?.baseUrl || sttBaseUrl),
       });
+      setXttsServerStatus({
+        healthy: Boolean(xttsResult?.healthy),
+        running: Boolean(xttsResult?.running),
+        managed: Boolean(xttsResult?.managed),
+        backend: String(xttsResult?.backend || ''),
+        mode: xttsResult?.mode || null,
+        error: String(xttsResult?.error || ''),
+        baseUrl: String(xttsResult?.baseUrl || xttsBaseUrl),
+        warming: Boolean(xttsResult?.warming),
+        details: Array.isArray(xttsResult?.details) ? xttsResult.details.map((item: unknown) => String(item || '').trim()).filter(Boolean) : [],
+      });
+      const resolvedXttsBaseUrl = String(xttsResult?.baseUrl || '').trim();
+      if (resolvedXttsBaseUrl && resolvedXttsBaseUrl !== (settings.xttsTtsBaseUrl || '').trim()) {
+        setSettings((prev) => ({ ...prev, xttsTtsBaseUrl: resolvedXttsBaseUrl }));
+      }
 
       const resolvedSttBaseUrl = String(sttResult?.baseUrl || '').trim();
       if (resolvedSttBaseUrl && resolvedSttBaseUrl !== (settings.localSttBaseUrl || '').trim()) {
@@ -168,7 +310,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     } finally {
       setIsRefreshingLocalServerStatus(false);
     }
-  }, [isDesktopRuntime, settings.kokoroTtsBaseUrl, settings.localSttBaseUrl, setSettings]);
+  }, [isDesktopRuntime, settings.kokoroTtsBaseUrl, settings.localSttBaseUrl, settings.xttsTtsBaseUrl, setSettings]);
 
   const handleStartKokoroFromSettings = useCallback(async () => {
     if (!isDesktopRuntime) return;
@@ -176,9 +318,10 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     if (!bridge?.kokoro?.startServer) return;
     setIsStartingKokoroFromSettings(true);
     try {
-      const result = await bridge.kokoro.startServer({
-        baseUrl: (settings.kokoroTtsBaseUrl || 'http://127.0.0.1:8880').trim(),
-      });
+        const result = await bridge.kokoro.startServer({
+          baseUrl: (settings.kokoroTtsBaseUrl || 'http://127.0.0.1:8880').trim(),
+          forceRecreate: Boolean(kokoroServerStatus.upgradeAvailable),
+        });
       if (!result?.success) {
         throw new Error(String(result?.error || 'Failed to start Kokoro.'));
       }
@@ -199,7 +342,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
     } finally {
       setIsStartingKokoroFromSettings(false);
     }
-  }, [isDesktopRuntime, refreshLocalServerStatus, setSettings, settings.kokoroTtsBaseUrl, toast]);
+  }, [isDesktopRuntime, refreshLocalServerStatus, setSettings, settings.kokoroTtsBaseUrl, toast, kokoroServerStatus.upgradeAvailable]);
 
   const handleStartSttFromSettings = useCallback(async () => {
     if (!isDesktopRuntime) return;
@@ -231,6 +374,346 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
       setIsStartingSttFromSettings(false);
     }
   }, [isDesktopRuntime, refreshLocalServerStatus, setSettings, settings.localSttBaseUrl, toast]);
+
+  const handleStopKokoroFromSettings = useCallback(async () => {
+    if (!isDesktopRuntime) return;
+    const bridge = (window as any)?.studioDesktop;
+    if (!bridge?.kokoro?.stopServer) return;
+    setIsStoppingKokoroFromSettings(true);
+    try {
+      const result = await bridge.kokoro.stopServer({});
+      if (!result?.success) {
+        throw new Error(String(result?.error || 'Failed to stop Kokoro.'));
+      }
+      toast({
+        title: 'Kokoro stopped',
+        description: 'Managed Kokoro service was stopped.',
+      });
+      await refreshLocalServerStatus();
+    } catch (error) {
+      toast({
+        title: 'Kokoro stop failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsStoppingKokoroFromSettings(false);
+    }
+  }, [isDesktopRuntime, refreshLocalServerStatus, toast]);
+
+  const handleStopXttsFromSettings = useCallback(async () => {
+    if (!isDesktopRuntime) return;
+    const bridge = (window as any)?.studioDesktop;
+    if (!bridge?.xtts?.stopServer || !isXttsBridgeSupported) return;
+    setIsStoppingXttsFromSettings(true);
+    try {
+      const result = await bridge.xtts.stopServer({});
+      if (!result?.success) {
+        throw new Error(String(result?.error || 'Failed to stop XTTS.'));
+      }
+      toast({
+        title: 'XTTS stopped',
+        description: 'Managed XTTS service was stopped.',
+      });
+      await refreshLocalServerStatus();
+    } catch (error) {
+      toast({
+        title: 'XTTS stop failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsStoppingXttsFromSettings(false);
+    }
+  }, [isDesktopRuntime, isXttsBridgeSupported, refreshLocalServerStatus, toast]);
+
+  const handleStopSttFromSettings = useCallback(async () => {
+    if (!isDesktopRuntime) return;
+    const bridge = (window as any)?.studioDesktop;
+    if (!bridge?.stt?.stopServer) return;
+    setIsStoppingSttFromSettings(true);
+    try {
+      const result = await bridge.stt.stopServer({});
+      if (!result?.success) {
+        throw new Error(String(result?.error || 'Failed to stop local STT server.'));
+      }
+      toast({
+        title: 'Local STT stopped',
+        description: 'Managed STT service was stopped.',
+      });
+      await refreshLocalServerStatus();
+    } catch (error) {
+      toast({
+        title: 'STT stop failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsStoppingSttFromSettings(false);
+    }
+  }, [isDesktopRuntime, refreshLocalServerStatus, toast]);
+
+  const handleStartXttsFromSettings = useCallback(async () => {
+    if (!isDesktopRuntime) return;
+    const bridge = (window as any)?.studioDesktop;
+    if (!bridge?.xtts?.startServer || !isXttsBridgeSupported) {
+      toast({
+        title: 'Restart required',
+        description: 'Restart the desktop app to enable XTTS controls in the Electron main process.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsStartingXttsFromSettings(true);
+    try {
+        const result = await bridge.xtts.startServer({
+          baseUrl: (settings.xttsTtsBaseUrl || DEFAULT_XTTS_BASE_URL).trim(),
+          forceRecreate: xttsNeedsRecreate || xttsCanRecreate,
+        });
+      if (!result?.success) {
+        throw new Error(String(result?.error || 'Failed to start XTTS.'));
+      }
+      if (result?.baseUrl) {
+        setSettings((prev) => ({ ...prev, xttsTtsBaseUrl: String(result.baseUrl) }));
+      }
+      toast({
+        title: 'XTTS running',
+        description: String(result?.managed ? 'Managed XTTS process started.' : 'Connected to existing XTTS server.'),
+      });
+      await refreshLocalServerStatus();
+    } catch (error) {
+      toast({
+        title: 'XTTS start failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsStartingXttsFromSettings(false);
+    }
+  }, [isDesktopRuntime, isXttsBridgeSupported, refreshLocalServerStatus, setSettings, settings.xttsTtsBaseUrl, toast, xttsCanRecreate, xttsNeedsRecreate]);
+
+  const handleInstallXttsFromSettings = useCallback(async () => {
+    if (!isDesktopRuntime) return;
+    const bridge = (window as any)?.studioDesktop;
+    if (!bridge?.xtts?.install || !isXttsBridgeSupported) {
+      toast({
+        title: 'Restart required',
+        description: 'Restart the desktop app to enable XTTS installer controls in the Electron main process.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsInstallingXttsFromSettings(true);
+    try {
+      const result = await bridge.xtts.install({});
+      if (!result?.success) {
+        throw new Error(String(result?.error || 'Failed to install XTTS.'));
+      }
+      toast({
+        title: 'XTTS installed',
+        description: 'XTTS dependencies were installed. You can start XTTS now.',
+      });
+      await refreshLocalServerStatus();
+    } catch (error) {
+      toast({
+        title: 'XTTS install failed',
+        description: error instanceof Error ? error.message : 'Unknown error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsInstallingXttsFromSettings(false);
+    }
+  }, [isDesktopRuntime, isXttsBridgeSupported, refreshLocalServerStatus, toast]);
+
+  const cleanupXttsSampleRecording = useCallback(() => {
+    if (xttsSampleRecorderRef.current && xttsSampleRecorderRef.current.state !== 'inactive') {
+      try {
+        xttsSampleRecorderRef.current.stop();
+      } catch {
+        // ignore
+      }
+    }
+    xttsSampleRecorderRef.current = null;
+    if (xttsSampleStreamRef.current) {
+      xttsSampleStreamRef.current.getTracks().forEach((track) => track.stop());
+      xttsSampleStreamRef.current = null;
+    }
+    setIsRecordingXttsSample(false);
+  }, []);
+
+  const handleStartXttsSampleRecording = useCallback(async () => {
+    if (isRecordingXttsSample || typeof window === 'undefined' || typeof navigator === 'undefined' || typeof MediaRecorder === 'undefined') {
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      xttsSampleStreamRef.current = stream;
+      xttsSampleChunksRef.current = [];
+      const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg']
+        .find((type) => {
+          try {
+            return MediaRecorder.isTypeSupported(type);
+          } catch {
+            return false;
+          }
+        });
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      xttsSampleRecorderRef.current = recorder;
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          xttsSampleChunksRef.current.push(event.data);
+        }
+      };
+      recorder.onstop = () => {
+        const nextBlob = new Blob(xttsSampleChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        xttsSampleChunksRef.current = [];
+        setXttsSampleBlob(nextBlob);
+        setIsRecordingXttsSample(false);
+      };
+      recorder.onerror = () => {
+        cleanupXttsSampleRecording();
+        toast({
+          title: 'Voice sample recording failed',
+          description: 'Could not record the XTTS voice sample.',
+          variant: 'destructive',
+        });
+      };
+      recorder.start();
+      setIsRecordingXttsSample(true);
+    } catch (error) {
+      toast({
+        title: 'Microphone unavailable',
+        description: error instanceof Error ? error.message : 'Could not access the microphone.',
+        variant: 'destructive',
+      });
+    }
+  }, [cleanupXttsSampleRecording, isRecordingXttsSample, toast]);
+
+  const handleStopXttsSampleRecording = useCallback(() => {
+    const recorder = xttsSampleRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      recorder.stop();
+    }
+    if (xttsSampleStreamRef.current) {
+      xttsSampleStreamRef.current.getTracks().forEach((track) => track.stop());
+      xttsSampleStreamRef.current = null;
+    }
+    setIsRecordingXttsSample(false);
+  }, []);
+
+  const handleResetXttsSample = useCallback(() => {
+    if (xttsSampleAudioRef.current) {
+      xttsSampleAudioRef.current.pause();
+      xttsSampleAudioRef.current.currentTime = 0;
+      xttsSampleAudioRef.current = null;
+    }
+    setIsPlayingXttsSample(false);
+    setXttsSampleBlob(null);
+  }, []);
+
+  const handlePlayXttsSample = useCallback(() => {
+    if (!xttsSampleUrl) return;
+    if (xttsSampleAudioRef.current && isPlayingXttsSample) {
+      xttsSampleAudioRef.current.pause();
+      xttsSampleAudioRef.current.currentTime = 0;
+      xttsSampleAudioRef.current = null;
+      setIsPlayingXttsSample(false);
+      return;
+    }
+    const audio = new Audio(xttsSampleUrl);
+    xttsSampleAudioRef.current = audio;
+    audio.onended = () => {
+      xttsSampleAudioRef.current = null;
+      setIsPlayingXttsSample(false);
+    };
+    audio.onerror = () => {
+      xttsSampleAudioRef.current = null;
+      setIsPlayingXttsSample(false);
+    };
+    setIsPlayingXttsSample(true);
+    void audio.play().catch(() => {
+      xttsSampleAudioRef.current = null;
+      setIsPlayingXttsSample(false);
+    });
+  }, [isPlayingXttsSample, xttsSampleUrl]);
+
+  const handleSaveXttsSample = useCallback(async () => {
+    if (!xttsSampleBlob || !isDesktopRuntime) return;
+    const bridge = (window as any)?.studioDesktop;
+    if (!bridge?.desktop?.saveAudioFile) return;
+    setIsSavingXttsSample(true);
+    try {
+      const wavBlob = xttsSampleBlob.type === 'audio/wav' ? xttsSampleBlob : await convertBlobToWav(xttsSampleBlob);
+      const buffer = await wavBlob.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let index = 0; index < bytes.length; index += 1) {
+        binary += String.fromCharCode(bytes[index]);
+      }
+      const result = await bridge.desktop.saveAudioFile({
+        base64: btoa(binary),
+        defaultFileName: `xtts-${(settings.xttsVoiceName || 'my_voice').trim() || 'my_voice'}-sample.wav`,
+        target: 'xtts-sample',
+      });
+      if (result?.success && result?.filePath) {
+        setSettings((prev) => ({
+          ...prev,
+          xttsVoiceSamplePath: String(result.xttsSpeakerPath || result.filePath),
+        }));
+        toast({
+          title: 'Voice sample saved',
+          description: String(result.filePath),
+        });
+      }
+    } catch (error) {
+      const fallbackUrl = URL.createObjectURL(xttsSampleBlob);
+      const link = document.createElement('a');
+      link.href = fallbackUrl;
+      link.download = `xtts-${(settings.xttsVoiceName || 'my_voice').trim() || 'my_voice'}-sample.webm`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(fallbackUrl);
+      toast({
+        title: 'Downloaded sample instead',
+        description:
+          error instanceof Error && /desktop:save-audio-file/i.test(error.message)
+            ? 'The desktop process needs a restart to enable direct save-path support. The sample was downloaded instead.'
+            : 'Direct save failed, so the sample was downloaded instead.',
+      });
+    } finally {
+      setIsSavingXttsSample(false);
+    }
+  }, [isDesktopRuntime, settings.xttsVoiceName, setSettings, toast, xttsSampleBlob]);
+
+  useEffect(() => {
+    if (!xttsSampleBlob) {
+      if (xttsSampleUrl) {
+        URL.revokeObjectURL(xttsSampleUrl);
+      }
+      setXttsSampleUrl('');
+      return;
+    }
+    const nextUrl = URL.createObjectURL(xttsSampleBlob);
+    if (xttsSampleUrl) {
+      URL.revokeObjectURL(xttsSampleUrl);
+    }
+    setXttsSampleUrl(nextUrl);
+    return () => {
+      URL.revokeObjectURL(nextUrl);
+    };
+  }, [xttsSampleBlob]);
+
+  useEffect(() => () => {
+    cleanupXttsSampleRecording();
+    if (xttsSampleAudioRef.current) {
+      xttsSampleAudioRef.current.pause();
+      xttsSampleAudioRef.current = null;
+    }
+    if (xttsSampleUrl) {
+      URL.revokeObjectURL(xttsSampleUrl);
+    }
+  }, [cleanupXttsSampleRecording, xttsSampleUrl]);
 
   // Drag state for non-modal popup
   const popupRef = React.useRef<HTMLDivElement | null>(null);
@@ -589,6 +1072,39 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const handleSettingChange = (key: keyof typeof settings, value: any) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
+  const handleBrowseXttsSample = useCallback(async () => {
+    if (!isDesktopRuntime) return;
+    const bridge = (window as any)?.studioDesktop;
+    if (!bridge?.desktop?.browseFile) return;
+    try {
+      const result = await bridge.desktop.browseFile({
+        title: 'Select XTTS voice sample',
+        target: 'xtts-sample',
+        filters: [
+          { name: 'Audio', extensions: ['wav', 'mp3', 'm4a', 'ogg', 'webm'] },
+        ],
+      });
+      if (!result?.success || !result?.filePath) return;
+      setSettings((prev) => ({
+        ...prev,
+        xttsVoiceSamplePath: String(result.xttsSpeakerPath || result.filePath),
+      }));
+      toast({
+        title: 'Voice sample ready',
+        description: 'The selected sample was copied into the XTTS voice folder.',
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Could not open file picker.';
+      const description = message.includes("No handler registered for 'desktop:browse-file'")
+        ? 'The desktop app needs a full restart before Browse is available.'
+        : message;
+      toast({
+        title: 'Browse failed',
+        description,
+        variant: 'destructive',
+      });
+    }
+  }, [isDesktopRuntime, setSettings, toast]);
   const handleAiSettingChange = (key: keyof NonNullable<typeof settings.ai>, value: string | number) => {
     setSettings((prev) => {
       const normalized = normalizeAiSettings(prev.ai, isDesktopRuntime);
@@ -1177,6 +1693,23 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                             </div>
                           </>
                         ) : null}
+                        <div className="space-y-1">
+                          <Label htmlFor="astra-reply-language">Astra Reply Language</Label>
+                          <select
+                            id="astra-reply-language"
+                            className="w-full rounded-md border bg-background px-3 py-2 text-sm"
+                            value={settings.astraReplyLanguage || 'auto'}
+                            onChange={(e) => handleSettingChange('astraReplyLanguage', e.target.value as 'auto' | 'english' | 'hindi' | 'hinglish')}
+                          >
+                            <option value="auto">Auto</option>
+                            <option value="english">English</option>
+                            <option value="hindi">Hindi</option>
+                            <option value="hinglish">Hinglish</option>
+                          </select>
+                          <p className="text-xs text-muted-foreground">
+                            Controls the language/style Astra writes in. `Hinglish` means Hindi written in English letters.
+                          </p>
+                        </div>
                         {isDesktopRuntime ? (
                           <div className="space-y-2 rounded-md border border-border/60 p-3">
                             <Label htmlFor="kokoro-base-url">Kokoro Local TTS (Desktop only)</Label>
@@ -1188,6 +1721,84 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                             />
                             <p className="text-xs text-muted-foreground">
                               Used by PDF read-aloud when selecting Kokoro provider voices.
+                            </p>
+                          </div>
+                        ) : null}
+                        {isDesktopRuntime ? (
+                          <div className="space-y-2 rounded-md border border-border/60 p-3">
+                            <Label htmlFor="xtts-base-url">XTTS v2 Local TTS (Desktop only)</Label>
+                            <Input
+                              id="xtts-base-url"
+                              placeholder="http://127.0.0.1:8020"
+                              value={settings.xttsTtsBaseUrl || ''}
+                              onChange={(e) => handleSettingChange('xttsTtsBaseUrl', e.target.value)}
+                            />
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Voice sample path, e.g. C:\\voices\\me.wav"
+                                value={settings.xttsVoiceSamplePath || ''}
+                                onChange={(e) => handleSettingChange('xttsVoiceSamplePath', e.target.value)}
+                              />
+                              <Button type="button" variant="outline" onClick={() => void handleBrowseXttsSample()}>
+                                Browse
+                              </Button>
+                            </div>
+                            <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <Label className="text-xs">Record voice sample</Label>
+                                <div className="text-[11px] text-muted-foreground">
+                                  {isRecordingXttsSample ? 'Recording...' : xttsSampleBlob ? 'Sample ready' : 'No sample recorded'}
+                                </div>
+                              </div>
+                              <div className="rounded-md border border-border/60 bg-background/60 p-2 text-xs leading-5 text-muted-foreground whitespace-pre-line">
+                                {XTTS_SAMPLE_SCRIPT}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {!isRecordingXttsSample ? (
+                                  <Button type="button" variant="outline" size="sm" onClick={() => void handleStartXttsSampleRecording()}>
+                                    <Mic className="mr-2 h-3.5 w-3.5" />
+                                    Record voice
+                                  </Button>
+                                ) : (
+                                  <Button type="button" variant="secondary" size="sm" onClick={handleStopXttsSampleRecording}>
+                                    <Square className="mr-2 h-3.5 w-3.5" />
+                                    Stop recording
+                                  </Button>
+                                )}
+                                <Button type="button" variant="outline" size="sm" onClick={handlePlayXttsSample} disabled={!xttsSampleUrl}>
+                                  <Play className="mr-2 h-3.5 w-3.5" />
+                                  {isPlayingXttsSample ? 'Stop playback' : 'Play back'}
+                                </Button>
+                                <Button type="button" variant="outline" size="sm" onClick={handleResetXttsSample} disabled={!xttsSampleBlob}>
+                                  <RotateCcw className="mr-2 h-3.5 w-3.5" />
+                                  Reset
+                                </Button>
+                                <Button type="button" size="sm" onClick={() => void handleSaveXttsSample()} disabled={!xttsSampleBlob || isSavingXttsSample}>
+                                  <Save className="mr-2 h-3.5 w-3.5" />
+                                  {isSavingXttsSample ? 'Saving...' : 'Save sample'}
+                                </Button>
+                              </div>
+                              <div className="text-[11px] text-muted-foreground">
+                                Save will write the recording to disk and fill the XTTS voice sample path automatically.
+                              </div>
+                            </div>
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <Input
+                                placeholder="Voice name"
+                                value={settings.xttsVoiceName || ''}
+                                onChange={(e) => handleSettingChange('xttsVoiceName', e.target.value)}
+                              />
+                              <Input
+                                placeholder="Language code"
+                                value={settings.xttsLanguage || ''}
+                                onChange={(e) => handleSettingChange('xttsLanguage', e.target.value)}
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Used for local voice cloning. If a sample path is set, XTTS uses that recording as the speaker reference.
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Desktop auto-start uses <code>ELECTRON_XTTS_START_COMMAND</code>. Default env base URL: <code>ELECTRON_XTTS_BASE_URL=http://127.0.0.1:8020</code>.
                             </p>
                           </div>
                         ) : null}
@@ -1222,32 +1833,95 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                               </Button>
                             </div>
                             <div className="grid gap-2 text-xs">
-                              <div className="flex items-center justify-between rounded border border-border/60 px-2 py-1.5">
-                                <span className="text-muted-foreground">Kokoro</span>
-                                <span className={kokoroServerStatus.healthy ? 'text-emerald-400' : 'text-muted-foreground'}>
-                                  {kokoroServerStatus.healthy
-                                    ? `running${kokoroServerStatus.mode ? ` (${kokoroServerStatus.mode})` : ''}`
-                                    : 'offline'}
-                                </span>
-                              </div>
+                                <div className="flex items-center justify-between rounded border border-border/60 px-2 py-1.5">
+                                  <span className="text-muted-foreground">Kokoro</span>
+                                  <span className={kokoroServerStatus.healthy ? 'text-emerald-400' : 'text-muted-foreground'}>
+                                    {kokoroServerStatus.healthy
+                                      ? `running${kokoroServerStatus.mode ? ` (${kokoroServerStatus.mode})` : ''}`
+                                      : 'offline'}
+                                  </span>
+                                </div>
+                                {kokoroServerStatus.upgradeAvailable ? (
+                                  <div className="rounded border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground">
+                                    GPU is available. Recreate Kokoro to switch from CPU to GPU.
+                                  </div>
+                                ) : null}
                               <div className="flex items-center justify-between rounded border border-border/60 px-2 py-1.5">
                                 <span className="text-muted-foreground">Local STT</span>
                                 <span className={sttServerStatus.healthy ? 'text-emerald-400' : 'text-muted-foreground'}>
                                   {sttServerStatus.healthy
-                                    ? `running${sttServerStatus.backend ? ` (${sttServerStatus.backend})` : sttServerStatus.managed ? ' (managed)' : ''}`
+                                    ? `running${sttServerStatus.mode ? ` (${sttServerStatus.mode})` : sttServerStatus.backend ? ` (${sttServerStatus.backend})` : sttServerStatus.managed ? ' (managed)' : ''}`
                                     : 'offline'}
                                 </span>
                               </div>
+                              <div className="flex items-center justify-between rounded border border-border/60 px-2 py-1.5">
+                                <span className="text-muted-foreground">XTTS</span>
+                                <span className={xttsServerStatus.healthy ? 'text-emerald-400' : 'text-muted-foreground'}>
+                                  {xttsServerStatus.healthy
+                                    ? `running${xttsServerStatus.mode ? ` (${xttsServerStatus.mode})` : xttsServerStatus.backend ? ` (${xttsServerStatus.backend})` : xttsServerStatus.managed ? ' (managed)' : ''}`
+                                    : !isXttsBridgeSupported
+                                    ? 'unavailable'
+                                    : xttsServerStatus.warming
+                                    ? 'warming'
+                                    : 'offline'}
+                                </span>
+                              </div>
+                              {!xttsServerStatus.healthy && (xttsServerStatus.error || xttsServerStatus.details?.length) ? (
+                                <div className="rounded border border-border/60 px-2 py-1.5 text-[11px] text-muted-foreground">
+                                  <div>{xttsServerStatus.error}</div>
+                                  {xttsServerStatus.details?.slice(0, 2).map((detail) => (
+                                    <div key={detail} className="mt-1 break-all">
+                                      {detail}
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
                             </div>
                             <div className="flex flex-wrap gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void handleStartKokoroFromSettings()}
+                                  disabled={isStartingKokoroFromSettings}
+                                >
+                                  {isStartingKokoroFromSettings ? (kokoroServerStatus.upgradeAvailable ? 'Upgrading Kokoro...' : 'Starting Kokoro...') : (kokoroServerStatus.upgradeAvailable ? 'Upgrade Kokoro to GPU' : 'Start Kokoro')}
+                                </Button>
+                              {kokoroServerStatus.running ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void handleStopKokoroFromSettings()}
+                                  disabled={isStoppingKokoroFromSettings}
+                                >
+                                  {isStoppingKokoroFromSettings ? 'Stopping Kokoro...' : 'Stop Kokoro'}
+                                </Button>
+                              ) : null}
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => void handleStartKokoroFromSettings()}
-                                disabled={isStartingKokoroFromSettings}
+                                onClick={() => void handleInstallXttsFromSettings()}
+                                disabled={isInstallingXttsFromSettings || !isXttsBridgeSupported}
                               >
-                                {isStartingKokoroFromSettings ? 'Starting Kokoro...' : 'Start Kokoro'}
+                                {isInstallingXttsFromSettings ? 'Installing XTTS...' : 'Install XTTS'}
                               </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void handleStartXttsFromSettings()}
+                                  disabled={isStartingXttsFromSettings || !isXttsBridgeSupported}
+                                >
+                                  {isStartingXttsFromSettings ? ((xttsNeedsRecreate || xttsCanRecreate) ? 'Recreating XTTS...' : 'Starting XTTS...') : ((xttsNeedsRecreate || xttsCanRecreate) ? 'Recreate XTTS' : 'Start XTTS')}
+                                </Button>
+                              {xttsServerStatus.running && (xttsServerStatus.managed || xttsServerStatus.backend === 'docker') ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void handleStopXttsFromSettings()}
+                                  disabled={isStoppingXttsFromSettings || !isXttsBridgeSupported}
+                                >
+                                  {isStoppingXttsFromSettings ? 'Stopping XTTS...' : 'Stop XTTS'}
+                                </Button>
+                              ) : null}
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1256,6 +1930,16 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                               >
                                 {isStartingSttFromSettings ? 'Starting STT...' : 'Start STT'}
                               </Button>
+                              {sttServerStatus.running && (sttServerStatus.managed || sttServerStatus.backend === 'docker') ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void handleStopSttFromSettings()}
+                                  disabled={isStoppingSttFromSettings}
+                                >
+                                  {isStoppingSttFromSettings ? 'Stopping STT...' : 'Stop STT'}
+                                </Button>
+                              ) : null}
                             </div>
                             {sttServerStatus.error ? (
                               <p className="text-[11px] text-destructive">{sttServerStatus.error}</p>

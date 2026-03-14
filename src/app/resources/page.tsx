@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter, CardDescription } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks, Zap, Search, View, File as FileIcon, Paintbrush } from 'lucide-react';
+import { PlusCircle, Trash2, Library, Folder, Link as LinkIcon, Edit, ExternalLink, ChevronDown, Loader2, Globe, GitMerge, MoreVertical, Youtube, Expand, PictureInPicture, ArrowRight, Workflow, GripVertical, X, Code, MessageSquare, Plus, Share, Pin, PinOff, ChevronLeft, ChevronRight as ChevronRightIcon, Upload, Play, Pause, Copy, Github, Unlink, Edit3, Blocks, Zap, Search, View, File as FileIcon, Paintbrush, Volume2, VolumeX } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { cn } from '@/lib/utils';
 import type { Resource, ResourceFolder, ResourcePoint, PopupState } from '@/types/workout';
@@ -33,7 +33,7 @@ import { format, parseISO } from 'date-fns';
 import { ModelViewer } from '@/components/ModelViewer';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { EditableField, DoubleEditableField, EmotionEditableField, EditableResourcePoint } from '@/components/EditableFields';
+import { EditableField, DoubleEditableField, EmotionEditableField, EditableResourcePoint, RESOURCE_BLOCK_OPTIONS, ResourceBlockMenu } from '@/components/EditableFields';
 import { HabitResourceCard } from '@/components/HabitResourceCard';
 import { MechanismResourceCard } from '@/components/MechanismResourceCard';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
@@ -41,6 +41,11 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { storePdf } from '@/lib/audioDB';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
+import { FlashcardResourceTile } from '@/components/FlashcardResourceTile';
+import { buildReadableTextFromResource } from '@/lib/resourceSpeech';
+import { useBufferedResource } from '@/hooks/useBufferedResource';
+import { loadAstraVoicePrefs, pickBestVoice } from '@/lib/tts';
+import { buildDefaultPointsForResourceType } from '@/lib/resourceDefaults';
 
 
 const getFaviconUrl = (link: string): string | undefined => {
@@ -259,19 +264,57 @@ interface ResourceCardComponentProps {
 const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, playingAudio, setPlayingAudio, onLinkClick, linkingFromId, isPopup = false, onEditLinkText, onClosePopup, onConvertToCard, onOpenPdfViewer }: ResourceCardComponentProps) => {
     const { resources, setFloatingVideoUrl, setFloatingVideoPlaylist } = useAuth();
     const [editingTitle, setEditingTitle] = useState(false);
+    const [isReadingAloud, setIsReadingAloud] = useState(false);
+    const [autoFocusPointId, setAutoFocusPointId] = useState<string | null>(null);
+    const [isAddStepMenuOpen, setIsAddStepMenuOpen] = useState(false);
     
     const [linkCardPopoverOpen, setLinkCardPopoverOpen] = useState(false);
     const [linkedCardId, setLinkedCardId] = useState<string>('');
     const audioInputRef = useRef<HTMLInputElement>(null);
+    const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+    const bufferedResource = useBufferedResource(resource, onUpdate);
+    const draftResource = bufferedResource.draftResource ?? resource;
+    const { queueUpdate, flush } = bufferedResource;
+    const readableText = useMemo(() => buildReadableTextFromResource(draftResource), [draftResource]);
 
     const handleUpdateTitle = (newTitle: string) => {
-        onUpdate({ ...resource, name: newTitle });
+        queueUpdate((current) => ({ ...current, name: newTitle }));
     };
 
+    const createPoint = (type: ResourcePoint['type'] = 'text', text = 'New step...'): ResourcePoint => ({
+        id: `point_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        text,
+        type,
+        checked: type === 'todo' ? false : undefined,
+    });
+
     const handleAddPoint = (type: ResourcePoint['type']) => {
-        const newPoint: ResourcePoint = { id: `point_${Date.now()}`, text: 'New step...', type };
-        const updatedPoints = [...(resource.points || []), newPoint];
-        onUpdate({ ...resource, points: updatedPoints });
+        const newPoint: ResourcePoint = createPoint(type || 'text');
+        setAutoFocusPointId(newPoint.id);
+        queueUpdate((current) => ({ ...current, points: [...(current.points || []), newPoint] }));
+    };
+
+    const handleInsertPointBelow = (pointId: string, type: ResourcePoint['type'] = 'text') => {
+        const newPoint = createPoint(type || 'text', '');
+        setAutoFocusPointId(newPoint.id);
+        queueUpdate((current) => {
+            const points = current.points || [];
+            const insertIndex = points.findIndex((p) => p.id === pointId);
+            const updatedPoints = [...points];
+            updatedPoints.splice(insertIndex >= 0 ? insertIndex + 1 : updatedPoints.length, 0, newPoint);
+            return { ...current, points: updatedPoints };
+        });
+    };
+
+    const handleChangePointType = (pointId: string, type: ResourcePoint['type']) => {
+        queueUpdate((current) => ({
+            ...current,
+            points: (current.points || []).map((p) =>
+                p.id === pointId
+                    ? { ...p, type, checked: type === 'todo' ? Boolean(p.checked) : undefined }
+                    : p
+            ),
+        }));
     };
 
     const handleAddCardLinkPoint = () => {
@@ -285,18 +328,19 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
             text: linkedCard.name,
             resourceId: linkedCardId
         };
-        const updatedPoints = [...(resource.points || []), newPoint];
-        onUpdate({ ...resource, points: updatedPoints });
+        queueUpdate((current) => ({ ...current, points: [...(current.points || []), newPoint] }));
         setLinkCardPopoverOpen(false);
         setLinkedCardId('');
     };
 
     const handleDeletePoint = (pointId: string) => {
-        const updatedPoints = (resource.points || []).filter(p => p.id !== pointId);
-        onUpdate({ ...resource, points: updatedPoints });
+        queueUpdate((current) => ({
+            ...current,
+            points: (current.points || []).filter((p) => p.id !== pointId),
+        }));
     };
     
-    const markdownOrCodeCount = (resource.points || []).filter(p => p.type === 'markdown' || p.type === 'code').length;
+    const markdownOrCodeCount = (draftResource.points || []).filter(p => p.type === 'markdown' || p.type === 'code').length;
     
     const handleAudioUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -304,7 +348,7 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
             const reader = new FileReader();
             reader.onload = (e) => {
                 const audioUrl = e.target?.result as string;
-                onUpdate({ ...resource, audioUrl });
+                queueUpdate((current) => ({ ...current, audioUrl }));
             };
             reader.readAsDataURL(file);
         }
@@ -320,45 +364,94 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
         });
     };
 
+    useEffect(() => {
+        return () => {
+            if (speechUtteranceRef.current && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+        };
+    }, []);
+
+    useEffect(() => {
+        setIsReadingAloud(false);
+    }, [resource.id]);
+
+    const toggleReadAloud = (e: React.MouseEvent | React.PointerEvent) => {
+        e.stopPropagation();
+        if (typeof window === 'undefined' || !('speechSynthesis' in window) || !readableText) return;
+        if (isReadingAloud) {
+            window.speechSynthesis.cancel();
+            speechUtteranceRef.current = null;
+            setIsReadingAloud(false);
+            return;
+        }
+
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(readableText);
+        const astraVoicePrefs = loadAstraVoicePrefs();
+        utterance.rate = Math.max(0.6, Math.min(1.6, astraVoicePrefs.rate || 0.96));
+        const preferredVoice = pickBestVoice(window.speechSynthesis.getVoices(), astraVoicePrefs.systemVoiceUri);
+        if (preferredVoice) {
+            utterance.voice = preferredVoice;
+            utterance.lang = preferredVoice.lang;
+        }
+        utterance.onend = () => {
+            speechUtteranceRef.current = null;
+            setIsReadingAloud(false);
+        };
+        utterance.onerror = () => {
+            speechUtteranceRef.current = null;
+            setIsReadingAloud(false);
+        };
+        speechUtteranceRef.current = utterance;
+        setIsReadingAloud(true);
+        window.speechSynthesis.speak(utterance);
+    };
+
     const handleDragEnd = (event: DragEndEvent) => {
       const { active, over } = event;
       if (!over || active.id === over.id) return;
-      const oldIndex = (resource.points || []).findIndex(p => p.id === active.id);
-      const newIndex = (resource.points || []).findIndex(p => p.id === over.id);
+      const oldIndex = (draftResource.points || []).findIndex(p => p.id === active.id);
+      const newIndex = (draftResource.points || []).findIndex(p => p.id === over.id);
       if (oldIndex !== -1 && newIndex !== -1) {
-        const newPoints = arrayMove(resource.points!, oldIndex, newIndex);
-        onUpdate({ ...resource, points: newPoints });
+        const newPoints = arrayMove(draftResource.points!, oldIndex, newIndex);
+        queueUpdate((current) => ({ ...current, points: newPoints }));
       }
     };
 
     return (
-        <Card className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl", linkingFromId === resource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== resource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
+        <Card className={cn("flex flex-col rounded-2xl group overflow-hidden transition-all duration-300 hover:shadow-xl", linkingFromId === draftResource.id && "ring-2 ring-primary", linkingFromId && linkingFromId !== draftResource.id && "cursor-pointer hover:ring-2 hover:ring-primary/50")}>
              <input type="file" ref={audioInputRef} onChange={handleAudioUpload} accept="audio/*" className="hidden" />
             <CardHeader>
                 <div className="flex justify-between items-start gap-2">
                    <div className="flex items-center gap-2 flex-grow min-w-0">
                         {editingTitle ? (
-                            <Input value={resource.name} onChange={(e) => handleUpdateTitle(e.target.value)} onBlur={() => setEditingTitle(false)} autoFocus className="text-lg font-semibold h-9" />
+                            <Input value={draftResource.name} onChange={(e) => handleUpdateTitle(e.target.value)} onBlur={() => { flush(); setEditingTitle(false); }} autoFocus className="text-lg font-semibold h-9" />
                         ) : (
                             <CardTitle className="flex items-center gap-3 text-lg cursor-pointer" onClick={() => setEditingTitle(true)}>
                                 <span className="text-primary"><Library className="h-5 w-5" /></span>
-                                <span className="truncate">{resource.name}</span>
+                                <span className="truncate">{draftResource.name}</span>
                             </CardTitle>
                         )}
                    </div>
                    <div className="flex items-center">
                         {markdownOrCodeCount > 0 && !isPopup && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onOpenMarkdownModal(resource.id, '')}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onOpenMarkdownModal(draftResource.id, '')}>
                                 <Expand className="h-4 w-4" />
                             </Button>
                         )}
-                        {resource.audioUrl && (
+                        {draftResource.audioUrl && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onPointerDownCapture={togglePlayAudio}>
-                                {playingAudio?.id === resource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                                {playingAudio?.id === draftResource.id && playingAudio.isPlaying ? <Pause className="h-4 w-4 text-green-500" /> : <Play className="h-4 w-4 text-green-500" />}
+                            </Button>
+                        )}
+                        {readableText && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onPointerDownCapture={toggleReadAloud} title={isReadingAloud ? "Stop read aloud" : "Read aloud"}>
+                                {isReadingAloud ? <VolumeX className="h-4 w-4 text-sky-500" /> : <Volume2 className="h-4 w-4 text-sky-500" />}
                             </Button>
                         )}
                         {!isPopup && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onLinkClick(resource.id)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onLinkClick(draftResource.id)}>
                                 <LinkIcon className="h-4 w-4" />
                             </Button>
                         )}
@@ -371,14 +464,14 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
                             <DropdownMenuContent align="end">
                                 <DropdownMenuItem onSelect={() => setEditingTitle(true)}>Edit Title</DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => audioInputRef.current?.click()}><Upload className="mr-2 h-4 w-4" />Upload Audio</DropdownMenuItem>
-                                {!isPopup && <DropdownMenuItem onSelect={() => onDelete(resource.id)} className="text-destructive">Delete Card</DropdownMenuItem>}
+                                {!isPopup && <DropdownMenuItem onSelect={() => onDelete(draftResource.id)} className="text-destructive">Delete Card</DropdownMenuItem>}
                             </DropdownMenuContent>
                     </DropdownMenu>
                     </div>
                 </div>
-                {resource.createdAt && (
+                {draftResource.createdAt && (
                     <CardDescription className="text-xs pt-1">
-                        Created: {format(parseISO(resource.createdAt), 'MMM d, yyyy')}
+                        Created: {format(parseISO(draftResource.createdAt), 'MMM d, yyyy')}
                     </CardDescription>
                 )}
             </CardHeader>
@@ -386,24 +479,43 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
               <div className={cn(markdownOrCodeCount > 0 ? 'h-[450px]' : '')}>
                 <ScrollArea className="h-full">
                     <DndContext onDragEnd={handleDragEnd}>
-                        <SortableContext items={(resource.points || []).map(p => p.id)}>
-                            <ul className="space-y-3 pr-3">
-                                {(resource.points || []).map((point) => (
+                        <SortableContext items={(draftResource.points || []).map(p => p.id)}>
+                            <ul className="space-y-1.5 pr-3">
+                                {(draftResource.points || []).map((point, index, list) => {
+                                    const numberedIndex =
+                                        point.type === 'numbered-list'
+                                            ? list.filter((entry, entryIndex) => entry.type === 'numbered-list' && entryIndex <= index).length - 1
+                                            : index;
+                                    return (
                                     <SortablePoint 
                                         key={point.id} 
+                                        resource={draftResource}
                                         point={point} 
-                                        onUpdate={(newText) => {
-                                            const updatedPoints = (resource.points || []).map(p => p.id === point.id ? { ...p, text: newText } : p);
-                                            onUpdate({ ...resource, points: updatedPoints });
+                                        onUpdate={(updates) => {
+                                            queueUpdate((current) => ({
+                                                ...current,
+                                                points: (current.points || []).map((p) => p.id === point.id ? { ...p, ...updates } : p),
+                                            }));
                                         }}
                                         onDelete={() => handleDeletePoint(point.id)}
                                         onOpenNestedPopup={(e: React.MouseEvent) => onOpenNestedPopup(point.resourceId!, e)}
-                                        onOpenMarkdownModal={() => onOpenMarkdownModal(resource.id, point.id)}
+                                        onOpenMarkdownModal={() => onOpenMarkdownModal(draftResource.id, point.id)}
                                         onEditLinkText={onEditLinkText}
                                         onConvertToCard={onConvertToCard}
                                         onOpenPdfViewer={() => {}}
+                                        onInsertBelow={(type) => handleInsertPointBelow(point.id, type)}
+                                        onChangeType={(type) => handleChangePointType(point.id, type)}
+                                        autoFocus={autoFocusPointId === point.id}
+                                        onAutoFocusConsumed={() => setAutoFocusPointId((prev) => (prev === point.id ? null : prev))}
+                                        blockIndex={numberedIndex}
+                                        onFocusPrevious={() => {
+                                            const previousPoint = list[index - 1];
+                                            if (previousPoint) {
+                                                setAutoFocusPointId(previousPoint.id);
+                                            }
+                                        }}
                                     />
-                                ))}
+                                )})}
                             </ul>
                         </SortableContext>
                     </DndContext>
@@ -412,20 +524,18 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
             </CardContent>
             <CardFooter className="p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                  <div className="flex gap-2 w-full">
-                    <Popover>
+                    <Popover open={isAddStepMenuOpen} onOpenChange={setIsAddStepMenuOpen}>
                         <PopoverTrigger asChild>
                             <Button variant="outline" size="sm" className="w-full">
                                 <Plus className="mr-2 h-4 w-4" /> Add Step
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-48 p-1">
-                           <div className="space-y-1">
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('text')}><MessageSquare className="mr-2 h-4 w-4" />Text</Button>
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('markdown')}><MessageSquare className="mr-2 h-4 w-4" />Markdown</Button>
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('code')}><Code className="mr-2 h-4 w-4" />Code</Button>
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('link')}><LinkIcon className="mr-2 h-4 w-4" />Link</Button>
-                                <Button variant="ghost" className="w-full justify-start" onClick={() => handleAddPoint('paint')}><Paintbrush className="mr-2 h-4 w-4" />Paint Canvas</Button>
-                           </div>
+                        <PopoverContent className="z-[220] w-[18rem] border-0 bg-transparent p-0 shadow-none" side="top" align="start" sideOffset={6}>
+                           <ResourceBlockMenu
+                                allowedValues={RESOURCE_BLOCK_OPTIONS.filter((option) => option.value !== 'youtube' && option.value !== 'obsidian' && option.value !== 'card' && option.value !== 'timestamp').map((option) => option.value)}
+                                onClose={() => setIsAddStepMenuOpen(false)}
+                                onSelect={(type) => handleAddPoint(type || 'text')}
+                           />
                         </PopoverContent>
                     </Popover>
                     <Popover open={linkCardPopoverOpen} onOpenChange={setLinkCardPopoverOpen}>
@@ -444,7 +554,7 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
                                     <Select value={linkedCardId} onValueChange={setLinkedCardId}>
                                         <SelectTrigger><SelectValue placeholder="Select a card..."/></SelectTrigger>
                                         <SelectContent>
-                                            {resources.filter(r => (r.type === 'card' || r.type === 'habit' || r.type === 'mechanism') && r.id !== resource.id).map(r => (
+                                            {resources.filter(r => (r.type === 'card' || r.type === 'habit' || r.type === 'mechanism') && r.id !== draftResource.id).map(r => (
                                                 <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                                             ))}
                                         </SelectContent>
@@ -493,15 +603,22 @@ const SortableResourceCard = React.memo(({ item, children, className, linkingFro
 SortableResourceCard.displayName = 'SortableResourceCard';
 
 
-const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText, onOpenPdfViewer }: {
+const SortablePoint = React.memo(({ resource, point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenMarkdownModal, onEditLinkText, onOpenPdfViewer, onInsertBelow, onChangeType, autoFocus, onAutoFocusConsumed, blockIndex, onFocusPrevious }: {
+    resource: Resource;
     point: ResourcePoint;
     onConvertToCard: () => void;
-    onUpdate: (updatedText: string) => void;
+    onUpdate: (updatedPoint: Partial<ResourcePoint>) => void;
     onDelete: () => void;
     onOpenNestedPopup: (event: React.MouseEvent) => void;
     onOpenMarkdownModal: () => void;
     onEditLinkText: (point: ResourcePoint) => void;
     onOpenPdfViewer: () => void;
+    onInsertBelow: (type?: ResourcePoint['type']) => void;
+    onChangeType: (type: ResourcePoint['type']) => void;
+    autoFocus: boolean;
+    onAutoFocusConsumed: () => void;
+    blockIndex: number;
+    onFocusPrevious?: () => void;
 }) => {
     const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: point.id, data: { type: 'point', item: point } });
 
@@ -536,13 +653,9 @@ const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, 
     return (
         <div ref={setNodeRef} style={style} className="relative bg-card">
             <EditableResourcePoint 
+                resource={resource}
                 point={point}
-                onUpdate={(pointId, updates) => {
-                    const newText = (updates as { text: string }).text;
-                    if (typeof newText === 'string') {
-                        onUpdate(newText);
-                    }
-                }}
+                onUpdate={(pointId, updates) => { onUpdate(updates); }}
                 onDelete={onDelete}
                 onOpenNestedPopup={onOpenNestedPopup}
                 onOpenContentView={onOpenMarkdownModal}
@@ -555,6 +668,12 @@ const SortablePoint = React.memo(({ point, onConvertToCard, onUpdate, onDelete, 
                 onClearEndTime={()=>{}}
                 onOpenDrawingCanvas={()=>{}}
                 onOpenPdfViewer={onOpenPdfViewer}
+                onInsertBelow={(_, type) => onInsertBelow(type)}
+                onChangeType={(_, type) => onChangeType(type)}
+                autoFocus={autoFocus}
+                onAutoFocusConsumed={onAutoFocusConsumed}
+                blockIndex={blockIndex}
+                onFocusPrevious={onFocusPrevious}
             />
         </div>
     );
@@ -572,6 +691,52 @@ const SearchResultCard = React.memo(({
     onDelete: (resource: Resource) => void;
     onOpenFolder: (folderId: string) => void;
 }) => {
+    if (resource.type === 'flashcard') {
+        return (
+            <FlashcardResourceTile
+                resource={resource}
+                footer={(
+                    <div className="flex gap-2">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="w-full"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOpen(resource.id, e);
+                            }}
+                        >
+                            Open
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenFolder(resource.folderId);
+                            }}
+                        >
+                            Folder
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 shrink-0 text-destructive"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onDelete(resource);
+                            }}
+                            title="Delete Resource"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+                )}
+            />
+        );
+    }
+
     const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.link);
     const icon = resource.type === 'habit' ? <Zap className="h-4 w-4 text-primary" /> :
         resource.type === 'mechanism' ? <Workflow className="h-4 w-4 text-primary" /> :
@@ -864,9 +1029,9 @@ function ResourcesPageContent() {
 
   const modelUploadInputRef = useRef<HTMLInputElement>(null);
 
-  const handleUpdateResource = (updatedResource: Resource) => {
+  const handleUpdateResource = useCallback((updatedResource: Resource) => {
     setResources(prev => prev.map(r => r.id === updatedResource.id ? updatedResource : r));
-  };
+  }, [setResources]);
   
   const handleEditLinkText = useCallback((point: ResourcePoint) => {
     const resource = resources.find(r => r.points?.some(p => p.id === point.id));
@@ -1123,7 +1288,7 @@ function ResourcesPageContent() {
         name: resourceName,
         folderId: selectedResourceFolderId,
         type: addResourceType,
-        points: [],
+        points: buildDefaultPointsForResourceType(addResourceType, []),
         icon: 'Library',
         createdAt: new Date().toISOString(),
         mechanismFramework: addResourceType === 'mechanism' ? mechanismFramework : undefined,
@@ -1434,6 +1599,37 @@ function ResourcesPageContent() {
                                                 onEditLinkText={handleEditLinkText}
                                                 onConvertToCard={onConvertToCard}
                                                 onOpenPdfViewer={openPdfViewer}
+                                            />
+                                        ) : res.type === 'flashcard' ? (
+                                            <FlashcardResourceTile
+                                                resource={res}
+                                                onClick={() => openGeneralPopup(res.id, null)}
+                                                footer={(
+                                                    <div className="flex gap-2">
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="sm"
+                                                            className="w-full"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                openGeneralPopup(res.id, e);
+                                                            }}
+                                                        >
+                                                            Open
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="w-full"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setDeleteConfirmation({ item: res });
+                                                            }}
+                                                        >
+                                                            Delete
+                                                        </Button>
+                                                    </div>
+                                                )}
                                             />
                                         ) : (
                                             <ResourceCard
@@ -1750,6 +1946,29 @@ const ResourceCard = React.memo(({ resource, onUpdate, onDelete, onOpenNestedPop
                     </DialogContent>
                 </Dialog>
             </>
+        );
+    }
+
+    if (resource.type === 'flashcard') {
+        return (
+            <FlashcardResourceTile
+                resource={resource}
+                footer={(
+                    <div className="flex gap-2">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            className="w-full"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenNestedPopup(resource.id, e);
+                            }}
+                        >
+                            Open
+                        </Button>
+                    </div>
+                )}
+            />
         );
     }
      

@@ -32,6 +32,7 @@ import { downloadPdfFromSupabase, uploadPdfToSupabase } from "@/lib/supabasePdfS
 import { Card, CardHeader, CardTitle, CardContent } from './ui/card';
 import { useDraggable } from '@dnd-kit/core';
 import { Button } from './ui/button';
+import { Checkbox } from './ui/checkbox';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
 import { useAuth } from "@/contexts/AuthContext";
@@ -41,18 +42,46 @@ import remarkGfm from "remark-gfm";
 import { addDays, addMonths, differenceInDays, differenceInMonths, isAfter, isBefore, parseISO, startOfDay } from "date-fns";
 import { getAiConfigFromSettings, normalizeAiSettings } from "@/lib/ai/config";
 import { cleanSpeechText, getKokoroLocalVoices, getOpenAiCloudVoices, loadSpeechPrefs, parseCloudVoiceURI, pickBestVoice, saveSpeechPrefs } from "@/lib/tts";
+import type { FlashcardSessionIndex, FlashcardTopicEntry, Resource } from "@/types/workout";
+import { buildFlashcardTaskKey, normalizeFlashcardTopicName, sanitizeFlashcardAiCandidate } from "@/lib/flashcards";
 
 pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 type AnnotationPoint = { x: number; y: number };
 type AnnotationStroke = { kind?: "stroke"; color: string; size: number; points: AnnotationPoint[] };
 type TextHighlightRect = { x: number; y: number; width: number; height: number };
-type TextHighlight = { kind: "text-highlight"; color: string; opacity: number; rects: TextHighlightRect[] };
+type TextHighlight = { kind: "text-highlight"; color: string; opacity: number; rects: TextHighlightRect[]; id?: string; text?: string; createdAt?: string };
 type PageAnnotation = AnnotationStroke | TextHighlight;
 type AnnotationByPage = Record<number, PageAnnotation[]>;
 type ViewerPrefs = { scale: number; fitMode: "custom" | "width"; rotation: number };
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type LaserLine = { id: number; left: number; top: number; width: number };
+type SpeakTextOptions = { continuousPageRead?: boolean };
+type FlashcardHighlightCandidate = { highlightId: string; pageNumber: number; text: string; createdAt: string };
+type FlashcardTaskOption = {
+    value: string;
+    definitionId: string;
+    activityType: "deepwork" | "upskill";
+    taskName: string;
+    specializationId: string;
+    specializationName: string;
+    skillAreaIds: string[] | null;
+    bookName: string;
+};
+type FlashcardPreviewCandidate = {
+    highlightId: string;
+    pageNumber: number;
+    sourceText: string;
+    question: string;
+    answer: string;
+    options: string[];
+    correctOptionIndex: number;
+    explanation: string;
+    matchedTopicIds: string[];
+    newTopics: string[];
+    selected: boolean;
+};
+type FlashcardGenerationScope = "target" | "page";
 
 const LASER_PROGRESS_SCALE = 1.0;
 const LASER_PROGRESS_OFFSET = 0.008;
@@ -104,6 +133,9 @@ const normalizeAnnotationMap = (input: unknown): AnnotationByPage => {
                     color: typeof item.color === "string" ? item.color : "#fde047",
                     opacity: Number.isFinite(Number(item.opacity)) ? Math.max(0.1, Math.min(0.9, Number(item.opacity))) : 0.35,
                     rects,
+                    id: typeof item.id === "string" ? item.id : undefined,
+                    text: typeof item.text === "string" ? item.text : undefined,
+                    createdAt: typeof item.createdAt === "string" ? item.createdAt : undefined,
                 });
                 return;
             }
@@ -200,8 +232,37 @@ const buildFallbackLaserRects = (container: HTMLElement | null): TextHighlightRe
     }));
 };
 
+const getPageNumberFromSpeechKey = (key?: string | null) => {
+    const raw = String(key || "").trim();
+    if (!raw.startsWith("page:")) return null;
+    const parsed = Number(raw.slice(5));
+    return Number.isFinite(parsed) ? parsed : null;
+};
+
+const makeId = (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+
+const getDateKey = (value?: string | Date | null) => {
+    const date = value instanceof Date ? value : value ? new Date(value) : new Date();
+    const time = date.getTime();
+    if (!Number.isFinite(time)) return "";
+    return date.toISOString().slice(0, 10);
+};
+
 export default function PdfViewerPopup() {
-    const { pdfViewerState, setPdfViewerState, settings, setSettings, setResources, currentUser, offerizationPlans, coreSkills } = useAuth();
+    const {
+        pdfViewerState,
+        setPdfViewerState,
+        settings,
+        setSettings,
+        setResources,
+        resourceFolders,
+        setResourceFolders,
+        currentUser,
+        offerizationPlans,
+        coreSkills,
+        upskillDefinitions,
+        deepWorkDefinitions,
+    } = useAuth();
     const { toast } = useToast();
     const [numPages, setNumPages] = useState<number | null>(null);
     const [pageNumber, setPageNumber] = useState(1);
@@ -211,6 +272,7 @@ export default function PdfViewerPopup() {
     const [fitMode, setFitMode] = useState<"custom" | "width">("width");
     const [rotation, setRotation] = useState(0);
     const [pageInput, setPageInput] = useState("1");
+    const [sessionStartPage, setSessionStartPage] = useState<number | null>(null);
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isReaderOnly, setIsReaderOnly] = useState(true);
     const [isAnnotating, setIsAnnotating] = useState(false);
@@ -230,14 +292,22 @@ export default function PdfViewerPopup() {
     const [ttsVoices, setTtsVoices] = useState<SpeechSynthesisVoice[]>([]);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [isSpeechPaused, setIsSpeechPaused] = useState(false);
+    const [isContinuousPageReadEnabled, setIsContinuousPageReadEnabled] = useState(false);
+    const [pageReadAwaitingTurnFromPage, setPageReadAwaitingTurnFromPage] = useState<number | null>(null);
     const [isStartingKokoro, setIsStartingKokoro] = useState(false);
     const [isKokoroHealthy, setIsKokoroHealthy] = useState(false);
     const [kokoroMode, setKokoroMode] = useState<"cpu" | "gpu" | "custom" | "existing" | null>(null);
     const [activeSpeechKey, setActiveSpeechKey] = useState<string | null>(null);
     const [ttsVoiceURI, setTtsVoiceURI] = useState<string | undefined>(undefined);
     const [ttsRate, setTtsRate] = useState(0.96);
-    const [showTargetCelebration, setShowTargetCelebration] = useState(false);
-    const [celebratedKey, setCelebratedKey] = useState<string | null>(null);
+    const [targetCelebrationCycle, setTargetCelebrationCycle] = useState(0);
+    const [isFlashcardPanelOpen, setIsFlashcardPanelOpen] = useState(false);
+    const [flashcardError, setFlashcardError] = useState("");
+    const [isFlashcardPreviewLoading, setIsFlashcardPreviewLoading] = useState(false);
+    const [isFlashcardGenerating, setIsFlashcardGenerating] = useState(false);
+    const [selectedFlashcardTaskValue, setSelectedFlashcardTaskValue] = useState("");
+    const [flashcardPreviewCandidates, setFlashcardPreviewCandidates] = useState<FlashcardPreviewCandidate[]>([]);
+    const [flashcardGenerationScope, setFlashcardGenerationScope] = useState<FlashcardGenerationScope>("target");
     const [laserCurrentLine, setLaserCurrentLine] = useState<LaserLine | null>(null);
     const [laserTrailLines, setLaserTrailLines] = useState<LaserLine[]>([]);
     const [laserCurrentLineProgress, setLaserCurrentLineProgress] = useState(1);
@@ -264,6 +334,8 @@ export default function PdfViewerPopup() {
     const laserCurrentLineIndexRef = useRef(-1);
     const speechPausedRef = useRef(false);
     const kokoroWarmupStartedRef = useRef(false);
+    const pageReadResumeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const renderedPageNumberRef = useRef(0);
     const isResizing = resizeMode !== null;
     
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
@@ -276,10 +348,12 @@ export default function PdfViewerPopup() {
             const resource = pdfViewerState?.resource;
             if (!resource?.id) {
                 setFile(null);
+                setSessionStartPage(null);
                 setIsLoading(false);
                 return;
             }
             setIsLoading(true);
+            setSessionStartPage(null);
             try {
                 const local = await getPdfForResource(resource.id, resource.pdfFileName);
                 if (local.blob) {
@@ -313,8 +387,18 @@ export default function PdfViewerPopup() {
 
             setNumPages(null);
             const lastOpenedPage = settings.pdfLastOpenedPageByResourceId?.[resource.id] || 1;
-            setPageNumber(Math.max(1, lastOpenedPage));
+            const restoredStartPage = Math.max(1, lastOpenedPage);
+            setSessionStartPage(restoredStartPage);
+            setPageNumber(restoredStartPage);
             setIsReaderOnly(true);
+            renderedPageNumberRef.current = 0;
+            setIsContinuousPageReadEnabled(false);
+            setPageReadAwaitingTurnFromPage(null);
+            setIsFlashcardPanelOpen(false);
+            setFlashcardError("");
+            setFlashcardPreviewCandidates([]);
+            setSelectedFlashcardTaskValue("");
+            setFlashcardGenerationScope("target");
         };
         void load();
     }, [
@@ -345,37 +429,6 @@ export default function PdfViewerPopup() {
         });
     }, [numPages, pageNumber, pdfViewerState?.resource?.id, setSettings]);
 
-    useEffect(() => {
-        const activeResourceId = pdfViewerState?.resource?.id;
-        if (!activeResourceId || pageNumber <= 0) return;
-        const todayKey = new Date().toISOString().slice(0, 10);
-        setSettings((prev) => {
-            const statsMap = prev.pdfDailyPageStatsByResourceId || {};
-            const existing = statsMap[activeResourceId];
-
-            if (!existing || existing.date !== todayKey) {
-                return {
-                    ...prev,
-                    pdfDailyPageStatsByResourceId: {
-                        ...statsMap,
-                        [activeResourceId]: { date: todayKey, startPage: pageNumber, maxPage: pageNumber },
-                    },
-                };
-            }
-
-            const nextMaxPage = Math.max(existing.maxPage || existing.startPage || 1, pageNumber);
-            if (nextMaxPage === existing.maxPage) return prev;
-
-            return {
-                ...prev,
-                pdfDailyPageStatsByResourceId: {
-                    ...statsMap,
-                    [activeResourceId]: { ...existing, maxPage: nextMaxPage },
-                },
-            };
-        });
-    }, [pdfViewerState?.resource?.id, pageNumber, setSettings]);
-
     const resourceId = pdfViewerState?.resource?.id || null;
     const aiConfig = useMemo(
         () => getAiConfigFromSettings(settings, isDesktopRuntime),
@@ -391,12 +444,53 @@ export default function PdfViewerPopup() {
         () => [...getOpenAiCloudVoices(aiConfig), ...getKokoroLocalVoices(kokoroEnabled)],
         [aiConfig, kokoroEnabled]
     );
+    const todayKey = useMemo(() => getDateKey(new Date()), []);
+    const linkedLearningContexts = useMemo(() => {
+        if (!resourceId) return [] as Array<{
+            specializationId: string;
+            specializationName: string;
+            skillAreaIds: string[] | null;
+            bookName: string;
+        }>;
+        const entries: Array<{
+            specializationId: string;
+            specializationName: string;
+            skillAreaIds: string[] | null;
+            bookName: string;
+        }> = [];
+        for (const spec of (coreSkills || []).filter((skill) => skill.type === "Specialization")) {
+            const learningPlan = offerizationPlans?.[spec.id]?.learningPlan;
+            if (!learningPlan) continue;
+            (learningPlan.bookWebpageResources || []).forEach((book) => {
+                if (book.linkedPdfResourceId !== resourceId) return;
+                entries.push({
+                    specializationId: spec.id,
+                    specializationName: spec.name,
+                    skillAreaIds: null,
+                    bookName: String(book.name || pdfViewerState?.resource?.name || "Book").trim(),
+                });
+            });
+            (learningPlan.skillTreePaths || []).forEach((path) => {
+                if (path.linkedPdfResourceId !== resourceId) return;
+                entries.push({
+                    specializationId: spec.id,
+                    specializationName: spec.name,
+                    skillAreaIds: Array.isArray(path.skillAreaIds) && path.skillAreaIds.length > 0 ? path.skillAreaIds : null,
+                    bookName: String(path.name || pdfViewerState?.resource?.name || "Book").trim(),
+                });
+            });
+        }
+        return entries.filter((entry, index, list) => {
+            const key = `${entry.specializationId}|${entry.bookName}|${(entry.skillAreaIds || []).join(",")}`;
+            return list.findIndex((candidate) => `${candidate.specializationId}|${candidate.bookName}|${(candidate.skillAreaIds || []).join(",")}` === key) === index;
+        });
+    }, [coreSkills, offerizationPlans, pdfViewerState?.resource?.name, resourceId]);
     const learningPageMetrics = useMemo(() => {
         if (!resourceId) {
             return {
                 isLinkedToLearningPlan: false,
                 targetPagesToday: 0,
-                completedPagesBaseline: 0,
+                completedPagesSeed: 0,
             };
         }
         const normalizeDateKey = (value?: string | null) => {
@@ -464,7 +558,7 @@ export default function PdfViewerPopup() {
 
         let isLinkedToLearningPlan = false;
         let bestTarget = 0;
-        let bestCompletedPages = 0;
+        let bestCompletedPagesSeed = 0;
         for (const spec of (coreSkills || []).filter((skill) => skill.type === "Specialization")) {
             const learningPlan = offerizationPlans?.[spec.id]?.learningPlan;
             if (!learningPlan) continue;
@@ -480,6 +574,9 @@ export default function PdfViewerPopup() {
                 (sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedPages || 0), 0),
                 0
             );
+            if (completedPages > bestCompletedPagesSeed) {
+                bestCompletedPagesSeed = completedPages;
+            }
             const remainingPages = Math.max(0, totalPages - completedPages);
             if (remainingPages <= 0) continue;
 
@@ -504,17 +601,15 @@ export default function PdfViewerPopup() {
                     : Math.max(1, Math.ceil(remainingPages / Math.max(1, daysLeft || 1)));
             if (pageTarget >= bestTarget) {
                 bestTarget = pageTarget;
-                bestCompletedPages = completedPages;
             }
         }
         return {
             isLinkedToLearningPlan,
             targetPagesToday: bestTarget,
-            completedPagesBaseline: bestCompletedPages,
+            completedPagesSeed: bestCompletedPagesSeed,
         };
     }, [resourceId, coreSkills, offerizationPlans, settings.routines]);
     const showLearningTargetUi = learningPageMetrics.isLinkedToLearningPlan;
-    const pagesCompletedToday = Math.max(0, pageNumber - learningPageMetrics.completedPagesBaseline);
     const targetPagesToday = showLearningTargetUi
         ? (learningPageMetrics.targetPagesToday > 0
         ? learningPageMetrics.targetPagesToday
@@ -522,22 +617,116 @@ export default function PdfViewerPopup() {
             ? Math.max(0, settings.pdfDailyPageTargetByResourceId?.[resourceId] || 0)
             : 0)
         : 0;
-    const floatingCount = showLearningTargetUi ? targetPagesToday - pagesCompletedToday : 0;
-    const celebrationKey = showLearningTargetUi && resourceId ? `${resourceId}:${new Date().toISOString().slice(0, 10)}` : null;
-
+    const learningTargetSeedPage = showLearningTargetUi
+        ? Math.max(
+            1,
+            learningPageMetrics.completedPagesSeed > 0
+                ? learningPageMetrics.completedPagesSeed + 1
+                : (sessionStartPage || pageNumber)
+        )
+        : Math.max(1, sessionStartPage || pageNumber);
+    const todayPageStats = resourceId ? settings.pdfDailyPageStatsByResourceId?.[resourceId] : undefined;
+    const todayTargetStartPage =
+        showLearningTargetUi && todayPageStats?.date === todayKey && Number.isFinite(todayPageStats.startPage)
+            ? Math.max(1, todayPageStats.startPage)
+            : learningTargetSeedPage;
     useEffect(() => {
-        if (!showLearningTargetUi) {
-            setShowTargetCelebration(false);
-            return;
-        }
-        if (!celebrationKey) return;
-        if (floatingCount !== -1) return;
-        if (celebratedKey === celebrationKey) return;
-        setCelebratedKey(celebrationKey);
-        setShowTargetCelebration(true);
-        const timer = window.setTimeout(() => setShowTargetCelebration(false), 2600);
-        return () => window.clearTimeout(timer);
-    }, [showLearningTargetUi, floatingCount, celebrationKey, celebratedKey]);
+        const activeResourceId = pdfViewerState?.resource?.id;
+        if (!activeResourceId || pageNumber <= 0 || sessionStartPage == null) return;
+        const todayKey = new Date().toISOString().slice(0, 10);
+        setSettings((prev) => {
+            const statsMap = prev.pdfDailyPageStatsByResourceId || {};
+            const existing = statsMap[activeResourceId];
+            const seededStartPage = Math.max(1, learningTargetSeedPage);
+
+            if (!existing || existing.date !== todayKey) {
+                return {
+                    ...prev,
+                    pdfDailyPageStatsByResourceId: {
+                        ...statsMap,
+                        [activeResourceId]: {
+                            date: todayKey,
+                            startPage: seededStartPage,
+                            maxPage: Math.max(seededStartPage, pageNumber),
+                        },
+                    },
+                };
+            }
+
+            if (
+                showLearningTargetUi &&
+                learningPageMetrics.completedPagesSeed > 0 &&
+                existing.startPage !== seededStartPage
+            ) {
+                return {
+                    ...prev,
+                    pdfDailyPageStatsByResourceId: {
+                        ...statsMap,
+                        [activeResourceId]: {
+                            ...existing,
+                            startPage: seededStartPage,
+                            maxPage: Math.max(existing.maxPage || existing.startPage || seededStartPage, pageNumber),
+                        },
+                    },
+                };
+            }
+
+            if (
+                existing.startPage > seededStartPage &&
+                (existing.maxPage || existing.startPage || 1) === existing.startPage
+            ) {
+                return {
+                    ...prev,
+                    pdfDailyPageStatsByResourceId: {
+                        ...statsMap,
+                        [activeResourceId]: {
+                            ...existing,
+                            startPage: seededStartPage,
+                            maxPage: Math.max(existing.maxPage || existing.startPage || seededStartPage, pageNumber),
+                        },
+                    },
+                };
+            }
+
+            const nextMaxPage = Math.max(existing.maxPage || existing.startPage || 1, pageNumber);
+            if (nextMaxPage === existing.maxPage) return prev;
+
+            return {
+                ...prev,
+                pdfDailyPageStatsByResourceId: {
+                    ...statsMap,
+                    [activeResourceId]: { ...existing, maxPage: nextMaxPage },
+                },
+            };
+        });
+    }, [learningTargetSeedPage, pageNumber, pdfViewerState?.resource?.id, sessionStartPage, setSettings]);
+    const todayTargetEndPage =
+        showLearningTargetUi && targetPagesToday > 0
+            ? Math.max(todayTargetStartPage, todayTargetStartPage + targetPagesToday - 1)
+            : null;
+    const pagesCompletedToday =
+        showLearningTargetUi && todayTargetEndPage != null && pageNumber >= todayTargetStartPage
+            ? Math.max(0, Math.min(targetPagesToday, pageNumber - todayTargetStartPage + 1))
+            : 0;
+    const todayTargetDelta =
+        showLearningTargetUi && todayTargetEndPage != null
+            ? todayTargetEndPage - pageNumber
+            : null;
+    const floatingCountLabel =
+        todayTargetDelta == null
+            ? "0"
+            : todayTargetDelta < 0
+                ? `+${Math.abs(todayTargetDelta)}`
+                : todayTargetDelta === 0
+                    ? "0"
+                    : `-${todayTargetDelta}`;
+    const isAheadOfTodayTarget = Boolean(todayTargetDelta != null && todayTargetDelta < 0);
+    const isBehindTodayTarget = Boolean(todayTargetDelta != null && todayTargetDelta > 0);
+    const isOnTodayTargetEndPage = Boolean(showLearningTargetUi && todayTargetEndPage != null && pageNumber === todayTargetEndPage);
+    useEffect(() => {
+        if (!isOnTodayTargetEndPage) return;
+        setTargetCelebrationCycle((prev) => prev + 1);
+    }, [isOnTodayTargetEndPage]);
     const annotationStorageKey = useMemo(() => {
         return resourceId ? `pdf-annotations:${resourceId}` : null;
     }, [resourceId]);
@@ -579,6 +768,138 @@ export default function PdfViewerPopup() {
             // ignore storage issues
         }
     }, [viewerPrefsStorageKey, scale, fitMode, rotation]);
+
+    const eligibleFlashcardHighlights = useMemo(() => {
+        if (!showLearningTargetUi || todayTargetEndPage == null) return [] as FlashcardHighlightCandidate[];
+        return Object.entries(annotations)
+            .flatMap(([pageKey, pageAnnotations]) => {
+                const page = Number(pageKey);
+                if (!Number.isFinite(page) || page < todayTargetStartPage || page > todayTargetEndPage) return [];
+                return (pageAnnotations || [])
+                    .filter((annotation): annotation is TextHighlight => isTextHighlight(annotation))
+                    .map((annotation) => ({
+                        pageNumber: page,
+                        highlightId: String(annotation.id || "").trim(),
+                        text: String(annotation.text || "").trim(),
+                        createdAt: String(annotation.createdAt || "").trim(),
+                    }))
+                    .filter((entry) =>
+                        entry.highlightId &&
+                        entry.text &&
+                        entry.createdAt &&
+                        getDateKey(entry.createdAt) === todayKey
+                    );
+            })
+            .sort((a, b) => (a.pageNumber - b.pageNumber) || a.highlightId.localeCompare(b.highlightId));
+    }, [annotations, showLearningTargetUi, todayKey, todayTargetEndPage, todayTargetStartPage]);
+    const currentPageFlashcardHighlights = useMemo(() => {
+        return (annotations[pageNumber] || [])
+            .filter((annotation): annotation is TextHighlight => isTextHighlight(annotation))
+            .map((annotation) => ({
+                pageNumber,
+                highlightId: String(annotation.id || "").trim(),
+                text: String(annotation.text || "").trim(),
+                createdAt: String(annotation.createdAt || "").trim(),
+            }))
+            .filter((entry) => entry.highlightId && entry.text)
+            .sort((a, b) => a.highlightId.localeCompare(b.highlightId));
+    }, [annotations, pageNumber]);
+    const activeFlashcardHighlights = flashcardGenerationScope === "page"
+        ? currentPageFlashcardHighlights
+        : eligibleFlashcardHighlights;
+    const activeFlashcardStartPage = flashcardGenerationScope === "page" ? pageNumber : todayTargetStartPage;
+    const activeFlashcardEndPage = flashcardGenerationScope === "page" ? pageNumber : todayTargetEndPage;
+    const flashcardScopeHeading = flashcardGenerationScope === "page" ? `Page ${pageNumber}` : `Pages ${todayTargetStartPage}-${todayTargetEndPage ?? todayTargetStartPage}`;
+    const flashcardScopeDescription = flashcardGenerationScope === "page"
+        ? "current page highlights"
+        : "eligible highlights";
+
+    const flashcardTaskOptions = useMemo(() => {
+        const normalize = (value: unknown) => String(value || "").trim().toLowerCase().replace(/\s+/g, " ");
+        const options: FlashcardTaskOption[] = [];
+        const seen = new Set<string>();
+        const definitionsByType: Array<{ activityType: "deepwork" | "upskill"; definitions: typeof deepWorkDefinitions }> = [
+            { activityType: "deepwork", definitions: deepWorkDefinitions },
+            { activityType: "upskill", definitions: upskillDefinitions },
+        ];
+
+        linkedLearningContexts.forEach((context) => {
+            const spec = (coreSkills || []).find((entry) => entry.id === context.specializationId);
+            if (!spec) return;
+            const allowedAreas =
+                context.skillAreaIds && context.skillAreaIds.length > 0
+                    ? spec.skillAreas.filter((area) => context.skillAreaIds!.includes(area.id))
+                    : spec.skillAreas;
+            const allowedMicroSkillNames = new Set(
+                allowedAreas.flatMap((area) => area.microSkills.map((micro) => normalize(micro.name))).filter(Boolean)
+            );
+            if (allowedMicroSkillNames.size === 0) return;
+
+            definitionsByType.forEach(({ activityType, definitions }) => {
+                definitions.forEach((definition) => {
+                    const categoryKey = normalize(definition.category);
+                    if (!categoryKey || !allowedMicroSkillNames.has(categoryKey)) return;
+                    const option: FlashcardTaskOption = {
+                        value: `${activityType}:${definition.id}:${context.specializationId}:${context.bookName}`,
+                        definitionId: definition.id,
+                        activityType,
+                        taskName: String(definition.name || definition.category || "Task").trim(),
+                        specializationId: context.specializationId,
+                        specializationName: context.specializationName,
+                        skillAreaIds: context.skillAreaIds,
+                        bookName: context.bookName,
+                    };
+                    const dedupeKey = `${option.value}`;
+                    if (seen.has(dedupeKey)) return;
+                    seen.add(dedupeKey);
+                    options.push(option);
+                });
+            });
+        });
+
+        return options.sort((a, b) =>
+            a.specializationName.localeCompare(b.specializationName) ||
+            a.bookName.localeCompare(b.bookName) ||
+            a.taskName.localeCompare(b.taskName)
+        );
+    }, [coreSkills, deepWorkDefinitions, linkedLearningContexts, upskillDefinitions]);
+
+    const resolvedFlashcardTaskOption = useMemo(() => {
+        if (!flashcardTaskOptions.length) return null;
+        const explicit = flashcardTaskOptions.find((option) => option.value === selectedFlashcardTaskValue);
+        if (explicit) return explicit;
+        const launchTaskKey = buildFlashcardTaskKey(
+            pdfViewerState?.launchContext?.sourceTaskActivityType,
+            pdfViewerState?.launchContext?.sourceDefinitionId
+        );
+        if (launchTaskKey) {
+            const launchMatch = flashcardTaskOptions.find(
+                (option) => buildFlashcardTaskKey(option.activityType, option.definitionId) === launchTaskKey
+            );
+            if (launchMatch) return launchMatch;
+        }
+        return flashcardTaskOptions.length === 1 ? flashcardTaskOptions[0] : null;
+    }, [flashcardTaskOptions, pdfViewerState?.launchContext?.sourceDefinitionId, pdfViewerState?.launchContext?.sourceTaskActivityType, selectedFlashcardTaskValue]);
+
+    useEffect(() => {
+        if (selectedFlashcardTaskValue) return;
+        const launchTaskKey = buildFlashcardTaskKey(
+            pdfViewerState?.launchContext?.sourceTaskActivityType,
+            pdfViewerState?.launchContext?.sourceDefinitionId
+        );
+        if (launchTaskKey) {
+            const launchMatch = flashcardTaskOptions.find(
+                (option) => buildFlashcardTaskKey(option.activityType, option.definitionId) === launchTaskKey
+            );
+            if (launchMatch) {
+                setSelectedFlashcardTaskValue(launchMatch.value);
+                return;
+            }
+        }
+        if (flashcardTaskOptions.length === 1) {
+            setSelectedFlashcardTaskValue(flashcardTaskOptions[0].value);
+        }
+    }, [flashcardTaskOptions, pdfViewerState?.launchContext?.sourceDefinitionId, pdfViewerState?.launchContext?.sourceTaskActivityType, selectedFlashcardTaskValue]);
 
     useEffect(() => {
         if (!resourceId) {
@@ -641,6 +962,292 @@ export default function PdfViewerPopup() {
         setPageInput(String(pageNumber));
         setSelectedTextRects([]);
     }, [pageNumber]);
+
+    useEffect(() => {
+        setFlashcardPreviewCandidates([]);
+        setFlashcardError("");
+    }, [selectedFlashcardTaskValue]);
+
+    const ensureFolderPath = useCallback((segments: string[]) => {
+        let nextFolders = [...(resourceFolders || [])];
+        let parentId: string | null = null;
+        segments.forEach((rawSegment) => {
+            const segment = String(rawSegment || "").trim();
+            if (!segment) return;
+            let folder = nextFolders.find((entry) => entry.name === segment && entry.parentId === parentId);
+            if (!folder) {
+                folder = {
+                    id: `folder_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                    name: segment,
+                    parentId,
+                    icon: "Folder",
+                };
+                nextFolders.push(folder);
+            }
+            parentId = folder.id;
+        });
+        return {
+            folderId: parentId,
+            folders: nextFolders,
+        };
+    }, [resourceFolders]);
+
+    const handleOpenFlashcardPanel = useCallback((scope: FlashcardGenerationScope = "target") => {
+        setFlashcardGenerationScope(scope);
+        setIsFlashcardPanelOpen(true);
+        setFlashcardError("");
+        setFlashcardPreviewCandidates([]);
+    }, []);
+
+    const handleLoadFlashcardPreview = useCallback(async () => {
+        if (!resourceId || !pdfViewerState?.resource) return;
+        if (!resolvedFlashcardTaskOption) {
+            setFlashcardError("Pick a task before generating flashcards.");
+            return;
+        }
+        if (activeFlashcardHighlights.length === 0) {
+            setFlashcardError(
+                flashcardGenerationScope === "page"
+                    ? "No text highlights were found on this page."
+                    : "No eligible highlights were found in today's target range."
+            );
+            return;
+        }
+
+        setFlashcardError("");
+        setIsFlashcardPreviewLoading(true);
+        try {
+            const response = await fetch("/api/ai/pdf-flashcards", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(isDesktopRuntime ? { "x-studio-desktop": "1" } : {}),
+                },
+                body: JSON.stringify({
+                    highlights: activeFlashcardHighlights,
+                    taskContext: {
+                        taskName: resolvedFlashcardTaskOption.taskName,
+                        definitionId: resolvedFlashcardTaskOption.definitionId,
+                        activityType: resolvedFlashcardTaskOption.activityType,
+                        specializationId: resolvedFlashcardTaskOption.specializationId,
+                        specializationName: resolvedFlashcardTaskOption.specializationName,
+                        bookName: resolvedFlashcardTaskOption.bookName,
+                        pdfResourceId: resourceId,
+                        pdfResourceName: pdfViewerState.resource.name,
+                    },
+                    topicTable:
+                        settings.flashcardTopicTablesBySpecializationId?.[resolvedFlashcardTaskOption.specializationId] || null,
+                    aiConfig,
+                }),
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(result?.details || result?.error || "Failed to generate flashcard preview.");
+            }
+
+            const responseCandidates = Array.isArray(result?.candidates) ? result.candidates : [];
+            const candidateByHighlightId = new Map<string, {
+                question: string;
+                answer: string;
+                options: string[];
+                correctOptionIndex: number;
+                explanation: string;
+                matchedTopicIds: string[];
+                newTopics: string[];
+            }>(
+                responseCandidates
+                    .filter((candidate: any) => candidate && typeof candidate.highlightId === "string")
+                    .map((candidate: any) => [
+                        candidate.highlightId,
+                        (() => {
+                            const sanitizedCandidate = sanitizeFlashcardAiCandidate(candidate);
+                            return {
+                            question: sanitizedCandidate.question,
+                            answer: sanitizedCandidate.answer,
+                            options: sanitizedCandidate.options,
+                            correctOptionIndex: sanitizedCandidate.correctOptionIndex,
+                            explanation: sanitizedCandidate.explanation,
+                            matchedTopicIds: sanitizedCandidate.matchedTopicIds,
+                            newTopics: sanitizedCandidate.newTopics,
+                            };
+                        })(),
+                    ] as const)
+            );
+
+            const preview = activeFlashcardHighlights.map((highlight) => {
+                const aiCandidate = candidateByHighlightId.get(highlight.highlightId);
+                return {
+                    highlightId: highlight.highlightId,
+                    pageNumber: highlight.pageNumber,
+                    sourceText: highlight.text,
+                    question: aiCandidate?.question || `What does this highlight explain on page ${highlight.pageNumber}?`,
+                    answer: aiCandidate?.answer || highlight.text,
+                    options:
+                        aiCandidate?.options && aiCandidate.options.length === 4
+                            ? aiCandidate.options
+                            : [highlight.text, "Not stated in the text", "A minor supporting detail", "An unrelated idea"],
+                    correctOptionIndex:
+                        aiCandidate?.options && aiCandidate.options.length === 4 && aiCandidate.correctOptionIndex >= 0 && aiCandidate.correctOptionIndex < aiCandidate.options.length
+                            ? aiCandidate.correctOptionIndex
+                            : 0,
+                    explanation: aiCandidate?.explanation || highlight.text,
+                    matchedTopicIds: aiCandidate?.matchedTopicIds || [],
+                    newTopics: aiCandidate?.newTopics || [],
+                    selected: true,
+                } satisfies FlashcardPreviewCandidate;
+            });
+
+            setFlashcardPreviewCandidates(preview);
+        } catch (error) {
+            setFlashcardPreviewCandidates([]);
+            setFlashcardError(error instanceof Error ? error.message : "Failed to generate flashcard preview.");
+        } finally {
+            setIsFlashcardPreviewLoading(false);
+        }
+    }, [activeFlashcardHighlights, aiConfig, flashcardGenerationScope, isDesktopRuntime, pdfViewerState?.resource, resolvedFlashcardTaskOption, resourceId, settings.flashcardTopicTablesBySpecializationId]);
+
+    const handleGenerateFlashcards = useCallback(() => {
+        if (!pdfViewerState?.resource || !resolvedFlashcardTaskOption || !resourceId || activeFlashcardEndPage == null) return;
+        const selectedCandidates = flashcardPreviewCandidates.filter((candidate) => candidate.selected);
+        if (selectedCandidates.length === 0) {
+            setFlashcardError("Select at least one preview card to generate.");
+            return;
+        }
+
+        const nowIso = new Date().toISOString();
+        const sessionId = makeId("flashcard_session");
+        const taskKey = buildFlashcardTaskKey(resolvedFlashcardTaskOption.activityType, resolvedFlashcardTaskOption.definitionId);
+        if (!taskKey) {
+            setFlashcardError("Task linkage is incomplete.");
+            return;
+        }
+
+        const ensured = ensureFolderPath([
+            "Flashcard",
+            resolvedFlashcardTaskOption.specializationName,
+            resolvedFlashcardTaskOption.bookName,
+            `Pages ${activeFlashcardStartPage}-${activeFlashcardEndPage}`,
+        ]);
+        if (!ensured.folderId) {
+            setFlashcardError("Unable to create the flashcard folder path.");
+            return;
+        }
+
+        const currentTable = settings.flashcardTopicTablesBySpecializationId?.[resolvedFlashcardTaskOption.specializationId] || {
+            specializationId: resolvedFlashcardTaskOption.specializationId,
+            specializationName: resolvedFlashcardTaskOption.specializationName,
+            topics: [],
+        };
+        const nextTopics: FlashcardTopicEntry[] = (currentTable.topics || []).map((topic) => ({
+            ...topic,
+            flashcardResourceIds: [...(topic.flashcardResourceIds || [])],
+        }));
+        const topicIdByNormalizedName = new Map(
+            nextTopics.map((topic) => [normalizeFlashcardTopicName(topic.normalizedName || topic.name), topic.id] as const)
+        );
+
+        const createdResources: Resource[] = selectedCandidates.map((candidate) => {
+            const topicIds = new Set(
+                candidate.matchedTopicIds.filter((topicId) => nextTopics.some((topic) => topic.id === topicId))
+            );
+            candidate.newTopics.forEach((topicName) => {
+                const normalizedName = normalizeFlashcardTopicName(topicName);
+                if (!normalizedName) return;
+                const existingTopicId = topicIdByNormalizedName.get(normalizedName);
+                if (existingTopicId) {
+                    topicIds.add(existingTopicId);
+                    return;
+                }
+                const newTopicId = makeId("topic");
+                topicIdByNormalizedName.set(normalizedName, newTopicId);
+                nextTopics.push({
+                    id: newTopicId,
+                    name: topicName.trim(),
+                    normalizedName,
+                    flashcardResourceIds: [],
+                });
+                topicIds.add(newTopicId);
+            });
+
+            const resourceFlashcardId = makeId("res_flashcard");
+            const finalTopicIds = Array.from(topicIds);
+            nextTopics.forEach((topic) => {
+                if (!finalTopicIds.includes(topic.id)) return;
+                if (!topic.flashcardResourceIds.includes(resourceFlashcardId)) {
+                    topic.flashcardResourceIds.push(resourceFlashcardId);
+                }
+            });
+
+            return {
+                id: resourceFlashcardId,
+                name: candidate.question,
+                folderId: ensured.folderId!,
+                type: "flashcard",
+                createdAt: nowIso,
+                description: candidate.explanation || candidate.answer,
+                flashcard: {
+                    question: candidate.question,
+                    answer: candidate.answer,
+                    options: candidate.options,
+                    correctOptionIndex: candidate.correctOptionIndex,
+                    explanation: candidate.explanation,
+                    topicIds: finalTopicIds,
+                    sessionId,
+                    pageNumber: candidate.pageNumber,
+                    sourceHighlightId: candidate.highlightId,
+                    sourceText: candidate.sourceText,
+                    specializationId: resolvedFlashcardTaskOption.specializationId,
+                    specializationName: resolvedFlashcardTaskOption.specializationName,
+                    taskKey,
+                    pdfResourceId: resourceId,
+                    generatedAt: nowIso,
+                },
+            } satisfies Resource;
+        });
+
+        const sessionRecord: FlashcardSessionIndex = {
+            id: sessionId,
+            createdAt: nowIso,
+            dateKey: todayKey,
+            resourceId,
+            resourceName: pdfViewerState.resource.name || "PDF",
+            specializationId: resolvedFlashcardTaskOption.specializationId,
+            specializationName: resolvedFlashcardTaskOption.specializationName,
+            taskKey,
+            taskDefinitionId: resolvedFlashcardTaskOption.definitionId,
+            taskActivityType: resolvedFlashcardTaskOption.activityType,
+            bookName: resolvedFlashcardTaskOption.bookName,
+            startPage: activeFlashcardStartPage,
+            endPage: activeFlashcardEndPage,
+            folderId: ensured.folderId,
+            flashcardResourceIds: createdResources.map((resource) => resource.id),
+        };
+
+        setIsFlashcardGenerating(true);
+        if (ensured.folders.length !== (resourceFolders || []).length) {
+            setResourceFolders(ensured.folders);
+        }
+        setResources((prev) => [...prev, ...createdResources]);
+        setSettings((prev) => ({
+            ...prev,
+            flashcardSessions: [...(prev.flashcardSessions || []), sessionRecord],
+            flashcardTopicTablesBySpecializationId: {
+                ...(prev.flashcardTopicTablesBySpecializationId || {}),
+                [resolvedFlashcardTaskOption.specializationId]: {
+                    specializationId: resolvedFlashcardTaskOption.specializationId,
+                    specializationName: resolvedFlashcardTaskOption.specializationName,
+                    topics: nextTopics,
+                },
+            },
+        }));
+        setFlashcardPreviewCandidates([]);
+        setIsFlashcardPanelOpen(false);
+        setIsFlashcardGenerating(false);
+        toast({
+            title: "Flashcards created",
+            description: `Created ${createdResources.length} flashcard${createdResources.length === 1 ? "" : "s"} in Resources.`,
+        });
+    }, [activeFlashcardEndPage, activeFlashcardStartPage, ensureFolderPath, flashcardPreviewCandidates, pdfViewerState?.resource, resolvedFlashcardTaskOption, resourceFolders, resourceId, setResourceFolders, setResources, setSettings, settings.flashcardTopicTablesBySpecializationId, todayKey, toast]);
 
     const handleResizeMouseDown = (mode: "x" | "y" | "xy") => (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -707,6 +1314,14 @@ export default function PdfViewerPopup() {
         return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
     }, []);
 
+    const goToPage = useCallback((nextPage: number | ((prev: number) => number)) => {
+        setPageNumber((prev) => {
+            const rawNext = typeof nextPage === "function" ? nextPage(prev) : nextPage;
+            const boundedNext = numPages ? Math.min(numPages, Math.max(1, rawNext)) : Math.max(1, rawNext);
+            return Number.isFinite(boundedNext) ? boundedNext : prev;
+        });
+    }, [numPages]);
+
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
             const target = event.target as HTMLElement | null;
@@ -717,9 +1332,9 @@ export default function PdfViewerPopup() {
             if (isTextInput) return;
 
             if (event.key === "ArrowRight") {
-                setPageNumber((p) => (numPages ? Math.min(numPages, p + 1) : p + 1));
+                goToPage((p) => p + 1);
             } else if (event.key === "ArrowLeft") {
-                setPageNumber((p) => Math.max(1, p - 1));
+                goToPage((p) => p - 1);
             } else if (event.key === "=" || event.key === "+") {
                 setScale((prev) => Math.min(prev + 0.2, 5));
                 setFitMode("custom");
@@ -731,7 +1346,7 @@ export default function PdfViewerPopup() {
 
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [numPages]);
+    }, [goToPage]);
 
     const drawStrokesToCanvas = useCallback((previewStroke?: AnnotationStroke | null) => {
         const canvas = annotationCanvasRef.current;
@@ -841,7 +1456,7 @@ export default function PdfViewerPopup() {
             return;
         }
         const next = Math.min(numPages, Math.max(1, Math.floor(parsed)));
-        setPageNumber(next);
+        goToPage(next);
         setPageInput(String(next));
     };
 
@@ -1180,6 +1795,9 @@ export default function PdfViewerPopup() {
             color: "#fde047",
             opacity: 0.35,
             rects,
+            id: makeId("hl"),
+            text: selectedText,
+            createdAt: new Date().toISOString(),
         };
 
         setAnnotations((prev) => {
@@ -1235,8 +1853,12 @@ export default function PdfViewerPopup() {
         };
     }, [captureSelectedText]);
 
-    const stopSpeaking = useCallback((clearLaser = true) => {
+    const stopSpeaking = useCallback((clearLaser = true, preserveContinuousPageRead = false) => {
         speechSessionIdRef.current += 1;
+        if (pageReadResumeTimerRef.current) {
+            clearTimeout(pageReadResumeTimerRef.current);
+            pageReadResumeTimerRef.current = null;
+        }
         if (clearLaser) {
             stopLaserGuide();
         }
@@ -1257,6 +1879,10 @@ export default function PdfViewerPopup() {
         setIsSpeechPaused(false);
         speechPausedRef.current = false;
         setActiveSpeechKey(null);
+        if (!preserveContinuousPageRead) {
+            setIsContinuousPageReadEnabled(false);
+            setPageReadAwaitingTurnFromPage(null);
+        }
     }, [stopLaserGuide]);
 
     const togglePauseSpeaking = useCallback(async () => {
@@ -1495,13 +2121,22 @@ export default function PdfViewerPopup() {
         return () => clearInterval(timerId);
     }, [checkKokoroServerHealth, isDesktopRuntime]);
 
-    const speakText = useCallback(async (rawText: string, key: string) => {
+    const speakText = useCallback(async (rawText: string, key: string, options?: SpeakTextOptions) => {
         if (typeof window === "undefined") return;
         const text = cleanSpeechText(rawText);
         if (!text) return;
+        const isContinuousPageRead = Boolean(options?.continuousPageRead) && key.startsWith("page:");
+        const speechPageNumber = getPageNumberFromSpeechKey(key);
         if (activeSpeechKey === key && isSpeaking) {
             stopSpeaking();
             return;
+        }
+        if (isContinuousPageRead) {
+            setIsContinuousPageReadEnabled(true);
+            setPageReadAwaitingTurnFromPage(null);
+        } else {
+            setIsContinuousPageReadEnabled(false);
+            setPageReadAwaitingTurnFromPage(null);
         }
         let laserRects: TextHighlightRect[] =
             key.startsWith("selection:") ? selectedTextRects :
@@ -1548,7 +2183,7 @@ export default function PdfViewerPopup() {
         if (shouldUseCloud) {
             const cloudVoice = selectedCloudVoice || cloudVoices[0];
             if (!cloudVoice) return;
-            stopSpeaking(false);
+            stopSpeaking(false, isContinuousPageRead);
             setIsSpeaking(true);
             setIsSpeechPaused(false);
             speechPausedRef.current = false;
@@ -1654,6 +2289,9 @@ export default function PdfViewerPopup() {
                 setIsSpeechPaused(false);
                 speechPausedRef.current = false;
                 setActiveSpeechKey((prev) => (prev === key ? null : prev));
+                if (isContinuousPageRead && speechPageNumber != null) {
+                    setPageReadAwaitingTurnFromPage(speechPageNumber);
+                }
                 syncLaserProgress(1);
                 stopLaserGuide();
             } catch (error) {
@@ -1662,6 +2300,8 @@ export default function PdfViewerPopup() {
                 setIsSpeechPaused(false);
                 speechPausedRef.current = false;
                 setActiveSpeechKey((prev) => (prev === key ? null : prev));
+                setIsContinuousPageReadEnabled(false);
+                setPageReadAwaitingTurnFromPage(null);
                 stopLaserGuide();
             }
             return;
@@ -1710,6 +2350,9 @@ export default function PdfViewerPopup() {
             speechPausedRef.current = false;
             setActiveSpeechKey((prev) => (prev === key ? null : prev));
             speechUtteranceRef.current = null;
+            if (isContinuousPageRead && speechPageNumber != null) {
+                setPageReadAwaitingTurnFromPage(speechPageNumber);
+            }
             syncLaserProgress(1);
             stopLaserGuide();
         };
@@ -1719,6 +2362,8 @@ export default function PdfViewerPopup() {
             speechPausedRef.current = false;
             setActiveSpeechKey((prev) => (prev === key ? null : prev));
             speechUtteranceRef.current = null;
+            setIsContinuousPageReadEnabled(false);
+            setPageReadAwaitingTurnFromPage(null);
             stopLaserGuide();
         };
         utterance.onpause = () => {
@@ -1838,6 +2483,43 @@ export default function PdfViewerPopup() {
         return text;
     }, []);
 
+    useEffect(() => {
+        const activePageNumber = getPageNumberFromSpeechKey(activeSpeechKey);
+        if (!isContinuousPageReadEnabled || !isSpeaking || activePageNumber == null) return;
+        if (activePageNumber === pageNumber) return;
+        setPageReadAwaitingTurnFromPage(activePageNumber);
+        stopSpeaking(false, true);
+    }, [activeSpeechKey, isContinuousPageReadEnabled, isSpeaking, pageNumber, stopSpeaking]);
+
+    useEffect(() => {
+        if (!isContinuousPageReadEnabled || pageReadAwaitingTurnFromPage == null) return;
+        if (pageNumber === pageReadAwaitingTurnFromPage) return;
+        if (renderedPageNumberRef.current !== pageNumber) return;
+
+        let cancelled = false;
+        const attemptResume = (attempt: number) => {
+            if (cancelled) return;
+            const nextText = cleanSpeechText(getCurrentPageText());
+            if (!nextText) {
+                if (attempt >= 12) return;
+                pageReadResumeTimerRef.current = setTimeout(() => attemptResume(attempt + 1), 120);
+                return;
+            }
+            pageReadResumeTimerRef.current = null;
+            setPageReadAwaitingTurnFromPage(null);
+            void speakText(nextText, `page:${pageNumber}`, { continuousPageRead: true });
+        };
+
+        attemptResume(0);
+        return () => {
+            cancelled = true;
+            if (pageReadResumeTimerRef.current) {
+                clearTimeout(pageReadResumeTimerRef.current);
+                pageReadResumeTimerRef.current = null;
+            }
+        };
+    }, [getCurrentPageText, isContinuousPageReadEnabled, pageNumber, pageReadAwaitingTurnFromPage, speakText]);
+
     const readSelectedOrPageText = useCallback(() => {
         const selected = cleanSpeechText(selectedText);
         if (selected) {
@@ -1846,7 +2528,7 @@ export default function PdfViewerPopup() {
         }
         const pageText = cleanSpeechText(getCurrentPageText());
         if (!pageText) return;
-        void speakText(pageText, `page:${pageNumber}`);
+        void speakText(pageText, `page:${pageNumber}`, { continuousPageRead: true });
     }, [getCurrentPageText, pageNumber, selectedText, speakText]);
 
     const handleExplainSelection = async () => {
@@ -1944,6 +2626,11 @@ export default function PdfViewerPopup() {
             }, 60);
         });
     }
+
+    const handlePageRenderSuccess = useCallback(() => {
+        renderedPageNumberRef.current = pageNumber;
+        syncAnnotationCanvasSize();
+    }, [pageNumber, syncAnnotationCanvasSize]);
     
     function zoomIn() {
         setFitMode("custom");
@@ -1960,9 +2647,12 @@ export default function PdfViewerPopup() {
     const canGoPrev = pageNumber > 1;
     const canGoNext = !!numPages && pageNumber < numPages;
     const hasSelectedText = selectedText.length > 0;
+    const isContinuousPageReadWaiting =
+        isContinuousPageReadEnabled && pageReadAwaitingTurnFromPage != null && !isSpeaking;
     const hasTextHighlights = (annotations[pageNumber] || []).some(
         (annotation) => isTextHighlight(annotation) && (annotation.rects || []).length > 0
     );
+    const hasCurrentPageFlashcardHighlights = currentPageFlashcardHighlights.length > 0;
     const hasExplainableSelection = isDesktopRuntime && hasSelectedText && isAiEnabled;
     const explainContextText = activeExplainText || selectedText;
 
@@ -2005,7 +2695,7 @@ export default function PdfViewerPopup() {
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <div className="flex flex-wrap items-center gap-2">
                                 <div className="flex items-center gap-1">
-                                    <Button variant="outline" size="sm" onClick={() => setPageNumber(p => Math.max(1, p - 1))} disabled={!canGoPrev}>Prev</Button>
+                                    <Button variant="outline" size="sm" onClick={() => goToPage((p) => p - 1)} disabled={!canGoPrev}>Prev</Button>
                                     <div className="flex items-center gap-1 rounded-md border px-1.5 h-9">
                                         <input
                                             value={pageInput}
@@ -2018,7 +2708,7 @@ export default function PdfViewerPopup() {
                                         />
                                         <span className="text-xs text-muted-foreground">/ {numPages ?? "-"}</span>
                                     </div>
-                                    <Button variant="outline" size="sm" onClick={() => setPageNumber(p => (numPages ? Math.min(numPages, p + 1) : p + 1))} disabled={!canGoNext}>Next</Button>
+                                    <Button variant="outline" size="sm" onClick={() => goToPage((p) => p + 1)} disabled={!canGoNext}>Next</Button>
                                 </div>
                                 {showLearningTargetUi && (
                                     <div className="flex items-center gap-2 rounded-md border px-2 py-1">
@@ -2047,19 +2737,33 @@ export default function PdfViewerPopup() {
                                 variant="outline"
                                 size="sm"
                                 className="h-8 px-2 text-xs"
-                                onClick={readSelectedOrPageText}
+                                onClick={() => {
+                                    if (isSpeaking || isContinuousPageReadEnabled) {
+                                        stopSpeaking();
+                                        return;
+                                    }
+                                    readSelectedOrPageText();
+                                }}
                                 disabled={!isSpeaking && !file}
-                                title={hasSelectedText ? "Read selected text aloud" : "Read full page aloud"}
+                                title={
+                                    isContinuousPageReadEnabled
+                                        ? isContinuousPageReadWaiting
+                                            ? "Stop waiting for the next page"
+                                            : "Stop continuous read aloud"
+                                        : hasSelectedText
+                                            ? "Read selected text aloud"
+                                            : "Read full page aloud and keep waiting for the next page"
+                                }
                             >
-                                <Volume2 className="h-3.5 w-3.5 mr-1.5" />
-                                Read
+                                {isContinuousPageReadEnabled ? <VolumeX className="h-3.5 w-3.5 mr-1.5" /> : <Volume2 className="h-3.5 w-3.5 mr-1.5" />}
+                                {isContinuousPageReadEnabled ? "Stop" : "Read"}
                             </Button>
                             <Button
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8"
-                                onClick={stopSpeaking}
-                                disabled={!isSpeaking}
+                                onClick={() => stopSpeaking()}
+                                disabled={!isSpeaking && !isContinuousPageReadEnabled}
                                 title="Stop read aloud"
                             >
                                 <VolumeX className="h-4 w-4" />
@@ -2204,7 +2908,7 @@ export default function PdfViewerPopup() {
                                            scale={fitMode === "custom" ? scale : undefined}
                                            width={fitMode === "width" ? pageRenderWidth : undefined}
                                            rotate={rotation}
-                                           onRenderSuccess={syncAnnotationCanvasSize}
+                                           onRenderSuccess={handlePageRenderSuccess}
                                        />
                                    </Document>
                                    <canvas
@@ -2351,7 +3055,7 @@ export default function PdfViewerPopup() {
                                 </Button>
                                 <Button
                                     variant="outline"
-                                    onClick={stopSpeaking}
+                                    onClick={() => stopSpeaking()}
                                     disabled={!isSpeaking}
                                     className="h-10 border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-800"
                                     title="Stop read aloud"
@@ -2363,12 +3067,255 @@ export default function PdfViewerPopup() {
                         </div>
                     </div>
                 )}
-                {showLearningTargetUi && showTargetCelebration && (
+                {isFlashcardPanelOpen && (
+                    <div className="absolute inset-0 z-50 bg-zinc-950/80 p-4 backdrop-blur-sm">
+                        <div className="mx-auto flex h-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl">
+                            <div className="flex items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-900 px-4 py-3">
+                                <div>
+                                    <div className="flex items-center gap-2 text-base font-semibold">
+                                        <Sparkles className="h-4 w-4 text-amber-300" />
+                                        Flashcard Generation
+                                    </div>
+                                    <>
+                                        <div className="mt-1 text-xs text-zinc-400">
+                                            {flashcardScopeHeading} · {activeFlashcardHighlights.length} {flashcardScopeDescription}
+                                            {activeFlashcardHighlights.length === 1 ? "" : "s"}
+                                        </div>
+                                        {false && <div className="mt-1 text-xs text-zinc-400">
+                                        Pages {todayTargetStartPage}-{todayTargetEndPage ?? todayTargetStartPage} · {eligibleFlashcardHighlights.length} eligible highlight{eligibleFlashcardHighlights.length === 1 ? "" : "s"}
+                                        </div>}
+                                    </>
+                                </div>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => {
+                                        setIsFlashcardPanelOpen(false);
+                                        setFlashcardError("");
+                                        setFlashcardGenerationScope("target");
+                                    }}
+                                    title="Close flashcard panel"
+                                >
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <div className="border-b border-zinc-800 bg-zinc-900/70 px-4 py-3">
+                                <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                                    <div className="space-y-1.5">
+                                        <div className="text-[11px] font-medium uppercase tracking-wide text-zinc-400">
+                                            Linked task
+                                        </div>
+                                        {flashcardTaskOptions.length > 0 ? (
+                                            <select
+                                                value={selectedFlashcardTaskValue}
+                                                onChange={(e) => setSelectedFlashcardTaskValue(e.target.value)}
+                                                className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 text-sm text-zinc-100 outline-none"
+                                            >
+                                                {flashcardTaskOptions.length > 1 && (
+                                                    <option value="">Select a task</option>
+                                                )}
+                                                {flashcardTaskOptions.map((option) => (
+                                                    <option key={option.value} value={option.value}>
+                                                        {option.specializationName} · {option.bookName} · {option.taskName}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
+                                                No linked learning task was found for this PDF. Open this PDF from an agenda task or connect it to a learning-plan book/path first.
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-wrap items-center justify-end gap-2">
+                                        <Button
+                                            variant="outline"
+                                            className="border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-800"
+                                            onClick={() => void handleLoadFlashcardPreview()}
+                                            disabled={
+                                                !resolvedFlashcardTaskOption ||
+                                                activeFlashcardHighlights.length === 0 ||
+                                                isFlashcardPreviewLoading
+                                            }
+                                        >
+                                            {isFlashcardPreviewLoading ? (
+                                                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Sparkles className="mr-1.5 h-4 w-4" />
+                                            )}
+                                            Preview MCQs
+                                        </Button>
+                                        <Button
+                                            onClick={handleGenerateFlashcards}
+                                            disabled={flashcardPreviewCandidates.length === 0 || isFlashcardGenerating}
+                                        >
+                                            {isFlashcardGenerating ? (
+                                                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Sparkles className="mr-1.5 h-4 w-4" />
+                                            )}
+                                            Generate Flashcards
+                                        </Button>
+                                    </div>
+                                </div>
+                                {resolvedFlashcardTaskOption && (
+                                    <div className="mt-2 text-xs text-zinc-400">
+                                        Saving into Flashcard / {resolvedFlashcardTaskOption.specializationName} / {resolvedFlashcardTaskOption.bookName} / Pages {activeFlashcardStartPage}-{activeFlashcardEndPage ?? activeFlashcardStartPage}
+                                    </div>
+                                )}
+                                {flashcardError && (
+                                    <div className="mt-2 text-sm text-red-300">{flashcardError}</div>
+                                )}
+                            </div>
+                            <div className="flex-1 min-h-0 px-4 py-4">
+                                <ScrollArea className="h-full pr-3">
+                                    {flashcardPreviewCandidates.length > 0 ? (
+                                        <div className="space-y-3">
+                                            {flashcardPreviewCandidates.map((candidate, index) => (
+                                                <div
+                                                    key={`${candidate.highlightId}-${index}`}
+                                                    className={cn(
+                                                        "rounded-xl border p-4 transition-colors",
+                                                        candidate.selected
+                                                            ? "border-emerald-500/40 bg-emerald-500/10"
+                                                            : "border-zinc-800 bg-zinc-900/70"
+                                                    )}
+                                                >
+                                                    <div className="flex items-start gap-3">
+                                                        <Checkbox
+                                                            checked={candidate.selected}
+                                                            onCheckedChange={(checked) => {
+                                                                setFlashcardPreviewCandidates((prev) =>
+                                                                    prev.map((entry) =>
+                                                                        entry.highlightId === candidate.highlightId
+                                                                            ? { ...entry, selected: !!checked }
+                                                                            : entry
+                                                                    )
+                                                                );
+                                                            }}
+                                                            className="mt-1 border-zinc-600 data-[state=checked]:border-emerald-500 data-[state=checked]:bg-emerald-500"
+                                                        />
+                                                        <div className="min-w-0 flex-1 space-y-3">
+                                                            <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide text-zinc-400">
+                                                                <span>Page {candidate.pageNumber}</span>
+                                                                {candidate.matchedTopicIds.length > 0 && (
+                                                                    <span>Reuses {candidate.matchedTopicIds.length} topic{candidate.matchedTopicIds.length === 1 ? "" : "s"}</span>
+                                                                )}
+                                                                {candidate.newTopics.length > 0 && (
+                                                                    <span>New: {candidate.newTopics.join(", ")}</span>
+                                                                )}
+                                                            </div>
+                                                            <div>
+                                                                <div className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500">
+                                                                    Source highlight
+                                                                </div>
+                                                                <div className="rounded-md border border-zinc-800 bg-zinc-950/80 px-3 py-2 text-sm text-zinc-300">
+                                                                    {candidate.sourceText}
+                                                                </div>
+                                                            </div>
+                                                            <div className="grid gap-3 lg:grid-cols-2">
+                                                                <div className="rounded-md border border-zinc-800 bg-zinc-950/70 p-3">
+                                                                    <div className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500">
+                                                                        Question
+                                                                    </div>
+                                                                    <div className="text-sm font-medium text-zinc-100">
+                                                                        {candidate.question}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="rounded-md border border-zinc-800 bg-zinc-950/70 p-3">
+                                                                    <div className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500">
+                                                                        Correct answer
+                                                                    </div>
+                                                                    <div className="text-sm text-zinc-300">
+                                                                        {candidate.answer}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="rounded-md border border-zinc-800 bg-zinc-950/70 p-3">
+                                                                <div className="mb-2 text-[11px] uppercase tracking-wide text-zinc-500">
+                                                                    Options
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                    {candidate.options.map((option, optionIndex) => (
+                                                                        <div
+                                                                            key={`${candidate.highlightId}-option-${optionIndex}`}
+                                                                            className={cn(
+                                                                                "rounded-md border px-3 py-2 text-sm",
+                                                                                optionIndex === candidate.correctOptionIndex
+                                                                                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-100"
+                                                                                    : "border-zinc-800 bg-zinc-950/60 text-zinc-300"
+                                                                            )}
+                                                                        >
+                                                                            <span className="mr-2 text-[11px] uppercase tracking-wide text-zinc-500">
+                                                                                {String.fromCharCode(65 + optionIndex)}
+                                                                            </span>
+                                                                            {option}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                            {candidate.explanation && (
+                                                                <div className="rounded-md border border-zinc-800 bg-zinc-950/70 p-3">
+                                                                    <div className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500">
+                                                                        Explanation
+                                                                    </div>
+                                                                    <div className="text-sm text-zinc-300">
+                                                                        {candidate.explanation}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-4">
+                                                <div className="text-sm font-medium text-zinc-100">
+                                                    {flashcardGenerationScope === "page"
+                                                        ? "Preview this page's highlights first"
+                                                        : "Preview the eligible highlights first"}
+                                                </div>
+                                                <div className="mt-1 text-sm text-zinc-400">
+                                                    The AI will turn each highlight into one 4-option MCQ flashcard candidate. You can deselect candidates before generation.
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                {activeFlashcardHighlights.map((highlight, index) => (
+                                                    <div
+                                                        key={`${highlight.highlightId}-${index}`}
+                                                        className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2"
+                                                    >
+                                                        <div className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500">
+                                                            Page {highlight.pageNumber}
+                                                        </div>
+                                                        <div className="text-sm text-zinc-300">
+                                                            {highlight.text}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {activeFlashcardHighlights.length === 0 && (
+                                                    <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-8 text-center text-sm text-zinc-400">
+                                                        {flashcardGenerationScope === "page"
+                                                            ? "No text highlights were found on this page."
+                                                            : "No eligible highlights were found in today&apos;s target range."}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </ScrollArea>
+                            </div>
+                        </div>
+                    </div>
+                )}
+                {showLearningTargetUi && isOnTodayTargetEndPage && (
                     <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden">
                         <div className="absolute inset-0 bg-emerald-500/10 backdrop-blur-[2px]" />
                         {Array.from({ length: 20 }).map((_, i) => (
                             <span
-                                key={`pdf-celebrate-${i}`}
+                                key={`pdf-celebrate-${targetCelebrationCycle}-${i}`}
                                 className="pdf-celebrate-piece"
                                 style={
                                     {
@@ -2380,11 +3327,26 @@ export default function PdfViewerPopup() {
                             />
                         ))}
                         <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="rounded-xl border border-emerald-300/40 bg-emerald-950/85 px-5 py-3 text-emerald-100 shadow-2xl animate-in fade-in zoom-in-95 duration-300">
+                            <div className="pointer-events-auto rounded-xl border border-emerald-300/40 bg-emerald-950/85 px-5 py-4 text-emerald-100 shadow-2xl animate-in fade-in zoom-in-95 duration-300">
                                 <div className="text-sm font-semibold flex items-center gap-2">
                                     <Sparkles className="h-4 w-4 text-emerald-300" />
                                     Today&apos;s target completed
                                 </div>
+                                <div className="mt-3 flex items-center justify-center">
+                                    <Button
+                                        size="sm"
+                                        className="bg-emerald-400 text-emerald-950 hover:bg-emerald-300"
+                                        onClick={() => handleOpenFlashcardPanel("target")}
+                                    >
+                                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                                        Generate Flashcards
+                                    </Button>
+                                </div>
+                                {eligibleFlashcardHighlights.length === 0 && (
+                                    <div className="mt-2 max-w-64 text-center text-xs text-emerald-200/80">
+                                        Add text highlights on today&apos;s target pages to generate flashcards for this session.
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -2392,11 +3354,11 @@ export default function PdfViewerPopup() {
                 {isReaderOnly && (
                     <div className="absolute top-4 right-4 z-30 flex items-center gap-2">
                         <Button
-                            variant={isSpeaking ? "default" : "outline"}
+                            variant={isSpeaking || isContinuousPageReadEnabled ? "default" : "outline"}
                             size="icon"
                             className="h-9 w-9 shadow-lg"
                             onClick={() => {
-                                if (isSpeaking) {
+                                if (isSpeaking || isContinuousPageReadEnabled) {
                                     stopSpeaking();
                                     return;
                                 }
@@ -2404,14 +3366,16 @@ export default function PdfViewerPopup() {
                             }}
                             disabled={!isSpeaking && !file}
                             title={
-                                isSpeaking
-                                    ? "Stop read aloud"
+                                isContinuousPageReadEnabled
+                                    ? isContinuousPageReadWaiting
+                                        ? "Stop waiting for the next page"
+                                        : "Stop continuous read aloud"
                                     : hasSelectedText
                                         ? "Read selected text aloud"
-                                        : "Read full page aloud"
+                                        : "Read full page aloud and keep waiting for the next page"
                             }
                         >
-                            {isSpeaking ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                            {isSpeaking || isContinuousPageReadEnabled ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                         </Button>
                         {isSpeaking && (
                             <Button
@@ -2471,6 +3435,30 @@ export default function PdfViewerPopup() {
                         >
                             <Highlighter className="h-4 w-4" />
                         </Button>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 shadow-lg"
+                            onClick={handleClearAnnotations}
+                            disabled={!hasPageAnnotations}
+                            title="Clear page annotations and highlights"
+                        >
+                            <Eraser className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 shadow-lg"
+                            onClick={() => handleOpenFlashcardPanel("page")}
+                            disabled={!hasCurrentPageFlashcardHighlights}
+                            title={
+                                hasCurrentPageFlashcardHighlights
+                                    ? "Generate flashcards from this page's highlights"
+                                    : "Add text highlights on this page to generate flashcards"
+                            }
+                        >
+                            <Sparkles className="h-4 w-4" />
+                        </Button>
                     </div>
                 )}
                 <Button
@@ -2495,10 +3483,21 @@ export default function PdfViewerPopup() {
                 </Button>
                 {showLearningTargetUi && (
                     <div
-                        className="absolute bottom-4 right-4 z-30 h-8 min-w-8 rounded-md border border-border/70 bg-background/90 px-2 text-sm font-semibold flex items-center justify-center shadow-lg"
-                        title="Today's completion - target"
+                        className={cn(
+                            "absolute bottom-4 right-4 z-30 h-8 min-w-8 rounded-md border px-2 text-sm font-semibold flex items-center justify-center shadow-lg",
+                            isAheadOfTodayTarget
+                                ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-300"
+                                : isBehindTodayTarget
+                                    ? "border-red-500/50 bg-red-500/15 text-red-300"
+                                    : "border-border/70 bg-background/90"
+                        )}
+                        title={
+                            isAheadOfTodayTarget
+                                ? "Pages ahead of today's target"
+                                : "Today's completion - target"
+                        }
                     >
-                        {floatingCount}
+                        {floatingCountLabel}
                     </div>
                 )}
                  <div

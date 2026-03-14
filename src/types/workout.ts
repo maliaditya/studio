@@ -72,6 +72,7 @@ export interface ExerciseDefinition {
   isReadyForBranding?: boolean;
   linkedProjectIds?: string[];
   primaryProjectId?: string | null;
+  linkedMicroSkillIds?: string[];
   nodeType?: NodeType;
   // Personal Branding
   brandingStatus?: 'converted' | 'published';
@@ -329,6 +330,12 @@ export interface KanbanCard {
   resolvedAt?: string | null;
   linkedProjectId?: string | null;
   linkedReleaseId?: string | null;
+  linkedResourceId?: string | null;
+  linkedFeatureResourceId?: string | null;
+  linkedFeaturePointId?: string | null;
+  linkedFeaturePointIds?: string[];
+  brandingType?: 'blog' | 'video' | null;
+  totalLoggedMinutes?: number;
   archived?: boolean;
   position: number;
   createdAt: string;
@@ -360,6 +367,7 @@ export interface KanbanBoard {
   cards: KanbanCard[];
   attachments: KanbanAttachment[];
   comments: KanbanComment[];
+  boardType?: 'project' | 'branding';
   migratedFromReleaseWorkflow?: boolean;
 }
 
@@ -447,13 +455,31 @@ export interface FormalizationData {
 export interface ResourcePoint {
   id: string;
   text: string;
-  type?: 'text' | 'youtube' | 'obsidian' | 'card' | 'markdown' | 'code' | 'link' | 'timestamp' | 'paint';
+  type?:
+    | 'text'
+    | 'ai-note'
+    | 'heading1'
+    | 'heading2'
+    | 'heading3'
+    | 'bulleted-list'
+    | 'numbered-list'
+    | 'todo'
+    | 'youtube'
+    | 'obsidian'
+    | 'card'
+    | 'markdown'
+    | 'code'
+    | 'link'
+    | 'timestamp'
+    | 'paint';
   url?: string;
   resourceId?: string; // ID of the linked Resource card
   displayText?: string;
   timestamp?: number; // Start time in seconds for audio/video notes
   endTime?: number; // End time in seconds for audio/video notes
   drawing?: string; // Store drawing data as a data URL
+  checked?: boolean;
+  readyForBranding?: boolean;
 }
 
 export interface Stopper {
@@ -474,11 +500,29 @@ export interface Strength {
     text: string;
 }
 
+export interface FlashcardResourceData {
+  question: string;
+  answer: string;
+  options?: string[];
+  correctOptionIndex?: number;
+  explanation?: string;
+  topicIds: string[];
+  sessionId: string;
+  pageNumber: number;
+  sourceHighlightId: string;
+  sourceText: string;
+  specializationId: string;
+  specializationName: string;
+  taskKey: string;
+  pdfResourceId: string;
+  generatedAt: string;
+}
+
 export interface Resource {
   id: string;
   name: string;
   folderId: string;
-  type: 'link' | 'card' | 'habit' | 'mechanism' | 'model3d' | 'pdf';
+  type: 'link' | 'card' | 'habit' | 'mechanism' | 'model3d' | 'pdf' | 'flashcard';
   createdAt: string;
   isFavorite?: boolean;
 
@@ -492,8 +536,10 @@ export interface Resource {
   linkedBrainHackIds?: string[];
   hasLocalAudio?: boolean; // Flag to check IndexedDB
   audioFileName?: string;
+  audioUrl?: string;
   hasLocalPdf?: boolean;
   pdfFileName?: string;
+  flashcard?: FlashcardResourceData;
 
   // For 'card' type
   points?: ResourcePoint[];
@@ -519,6 +565,9 @@ export interface Resource {
   urges?: Stopper[];
   resistances?: Stopper[];
   strengths?: Strength[];
+  state?: string;
+  linkedBotheringId?: string;
+  linkedBotheringType?: 'mismatch' | 'constraint' | 'external';
   
   // For 'mechanism' type
   mechanismFramework?: 'positive' | 'negative';
@@ -642,6 +691,7 @@ export interface CoreSkill {
   parentId?: string | null;
   addToPortfolio?: boolean; // New field
   linkedPdfResourceId?: string | null;
+  linkedResourceIds?: string[];
 }
 
 export interface SkillArea {
@@ -750,6 +800,19 @@ export interface Pattern {
   id: string;
   name: string;
   type: 'Positive' | 'Negative';
+  patternCategory?: string;
+  threatSignalCategory?: string;
+  growthSignalCategory?: string;
+  sharedCause?: string;
+  threatSignal?: string;
+  threatAction?: string;
+  threatOutcome?: string;
+  growthSignal?: string;
+  growthAction?: string;
+  growthOutcome?: string;
+  actionType?: string;
+  growthActionType?: string;
+  state?: string;
   phrases: PatternPhrase[];
 }
 
@@ -822,13 +885,16 @@ export interface MindsetPoint {
   text: string;
   completed?: boolean;
   coreDomainId?: CoreDomainId;
+  means?: BotheringMeans;
   resolution?: string;
   endDate?: string;
   mismatchType?: 'mental-model' | 'cognitive-load' | 'threat-prediction' | 'action-sequencing';
+  constraintType?: 'externally-imposed' | 'self-imposed';
   linkedHabitIds?: string[];
   linkedUrgeIds?: string[];
   linkedResistanceIds?: string[];
   linkedMismatchIds?: string[];
+  linkedExternalIds?: string[];
   tasks?: {
     id: string;
     type: ActivityType;
@@ -859,11 +925,176 @@ export interface StopperProgressPopupState {
     habitName: string | null;
 }
 
+export type JournalSessionStatus = 'in_progress' | 'completed';
+export type JournalSection = 'opening' | 'slots' | 'botherings' | 'closeout' | 'done';
+export type JournalSlotState = 'empty' | 'incomplete' | 'completed_with_remainder' | 'completed_exact';
+export type JournalCauseCategory =
+  | 'distraction'
+  | 'low_energy'
+  | 'external_demand'
+  | 'transition_friction'
+  | 'overplanned'
+  | 'avoidance'
+  | 'rest'
+  | 'admin'
+  | 'other';
+export type JournalIntentionality = 'intentional' | 'mixed' | 'unintentional';
+export type JournalBotheringStatus = 'solved' | 'partial' | 'not_solved' | 'changed' | 'active';
+
+export interface JournalChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  promptId?: string;
+  timestamp?: number;
+}
+
+export interface JournalCursor {
+  stepId: string | null;
+  stepIndex: number;
+  totalSteps: number;
+  section: JournalSection;
+}
+
+export interface JournalOpeningReview {
+  moodRating?: number | null;
+  energyRating?: number | null;
+  stressRating?: number | null;
+  note?: string;
+}
+
+export interface JournalTaskReflection {
+  taskId: string;
+  status: 'completed' | 'incomplete' | 'missed' | 'partial' | 'unknown';
+  missReasonCategory?: JournalCauseCategory;
+  actualActivityType?: string;
+  linkedStopperIds: string[];
+  blockerSummary?: string;
+  nextAction?: string;
+  rescheduleDateKey?: string;
+  rescheduleSlotName?: SlotName;
+  rescheduleFit?: 'pending' | 'confirmed' | 'skipped' | 'not_needed';
+  note?: string;
+}
+
+export interface JournalSlotReview {
+  slotName: SlotName;
+  slotState: JournalSlotState;
+  scheduledTaskIds: string[];
+  completedTaskIds: string[];
+  incompleteTaskIds: string[];
+  loggedMinutes: number;
+  untrackedMinutes: number;
+  actualActivityType?: string;
+  causeCategory?: JournalCauseCategory;
+  intentionality?: JournalIntentionality;
+  feelingRating?: number | null;
+  linkedStopperIds: string[];
+  note?: string;
+  taskReflections: JournalTaskReflection[];
+}
+
+export interface JournalBotheringReflection {
+  botheringId: string;
+  sourceType: 'external' | 'mismatch' | 'constraint';
+  status?: JournalBotheringStatus;
+  feelingRating?: number | null;
+  blockerCategory?: JournalCauseCategory;
+  todaySummary?: string;
+  resolutionSummary?: string;
+  linkedTaskIds: string[];
+  linkedStopperIds: string[];
+  nextAction?: string;
+  dueTaskWindowNote?: string;
+  contextualData?: Record<string, unknown>;
+}
+
+export interface JournalCloseout {
+  tomorrowFocus?: string;
+  tomorrowProtection?: string;
+  carryForwardNotes?: string;
+}
+
+export interface DailyJournalSession {
+  id: string;
+  date: string; // YYYY-MM-DD
+  status: JournalSessionStatus;
+  startedAt: number;
+  completedAt?: number | null;
+  opening: JournalOpeningReview;
+  slotReviews: JournalSlotReview[];
+  botheringReviews: JournalBotheringReflection[];
+  closeout: JournalCloseout;
+  cursor: JournalCursor;
+  messages?: JournalChatMessage[];
+}
+
+export type MindsetPathId = 'reality_interpretation_debugger';
+export type MindsetSessionStatus = 'in_progress' | 'completed' | 'abandoned';
+export type MindsetPathAnswerValue = string | string[];
+
+export interface MindsetSessionCursor {
+  stepId: string | null;
+  stepIndex: number;
+  totalSteps: number;
+}
+
+export interface MindsetSessionLinkTarget {
+  type: 'task' | 'bothering' | 'none';
+  id?: string;
+  label?: string;
+}
+
+export interface MindsetPathAnswer {
+  stepId: string;
+  value: MindsetPathAnswerValue;
+  label?: string;
+  note?: string;
+  answeredAt: number;
+}
+
+export interface MindsetPathSummary {
+  observableReality?: string;
+  mindInterpretation?: string;
+  evidenceStatus?: string;
+  futureProjection?: string;
+  bodyState: string[];
+  witness?: string;
+  identityPosition?: string;
+  groundedAction?: string;
+  conclusion?: string;
+}
+
+export interface MindsetChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  stepId?: string;
+  timestamp?: number;
+}
+
+export interface MindsetSession {
+  id: string;
+  pathId: MindsetPathId;
+  status: MindsetSessionStatus;
+  startedAt: number;
+  completedAt?: number | null;
+  linkTarget: MindsetSessionLinkTarget;
+  cursor: MindsetSessionCursor;
+  answers: MindsetPathAnswer[];
+  summary: MindsetPathSummary;
+  messages?: MindsetChatMessage[];
+}
+
 export interface MissedSlotReview {
     id: string; // composite key: `${date}-${slotName}`
     reason: string;
     followedRuleIds: string[];
     snoozedUntil?: number; // timestamp
+    journalSessionId?: string;
+    slotState?: JournalSlotState;
+    untrackedMinutes?: number;
+    causeCategory?: JournalCauseCategory;
+    linkedStopperIds?: string[];
+    activitySummary?: string;
 }
 
 export interface Priority {
@@ -920,6 +1151,14 @@ export type CoreDomainId =
 export type MeansPillar = 'money' | 'method' | 'ability';
 export type MeansStatus = 'missing' | 'building' | 'ready';
 
+export interface BotheringMeansValue {
+  status: MeansStatus;
+  category?: string;
+  notes?: string;
+}
+
+export type BotheringMeans = Partial<Record<MeansPillar, BotheringMeansValue>>;
+
 export interface MeansEntry {
   id: string;
   pillar: MeansPillar;
@@ -959,6 +1198,11 @@ export interface UserSettings {
   pdfViewerPositionX?: number;
   pdfViewerPositionY?: number;
   kokoroTtsBaseUrl?: string;
+  xttsTtsBaseUrl?: string;
+  xttsVoiceSamplePath?: string;
+  xttsVoiceName?: string;
+  xttsLanguage?: string;
+  astraReplyLanguage?: 'auto' | 'english' | 'hindi' | 'hinglish';
   localSttBaseUrl?: string;
   timestampAnnotationOffset?: number;
   drawingCanvasAutoSaveInterval?: number;
@@ -995,6 +1239,8 @@ export interface UserSettings {
   pdfDailyPageTargetByResourceId?: Record<string, number>;
   pdfDailyPageStatsByResourceId?: Record<string, { date: string; startPage: number; maxPage: number }>;
   pdfAnnotationsByResourceId?: Record<string, Record<string, PdfPageAnnotation[]>>;
+  flashcardSessions?: FlashcardSessionIndex[];
+  flashcardTopicTablesBySpecializationId?: Record<string, FlashcardTopicTable>;
   learningPerformanceDailyLogs?: Record<string, LearningPerformanceLogEntry[]>;
   stateDiagramStore?: StateDiagramStore;
   ai?: {
@@ -1139,15 +1385,56 @@ export interface PdfTextHighlight {
     color: string;
     opacity: number;
     rects: PdfTextHighlightRect[];
+    id?: string;
+    text?: string;
+    createdAt?: string;
 }
 
 export type PdfPageAnnotation = PdfAnnotationStroke | PdfTextHighlight;
+
+export interface FlashcardSessionIndex {
+  id: string;
+  createdAt: string;
+  dateKey: string;
+  resourceId: string;
+  resourceName: string;
+  specializationId: string;
+  specializationName: string;
+  taskKey: string;
+  taskDefinitionId: string;
+  taskActivityType: "deepwork" | "upskill";
+  bookName: string;
+  startPage: number;
+  endPage: number;
+  folderId: string;
+  flashcardResourceIds: string[];
+}
+
+export interface FlashcardTopicEntry {
+  id: string;
+  name: string;
+  normalizedName: string;
+  flashcardResourceIds: string[];
+}
+
+export interface FlashcardTopicTable {
+  specializationId: string;
+  specializationName: string;
+  topics: FlashcardTopicEntry[];
+}
+
+export interface PdfViewerLaunchContext {
+  sourceActivityId?: string | null;
+  sourceDefinitionId?: string | null;
+  sourceTaskActivityType?: "deepwork" | "upskill" | null;
+}
 
 export interface PdfViewerPopupState {
   isOpen: boolean;
   resource: Resource | null;
   position: { x: number; y: number };
   size?: { width: number; height?: number };
+  launchContext?: PdfViewerLaunchContext | null;
 }
 
 export type DrawingCanvasData = {

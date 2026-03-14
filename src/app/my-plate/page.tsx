@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project, CoreSkill } from '@/types/workout';
+import type { Activity, DailySchedule, FullSchedule, ActivityType, SlotName, Release, ExerciseDefinition, Project, CoreSkill, KanbanCard } from '@/types/workout';
 import { format, startOfToday, isAfter, parseISO, differenceInDays, subDays, isSameDay, getISOWeekYear, getISOWeek, startOfMonth } from 'date-fns';
 import { motion } from 'framer-motion';
 import { DndContext, useDraggable, type DragEndEvent } from '@dnd-kit/core';
@@ -67,6 +67,7 @@ function MyPlatePageContent() {
         productizationPlans,
         offerizationPlans,
         projects,
+        kanbanBoards,
         coreSkills,
         microSkillMap,
         findRootTask,
@@ -78,6 +79,7 @@ function MyPlatePageContent() {
         focusActivity,
         setFocusActivity,
         focusDuration,
+        setFocusDuration,
         setFocusSessionModalOpen,
         logWorkoutSet, 
         updateWorkoutSet, 
@@ -102,9 +104,9 @@ function MyPlatePageContent() {
         setSelectedDomainId,
         selectedSkillId,
         setSelectedSkillId,
+        setSelectedProjectId,
         handleToggleComplete,
         getUpskillNodeType,
-        onStartFocus,
     } = useAuth();
     const router = useRouter();
     const { toast } = useToast();
@@ -121,6 +123,12 @@ function MyPlatePageContent() {
     const [isDietPlanModalOpen, setIsDietPlanModalOpen] = useState(false);
     const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
     const [isKanbanModalOpen, setIsKanbanModalOpen] = useState(false);
+    const [kanbanSelectionContext, setKanbanSelectionContext] = useState<{
+        activityId: string;
+        boardId: string;
+        cardId?: string | null;
+        taskDefinitionId?: string | null;
+    } | null>(null);
     const [isChartModalOpen, setIsChartModalOpen] = useState(false);
     const [isTimesheetModalOpen, setIsTimesheetModalOpen] = useState(false);
     const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
@@ -156,6 +164,10 @@ function MyPlatePageContent() {
 
     const selectedDateKey = useMemo(() => format(selectedDate, 'yyyy-MM-dd'), [selectedDate]);
     const todaysSchedule = useMemo(() => schedule[selectedDateKey] || {}, [schedule, selectedDateKey]);
+    const kanbanCardIds = useMemo(
+        () => new Set((kanbanBoards || []).flatMap((board) => board.cards.map((card) => card.id))),
+        [kanbanBoards]
+    );
     
     const findSpecializationForTask = useCallback((def: ExerciseDefinition | null | undefined) => {
         if (!def) return null;
@@ -176,6 +188,58 @@ function MyPlatePageContent() {
         return null;
     }, [coreSkills]);
 
+    const findProjectKanbanBoardForActivity = useCallback((activity: Activity) => {
+        const rootTask = findRootTask(activity);
+        const specialization =
+            findSpecializationForTask(rootTask) ||
+            coreSkills.find((skill) => skill.name === activity.details && skill.type === 'Specialization') ||
+            null;
+        const existingCardId = (activity.taskIds || []).find((id) => kanbanCardIds.has(id)) || null;
+
+        if (existingCardId) {
+            const existingBoard = kanbanBoards.find((board) =>
+                (board.boardType || 'project') === 'project' && board.cards.some((card) => card.id === existingCardId)
+            );
+            if (existingBoard) {
+                return { board: existingBoard, rootTask, existingCardId };
+            }
+        }
+
+        const targetProjectId = rootTask?.primaryProjectId || rootTask?.linkedProjectIds?.[0] || null;
+        const projectBoards = kanbanBoards.filter((board) => (board.boardType || 'project') === 'project');
+        const specializationBoards = specialization
+            ? projectBoards.filter((board) => board.specializationId === specialization.id)
+            : projectBoards;
+
+        const board =
+            (targetProjectId ? specializationBoards.find((entry) => entry.projectId === targetProjectId) : null) ||
+            specializationBoards[0] ||
+            null;
+
+        return { board, rootTask, existingCardId };
+    }, [coreSkills, findRootTask, findSpecializationForTask, kanbanBoards, kanbanCardIds]);
+
+    const openFocusSessionForActivity = useCallback((activity: Activity) => {
+        const estDurationStr = activity.duration?.toString();
+        let minutes = 0;
+        if (estDurationStr) {
+            const hMatch = estDurationStr.match(/(\d+)h/);
+            const mMatch = estDurationStr.match(/(\d+)m/);
+            const h = hMatch ? parseInt(hMatch[1], 10) * 60 : 0;
+            const m = mMatch ? parseInt(mMatch[1], 10) : 0;
+            minutes = h + m;
+            if (minutes === 0 && /^\d+$/.test(estDurationStr.trim())) {
+                minutes = parseInt(estDurationStr.trim(), 10);
+            }
+        }
+        if (Number.isNaN(minutes) || minutes <= 0) minutes = 25;
+
+        setFocusDuration(minutes);
+        setFocusActivity(activity);
+        setFocusSessionModalOpen(true);
+        return true;
+    }, [setFocusActivity, setFocusDuration, setFocusSessionModalOpen]);
+
     const handleOpenFocusModalForPlanning = useCallback((activity: Activity) => {
         const { type, details } = activity;
         if (type === 'workout') {
@@ -188,20 +252,41 @@ function MyPlatePageContent() {
             return false;
         }
 
+        if (type === 'deepwork') {
+            const { board, rootTask, existingCardId } = findProjectKanbanBoardForActivity(activity);
+            if (existingCardId) {
+                return openFocusSessionForActivity(activity);
+            }
+            if (!board) {
+                toast({
+                    title: 'No Kanban board found',
+                    description: 'Create a project Kanban board for this specialization first.',
+                    variant: 'destructive',
+                });
+                return false;
+            }
+
+            setFocusActivity(activity);
+            setKanbanSelectionContext({
+                activityId: activity.id,
+                boardId: board.id,
+                cardId: existingCardId,
+                taskDefinitionId: rootTask?.id || null,
+            });
+            setIsKanbanModalOpen(true);
+            return true;
+        }
+
         const rootTask = findRootTask(activity);
         if (rootTask) {
-            if (type === 'deepwork') {
-                setSelectedDeepWorkTask(rootTask);
-                setSelectedUpskillTask(null);
-            } else {
-                setSelectedUpskillTask(rootTask);
-                setSelectedDeepWorkTask(null);
-            }
+            setSelectedUpskillTask(null);
+            setSelectedDeepWorkTask(null);
             const coreSkill = findSpecializationForTask(rootTask) || coreSkills.find(cs => cs.name === details && cs.type === 'Specialization');
             if (coreSkill) {
                 setSelectedDomainId(coreSkill.domainId);
                 setSelectedSkillId(coreSkill.id);
             }
+            setSelectedProjectId(null);
             setFocusActivity(activity);
             setIsDeepWorkModalOpen(true);
             return true;
@@ -213,13 +298,73 @@ function MyPlatePageContent() {
             setSelectedSkillId(coreSkill.id);
             setSelectedUpskillTask(null);
             setSelectedDeepWorkTask(null);
+            setSelectedProjectId(null);
             setFocusActivity(activity);
             setIsDeepWorkModalOpen(true);
             return true;
         }
         
         return false;
-    }, [coreSkills, findRootTask, findSpecializationForTask, setSelectedDomainId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, setFocusActivity, setIsDeepWorkModalOpen, setIsTodaysWorkoutModalOpen, setWorkoutActivityToLog]);
+    }, [coreSkills, findProjectKanbanBoardForActivity, findRootTask, findSpecializationForTask, openFocusSessionForActivity, setSelectedDomainId, setSelectedProjectId, setSelectedSkillId, setSelectedUpskillTask, setSelectedDeepWorkTask, setFocusActivity, setIsDeepWorkModalOpen, setIsKanbanModalOpen, setIsTodaysWorkoutModalOpen, setWorkoutActivityToLog, toast]);
+
+    const handleSelectKanbanCardForDeepWork = useCallback((card: KanbanCard) => {
+        if (!kanbanSelectionContext) return;
+
+        setSchedule((prev) => {
+            const daySchedule = prev[selectedDateKey];
+            if (!daySchedule) return prev;
+
+            const nextDaySchedule = Object.fromEntries(
+                Object.entries(daySchedule).map(([slotName, activities]) => [
+                    slotName,
+                    ((activities as Activity[]) || []).map((entry) => {
+                        if (entry.id !== kanbanSelectionContext.activityId) return entry;
+                        const preservedTaskIds = (entry.taskIds || []).filter((id) => !kanbanCardIds.has(id));
+                        const nextTaskIds = Array.from(
+                            new Set([
+                                ...preservedTaskIds,
+                                ...(kanbanSelectionContext.taskDefinitionId ? [kanbanSelectionContext.taskDefinitionId] : []),
+                                card.id,
+                            ])
+                        );
+                        return {
+                            ...entry,
+                            details: card.title || entry.details,
+                            taskIds: nextTaskIds,
+                        };
+                    }),
+                ])
+            ) as DailySchedule;
+
+            return {
+                ...prev,
+                [selectedDateKey]: nextDaySchedule,
+            };
+        });
+
+        setFocusActivity((prev) =>
+            prev && prev.id === kanbanSelectionContext.activityId
+                ? {
+                    ...prev,
+                    details: card.title || prev.details,
+                    taskIds: Array.from(
+                        new Set([
+                            ...((prev.taskIds || []).filter((id) => !kanbanCardIds.has(id))),
+                            ...(kanbanSelectionContext.taskDefinitionId ? [kanbanSelectionContext.taskDefinitionId] : []),
+                            card.id,
+                        ])
+                    ),
+                }
+                : prev
+        );
+
+        setIsKanbanModalOpen(false);
+        setKanbanSelectionContext(null);
+        toast({
+            title: 'Kanban card selected',
+            description: `"${card.title}" is now linked to this deep work activity.`,
+        });
+    }, [kanbanCardIds, kanbanSelectionContext, selectedDateKey, setFocusActivity, setSchedule, toast]);
 
     const calculateTotalEstimate = useCallback((def: ExerciseDefinition): number => {
         let total = 0;
@@ -563,7 +708,7 @@ function MyPlatePageContent() {
                   currentSlot={currentSlot}
                   onOpenFocusModal={onOpenFocusModal}
                   onActivityClick={handleOpenFocusModalForPlanning}
-                  onStartFocus={onStartFocus}
+                  onStartFocus={(activity) => { onOpenFocusModal(activity); }}
               />
           </div>
       );
@@ -628,7 +773,7 @@ function MyPlatePageContent() {
                             currentSlot={currentSlot}
                             onActivityClick={handleOpenFocusModalForPlanning}
                             onOpenHabitPopup={onOpenHabitPopup}
-                            onStartFocus={onStartFocus}
+                            onStartFocus={(activity) => { onOpenFocusModal(activity); }}
                         />
                     </CardContent>
                 </Card>
@@ -697,12 +842,25 @@ function MyPlatePageContent() {
                     <div className="flex-grow min-h-0"><MindMapViewer showControls={true} /></div>
                 </DialogContent>
             </Dialog>
-            <Dialog open={isKanbanModalOpen} onOpenChange={setIsKanbanModalOpen}>
-                <DialogContent className="max-w-7xl h-[90vh] p-0 flex flex-col">
+            <Dialog open={isKanbanModalOpen} onOpenChange={(isOpen) => {
+                setIsKanbanModalOpen(isOpen);
+                if (!isOpen) {
+                    setKanbanSelectionContext(null);
+                }
+            }}>
+                <DialogContent className="w-[95vw] max-w-[95vw] h-[95vh] p-0 flex flex-col">
                     <DialogHeader className="p-4 border-b">
-                        <DialogTitle>Kanban Board</DialogTitle>
+                        <DialogTitle>{kanbanSelectionContext ? 'Select Kanban Card' : 'Kanban Board'}</DialogTitle>
                     </DialogHeader>
-                    <div className="flex-grow min-h-0"><KanbanPageContent isModal={true} /></div>
+                    <div className="flex-grow min-h-0">
+                        <KanbanPageContent
+                            isModal={true}
+                            forcedBoardMode="project"
+                            initialBoardId={kanbanSelectionContext?.boardId}
+                            initialCardId={kanbanSelectionContext?.cardId || undefined}
+                            onSelectCard={kanbanSelectionContext ? handleSelectKanbanCardForDeepWork : undefined}
+                        />
+                    </div>
                 </DialogContent>
             </Dialog>
             <Dialog open={isChartModalOpen} onOpenChange={setIsChartModalOpen}>

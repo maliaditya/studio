@@ -1,19 +1,18 @@
 "use client";
 
-import React, { useMemo, useState } from 'react';
-import { AuthGuard } from '@/components/AuthGuard';
-import { useAuth } from '@/contexts/AuthContext';
-import type { MeansEntry, MeansPillar, MeansStatus } from '@/types/workout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Coins, BrainCircuit, Wrench, Plus, Pencil, Trash2, Link2, Layers3, Bug, Workflow, Target } from 'lucide-react';
+import React, { useMemo, useState } from "react";
+import { AuthGuard } from "@/components/AuthGuard";
+import { useAuth } from "@/contexts/AuthContext";
+import type { CoreDomainId, MeansPillar, MeansStatus, MindsetPoint } from "@/types/workout";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Blocks, BrainCircuit, Compass, Coins, HandHeart, HeartPulse, Palette, Pencil, Plus, Sparkles, Trash2, Users, Wallet, Wrench } from "lucide-react";
 
 const PILLAR_META: Record<
   MeansPillar,
@@ -25,266 +24,325 @@ const PILLAR_META: Record<
   }
 > = {
   money: {
-    label: 'Money',
-    description: 'Resources that make execution possible.',
+    label: "Money",
+    description: "Resources required to unblock execution.",
     icon: Coins,
-    categories: ['Income', 'Assets', 'Capital', 'Investments', 'Cash flow'],
+    categories: ["Income", "Assets", "Capital", "Investments", "Cash flow"],
   },
   method: {
-    label: 'Method',
-    description: 'Process, strategy, workflow, and tools.',
+    label: "Method",
+    description: "Knowledge, workflow, strategy, and tools.",
     icon: Wrench,
-    categories: ['Knowledge', 'Algorithms', 'Workflow', 'Strategy', 'Tools'],
+    categories: ["Knowledge", "Algorithms", "Workflow", "Strategy", "Tools"],
   },
   ability: {
-    label: 'Ability',
-    description: 'Capability to execute under constraints.',
+    label: "Ability",
+    description: "Skill, capacity, and consistency under constraints.",
     icon: BrainCircuit,
-    categories: ['Skill', 'Experience', 'Problem solving', 'Discipline', 'Cognitive ability'],
+    categories: ["Skill", "Experience", "Problem solving", "Discipline", "Cognitive ability"],
   },
 };
 
 const STATUS_META: Record<MeansStatus, { label: string; className: string }> = {
-  missing: { label: 'Missing', className: 'bg-rose-500/10 text-rose-300 border-rose-500/30' },
-  building: { label: 'Building', className: 'bg-amber-500/10 text-amber-300 border-amber-500/30' },
-  ready: { label: 'Ready', className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30' },
+  missing: { label: "Missing", className: "bg-rose-500/10 text-rose-300 border-rose-500/30" },
+  building: { label: "Building", className: "bg-amber-500/10 text-amber-300 border-amber-500/30" },
+  ready: { label: "Ready", className: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30" },
 };
 
+const CORE_META: Array<{
+  id: CoreDomainId;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { id: "health", label: "Health", icon: HeartPulse },
+  { id: "wealth", label: "Wealth", icon: Wallet },
+  { id: "relations", label: "Relations", icon: Users },
+  { id: "meaning", label: "Meaning", icon: Compass },
+  { id: "competence", label: "Competence", icon: Wrench },
+  { id: "autonomy", label: "Autonomy", icon: Blocks },
+  { id: "creativity", label: "Creativity", icon: Palette },
+  { id: "contribution", label: "Contribution", icon: HandHeart },
+  { id: "transcendence", label: "Transcendence", icon: Sparkles },
+];
+
+const CORE_LABEL_BY_ID = CORE_META.reduce(
+  (acc, item) => {
+    acc[item.id] = item.label;
+    return acc;
+  },
+  {} as Record<CoreDomainId, string>
+);
+
+const BOTHERING_SOURCES = [
+  { cardId: "mindset_botherings_external", type: "External", fallbackCoreId: "health" as CoreDomainId },
+  { cardId: "mindset_botherings_mismatch", type: "Mismatch", fallbackCoreId: "meaning" as CoreDomainId },
+  { cardId: "mindset_botherings_constraint", type: "Constraint", fallbackCoreId: "wealth" as CoreDomainId },
+] as const;
+
 type MeansDraft = {
-  id?: string;
+  botheringId: string;
   pillar: MeansPillar;
   category: string;
-  title: string;
   status: MeansStatus;
   notes: string;
-  linkedProjectIds: string[];
+};
+
+type BotheringRow = {
+  id: string;
+  cardId: string;
+  type: "External" | "Mismatch" | "Constraint";
+  point: MindsetPoint;
+  coreId: CoreDomainId;
+  taskCount: number;
 };
 
 function MeansPageContent() {
-  const { settings, setSettings, projects, offerizationPlans, coreSkills, deepWorkDefinitions, kanbanBoards } = useAuth();
-  const entries = settings.means?.entries || [];
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('all');
+  const { mindsetCards, settings, setMindsetCards } = useAuth();
+  const [selectedCoreId, setSelectedCoreId] = useState<CoreDomainId | "all">("all");
+  const [selectedType, setSelectedType] = useState<"all" | "External" | "Mismatch" | "Constraint">("all");
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [draft, setDraft] = useState<MeansDraft>({
-    pillar: 'money',
+    botheringId: "",
+    pillar: "money",
     category: PILLAR_META.money.categories[0],
-    title: '',
-    status: 'building',
-    notes: '',
-    linkedProjectIds: [],
+    status: "missing",
+    notes: "",
   });
 
-  const specializationNames = useMemo(
-    () =>
-      new Map(coreSkills.filter((skill) => skill.type === 'Specialization').map((skill) => [skill.id, skill.name])),
-    [coreSkills]
-  );
+  const mismatchPointById = useMemo(() => {
+    const mismatchPoints = mindsetCards.find((card) => card.id === "mindset_botherings_mismatch")?.points || [];
+    return new Map(mismatchPoints.map((point) => [point.id, point] as const));
+  }, [mindsetCards]);
 
-  const releaseLinksByProject = useMemo(() => {
-    const next = new Map<string, Array<{ specializationId: string; specializationName: string; releaseId: string }>>();
-    Object.entries(offerizationPlans || {}).forEach(([specializationId, plan]) => {
-      (plan.releases || []).forEach((release) => {
-        const project = projects.find((candidate) => candidate.name === release.name);
-        if (!project) return;
-        const existing = next.get(project.id) || [];
-        existing.push({
-          specializationId,
-          specializationName: specializationNames.get(specializationId) || 'Unknown specialization',
-          releaseId: release.id,
+  const allBotherings = useMemo<BotheringRow[]>(() => {
+    return BOTHERING_SOURCES.flatMap(({ cardId, type, fallbackCoreId }) => {
+      const card = mindsetCards.find((item) => item.id === cardId);
+      if (!card) return [];
+
+      return (card.points || [])
+        .filter((point) => !point.completed)
+        .map((point) => {
+          const directTasks = point.tasks || [];
+          const mergedTasks = [...directTasks];
+
+          if (type === "Constraint") {
+            const seen = new Set(mergedTasks.map((task) => task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`));
+            (point.linkedMismatchIds || []).forEach((mismatchId) => {
+              const mismatchPoint = mismatchPointById.get(mismatchId);
+              mismatchPoint?.tasks?.forEach((task) => {
+                const key = task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`;
+                if (seen.has(key)) return;
+                seen.add(key);
+                mergedTasks.push(task);
+              });
+            });
+          }
+
+          return {
+            id: point.id,
+            cardId,
+            type,
+            point,
+            coreId: point.coreDomainId || settings.coreStateManualOverrides?.[point.id] || fallbackCoreId,
+            taskCount: mergedTasks.length,
+          };
         });
-        next.set(project.id, existing);
-      });
     });
-    return next;
-  }, [offerizationPlans, projects, specializationNames]);
+  }, [mindsetCards, mismatchPointById, settings.coreStateManualOverrides]);
 
-  const boardStatsByProject = useMemo(() => {
-    const next = new Map<string, { cards: number; openBugs: number }>();
-    kanbanBoards.forEach((board) => {
-      const projectId = board.projectId || projects.find((project) => project.name === board.name)?.id;
-      if (!projectId) return;
-      const current = next.get(projectId) || { cards: 0, openBugs: 0 };
-      current.cards += (board.cards || []).filter((card) => !card.archived).length;
-      current.openBugs += (board.cards || []).filter((card) => card.cardKind === 'bug' && !card.archived).length;
-      next.set(projectId, current);
+  const filteredBotherings = useMemo(() => {
+    return allBotherings.filter((item) => {
+      if (selectedCoreId !== "all" && item.coreId !== selectedCoreId) return false;
+      if (selectedType !== "all" && item.type !== selectedType) return false;
+      return true;
     });
-    return next;
-  }, [kanbanBoards, projects]);
+  }, [allBotherings, selectedCoreId, selectedType]);
 
-  const intentionStatsByProject = useMemo(() => {
-    const next = new Map<string, { total: number; completed: number }>();
-    deepWorkDefinitions.forEach((definition) => {
-      const linkedIds = new Set<string>([
-        ...(definition.primaryProjectId ? [definition.primaryProjectId] : []),
-        ...(definition.linkedProjectIds || []),
-      ]);
-      linkedIds.forEach((projectId) => {
-        const current = next.get(projectId) || { total: 0, completed: 0 };
-        current.total += 1;
-        if (definition.completed) current.completed += 1;
-        next.set(projectId, current);
-      });
-    });
-    return next;
-  }, [deepWorkDefinitions]);
+  const botheringOptions = filteredBotherings.length > 0 ? filteredBotherings : allBotherings;
 
-  const filteredEntries = useMemo(() => {
-    if (selectedProjectId === 'all') return entries;
-    return entries.filter((entry) => (entry.linkedProjectIds || []).includes(selectedProjectId));
-  }, [entries, selectedProjectId]);
+  const selectedCoreMeta = useMemo(
+    () => CORE_META.find((item) => item.id === selectedCoreId) || null,
+    [selectedCoreId]
+  );
 
   const summary = useMemo(() => {
     return (Object.keys(PILLAR_META) as MeansPillar[]).map((pillar) => {
-      const pillarEntries = filteredEntries.filter((entry) => entry.pillar === pillar);
+      const ready = filteredBotherings.filter((item) => item.point.means?.[pillar]?.status === "ready").length;
+      const building = filteredBotherings.filter((item) => item.point.means?.[pillar]?.status === "building").length;
+      const total = filteredBotherings.length;
       return {
         pillar,
-        total: pillarEntries.length,
-        ready: pillarEntries.filter((entry) => entry.status === 'ready').length,
-        building: pillarEntries.filter((entry) => entry.status === 'building').length,
-        missing: pillarEntries.filter((entry) => entry.status === 'missing').length,
+        total,
+        ready,
+        building,
+        missing: Math.max(0, total - ready - building),
       };
     });
-  }, [filteredEntries]);
+  }, [filteredBotherings]);
 
-  const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedProjectId) || null,
-    [projects, selectedProjectId]
-  );
+  const selectedCoreCoverage = useMemo(() => {
+    if (!selectedCoreMeta) return null;
 
-  const selectedProjectCoverage = useMemo(() => {
-    if (!selectedProject) return null;
-    const linkedEntries = entries.filter((entry) => (entry.linkedProjectIds || []).includes(selectedProject.id));
-    const byPillar = (Object.keys(PILLAR_META) as MeansPillar[]).map((pillar) => ({
-      pillar,
-      count: linkedEntries.filter((entry) => entry.pillar === pillar).length,
-      ready: linkedEntries.filter((entry) => entry.pillar === pillar && entry.status === 'ready').length,
-    }));
+    const botherings = allBotherings.filter((item) => item.coreId === selectedCoreMeta.id);
+    const totalTasks = botherings.reduce((sum, item) => sum + item.taskCount, 0);
 
     return {
-      plannerLinks: releaseLinksByProject.get(selectedProject.id) || [],
-      boardStats: boardStatsByProject.get(selectedProject.id) || { cards: 0, openBugs: 0 },
-      intentions: intentionStatsByProject.get(selectedProject.id) || { total: 0, completed: 0 },
-      byPillar,
-      linkedEntries,
+      botherings: botherings.length,
+      totalTasks,
+      byPillar: (Object.keys(PILLAR_META) as MeansPillar[]).map((pillar) => {
+        const ready = botherings.filter((item) => item.point.means?.[pillar]?.status === "ready").length;
+        const building = botherings.filter((item) => item.point.means?.[pillar]?.status === "building").length;
+        const total = botherings.length;
+        return {
+          pillar,
+          ready,
+          building,
+          missing: Math.max(0, total - ready - building),
+        };
+      }),
     };
-  }, [selectedProject, entries, releaseLinksByProject, boardStatsByProject, intentionStatsByProject]);
+  }, [allBotherings, selectedCoreMeta]);
 
   const openCreate = (pillar: MeansPillar) => {
+    const defaultBotheringId = botheringOptions[0]?.id || "";
     setDraft({
+      botheringId: defaultBotheringId,
       pillar,
       category: PILLAR_META[pillar].categories[0],
-      title: '',
-      status: 'building',
-      notes: '',
-      linkedProjectIds: selectedProjectId !== 'all' ? [selectedProjectId] : [],
+      status: "missing",
+      notes: "",
     });
     setIsEditorOpen(true);
   };
 
-  const openEdit = (entry: MeansEntry) => {
+  const openEdit = (bothering: BotheringRow, pillar: MeansPillar) => {
+    const current = bothering.point.means?.[pillar];
     setDraft({
-      id: entry.id,
-      pillar: entry.pillar,
-      category: entry.category,
-      title: entry.title,
-      status: entry.status,
-      notes: entry.notes || '',
-      linkedProjectIds: [...(entry.linkedProjectIds || [])],
+      botheringId: bothering.id,
+      pillar,
+      category: current?.category || PILLAR_META[pillar].categories[0],
+      status: current?.status || "missing",
+      notes: current?.notes || "",
+    });
+    setIsEditorOpen(true);
+  };
+
+  const openCreateForBothering = (bothering: BotheringRow, pillar: MeansPillar) => {
+    setDraft({
+      botheringId: bothering.id,
+      pillar,
+      category: PILLAR_META[pillar].categories[0],
+      status: "missing",
+      notes: "",
     });
     setIsEditorOpen(true);
   };
 
   const saveEntry = () => {
-    if (!draft.title.trim()) return;
-    const nextEntry: MeansEntry = {
-      id: draft.id || `means-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      pillar: draft.pillar,
-      category: draft.category,
-      title: draft.title.trim(),
-      status: draft.status,
-      notes: draft.notes.trim(),
-      linkedProjectIds: draft.linkedProjectIds,
-    };
-    setSettings((prev) => {
-      const currentEntries = prev.means?.entries || [];
-      const nextEntries = draft.id
-        ? currentEntries.map((entry) => (entry.id === draft.id ? nextEntry : entry))
-        : [...currentEntries, nextEntry];
-      return {
-        ...prev,
-        means: {
-          entries: nextEntries,
-        },
-      };
-    });
+    if (!draft.botheringId) return;
+
+    setMindsetCards((prev) =>
+      prev.map((card) => {
+        if (!card.id.startsWith("mindset_botherings_")) return card;
+        return {
+          ...card,
+          points: card.points.map((point) => {
+            if (point.id !== draft.botheringId) return point;
+            return {
+              ...point,
+              means: {
+                ...(point.means || {}),
+                [draft.pillar]: {
+                  status: draft.status,
+                  category: draft.category,
+                  notes: draft.notes.trim(),
+                },
+              },
+            };
+          }),
+        };
+      })
+    );
+
     setIsEditorOpen(false);
   };
 
-  const deleteEntry = (entryId: string) => {
-    setSettings((prev) => ({
-      ...prev,
-      means: {
-        entries: (prev.means?.entries || []).filter((entry) => entry.id !== entryId),
-      },
-    }));
+  const deleteEntry = (botheringId: string, pillar: MeansPillar) => {
+    setMindsetCards((prev) =>
+      prev.map((card) => {
+        if (!card.id.startsWith("mindset_botherings_")) return card;
+        return {
+          ...card,
+          points: card.points.map((point) => {
+            if (point.id !== botheringId || !point.means?.[pillar]) return point;
+            const nextMeans = { ...(point.means || {}) };
+            delete nextMeans[pillar];
+            return {
+              ...point,
+              means: Object.keys(nextMeans).length > 0 ? nextMeans : undefined,
+            };
+          }),
+        };
+      })
+    );
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] w-full px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8 2xl:px-10">
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <div className="h-[calc(100vh-4rem)] w-full px-3 py-3 sm:px-4 sm:py-4 lg:px-6 lg:py-5 2xl:px-8">
+      <div className="space-y-4">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Means</h1>
-            <p className="text-sm text-muted-foreground">
-              Every task demands Money, Method, and Ability. This page tracks those execution prerequisites against your projects.
+            <h1 className="text-2xl font-bold tracking-tight">Means</h1>
+            <p className="text-xs text-muted-foreground sm:text-sm">
+              Every bothering demands Money, Method, and Ability. This page tracks those execution prerequisites and rolls them up per core state.
             </p>
           </div>
-          <div className="w-full max-w-sm">
-            <Label className="mb-2 block text-xs uppercase tracking-[0.24em] text-muted-foreground">Project Lens</Label>
+          <div className="w-full max-w-xs">
+            <Label className="mb-2 block text-xs uppercase tracking-[0.24em] text-muted-foreground">Core State Lens</Label>
             <select
-              value={selectedProjectId}
-              onChange={(event) => setSelectedProjectId(event.target.value)}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+              value={selectedCoreId}
+              onChange={(event) => setSelectedCoreId(event.target.value as CoreDomainId | "all")}
+              className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
             >
-              <option value="all">All projects</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name}
+              <option value="all">All core states</option>
+              {CORE_META.map((core) => (
+                <option key={core.id} value={core.id}>
+                  {core.label}
                 </option>
               ))}
             </select>
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-3">
           {summary.map(({ pillar, total, ready, building, missing }) => {
             const meta = PILLAR_META[pillar];
             const Icon = meta.icon;
             return (
               <Card key={pillar} className="border-border/60 bg-card/70">
-                <CardHeader className="pb-3">
+                <CardHeader className="pb-2 pt-4">
                   <div className="flex items-center gap-2">
-                    <Icon className="h-5 w-5 text-primary" />
-                    <CardTitle className="text-xl">{meta.label}</CardTitle>
+                    <Icon className="h-4 w-4 text-primary" />
+                    <CardTitle className="text-base">{meta.label}</CardTitle>
                   </div>
-                  <CardDescription>{meta.description}</CardDescription>
+                  <CardDescription className="text-xs">{meta.description}</CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-4 gap-3 text-sm">
+                <CardContent className="grid grid-cols-4 gap-2 pt-0 text-xs sm:text-sm">
                   <div>
-                    <div className="text-muted-foreground">Total</div>
-                    <div className="text-2xl font-semibold">{total}</div>
+                    <div className="text-muted-foreground">Bothers</div>
+                    <div className="text-lg font-semibold sm:text-xl">{total}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground">Ready</div>
-                    <div className="text-2xl font-semibold text-emerald-400">{ready}</div>
+                    <div className="text-lg font-semibold text-emerald-400 sm:text-xl">{ready}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground">Building</div>
-                    <div className="text-2xl font-semibold text-amber-400">{building}</div>
+                    <div className="text-lg font-semibold text-amber-400 sm:text-xl">{building}</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground">Missing</div>
-                    <div className="text-2xl font-semibold text-rose-400">{missing}</div>
+                    <div className="text-lg font-semibold text-rose-400 sm:text-xl">{missing}</div>
                   </div>
                 </CardContent>
               </Card>
@@ -292,48 +350,26 @@ function MeansPageContent() {
           })}
         </div>
 
-        {selectedProject && selectedProjectCoverage ? (
+        {selectedCoreMeta && selectedCoreCoverage ? (
           <Card className="border-border/60 bg-card/70">
-            <CardHeader>
+            <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
-                {selectedProject.name}
+                <selectedCoreMeta.icon className="h-4 w-4 text-primary" />
+                {selectedCoreMeta.label}
               </CardTitle>
-              <CardDescription>
-                Coverage view for the currently selected project.
-              </CardDescription>
+              <CardDescription className="text-xs">Means rollup for botherings linked to this core state.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 xl:grid-cols-[1.2fr_1fr_1fr_1fr]">
-              <div className="space-y-3 rounded-xl border border-border/60 bg-background/30 p-4">
-                <div className="text-xs uppercase tracking-[0.24em] text-muted-foreground">Planner Links</div>
-                {selectedProjectCoverage.plannerLinks.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {selectedProjectCoverage.plannerLinks.map((link) => (
-                      <Badge key={`${link.specializationId}-${link.releaseId}`} variant="outline">
-                        {link.specializationName}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-sm text-muted-foreground">No specialization project planner link.</div>
-                )}
+            <CardContent className="grid gap-3 pt-0 xl:grid-cols-[0.8fr_1.2fr]">
+              <div className="space-y-1 rounded-xl border border-border/60 bg-background/30 p-3">
+                <div className="text-xs text-muted-foreground">Active botherings: <span className="text-foreground">{selectedCoreCoverage.botherings}</span></div>
+                <div className="text-xs text-muted-foreground">Linked tasks: <span className="text-foreground">{selectedCoreCoverage.totalTasks}</span></div>
               </div>
-              <div className="space-y-2 rounded-xl border border-border/60 bg-background/30 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium"><Workflow className="h-4 w-4 text-primary" />Kanban</div>
-                <div className="text-sm text-muted-foreground">Cards: <span className="text-foreground">{selectedProjectCoverage.boardStats.cards}</span></div>
-                <div className="text-sm text-muted-foreground">Open bugs: <span className="text-foreground">{selectedProjectCoverage.boardStats.openBugs}</span></div>
-              </div>
-              <div className="space-y-2 rounded-xl border border-border/60 bg-background/30 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium"><Layers3 className="h-4 w-4 text-primary" />Deep Work</div>
-                <div className="text-sm text-muted-foreground">Intentions: <span className="text-foreground">{selectedProjectCoverage.intentions.total}</span></div>
-                <div className="text-sm text-muted-foreground">Completed: <span className="text-foreground">{selectedProjectCoverage.intentions.completed}</span></div>
-              </div>
-              <div className="space-y-2 rounded-xl border border-border/60 bg-background/30 p-4">
-                <div className="flex items-center gap-2 text-sm font-medium"><Link2 className="h-4 w-4 text-primary" />Means Coverage</div>
-                {selectedProjectCoverage.byPillar.map((item) => (
-                  <div key={item.pillar} className="flex items-center justify-between text-sm">
+              <div className="space-y-1 rounded-xl border border-border/60 bg-background/30 p-3">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Coverage</div>
+                {selectedCoreCoverage.byPillar.map((item) => (
+                  <div key={item.pillar} className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">{PILLAR_META[item.pillar].label}</span>
-                    <span className="text-foreground">{item.ready}/{item.count}</span>
+                    <span className="text-foreground">{item.ready} ready • {item.building} building • {item.missing} missing</span>
                   </div>
                 ))}
               </div>
@@ -341,88 +377,127 @@ function MeansPageContent() {
           </Card>
         ) : null}
 
-        <div className="grid gap-4 xl:grid-cols-3">
-          {(Object.keys(PILLAR_META) as MeansPillar[]).map((pillar) => {
-            const meta = PILLAR_META[pillar];
-            const Icon = meta.icon;
-            const pillarEntries = filteredEntries.filter((entry) => entry.pillar === pillar);
-
-            return (
-              <Card key={pillar} className="border-border/60 bg-card/70">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-5 w-5 text-primary" />
-                      <CardTitle>{meta.label}</CardTitle>
-                    </div>
-                    <Button size="sm" onClick={() => openCreate(pillar)}>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add
-                    </Button>
-                  </div>
-                  <CardDescription>{meta.categories.join(' • ')}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {pillarEntries.length > 0 ? (
-                    pillarEntries.map((entry) => (
-                      <div key={entry.id} className="rounded-xl border border-border/60 bg-background/35 p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-base font-semibold">{entry.title}</div>
-                            <div className="mt-1 flex flex-wrap gap-2">
-                              <Badge variant="outline">{entry.category}</Badge>
-                              <Badge variant="outline" className={STATUS_META[entry.status].className}>
-                                {STATUS_META[entry.status].label}
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openEdit(entry)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => deleteEntry(entry.id)}>
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+        {allBotherings.length === 0 ? (
+          <Card className="border-border/60 bg-card/70">
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">
+              No active botherings yet. Add botherings first, then define their Money, Method, and Ability.
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-border/60 bg-card/70">
+            <CardHeader className="pb-2 pt-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base">Botherings</CardTitle>
+                  <CardDescription className="text-xs">Each bothering carries its own Money, Method, and Ability.</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <Tabs value={selectedType} onValueChange={(value) => setSelectedType(value as typeof selectedType)} className="mb-3">
+                <TabsList className="h-8">
+                  <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
+                  <TabsTrigger value="External" className="text-xs">External</TabsTrigger>
+                  <TabsTrigger value="Mismatch" className="text-xs">Mismatch</TabsTrigger>
+                  <TabsTrigger value="Constraint" className="text-xs">Constraint</TabsTrigger>
+                </TabsList>
+              </Tabs>
+              {filteredBotherings.length > 0 ? (
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {filteredBotherings.map((bothering) => (
+                    <div key={bothering.id} className="rounded-lg border border-border/60 bg-background/35 p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="line-clamp-2 text-sm font-semibold">{bothering.point.text}</div>
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">{CORE_LABEL_BY_ID[bothering.coreId]}</Badge>
+                            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">{bothering.type}</Badge>
+                            <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">{bothering.taskCount} task{bothering.taskCount === 1 ? "" : "s"}</Badge>
                           </div>
                         </div>
-                        {entry.notes ? (
-                          <p className="mt-3 text-sm text-muted-foreground">{entry.notes}</p>
-                        ) : null}
-                        {(entry.linkedProjectIds || []).length > 0 ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {(entry.linkedProjectIds || [])
-                              .map((projectId) => projects.find((project) => project.id === projectId)?.name)
-                              .filter((name): name is string => !!name)
-                              .map((name) => (
-                                <Badge key={`${entry.id}-${name}`} variant="secondary">{name}</Badge>
-                              ))}
-                          </div>
-                        ) : (
-                          <div className="mt-3 text-xs text-muted-foreground">Not linked to a specific project.</div>
-                        )}
                       </div>
-                    ))
-                  ) : (
-                    <div className="rounded-xl border border-dashed border-border/60 px-4 py-10 text-center text-sm text-muted-foreground">
-                      No {meta.label.toLowerCase()} entries yet.
+
+                      <div className="mt-3 space-y-2">
+                        {(Object.keys(PILLAR_META) as MeansPillar[]).map((pillar) => {
+                          const meta = PILLAR_META[pillar];
+                          const Icon = meta.icon;
+                          const entry = bothering.point.means?.[pillar];
+                          const status = entry?.status || "missing";
+
+                          return (
+                            <div key={`${bothering.id}-${pillar}`} className="rounded-md border border-border/60 bg-background/40 p-2.5">
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <Icon className="h-3.5 w-3.5 text-primary" />
+                                    <div className="text-xs font-medium">{meta.label}</div>
+                                  </div>
+                                  <div className="mt-1 flex flex-wrap gap-1">
+                                    <Badge variant="outline" className={`px-1.5 py-0 text-[10px] ${STATUS_META[status].className}`}>
+                                      {STATUS_META[status].label}
+                                    </Badge>
+                                    {entry?.category ? <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">{entry.category}</Badge> : null}
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-0.5">
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(bothering, pillar)}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                  </Button>
+                                  {entry ? (
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => deleteEntry(bothering.id, pillar)}>
+                                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                                    </Button>
+                                  ) : (
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openCreateForBothering(bothering, pillar)}>
+                                      <Plus className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                              {entry?.notes ? (
+                                <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{entry.notes}</p>
+                              ) : (
+                                <p className="mt-2 text-xs text-muted-foreground">No {meta.label.toLowerCase()} detail set yet.</p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-lg border border-dashed border-border/60 px-4 py-8 text-center text-sm text-muted-foreground">
+                  No botherings in this core state yet.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{draft.id ? 'Edit Means Entry' : 'Add Means Entry'}</DialogTitle>
+            <DialogTitle>Set Means</DialogTitle>
             <DialogDescription>
-              Capture the prerequisite needed to execute a project or class of tasks.
+              Attach Money, Method, or Ability status directly to a bothering. Core state rollups update automatically.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-2 sm:grid-cols-2">
+            <div className="space-y-2 sm:col-span-2">
+              <Label>Bothering</Label>
+              <Select value={draft.botheringId} onValueChange={(value) => setDraft((prev) => ({ ...prev, botheringId: value }))}>
+                <SelectTrigger><SelectValue placeholder="Select bothering" /></SelectTrigger>
+                <SelectContent>
+                  {botheringOptions.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.point.text} • {CORE_LABEL_BY_ID[item.coreId]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               <Label>Pillar</Label>
               <Select
@@ -456,14 +531,6 @@ function MeansPageContent() {
               </Select>
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label>Title</Label>
-              <Input value={draft.title} onChange={(event) => setDraft((prev) => ({ ...prev, title: event.target.value }))} placeholder="e.g. Stable monthly runway for LifeOS launch" />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label>Notes</Label>
-              <Textarea value={draft.notes} onChange={(event) => setDraft((prev) => ({ ...prev, notes: event.target.value }))} placeholder="What exactly is missing or ready here?" />
-            </div>
-            <div className="space-y-2 sm:col-span-2">
               <Label>Status</Label>
               <Select value={draft.status} onValueChange={(value) => setDraft((prev) => ({ ...prev, status: value as MeansStatus }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
@@ -475,33 +542,17 @@ function MeansPageContent() {
               </Select>
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label>Linked Projects</Label>
-              <div className="max-h-52 space-y-2 overflow-y-auto rounded-xl border border-border/60 p-3">
-                {projects.map((project) => {
-                  const checked = draft.linkedProjectIds.includes(project.id);
-                  return (
-                    <label key={project.id} className="flex items-start gap-2 rounded-md px-1 py-1 text-sm">
-                      <Checkbox
-                        checked={checked}
-                        onCheckedChange={(value) =>
-                          setDraft((prev) => ({
-                            ...prev,
-                            linkedProjectIds: value
-                              ? [...prev.linkedProjectIds, project.id]
-                              : prev.linkedProjectIds.filter((id) => id !== project.id),
-                          }))
-                        }
-                      />
-                      <span>{project.name}</span>
-                    </label>
-                  );
-                })}
-              </div>
+              <Label>Notes</Label>
+              <Textarea
+                value={draft.notes}
+                onChange={(event) => setDraft((prev) => ({ ...prev, notes: event.target.value }))}
+                placeholder="What is missing, already working, or currently being built?"
+              />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditorOpen(false)}>Cancel</Button>
-            <Button onClick={saveEntry}>Save Entry</Button>
+            <Button onClick={saveEntry} disabled={!draft.botheringId}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -193,7 +193,6 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
         { href: '/kanban', label: 'Kanban' },
         { href: '/means', label: 'Means' },
         { href: '/strategic-planning', label: 'Strategy' },
-        { href: '/support', label: 'Support' },
         { href: '/graph', label: 'Graph', icon: Workflow },
         ...(isAdminUser ? [{ href: '/admin/monetization', label: 'Admin' }] : []),
       ];
@@ -230,6 +229,7 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
           <DropdownMenuItem asChild><Link href="/deep-work">Deep Work</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/personal-branding">Branding</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/lead-generation">Lead Gen</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/support">Support</Link></DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild><Link href="/gamified-skills">Gamified Skills</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/formalization">Formalization</Link></DropdownMenuItem>
@@ -1602,6 +1602,13 @@ export function Header() {
   const [isHabitDashboardOpen, setIsHabitDashboardOpen] = useState(false);
   const [isStateDiagramOpen, setIsStateDiagramOpen] = useState(false);
   const [isLearningPerformanceOpen, setIsLearningPerformanceOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const openStateDiagram = () => setIsStateDiagramOpen(true);
+    window.addEventListener('open-state-diagram', openStateDiagram);
+    return () => window.removeEventListener('open-state-diagram', openStateDiagram);
+  }, []);
   const [habitDashboardMonth, setHabitDashboardMonth] = useState(startOfMonth(new Date()));
   const isMobile = useIsMobile();
   const simpleMode = settings.ispSimpleMode ?? true;

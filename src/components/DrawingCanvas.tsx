@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush, Plus, Library, ArrowUpRight, Copy, Edit3, Sparkles, Loader2, Volume2, VolumeX, RefreshCw } from 'lucide-react';
@@ -206,21 +207,33 @@ export const SearchPopup = React.memo(({ open, setOpen, onSelect, title }: { ope
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        zIndex: 130,
+        zIndex: 220,
     };
 
     if (!open) return null;
 
-    return (
+    const popup = (
         <div style={style}>
              <Card className="w-[512px] shadow-2xl border-2 bg-popover">
-                <CardHeader className="p-3 border-b">
+                <CardHeader className="flex flex-row items-center justify-between gap-3 p-3 border-b">
                     <CardTitle className="text-base">{title}</CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => setOpen(false)}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                 </CardHeader>
                 <SearchContent onSelect={onSelect} />
             </Card>
         </div>
     );
+
+    if (typeof document === 'undefined') return popup;
+
+    return createPortal(popup, document.body);
 });
 SearchPopup.displayName = 'SearchPopup';
 
@@ -493,18 +506,18 @@ const ResourceSearchContent = React.memo(({ onSelect }: { onSelect: (resource: R
 });
 ResourceSearchContent.displayName = 'ResourceSearchContent';
 
-const ResourceSearchPopup = React.memo(({ open, setOpen, onSelect, title }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource) => void, title: string }) => {
+export const ResourceSearchPopup = React.memo(({ open, setOpen, onSelect, title }: { open: boolean, setOpen: (open: boolean) => void, onSelect: (resource: Resource) => void, title: string }) => {
   const style: React.CSSProperties = {
-      position: 'fixed',
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-      zIndex: 130,
+    position: 'fixed',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    zIndex: 220,
   };
 
   if (!open) return null;
 
-  return (
+  const popup = (
       <div style={style}>
            <Card className="w-[512px] shadow-2xl border-2 bg-popover">
               <CardHeader className="p-3 border-b">
@@ -514,6 +527,10 @@ const ResourceSearchPopup = React.memo(({ open, setOpen, onSelect, title }: { op
           </Card>
       </div>
   );
+
+  if (typeof document === 'undefined') return popup;
+
+  return createPortal(popup, document.body);
 });
 ResourceSearchPopup.displayName = 'ResourceSearchPopup';
 
@@ -552,12 +569,12 @@ const SubCanvasListPopup = React.memo(({ open, setOpen, resource, onSelect }: { 
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    zIndex: 130,
+    zIndex: 220,
   };
 
   if (!open) return null;
 
-  return (
+  const popup = (
     <div style={style}>
       <Card className="w-[512px] shadow-2xl border-2 bg-popover">
         <CardHeader className="p-3 border-b">
@@ -567,6 +584,10 @@ const SubCanvasListPopup = React.memo(({ open, setOpen, resource, onSelect }: { 
       </Card>
     </div>
   );
+
+  if (typeof document === 'undefined') return popup;
+
+  return createPortal(popup, document.body);
 });
 SubCanvasListPopup.displayName = 'SubCanvasListPopup';
 

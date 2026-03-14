@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical, Upload, LineChart as LineChartIcon, Download, ClipboardList, Sparkles, Loader2 } from 'lucide-react';
+import { PlusCircle, Trash2, Edit, Save, X, BrainCircuit, Blocks, Sprout, Briefcase, Plus, Building, Unlink, BookCopy, Folder, GitMerge, Workflow, Lightbulb, Flashlight, Frame, Activity, ArrowLeft, Bolt, Flag, Focus, GripVertical, Upload, LineChart as LineChartIcon, Download, ClipboardList, Sparkles, Loader2, Link2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { AuthGuard } from '@/components/AuthGuard';
 import type { SkillDomain, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, Project, Feature, Company, Position, WorkProject, ActivityType, DailySchedule, ProjectSkillLink, Resource, ResourceFolder } from '@/types/workout';
@@ -42,6 +42,7 @@ import { DeepWorkPageContent } from '@/app/deep-work/page';
 import { getAiConfigFromSettings, normalizeAiSettings } from '@/lib/ai/config';
 import { getPdfForResource } from '@/lib/audioDB';
 import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
+import { ResourceSearchPopup } from '@/components/DrawingCanvas';
 
 if (typeof window !== "undefined" && (pdfjs as any).GlobalWorkerOptions) {
   (pdfjs as any).GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${(pdfjs as any).version}/build/pdf.worker.min.mjs`;
@@ -84,7 +85,9 @@ const SpecializationItem: React.FC<{
   totalEst: number;
   totalLogged: number;
   onDownload: (skillId: string) => void;
-}> = ({ spec, allSpecs, level = 0, selectedSkillId, onSelect, onAddSub, onEdit, onDelete, totalEst, totalLogged, onDownload }) => {
+  linkedResourceCount: number;
+  onLinkResource: (skill: CoreSkill) => void;
+}> = ({ spec, allSpecs, level = 0, selectedSkillId, onSelect, onAddSub, onEdit, onDelete, totalEst, totalLogged, onDownload, linkedResourceCount, onLinkResource }) => {
     const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: spec.id });
     const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 100 } : {};
     
@@ -101,7 +104,7 @@ const SpecializationItem: React.FC<{
     return (
         <div style={{ marginLeft: `${level * 20}px` }}>
             <Droppable id={spec.id} className="group rounded-lg border border-transparent hover:border-border/60 hover:bg-muted/40 transition-colors min-w-0">
-                <div ref={setNodeRef} style={style} className="grid grid-cols-[minmax(0,1fr)_112px] items-center p-2.5 min-w-0 gap-1">
+                <div ref={setNodeRef} style={style} className="grid grid-cols-[minmax(0,1fr)_136px] items-center p-2.5 min-w-0 gap-1">
                     <button className="flex items-start gap-2 min-w-0" onClick={() => onSelect(spec.id)}>
                         <span {...listeners} {...attributes} className="cursor-grab p-1 -ml-1">
                             <GripVertical className="h-4 w-4 text-muted-foreground" />
@@ -111,14 +114,24 @@ const SpecializationItem: React.FC<{
                             <span className={cn("text-sm block truncate", selectedSkillId === spec.id ? 'font-semibold text-primary' : 'text-foreground/90')} title={spec.name}>
                                 {spec.name}
                             </span>
-                            {totalEst > 0 && (
-                                <span className="text-[11px] text-muted-foreground block truncate">
-                                    {formatMinutes(totalEst)} est / {formatMinutes(totalLogged)} log
-                                </span>
-                            )}
+                            <div className="flex items-center gap-2 min-w-0">
+                                {totalEst > 0 && (
+                                    <span className="text-[11px] text-muted-foreground block truncate">
+                                        {formatMinutes(totalEst)} est / {formatMinutes(totalLogged)} log
+                                    </span>
+                                )}
+                                {linkedResourceCount > 0 && (
+                                    <span className="text-[11px] text-muted-foreground shrink-0">
+                                        {linkedResourceCount} card{linkedResourceCount === 1 ? '' : 's'}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </button>
-                    <div className={cn("flex items-center justify-end gap-0.5 w-[112px] shrink-0 transition-opacity", selectedSkillId === spec.id ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
+                    <div className={cn("flex items-center justify-end gap-0.5 w-[136px] shrink-0 transition-opacity", selectedSkillId === spec.id ? "opacity-100" : "opacity-0 group-hover:opacity-100")}>
+                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onLinkResource(spec)}>
+                            <Link2 className="h-3.5 w-3.5 text-violet-400" />
+                        </Button>
                         <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onDownload(spec.id)}>
                             <Download className="h-3.5 w-3.5 text-blue-500" />
                         </Button>
@@ -147,6 +160,8 @@ const SpecializationItem: React.FC<{
                                 totalEst={0}
                                 totalLogged={0}
                                 onDownload={onDownload}
+                                linkedResourceCount={child.linkedResourceIds?.length || 0}
+                                onLinkResource={onLinkResource}
                             />
                         )
                     })}
@@ -242,6 +257,7 @@ function SkillPageContent() {
 
   const [isDeepWorkModalOpen, setIsDeepWorkModalOpen] = useState(false);
   const [specializationFilter, setSpecializationFilter] = useState<'all' | 'linked'>('linked');
+  const [linkingResourcesForSpecialization, setLinkingResourcesForSpecialization] = useState<CoreSkill | null>(null);
   const [projectPlannerLinkSpecializationId, setProjectPlannerLinkSpecializationId] = useState<string>('');
   const [projectPlannerLinkTargetDate, setProjectPlannerLinkTargetDate] = useState<string>(new Date().toISOString().slice(0, 10));
   const [isGeneratingFromLinkedPdf, setIsGeneratingFromLinkedPdf] = useState(false);
@@ -1079,6 +1095,11 @@ function SkillPageContent() {
     if (!selectedCoreSkill.linkedPdfResourceId) return null;
     return pdfResources.find((resource) => resource.id === selectedCoreSkill.linkedPdfResourceId) || null;
   }, [selectedCoreSkill, pdfResources]);
+  const linkedSpecializationResources = useMemo(() => {
+    if (!selectedCoreSkill || selectedCoreSkill.type !== 'Specialization') return [] as Resource[];
+    const linkedIds = new Set(selectedCoreSkill.linkedResourceIds || []);
+    return resources.filter((resource) => linkedIds.has(resource.id));
+  }, [selectedCoreSkill, resources]);
 
   const coreSkillsInDomain = useMemo(() => {
     if (!selectedDomainId) return [];
@@ -1295,6 +1316,43 @@ function SkillPageContent() {
       title: "PDF Linked",
       description: linked ? `"${linked.name}" linked to ${selectedCoreSkill.name}.` : "PDF linked.",
     });
+  };
+
+  const handleOpenSpecializationResourceLinker = (skill: CoreSkill) => {
+    setLinkingResourcesForSpecialization(skill);
+  };
+
+  const handleLinkResourceToSpecialization = (resource: Resource) => {
+    if (!linkingResourcesForSpecialization) return;
+    const specialization = linkingResourcesForSpecialization;
+    setCoreSkills((prev) =>
+      prev.map((skill) => {
+        if (skill.id !== specialization.id) return skill;
+        const currentIds = new Set(skill.linkedResourceIds || []);
+        currentIds.add(resource.id);
+        return { ...skill, linkedResourceIds: Array.from(currentIds) };
+      })
+    );
+    setLinkingResourcesForSpecialization(null);
+    toast({
+      title: 'Resource Linked',
+      description: `"${resource.name}" linked to ${specialization.name}.`,
+    });
+  };
+
+  const handleUnlinkResourceFromSpecialization = (resourceId: string) => {
+    if (!selectedCoreSkill || selectedCoreSkill.type !== 'Specialization') return;
+    setCoreSkills((prev) =>
+      prev.map((skill) =>
+        skill.id === selectedCoreSkill.id
+          ? {
+              ...skill,
+              linkedResourceIds: (skill.linkedResourceIds || []).filter((id) => id !== resourceId),
+            }
+          : skill
+      )
+    );
+    toast({ title: 'Resource Unlinked', description: 'Removed linked resource card from this specialization.' });
   };
 
   const handleGenerateFromLinkedPdf = async () => {
@@ -1665,6 +1723,8 @@ function SkillPageContent() {
                                                         totalEst={totalEst}
                                                         totalLogged={totalLogged}
                                                         onDownload={handleDownloadSpecialization}
+                                                        linkedResourceCount={spec.linkedResourceIds?.length || 0}
+                                                        onLinkResource={handleOpenSpecializationResourceLinker}
                                                     />
                                                 );
                                             })}
@@ -1847,30 +1907,30 @@ function SkillPageContent() {
                                                 <Badge variant="outline">{skillAreaName}</Badge>
                                               </div>
                                             </CardHeader>
-                                            <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4">
+                                            <CardContent className="p-3 pt-0 grid grid-cols-1 gap-4 md:grid-cols-2">
                                               <div className="space-y-1">
-                                                  <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Flashlight className="h-3 w-3 text-amber-500" />Curiosities</h4>
-                                                  {curiosities.length > 0 ? (
-                                                    <ul className="space-y-1 text-xs">
-                                                      {curiosities.map(task => (
-                                                        <li key={task.id}>
-                                                          <button onClick={() => openIntentionPopup(task.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{task.name}</button>
-                                                        </li>
-                                                      ))}
-                                                    </ul>
-                                                  ) : <p className="text-muted-foreground text-xs italic">None</p>}
+                                                <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Flashlight className="h-3 w-3 text-amber-500" />Curiosities</h4>
+                                                {curiosities.length > 0 ? (
+                                                  <ul className="space-y-1 text-xs">
+                                                    {curiosities.map(task => (
+                                                      <li key={task.id}>
+                                                        <button onClick={() => openIntentionPopup(task.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{task.name}</button>
+                                                      </li>
+                                                    ))}
+                                                  </ul>
+                                                ) : <p className="text-muted-foreground text-xs italic">None</p>}
                                               </div>
                                               <div className="space-y-1">
-                                                  <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
-                                                   {intentions.length > 0 ? (
-                                                    <ul className="space-y-1 text-xs">
-                                                      {intentions.map(intention => (
-                                                        <li key={intention.id}>
-                                                          <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
-                                                        </li>
-                                                      ))}
-                                                    </ul>
-                                                  ) : <p className="text-muted-foreground text-xs italic">None</p>}
+                                                <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
+                                                {intentions.length > 0 ? (
+                                                  <ul className="space-y-1 text-xs">
+                                                    {intentions.map(task => (
+                                                      <li key={task.id}>
+                                                        <button onClick={() => openIntentionPopup(task.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{task.name}</button>
+                                                      </li>
+                                                    ))}
+                                                  </ul>
+                                                ) : <p className="text-muted-foreground text-xs italic">None</p>}
                                               </div>
                                             </CardContent>
                                         </Card>
@@ -1980,6 +2040,53 @@ function SkillPageContent() {
                                         </Button>
                                       ) : null}
                                     </div>
+                                    <div className="space-y-2 rounded-md border border-border/60 bg-muted/20 p-3">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                          <Label className="text-xs text-muted-foreground">Linked Resource Cards</Label>
+                                          <p className="text-xs text-muted-foreground">Attach resource cards directly to this specialization.</p>
+                                        </div>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleOpenSpecializationResourceLinker(selectedCoreSkill)}
+                                        >
+                                          <Link2 className="mr-2 h-4 w-4" />
+                                          Link Card
+                                        </Button>
+                                      </div>
+                                      {linkedSpecializationResources.length > 0 ? (
+                                        <div className="flex flex-wrap gap-2">
+                                          {linkedSpecializationResources.map((resource) => (
+                                            <div
+                                              key={resource.id}
+                                              className="inline-flex max-w-full items-center gap-2 rounded-md border border-border/60 bg-background/70 px-2 py-1 text-sm"
+                                            >
+                                              <button
+                                                type="button"
+                                                className="truncate text-left hover:text-primary"
+                                                onClick={() => openPistonsFor(resource.id)}
+                                                title={resource.name}
+                                              >
+                                                {resource.name}
+                                              </button>
+                                              <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-5 w-5 shrink-0"
+                                                onClick={() => handleUnlinkResourceFromSpecialization(resource.id)}
+                                              >
+                                                <X className="h-3.5 w-3.5 text-muted-foreground" />
+                                              </Button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <p className="text-xs text-muted-foreground">No resource cards linked yet.</p>
+                                      )}
+                                    </div>
                                     <div className="flex items-center gap-2">
                                       <Input value={newSkillAreaNames[selectedSkillId!] || ''} onChange={e => setNewSkillAreaNames(prev => ({...prev, [selectedSkillId!]: e.target.value}))} placeholder="New Skill Area Name" />
                                       <Button onClick={() => handleAddSkillArea(selectedSkillId!)}>Add</Button>
@@ -2034,13 +2141,10 @@ function SkillPageContent() {
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {area.microSkills.map(micro => {
                                             const {
-                                              intentionEst = 0,
-                                              intentionLogged = 0,
                                               curiosityEst = 0,
                                               curiosityLogged = 0
                                             } = microSkillTotals.get(micro.id) || {};
                                             
-                                            const relatedIntentions = microSkillIntentions.get(micro.name) || [];
                                             const relatedCuriosities = microSkillCuriosities.get(micro.name) || [];
                                             const learningPlan = offerizationPlans[selectedCoreSkill!.id]?.learningPlan;
                                             const hasLearningPlan = (learningPlan?.audioVideoResources?.length ?? 0) > 0 || (learningPlan?.bookWebpageResources?.length ?? 0) > 0;
@@ -2072,8 +2176,8 @@ function SkillPageContent() {
                                                           />
                                                       </div>
                                                   </CardHeader>
-                                                  <CardContent className="p-3 pt-0 grid grid-cols-2 gap-4 flex-grow">
-                                                      <div className="border-r pr-2">
+                                                  <CardContent className="p-3 pt-0 flex-grow">
+                                                      <div>
                                                           <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Flashlight className="h-3 w-3 text-amber-500" />Curiosities</h4>
                                                           <Badge variant="outline" className="text-xs mb-1 w-full justify-center">{formatMinutes(curiosityEst)} est / {formatMinutes(curiosityLogged)} log</Badge>
                                                           {relatedCuriosities.length > 0 ? (
@@ -2081,19 +2185,6 @@ function SkillPageContent() {
                                                                   {relatedCuriosities.map(curiosity => (
                                                                       <li key={curiosity.id}>
                                                                           <button onClick={() => openIntentionPopup(curiosity.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{curiosity.name}</button>
-                                                                      </li>
-                                                                  ))}
-                                                              </ul>
-                                                          ) : <p className="text-muted-foreground text-xs italic">None</p>}
-                                                      </div>
-                                                      <div>
-                                                          <h4 className="font-semibold text-xs mb-1 flex items-center gap-1"><Lightbulb className="h-3 w-3 text-green-500" />Intentions</h4>
-                                                          <Badge variant="outline" className="text-xs mb-1 w-full justify-center">{formatMinutes(intentionEst)} est / {formatMinutes(intentionLogged)} log</Badge>
-                                                           {relatedIntentions.length > 0 ? (
-                                                              <ul className="space-y-1 text-xs">
-                                                                  {relatedIntentions.map(intention => (
-                                                                      <li key={intention.id}>
-                                                                          <button onClick={() => openIntentionPopup(intention.id)} className="text-muted-foreground hover:text-primary truncate w-full text-left">{intention.name}</button>
                                                                       </li>
                                                                   ))}
                                                               </ul>
@@ -2322,6 +2413,18 @@ function SkillPageContent() {
       <SpacedRepetitionModal 
         modalState={repetitionModalState} 
         onOpenChange={(isOpen) => setRepetitionModalState(prev => ({ ...prev, isOpen }))} 
+      />
+      <ResourceSearchPopup
+        open={!!linkingResourcesForSpecialization}
+        setOpen={(open) => {
+          if (!open) setLinkingResourcesForSpecialization(null);
+        }}
+        onSelect={handleLinkResourceToSpecialization}
+        title={
+          linkingResourcesForSpecialization
+            ? `Link Resource Card to ${linkingResourcesForSpecialization.name}`
+            : 'Link a Resource Card'
+        }
       />
       
       {isLogProgressModalOpen && loggingMicroSkill && (

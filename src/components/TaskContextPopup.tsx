@@ -2,21 +2,50 @@
 
 "use client";
 
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { X, GitBranch, Briefcase, BrainCircuit, Blocks, Sprout, GripVertical, Clock, Plus, Minus, Timer } from 'lucide-react';
-import type { ExerciseDefinition, CoreSkill, SkillArea, Project, SkillDomain, TaskContextPopupState, Activity, FullSchedule, PauseEvent } from '@/types/workout';
+import { X, GitBranch, Briefcase, BrainCircuit, Blocks, Sprout, Loader2, RefreshCw, Bot } from 'lucide-react';
+import type { CoreSkill, SkillArea, Project, SkillDomain, TaskContextPopupState, Activity, MindsetPoint } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import { useDraggable } from '@dnd-kit/core';
-import { format, formatDistanceStrict } from 'date-fns';
-import { ScrollArea } from './ui/scroll-area';
+import { cn } from '@/lib/utils';
+import { getAiConfigFromSettings } from '@/lib/ai/config';
+import type { TaskBciContext, TaskBciLinkedBothering, TaskBciModel } from '@/lib/taskBci';
+import { getEffectiveConstraintTasks } from '@/lib/botheringUtils';
 
 interface TaskContextPopupProps {
     popupState: TaskContextPopupState;
 }
+
+type TaskBciState = {
+    loading: boolean;
+    data: TaskBciModel | null;
+    error: string | null;
+    usedFallback: boolean;
+    providerLabel: string;
+};
+
+type TaskScriptState = {
+    loading: boolean;
+    data: string;
+    error: string | null;
+    usedFallback: boolean;
+    providerLabel: string;
+};
+
+const sourceTypeByCardId: Record<string, TaskBciLinkedBothering['type']> = {
+    mindset_botherings_external: 'external',
+    mindset_botherings_mismatch: 'mismatch',
+    mindset_botherings_constraint: 'constraint',
+};
+
+const normalizeText = (value: unknown) =>
+    String(value || '')
+        .replace(/\s+/g, ' ')
+        .trim();
 
 export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
     const { 
@@ -27,18 +56,75 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         skillDomains,
         microSkillMap,
         schedule,
-        activeFocusSession,
+        offerizationPlans,
+        skillAcquisitionPlans,
+        resources,
+        mindsetCards,
+        settings,
+        findRootTask,
         closeTaskContextPopup,
     } = useAuth();
+
+    const [bciState, setBciState] = useState<TaskBciState>({
+        loading: false,
+        data: null,
+        error: null,
+        usedFallback: false,
+        providerLabel: '',
+    });
+    const [scriptState, setScriptState] = useState<TaskScriptState>({
+        loading: false,
+        data: '',
+        error: null,
+        usedFallback: false,
+        providerLabel: '',
+    });
+    const popupRef = useRef<HTMLDivElement | null>(null);
+    const [popupSize, setPopupSize] = useState({ width: 820, height: 640 });
     
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: `task-context-popup-${popupState.activityId}`,
     });
 
+    const setCombinedRef = useCallback((node: HTMLDivElement | null) => {
+        popupRef.current = node;
+        setNodeRef(node);
+    }, [setNodeRef]);
+
+    useEffect(() => {
+        const node = popupRef.current;
+        if (!node) return;
+
+        const updateSize = () => {
+            const rect = node.getBoundingClientRect();
+            setPopupSize((prev) => {
+                const nextWidth = Math.round(rect.width);
+                const nextHeight = Math.round(rect.height);
+                if (prev.width === nextWidth && prev.height === nextHeight) return prev;
+                return { width: nextWidth, height: nextHeight };
+            });
+        };
+
+        updateSize();
+
+        if (typeof ResizeObserver === 'undefined') return;
+        const observer = new ResizeObserver(() => updateSize());
+        observer.observe(node);
+        return () => observer.disconnect();
+    }, [popupState.activityId, bciState.data, bciState.error, bciState.loading, scriptState.error, scriptState.loading]);
+
+    const margin = 16;
+    const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : popupSize.width + margin * 2;
+    const viewportHeight = typeof window !== 'undefined' ? window.innerHeight : popupSize.height + margin * 2;
+    const maxLeft = Math.max(margin, viewportWidth - popupSize.width - margin);
+    const maxTop = Math.max(margin, viewportHeight - popupSize.height - margin);
+    const clampedLeft = Math.min(Math.max(popupState.x, margin), maxLeft);
+    const clampedTop = Math.min(Math.max(popupState.y, margin), maxTop);
+
     const style: React.CSSProperties = {
         position: 'fixed',
-        top: popupState.y,
-        left: popupState.x,
+        top: clampedTop,
+        left: clampedLeft,
         transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
         willChange: 'transform',
         zIndex: 101 + (popupState.level || 0),
@@ -59,11 +145,21 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
     }, [popupState.activityId, schedule]);
 
     const taskInfo = useMemo(() => {
-        if (!activityInfo?.taskIds?.[0]) return null;
-        
-        const taskId = activityInfo.taskIds[0];
+        if (!activityInfo) return null;
+
         const allDefs = [...deepWorkDefinitions, ...upskillDefinitions];
-        const task = allDefs.find(d => taskId.startsWith(d.id));
+        const normalizeLookup = (value?: string) => normalizeText(value).toLowerCase();
+        const taskIdCandidates = [
+            activityInfo.taskIds?.[0],
+            activityInfo.id,
+        ]
+            .map((value) => String(value || '').trim())
+            .filter(Boolean);
+        const detailsKey = normalizeLookup(activityInfo.details);
+        const task = allDefs.find((definition) =>
+            taskIdCandidates.some((candidate) => candidate === definition.id || candidate.startsWith(definition.id)) ||
+            (!!detailsKey && normalizeLookup(definition.name) === detailsKey)
+        );
 
         if (!task) return null;
 
@@ -105,80 +201,313 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
 
     }, [activityInfo, deepWorkDefinitions, upskillDefinitions, projects, coreSkills, skillDomains, microSkillMap]);
 
-    const attentionSpanInfo = useMemo(() => {
-        const activityForSpan = activeFocusSession?.activity?.id === activityInfo?.id ? activeFocusSession.activity : activityInfo;
-        
-        if (!activityForSpan || !activityForSpan.focusSessionInitialStartTime) {
+    const rootTask = useMemo(() => {
+        if (!activityInfo) return null;
+        return findRootTask(activityInfo);
+    }, [activityInfo, findRootTask]);
+
+    const mismatchPointById = useMemo(() => {
+        const mismatchCard = (mindsetCards || []).find((card) => card.id === 'mindset_botherings_mismatch');
+        return new Map((mismatchCard?.points || []).map((point) => [point.id, point] as const));
+    }, [mindsetCards]);
+    const externalPointById = useMemo(() => {
+        const externalCard = (mindsetCards || []).find((card) => card.id === 'mindset_botherings_external');
+        return new Map((externalCard?.points || []).map((point) => [point.id, point] as const));
+    }, [mindsetCards]);
+
+    const linkedBotherings = useMemo(() => {
+        if (!activityInfo) return [];
+
+        const currentTaskId = String(taskInfo?.task.id || '');
+        const currentActivityId = String(activityInfo.id || '');
+        const normalizedTaskName = normalizeText(taskInfo?.task.name || activityInfo.details).toLowerCase();
+        const normalizedActivityDetails = normalizeText(activityInfo.details).toLowerCase();
+
+        const matchesTaskRef = (taskRef: NonNullable<MindsetPoint['tasks']>[number]) => {
+            const taskRefId = String(taskRef.id || '');
+            const taskRefActivityId = String(taskRef.activityId || '');
+            const taskRefDetails = normalizeText(taskRef.details).toLowerCase();
+            return (
+                taskRefActivityId === currentActivityId ||
+                taskRefId === currentActivityId ||
+                taskRefId === currentTaskId ||
+                taskRefActivityId === currentTaskId ||
+                (!!taskRefDetails && (
+                    taskRefDetails === normalizedTaskName ||
+                    taskRefDetails === normalizedActivityDetails
+                ))
+            );
+        };
+
+        const getEffectiveTasks = (point: MindsetPoint, sourceType: TaskBciLinkedBothering['type']) => {
+            const directTasks = Array.isArray(point.tasks) ? point.tasks : [];
+            if (sourceType !== 'constraint') return directTasks;
+            return getEffectiveConstraintTasks(point, mismatchPointById, externalPointById);
+        };
+
+        const matches: Array<TaskBciLinkedBothering & { id: string }> = [];
+        (mindsetCards || []).forEach((card) => {
+            const sourceType = sourceTypeByCardId[card.id];
+            if (!sourceType) return;
+            (card.points || []).forEach((point) => {
+                if (!getEffectiveTasks(point, sourceType).some(matchesTaskRef)) return;
+                matches.push({
+                    id: point.id,
+                    type: sourceType,
+                    text: normalizeText(point.text) || 'Untitled bothering',
+                    resolution: normalizeText(point.resolution) || undefined,
+                    mismatchType: point.mismatchType,
+                });
+            });
+        });
+
+        return matches.filter((entry, index, arr) => arr.findIndex((item) => item.id === entry.id) === index);
+    }, [activityInfo, externalPointById, mindsetCards, mismatchPointById, taskInfo]);
+
+    const resolvedSpecialization = useMemo(() => {
+        if (!taskInfo) return null;
+        if (taskInfo.coreSkill?.type === 'Specialization') return taskInfo.coreSkill;
+
+        const candidates = [
+            taskInfo.task.category,
+            taskInfo.parent?.category,
+            rootTask?.category,
+            taskInfo.coreSkill?.name,
+        ]
+            .map((entry) => normalizeText(entry).toLowerCase())
+            .filter(Boolean);
+
+        return (
+            coreSkills.find(
+                (skill) =>
+                    skill.type === 'Specialization' &&
+                    candidates.includes(normalizeText(skill.name).toLowerCase())
+            ) || null
+        );
+    }, [coreSkills, rootTask, taskInfo]);
+
+    const learningPlanContext = useMemo(() => {
+        const specializationId = resolvedSpecialization?.id;
+        if (!specializationId) return null;
+
+        const learningPlan = offerizationPlans?.[specializationId]?.learningPlan;
+        const acquisitionPlan = (skillAcquisitionPlans || []).find((plan) => plan.specializationId === specializationId);
+        if (!learningPlan && !acquisitionPlan) return null;
+
+        return {
+            specializationName: resolvedSpecialization?.name || '',
+            targetDate: acquisitionPlan?.targetDate || null,
+            requiredHours: acquisitionPlan?.requiredHours ?? null,
+            requiredMoney: acquisitionPlan?.requiredMoney ?? null,
+            books: (learningPlan?.bookWebpageResources || []).map((resource) => resource.name).filter(Boolean),
+            audioVideo: (learningPlan?.audioVideoResources || []).map((resource) => resource.name).filter(Boolean),
+            paths: (learningPlan?.skillTreePaths || []).map((path) => path.name).filter(Boolean),
+        };
+    }, [offerizationPlans, resolvedSpecialization, skillAcquisitionPlans]);
+
+    const projectPlanContext = useMemo(() => {
+        if (!taskInfo?.project && !resolvedSpecialization) return null;
+
+        const releasePlans = resolvedSpecialization?.id
+            ? offerizationPlans?.[resolvedSpecialization.id]?.releases || []
+            : [];
+        const workflowStageSummary = releasePlans.flatMap((release) => {
+            if (!release.workflowStages) return [];
+            return [
+                `${release.name}: idea ${release.workflowStages.ideaItems.length}, code ${release.workflowStages.codeItems.length}, break ${release.workflowStages.breakItems.length}, fix ${release.workflowStages.fixItems.length}`,
+            ];
+        });
+
+        if (!taskInfo?.project?.productPlan && !taskInfo?.project?.name && releasePlans.length === 0) {
             return null;
         }
 
-        const { focusSessionInitialStartTime, focusSessionEndTime, focusSessionInitialDuration } = activityForSpan;
-        const focusSessionPauses = Array.isArray(activityForSpan.focusSessionPauses) ? activityForSpan.focusSessionPauses : [];
+        return {
+            projectName: taskInfo?.project?.name || '',
+            targetDate: taskInfo?.project?.productPlan?.targetDate || null,
+            requiredHours: taskInfo?.project?.productPlan?.requiredHours ?? null,
+            requiredMoney: taskInfo?.project?.productPlan?.requiredMoney ?? null,
+            releaseNames: releasePlans.map((release) => release.launchDate ? `${release.name} (${release.launchDate})` : release.name),
+            workflowStageSummary: workflowStageSummary.slice(0, 4),
+        };
+    }, [offerizationPlans, resolvedSpecialization, taskInfo]);
 
-        if (focusSessionEndTime) {
-            const totalSessionMs = focusSessionEndTime - focusSessionInitialStartTime;
-            
-            const pauseDurationsMs: number[] = [];
-            (focusSessionPauses || []).forEach(p => {
-                if (p.resumeTime) {
-                    pauseDurationsMs.push(p.resumeTime - p.pauseTime);
-                }
+    const linkedResourceNames = useMemo(() => {
+        if (!taskInfo) return [];
+        const resourceIds = Array.from(
+            new Set([
+                ...(taskInfo.task.linkedResourceIds || []),
+                ...(taskInfo.parent?.linkedResourceIds || []),
+                ...(taskInfo.coreSkill?.linkedResourceIds || []),
+                ...(taskInfo.coreSkill?.linkedPdfResourceId ? [taskInfo.coreSkill.linkedPdfResourceId] : []),
+            ])
+        );
+        return resourceIds
+            .map((resourceId) => resources.find((resource) => resource.id === resourceId)?.name || '')
+            .map((name) => normalizeText(name))
+            .filter(Boolean);
+    }, [resources, taskInfo]);
+
+    const bciContext = useMemo<TaskBciContext | null>(() => {
+        if (!activityInfo) return null;
+        return {
+            taskName: taskInfo?.task.name || activityInfo.details || activityInfo.type,
+            taskType: activityInfo.type,
+            taskDetails: activityInfo.details || taskInfo?.task.name || activityInfo.type,
+            taskDescription: taskInfo?.task.description,
+            taskCategory: taskInfo?.task.category || activityInfo.type,
+            slotName: activityInfo.slot,
+            parentTaskName: taskInfo?.parent?.name,
+            rootTaskName: rootTask?.name,
+            nodeType: taskInfo?.task.nodeType,
+            projectName: taskInfo?.project?.name,
+            skillDomainName: taskInfo?.domain?.name,
+            coreSkillName: taskInfo?.coreSkill?.name,
+            skillAreaName: taskInfo?.skillArea?.name,
+            linkedBotherings,
+            learningContext: learningPlanContext || undefined,
+            projectContext: projectPlanContext || undefined,
+            resourceNames: linkedResourceNames,
+        };
+    }, [activityInfo, learningPlanContext, linkedBotherings, linkedResourceNames, projectPlanContext, rootTask, taskInfo]);
+
+    const isDesktopRuntime =
+        typeof window !== 'undefined' &&
+        (Boolean((window as any)?.electronAPI) || navigator.userAgent.toLowerCase().includes(' electron/'));
+
+    const aiConfig = useMemo(
+        () => getAiConfigFromSettings(settings, isDesktopRuntime),
+        [isDesktopRuntime, settings]
+    );
+
+    const generateBci = useCallback(
+        async (signal?: AbortSignal) => {
+            if (!bciContext) return;
+            setScriptState({
+                loading: false,
+                data: '',
+                error: null,
+                usedFallback: false,
+                providerLabel: '',
             });
-            const totalPauseTimeMs = pauseDurationsMs.reduce((sum, p) => sum + p, 0);
-
-            const workIntervalsMs: number[] = [];
-            let lastStartTime = focusSessionInitialStartTime;
-
-            focusSessionPauses.forEach(p => {
-                workIntervalsMs.push(p.pauseTime - lastStartTime);
-                if (p.resumeTime) {
-                    lastStartTime = p.resumeTime;
+            setBciState((prev) => ({
+                ...prev,
+                loading: true,
+                error: null,
+            }));
+            try {
+                const response = await fetch('/api/ai/task-bci', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+                    },
+                    body: JSON.stringify({
+                        context: bciContext,
+                        aiConfig,
+                    }),
+                    signal,
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(String(result?.error || result?.details || 'Failed to generate task context.'));
                 }
-            });
-            
-            const lastEventTime = focusSessionPauses.length > 0 && focusSessionPauses[focusSessionPauses.length-1].resumeTime 
-                ? focusSessionPauses[focusSessionPauses.length-1].resumeTime! 
-                : focusSessionInitialStartTime;
+                setBciState({
+                    loading: false,
+                    data: result?.bci || null,
+                    error: null,
+                    usedFallback: Boolean(result?.meta?.usedFallback),
+                    providerLabel: [result?.meta?.provider, result?.meta?.model].filter(Boolean).join(' | '),
+                });
+            } catch (error) {
+                if (signal?.aborted) return;
+                const message = error instanceof Error ? error.message : 'Failed to generate task context.';
+                setBciState({
+                    loading: false,
+                    data: null,
+                    error: message,
+                    usedFallback: false,
+                    providerLabel: '',
+                });
+            }
+        },
+        [aiConfig, bciContext, isDesktopRuntime]
+    );
 
-            workIntervalsMs.push(focusSessionEndTime - lastEventTime);
+    const generateScript = useCallback(
+        async (signal?: AbortSignal) => {
+            if (!bciContext) return '';
+            setScriptState((prev) => ({
+                ...prev,
+                loading: true,
+                error: null,
+            }));
+            try {
+                const response = await fetch('/api/ai/task-convincer-script', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+                    },
+                    body: JSON.stringify({
+                        context: bciContext,
+                        bci: bciState.data,
+                        aiConfig,
+                    }),
+                    signal,
+                });
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(String(result?.error || result?.details || 'Failed to generate task script.'));
+                }
+                const nextScript = String(result?.script || '');
+                setScriptState({
+                    loading: false,
+                    data: nextScript,
+                    error: null,
+                    usedFallback: Boolean(result?.meta?.usedFallback),
+                    providerLabel: [result?.meta?.provider, result?.meta?.model].filter(Boolean).join(' | '),
+                });
+                return nextScript;
+            } catch (error) {
+                if (signal?.aborted) return;
+                const message = error instanceof Error ? error.message : 'Failed to generate task script.';
+                setScriptState({
+                    loading: false,
+                    data: '',
+                    error: message,
+                    usedFallback: false,
+                    providerLabel: '',
+                });
+                return '';
+            }
+        },
+        [aiConfig, bciContext, bciState.data, isDesktopRuntime]
+    );
 
-            const validIntervalsMs = workIntervalsMs.filter(i => i > 1000); // Ignore intervals less than a second
-            const totalWorkTimeMs = validIntervalsMs.reduce((sum, i) => sum + i, 0);
+    useEffect(() => {
+        setBciState({
+            loading: false,
+            data: null,
+            error: null,
+            usedFallback: false,
+            providerLabel: '',
+        });
+        setScriptState({
+            loading: false,
+            data: '',
+            error: null,
+            usedFallback: false,
+            providerLabel: '',
+        });
+    }, [popupState.activityId]);
 
-            const attentionSpanMs = validIntervalsMs.length > 0 ? Math.max(...validIntervalsMs) : 0;
-            const avgSpanMs = validIntervalsMs.length > 0 ? totalWorkTimeMs / validIntervalsMs.length : 0;
-            
-            const totalDurationMinutes = Math.ceil(totalSessionMs / 60000);
-            const extendedTime = focusSessionInitialDuration ? totalDurationMinutes - focusSessionInitialDuration : 0;
-            
-            return {
-                title: "Session Completed",
-                sessionCompleted: formatDistanceStrict(new Date(0), new Date(totalSessionMs)),
-                attentionSpan: formatDistanceStrict(new Date(0), new Date(attentionSpanMs)),
-                avgSpan: formatDistanceStrict(new Date(0), new Date(avgSpanMs)),
-                totalAttention: formatDistanceStrict(new Date(0), new Date(totalWorkTimeMs)),
-                workIntervals: validIntervalsMs.map(ms => formatDistanceStrict(new Date(0), new Date(ms))),
-                pauses: focusSessionPauses.length,
-                extendedBy: extendedTime > 0 ? `${extendedTime} minutes` : null,
-                totalBreakTime: formatDistanceStrict(new Date(0), new Date(totalPauseTimeMs)),
-            };
-        } else {
-            // Live session data
-             const now = Date.now();
-             const totalSessionMs = now - focusSessionInitialStartTime;
-             return {
-                title: "Session In Progress",
-                sessionCompleted: formatDistanceStrict(new Date(0), new Date(totalSessionMs)),
-                attentionSpan: '-',
-                avgSpan: '-',
-                totalAttention: '-',
-                workIntervals: [],
-                pauses: focusSessionPauses.length,
-                extendedBy: null,
-                totalBreakTime: '-',
-            };
-        }
-    }, [activityInfo, activeFocusSession]);
+    useEffect(() => {
+        if (!bciContext) return;
+        const controller = new AbortController();
+        void generateBci(controller.signal);
+        return () => controller.abort();
+    }, [bciContext, generateBci, popupState.activityId]);
 
     const handleClose = (e: React.PointerEvent<HTMLButtonElement>) => {
         e.stopPropagation();
@@ -194,31 +523,108 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
       }
     };
     
-    if (!taskInfo || !activityInfo) return null;
-    const { task, parent, project, domain, coreSkill, skillArea } = taskInfo;
+    if (!activityInfo) return null;
+    const task = taskInfo?.task || null;
+    const parent = taskInfo?.parent || null;
+    const project = taskInfo?.project || null;
+    const domain = taskInfo?.domain || null;
+    const coreSkill = taskInfo?.coreSkill || null;
+    const skillArea = taskInfo?.skillArea || null;
+    const taskLabel = task?.name || activityInfo.details || activityInfo.type;
+
+    const dispatchScriptToAstra = (script: string) => {
+        if (typeof window === 'undefined') return;
+        const content = String(script || '').trim();
+        if (!content) return;
+        window.dispatchEvent(
+            new CustomEvent('open-astra-task-script', {
+                detail: {
+                    taskName: taskLabel,
+                    content,
+                },
+            })
+        );
+    };
+
+    const handleOpenInAstra = async () => {
+        if (scriptState.loading) return;
+        const existingScript = String(scriptState.data || '').trim();
+        if (existingScript) {
+            dispatchScriptToAstra(existingScript);
+            return;
+        }
+        const nextScript = await generateScript();
+        if (nextScript) {
+            dispatchScriptToAstra(nextScript);
+        }
+    };
+
+    const handleOpenInAstraPointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+        e.stopPropagation();
+        void handleOpenInAstra();
+    };
+
+    const renderBciSection = (title: string, items: string[]) => (
+        <div className="rounded-lg border bg-muted/20 p-3">
+            <div className="mb-2 flex items-center gap-2">
+                <Badge variant="secondary">{title}</Badge>
+            </div>
+            {items.length > 0 ? (
+                <ul className="space-y-1 text-sm text-muted-foreground">
+                    {items.map((item, index) => (
+                        <li key={`${title}-${index}`} className="flex gap-2">
+                            <span className="text-primary">•</span>
+                            <span>{item}</span>
+                        </li>
+                    ))}
+                </ul>
+            ) : (
+                <p className="text-sm text-muted-foreground">No {title.toLowerCase()} details generated yet.</p>
+            )}
+        </div>
+    );
 
     return (
-        <div ref={setNodeRef} style={style} {...attributes}>
-            <Card className="w-[600px] shadow-2xl border-2 border-primary/30 bg-card grid grid-cols-3">
-                <div className="col-span-2">
+        <div ref={setCombinedRef} style={style} {...attributes}>
+            <Card className="w-[min(820px,calc(100vw-32px))] max-h-[calc(100vh-32px)] overflow-y-auto shadow-2xl border-2 border-primary/30 bg-card">
+                <div>
                     <CardHeader className="p-3 relative cursor-grab" {...listeners}>
-                        <div className="flex justify-between items-center">
+                        <div className="flex items-center justify-between gap-3">
                             <CardTitle className="text-base flex items-center gap-2">
-                            <GitBranch className="h-4 w-4 text-primary"/>
-                            Task Context
+                                <GitBranch className="h-4 w-4 text-primary" />
+                                Task Context
                             </CardTitle>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" size="sm" className="h-8" onPointerDown={handleOpenInAstraPointerDown}>
+                                    {scriptState.loading ? (
+                                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                        <Bot className="mr-1.5 h-3.5 w-3.5" />
+                                    )}
+                                    {scriptState.loading ? 'Preparing...' : 'Open in Astra'}
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={handleClose}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent className="p-4 pt-0 space-y-3">
                         <div className="p-3 rounded-lg bg-muted/50 border">
                             <p className="text-xs text-muted-foreground">Current Task</p>
-                            <p className="font-bold text-base text-foreground">{task.name}</p>
+                            <p className="font-bold text-base text-foreground">{task?.name || activityInfo.details || activityInfo.type}</p>
                         </div>
                         <div className="space-y-2 text-sm">
                             {parent && (
                                 <div className="flex items-center gap-3">
                                     <Badge variant="outline" className="flex-shrink-0">Parent</Badge>
                                     <p className="font-medium truncate">{parent.name}</p>
+                                </div>
+                            )}
+                            {rootTask && rootTask.id !== task?.id && rootTask.id !== parent?.id && (
+                                <div className="flex items-center gap-3">
+                                    <Badge variant="outline" className="flex-shrink-0">Root</Badge>
+                                    <p className="font-medium truncate">{rootTask.name}</p>
                                 </div>
                             )}
                             {project && (
@@ -236,66 +642,101 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                             {domain && <div className="flex items-center gap-2"><Badge variant="secondary" className="w-24 justify-center">Domain</Badge> <span>{domain.name}</span></div>}
                             {coreSkill && <div className="flex items-center gap-2"><Badge variant="secondary" className="w-24 justify-center">Core Skill</Badge> {getCoreSkillIcon(coreSkill.type)} <span>{coreSkill.name}</span></div>}
                             {skillArea && <div className="flex items-center gap-2"><Badge variant="secondary" className="w-24 justify-center">Skill Area</Badge> <span>{skillArea.name}</span></div>}
-                            <div className="flex items-center gap-2"><Badge variant="secondary" className="w-24 justify-center">Micro-Skill</Badge> <span className="font-bold">{task.category}</span></div>
+                            <div className="flex items-center gap-2"><Badge variant="secondary" className="w-24 justify-center">{task ? 'Micro-Skill' : 'Type'}</Badge> <span className="font-bold">{task?.category || activityInfo.type}</span></div>
                         </div>
-                    </CardContent>
-                </div>
-                <div className="col-span-1 border-l flex flex-col">
-                    <CardHeader className="p-3">
-                        <CardTitle className="text-base flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-primary" />
-                            <span className="truncate">Attention</span>
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-0 flex-grow flex flex-col justify-center text-center">
-                        {attentionSpanInfo ? (
-                            <div className="space-y-4 w-full">
-                                <div>
-                                    <p className="text-xs text-muted-foreground">{attentionSpanInfo.title}</p>
-                                    <p className="text-2xl font-bold">{attentionSpanInfo.sessionCompleted}</p>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3 text-center">
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">Attention Span</p>
-                                        <p className="text-lg font-bold">{attentionSpanInfo.attentionSpan}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs text-muted-foreground">Avg. Span</p>
-                                        <p className="text-lg font-bold">{attentionSpanInfo.avgSpan}</p>
-                                    </div>
-                                     <div>
-                                        <p className="text-xs text-muted-foreground">Pauses</p>
-                                        <p className="text-lg font-bold">{attentionSpanInfo.pauses}</p>
-                                    </div>
-                                     <div>
-                                        <p className="text-xs text-muted-foreground">Extended By</p>
-                                        <p className="text-lg font-bold">{attentionSpanInfo.extendedBy || '-'}</p>
-                                    </div>
-                                    <div className="col-span-2">
-                                        <p className="text-xs text-muted-foreground">Total Break Time</p>
-                                        <p className="text-lg font-bold">{attentionSpanInfo.totalBreakTime}</p>
+
+                        <Separator />
+
+                        <div className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
+                                {linkedBotherings.length > 0 && (
+                                    <Badge variant="secondary">{linkedBotherings.length} linked bothering{linkedBotherings.length === 1 ? '' : 's'}</Badge>
+                                )}
+                                {learningPlanContext?.specializationName && (
+                                    <Badge variant="secondary">Learning: {learningPlanContext.specializationName}</Badge>
+                                )}
+                                {projectPlanContext?.projectName && (
+                                    <Badge variant="secondary"><Briefcase className="mr-1 h-3 w-3" />{projectPlanContext.projectName}</Badge>
+                                )}
+                            </div>
+
+                            {linkedBotherings.length > 0 && (
+                                <div className="rounded-lg border bg-muted/20 p-3">
+                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Linked botherings</p>
+                                    <div className="space-y-1.5 text-sm">
+                                        {linkedBotherings.map((bothering) => (
+                                            <div key={`${bothering.id}-${bothering.type}`}>
+                                                <span className="font-medium text-foreground">{bothering.text}</span>
+                                                <span className="ml-2 text-xs uppercase text-muted-foreground">{bothering.type}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
-                                {attentionSpanInfo.workIntervals.length > 0 && (
-                                    <div className="pt-2 border-t">
-                                        <p className="text-xs font-semibold text-muted-foreground mb-1">Work Intervals ({attentionSpanInfo.totalAttention})</p>
-                                        <ScrollArea className="h-20">
-                                            <ul className="text-xs text-center space-y-1">
-                                                {attentionSpanInfo.workIntervals.map((interval, i) => (
-                                                    <li key={i}>{i+1}. {interval}</li>
-                                                ))}
-                                            </ul>
-                                        </ScrollArea>
+                            )}
+
+                            {scriptState.error && (
+                                <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                                    {scriptState.error}
+                                </div>
+                            )}
+
+                            <div className="space-y-3">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <h4 className="font-semibold text-xs text-muted-foreground">AI Draft BCI</h4>
+                                        <p className="text-xs text-muted-foreground">
+                                            Boundary defines lifecycle, contents define what exists inside it, invariant defines what must stay true.
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Badge
+                                            variant="outline"
+                                            className={cn(
+                                                bciState.usedFallback && "border-amber-500/40 text-amber-300",
+                                                !bciState.usedFallback && bciState.data && "border-emerald-500/40 text-emerald-300"
+                                            )}
+                                        >
+                                            {bciState.loading ? 'Generating' : bciState.usedFallback ? 'Fallback draft' : 'AI draft'}
+                                        </Badge>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-7"
+                                            onClick={() => void generateBci()}
+                                            disabled={bciState.loading || !bciContext}
+                                        >
+                                            {bciState.loading ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-1 h-3.5 w-3.5" />}
+                                            Regenerate
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {bciState.providerLabel && (
+                                    <p className="text-[11px] text-muted-foreground">Source: {bciState.providerLabel}</p>
+                                )}
+
+                                {scriptState.providerLabel && scriptState.data && (
+                                    <p className="text-[11px] text-muted-foreground">Astra script source: {scriptState.providerLabel}</p>
+                                )}
+
+                                {bciState.error ? (
+                                    <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                                        {bciState.error}
+                                    </div>
+                                ) : bciState.loading && !bciState.data ? (
+                                    <div className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">
+                                        Generating a draft from the task, linked bothering, and plan context...
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+                                        {renderBciSection('Boundary', bciState.data?.boundary || [])}
+                                        {renderBciSection('Contents', bciState.data?.contents || [])}
+                                        {renderBciSection('Invariant', bciState.data?.invariant || [])}
                                     </div>
                                 )}
                             </div>
-                        ) : (
-                            <p className="text-xs text-muted-foreground">No active or completed focus session data for this task.</p>
-                        )}
+                        </div>
                     </CardContent>
-                    <div className="absolute top-2 right-2">
-                        <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={handleClose}><X className="h-4 w-4" /></Button>
-                    </div>
                 </div>
             </Card>
         </div>

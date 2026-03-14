@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { format, isBefore, isSameDay, parseISO, startOfToday } from 'date-fns';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { buildDefaultPointsForResourceType } from '@/lib/resourceDefaults';
 import {
   BookOpenCheck,
   Briefcase,
@@ -17,15 +19,20 @@ import {
   CalendarPlus,
   CheckSquare,
   Clock3,
+  FileText,
   Magnet,
   MessageSquare,
   Paperclip,
   Plus,
+  RefreshCw,
   Search,
+  Share2,
   Trash2,
+  Video,
   X,
+  Library,
 } from 'lucide-react';
-import type { Activity, ExerciseDefinition, KanbanBoard, KanbanCard, KanbanLabel, KanbanList, ProductizationPlan, Release, SlotName } from '@/types/workout';
+import type { Activity, ExerciseDefinition, KanbanBoard, KanbanCard, KanbanLabel, KanbanList, ProductizationPlan, Release, Resource, ResourceFolder, SlotName } from '@/types/workout';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,6 +47,10 @@ import {
 
 interface KanbanPageContentProps {
   isModal?: boolean;
+  forcedBoardMode?: BoardMode;
+  initialBoardId?: string;
+  initialCardId?: string;
+  onSelectCard?: (card: KanbanCard) => void;
 }
 
 type TaskBoardBuckets = {
@@ -49,7 +60,7 @@ type TaskBoardBuckets = {
   completed: any[];
 };
 
-type BoardMode = 'project' | 'tasks';
+type BoardMode = 'project' | 'branding' | 'tasks';
 
 type ReleaseOption = {
   key: string;
@@ -64,6 +75,9 @@ type CardDraft = {
   description: string;
   dueDate: string;
   labelIds: string[];
+  linkedFeaturePointId: string;
+  linkedFeaturePointIds: string[];
+  brandingType: 'blog' | 'video';
   linkedIntentionIds: string[];
   checklist: KanbanCard['checklist'];
 };
@@ -71,8 +85,8 @@ type CardDraft = {
 type PendingIntentionDraft = {
   tempId: string;
   name: string;
-  microSkillId: string;
-  microSkillName: string;
+  microSkillIds: string[];
+  microSkillNames: string[];
 };
 
 type DraggedCardState = {
@@ -95,6 +109,15 @@ const LABEL_COLOR_PALETTE = [
   '#8b5cf6',
   '#64748b',
 ];
+
+const BRANDING_LIST_TEMPLATES = [
+  { key: 'script', title: 'Creating Script', color: '#2563eb' },
+  { key: 'final', title: 'Finalizing Script', color: '#7c3aed' },
+  { key: 'audio', title: 'Audio Recording', color: '#0891b2' },
+  { key: 'video', title: 'Video Recording', color: '#db2777' },
+  { key: 'social', title: 'Post on Social Media', color: '#ea580c' },
+  { key: 'done', title: 'Done', color: '#0f766e' },
+] as const;
 
 const getTaskCategory = (type: string) => {
   switch (type) {
@@ -213,6 +236,22 @@ const formatDueDate = (dueDate?: string | null) => {
   } catch {
     return dueDate;
   }
+};
+
+const getDescriptionPreview = (description?: string | null, maxLength = 50) => {
+  const text = description?.trim();
+  if (!text) return null;
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+};
+
+const formatLoggedMinutes = (minutes?: number) => {
+  const total = Math.max(0, minutes || 0);
+  if (total <= 0) return null;
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+  if (hours > 0 && mins > 0) return `${hours}h ${mins}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${mins}m`;
 };
 
 const getOrderedBoardLists = (board: KanbanBoard) => {
@@ -394,6 +433,7 @@ const getBoardReleaseOptions = (
 const BoardCard = ({
   card,
   labels,
+  linkedFeatureNames,
   onOpen,
   onDragStart,
   onDragEnd,
@@ -402,9 +442,11 @@ const BoardCard = ({
   onToggleChecklist,
   onToggleChecklistItem,
   onScheduleBug,
+  onOpenResource,
 }: {
   card: KanbanCard;
   labels: KanbanLabel[];
+  linkedFeatureNames?: string[];
   onOpen: (card: KanbanCard) => void;
   onDragStart: (event: React.DragEvent<HTMLDivElement>, card: KanbanCard) => void;
   onDragEnd: () => void;
@@ -413,8 +455,11 @@ const BoardCard = ({
   onToggleChecklist: (cardId: string) => void;
   onToggleChecklistItem: (cardId: string, itemId: string) => void;
   onScheduleBug: (card: KanbanCard) => void;
+  onOpenResource: (card: KanbanCard) => void;
 }) => {
   const checklistDone = cardChecklistDone(card);
+  const descriptionPreview = getDescriptionPreview(card.description);
+  const loggedTimeLabel = formatLoggedMinutes(card.totalLoggedMinutes);
   const labelBars = card.labelIds
     .map((labelId) => labels.find((label) => label.id === labelId))
     .filter((label): label is KanbanLabel => !!label);
@@ -450,10 +495,46 @@ const BoardCard = ({
           ))}
         </div>
       ) : null}
-      <div className="line-clamp-2 text-sm font-semibold leading-5 text-foreground">{card.title}</div>
-      {card.description?.trim() ? (
+      <div className="flex items-start justify-between gap-2">
+        <div className="line-clamp-2 text-sm font-semibold leading-5 text-foreground">{card.title}</div>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenResource(card);
+          }}
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background/40 text-muted-foreground transition hover:border-border hover:bg-background/60 hover:text-foreground"
+          title="Open resource card"
+        >
+          <Library className="h-3.5 w-3.5" />
+        </button>
+      </div>
+      {card.brandingType ? (
+        <div className="mt-2">
+          <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/40 px-2 py-1 text-[11px] text-muted-foreground">
+            {card.brandingType === 'video' ? <Video className="h-3 w-3" /> : <FileText className="h-3 w-3" />}
+            {card.brandingType === 'video' ? 'Video' : 'Blog'}
+          </span>
+        </div>
+      ) : null}
+      {linkedFeatureNames && linkedFeatureNames.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {linkedFeatureNames.slice(0, 2).map((linkedFeatureName) => (
+            <span key={linkedFeatureName} className="inline-flex max-w-full items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[11px] font-medium text-emerald-200">
+              <Library className="h-3 w-3 shrink-0" />
+              <span className="truncate">{linkedFeatureName}</span>
+            </span>
+          ))}
+          {linkedFeatureNames.length > 2 ? (
+            <span className="inline-flex items-center rounded-full border border-border/60 bg-background/40 px-2 py-1 text-[11px] text-muted-foreground">
+              +{linkedFeatureNames.length - 2} more
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+      {descriptionPreview ? (
         <div className="mt-2 rounded-lg bg-background/35 px-2.5 py-2 text-xs leading-4 text-muted-foreground">
-          {card.description}
+          {descriptionPreview}
         </div>
       ) : null}
       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
@@ -468,6 +549,12 @@ const BoardCard = ({
           <CheckSquare className="h-3 w-3" />
           {checklistDone}/{card.checklist.length}
         </button>
+        {loggedTimeLabel ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/40 px-2 py-0.5">
+            <Clock3 className="h-3 w-3" />
+            {loggedTimeLabel}
+          </span>
+        ) : null}
         {card.dueDate ? (
           <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/40 px-2 py-0.5">
             <Clock3 className="h-3 w-3" />
@@ -530,6 +617,7 @@ const BoardList = ({
   list,
   cards,
   labels,
+  getLinkedFeatureNames,
   onOpenCard,
   onAddCard,
   onCardDragStart,
@@ -549,10 +637,12 @@ const BoardList = ({
   onToggleChecklist,
   onToggleChecklistItem,
   onScheduleBug,
+  onOpenResource,
 }: {
   list: KanbanList;
   cards: KanbanCard[];
   labels: KanbanLabel[];
+  getLinkedFeatureNames: (card: KanbanCard) => string[];
   onOpenCard: (card: KanbanCard) => void;
   onAddCard: (listId: string) => void;
   onCardDragStart: (event: React.DragEvent<HTMLDivElement>, card: KanbanCard) => void;
@@ -572,6 +662,7 @@ const BoardList = ({
   onToggleChecklist: (cardId: string) => void;
   onToggleChecklistItem: (cardId: string, itemId: string) => void;
   onScheduleBug: (card: KanbanCard) => void;
+  onOpenResource: (card: KanbanCard) => void;
 }) => (
   <div className="flex min-h-[460px] flex-col rounded-xl border border-border/60 bg-card/70">
     <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2.5">
@@ -625,6 +716,7 @@ const BoardList = ({
                 <BoardCard
                   card={card}
                   labels={labels}
+                  linkedFeatureNames={getLinkedFeatureNames(card)}
                   onOpen={onOpenCard}
                   onDragStart={onCardDragStart}
                   onDragEnd={onCardDragEnd}
@@ -633,6 +725,7 @@ const BoardList = ({
                   onToggleChecklist={onToggleChecklist}
                   onToggleChecklistItem={onToggleChecklistItem}
                   onScheduleBug={onScheduleBug}
+                  onOpenResource={onOpenResource}
                 />
               </div>
             </React.Fragment>
@@ -664,7 +757,15 @@ const BoardList = ({
   </div>
 );
 
-export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
+export function KanbanPageContent({
+  isModal = false,
+  forcedBoardMode,
+  initialBoardId,
+  initialCardId,
+  onSelectCard,
+}: KanbanPageContentProps) {
+  const appliedInitialCardKeyRef = useRef<string | null>(null);
+  const searchParams = useSearchParams();
   const {
     schedule,
     setSchedule,
@@ -676,20 +777,27 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
     setDeepWorkDefinitions,
     kanbanBoards,
     setKanbanBoards,
+    refreshKanbanBoards,
     offerizationPlans,
     coreSkills,
     projects,
+    resources,
+    setResources,
+    resourceFolders,
+    setResourceFolders,
+    openGeneralPopup,
   } = useAuth();
 
-  const [boardMode, setBoardMode] = useState<BoardMode>(isModal ? 'tasks' : 'project');
+  const [boardMode, setBoardMode] = useState<BoardMode>(forcedBoardMode || (isModal ? 'tasks' : 'project'));
   const [selectedBoardId, setSelectedBoardId] = useState('');
   const [search, setSearch] = useState('');
+  const [selectedFeatureFilterId, setSelectedFeatureFilterId] = useState('');
   const [selectedCardId, setSelectedCardId] = useState('');
   const [cardDraft, setCardDraft] = useState<CardDraft | null>(null);
   const [cardLabelsDraft, setCardLabelsDraft] = useState<KanbanLabel[]>([]);
   const [newLabelTitle, setNewLabelTitle] = useState('');
   const [newLabelColor, setNewLabelColor] = useState(LABEL_COLOR_PALETTE[0]);
-  const [selectedIntentionMicroSkillId, setSelectedIntentionMicroSkillId] = useState('');
+  const [selectedIntentionMicroSkillIds, setSelectedIntentionMicroSkillIds] = useState<string[]>([]);
   const [newIntentionName, setNewIntentionName] = useState('');
   const [newBugIssueName, setNewBugIssueName] = useState('');
   const [pendingNewIntentions, setPendingNewIntentions] = useState<PendingIntentionDraft[]>([]);
@@ -781,38 +889,131 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
   }, [kanbanBoards, releaseOptions]);
 
   useEffect(() => {
+    if (forcedBoardMode && boardMode !== forcedBoardMode) {
+      setBoardMode(forcedBoardMode);
+    }
+  }, [boardMode, forcedBoardMode]);
+
+  useEffect(() => {
+    if (!initialBoardId) return;
+    if (!kanbanBoards.some((board) => board.id === initialBoardId)) return;
+    if (selectedBoardId === initialBoardId) return;
+    setSelectedBoardId(initialBoardId);
+  }, [initialBoardId, kanbanBoards, selectedBoardId]);
+
+  useEffect(() => {
+    if (boardMode !== 'project') return;
+    const specId = searchParams.get('spec') || '';
+    const releaseId = searchParams.get('release') || '';
+    if (!specId || !releaseId) return;
+    const matchedBoard = visibleBoards.find(
+      (board) => board.specializationId === specId && board.releaseId === releaseId
+    );
+    if (matchedBoard && matchedBoard.id !== selectedBoardId) {
+      setSelectedBoardId(matchedBoard.id);
+    }
+  }, [boardMode, searchParams, selectedBoardId, visibleBoards]);
+
+  useEffect(() => {
     if (boardMode !== 'project') return;
     if (!selectedBoardId || !visibleBoards.some((board) => board.id === selectedBoardId)) {
       setSelectedBoardId(visibleBoards[0]?.id || '');
     }
   }, [boardMode, selectedBoardId, visibleBoards]);
 
-  const selectedBoard = useMemo(
+  useEffect(() => {
+    setSelectedFeatureFilterId('');
+  }, [selectedBoardId]);
+
+  const selectedProjectBoard = useMemo(
     () => visibleBoards.find((board) => board.id === selectedBoardId) || null,
     [visibleBoards, selectedBoardId]
   );
 
   const selectedBoardMeta = useMemo(() => {
-    if (!selectedBoard) return null;
+    if (!selectedProjectBoard) return null;
     const option = releaseOptions.find(
-      (item) => item.release.id === selectedBoard.releaseId && item.specializationId === selectedBoard.specializationId
+      (item) => item.release.id === selectedProjectBoard.releaseId && item.specializationId === selectedProjectBoard.specializationId
     );
     return option || null;
-  }, [selectedBoard, releaseOptions]);
+  }, [selectedProjectBoard, releaseOptions]);
 
   const selectedProject = useMemo(() => {
-    if (!selectedBoard) return null;
+    if (!selectedProjectBoard) return null;
     return (
-      projects.find((project) => project.id === selectedBoard.projectId) ||
-      projects.find((project) => project.name === selectedBoard.name) ||
+      projects.find((project) => project.id === selectedProjectBoard.projectId) ||
+      projects.find((project) => project.name === selectedProjectBoard.name) ||
       null
     );
-  }, [projects, selectedBoard]);
+  }, [projects, selectedProjectBoard]);
+
+  const selectedBrandingBoard = useMemo(() => {
+    if (!selectedProject?.id) return null;
+    return kanbanBoards.find((board) => board.boardType === 'branding' && board.projectId === selectedProject.id) || null;
+  }, [kanbanBoards, selectedProject]);
+
+  const selectedBoard = boardMode === 'branding' ? selectedBrandingBoard : selectedProjectBoard;
+
+  useEffect(() => {
+    if (!initialCardId || !selectedBoard) return;
+    const initialCardKey = `${selectedBoard.id}:${initialCardId}`;
+    if (appliedInitialCardKeyRef.current === initialCardKey) return;
+    if (!selectedBoard.cards.some((card) => card.id === initialCardId)) return;
+    appliedInitialCardKeyRef.current = initialCardKey;
+    setSelectedCardId(initialCardId);
+  }, [initialCardId, selectedBoard]);
+
+  useEffect(() => {
+    if (!initialCardId) {
+      appliedInitialCardKeyRef.current = null;
+    }
+  }, [initialCardId]);
 
   const selectedSpecialization = useMemo(() => {
-    if (!selectedBoard?.specializationId) return null;
-    return coreSkills.find((skill) => skill.id === selectedBoard.specializationId) || null;
-  }, [coreSkills, selectedBoard]);
+    if (!selectedProjectBoard?.specializationId) return null;
+    return coreSkills.find((skill) => skill.id === selectedProjectBoard.specializationId) || null;
+  }, [coreSkills, selectedProjectBoard]);
+
+  useEffect(() => {
+    if (boardMode !== 'branding' || !selectedProjectBoard || !selectedProject || selectedBrandingBoard) return;
+    const timestamp = new Date().toISOString();
+    const boardId = `branding_board_${selectedProject.id}`;
+    const labels: KanbanBoard['labels'] = [];
+    const lists: KanbanList[] = BRANDING_LIST_TEMPLATES.map((list, index) => ({
+      id: `${boardId}_${list.key}`,
+      boardId,
+      title: list.title,
+      color: list.color,
+      cardOrder: [],
+      position: index,
+      archived: false,
+    }));
+
+    setKanbanBoards((prev) => {
+      if (prev.some((board) => board.id === boardId)) return prev;
+      return [
+        ...prev,
+        {
+          id: boardId,
+          name: `${selectedProject.name} Branding`,
+          description: `${selectedProject.name} feature branding pipeline`,
+          projectId: selectedProject.id,
+          releaseId: selectedProjectBoard.releaseId || null,
+          specializationId: selectedProjectBoard.specializationId || null,
+          createdAt: timestamp,
+          updatedAt: timestamp,
+          listOrder: lists.map((list) => list.id),
+          labels,
+          lists,
+          cards: [],
+          attachments: [],
+          comments: [],
+          boardType: 'branding',
+          migratedFromReleaseWorkflow: false,
+        },
+      ];
+    });
+  }, [boardMode, selectedBrandingBoard, selectedProject, selectedProjectBoard, setKanbanBoards]);
 
   const availableMicroSkills = useMemo(
     () =>
@@ -841,6 +1042,187 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
     [selectedSpecialization]
   );
 
+  const selectedFeatureResource = useMemo(() => {
+    if (!selectedProjectBoard) return null;
+    const featureCardName = `${selectedProject?.name || selectedProjectBoard.name} Features`;
+    const featureFolderId = resourceFolders.find((folder) => folder.name === 'Kanban Features' && folder.parentId === null)?.id || null;
+    return (
+      resources.find(
+        (resource) =>
+          resource.type === 'card' &&
+          resource.name === featureCardName &&
+          (!featureFolderId || resource.folderId === featureFolderId)
+      ) || null
+    );
+  }, [resourceFolders, resources, selectedProject, selectedProjectBoard]);
+
+  const featurePointOptions = useMemo(() => {
+    return (selectedFeatureResource?.points || [])
+      .filter((point) => (point.type === 'text' || point.type === 'todo') && point.text.trim())
+      .map((point) => ({
+        id: point.id,
+        name: point.text.trim(),
+      }));
+  }, [selectedFeatureResource]);
+
+  const linkedFeatureLookup = useMemo(() => {
+    const lookup = new Map<string, string>();
+    resources.forEach((resource) => {
+      (resource.points || []).forEach((point) => {
+        const text = point.text?.trim();
+        if (!text) return;
+        lookup.set(`${resource.id}:${point.id}`, text);
+      });
+    });
+    return lookup;
+  }, [resources]);
+
+  const handleOpenFeaturesResource = useCallback(() => {
+    if (!selectedProjectBoard) return;
+
+    const now = new Date().toISOString();
+    const featureFolderName = 'Kanban Features';
+    const featureCardName = `${selectedProject?.name || selectedProjectBoard.name} Features`;
+
+    let targetFolder = resourceFolders.find((folder) => folder.name === featureFolderName && folder.parentId === null) || null;
+    const nextFolders = [...resourceFolders];
+
+    if (!targetFolder) {
+      targetFolder = {
+        id: `folder_kanban_features_${Date.now()}`,
+        name: featureFolderName,
+        parentId: null,
+        icon: 'Library',
+      } as ResourceFolder;
+      nextFolders.push(targetFolder);
+      setResourceFolders(nextFolders);
+    }
+
+    let featureResource =
+      resources.find((resource) => resource.folderId === targetFolder!.id && resource.name === featureCardName && resource.type === 'card') || null;
+
+    if (!featureResource) {
+      const seededPoints = (selectedProject?.features || []).length > 0
+        ? selectedProject!.features.map((feature) => ({
+            id: `point_feature_${feature.id}`,
+            text: feature.name,
+            type: 'todo' as const,
+            checked: false,
+          }))
+        : [
+            {
+              id: `point_${Date.now()}_seed`,
+              text: '',
+              type: 'todo' as const,
+              checked: false,
+            },
+          ];
+
+      featureResource = {
+        id: `res_feature_${Date.now()}`,
+        name: featureCardName,
+        folderId: targetFolder.id,
+        type: 'card',
+        createdAt: now,
+        points: seededPoints,
+        icon: 'Library',
+      } as Resource;
+      setResources((prev) => [...prev, featureResource!]);
+    }
+
+    openGeneralPopup(featureResource.id, null);
+  }, [openGeneralPopup, resourceFolders, resources, selectedProject, selectedProjectBoard, setResourceFolders, setResources]);
+
+  const handleOpenCardResource = useCallback((card: KanbanCard) => {
+    const timestamp = new Date().toISOString();
+    const rootFolderName = 'Kanban Card Resources';
+    const boardFolderName = selectedProject?.name || selectedBoard?.name || 'Kanban Board';
+
+    let nextFolders = [...resourceFolders];
+    let rootFolder = nextFolders.find((folder) => folder.name === rootFolderName && folder.parentId === null) || null;
+    if (!rootFolder) {
+      rootFolder = {
+        id: `folder_kanban_cards_${Date.now()}`,
+        name: rootFolderName,
+        parentId: null,
+        icon: 'Library',
+      } as ResourceFolder;
+      nextFolders.push(rootFolder);
+    }
+
+    let boardFolder = nextFolders.find((folder) => folder.name === boardFolderName && folder.parentId === rootFolder!.id) || null;
+    if (!boardFolder) {
+      boardFolder = {
+        id: `folder_kanban_board_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: boardFolderName,
+        parentId: rootFolder!.id,
+        icon: 'Library',
+      } as ResourceFolder;
+      nextFolders.push(boardFolder);
+    }
+
+    if (nextFolders.length !== resourceFolders.length) {
+      setResourceFolders(nextFolders);
+    }
+
+    let resource =
+      (card.linkedResourceId ? resources.find((entry) => entry.id === card.linkedResourceId) : null) ||
+      null;
+
+    if (!resource) {
+      resource = {
+        id: `res_kanban_card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        name: card.title || 'Kanban Card',
+        folderId: boardFolder.id,
+        type: 'card',
+        createdAt: timestamp,
+        points: buildDefaultPointsForResourceType('card', []),
+        icon: 'Library',
+      } as Resource;
+      setResources((prev) => [...prev, resource!]);
+      setKanbanBoards((prev) =>
+        prev.map((board) =>
+          board.id === card.boardId
+            ? {
+                ...board,
+                cards: board.cards.map((entry) =>
+                  entry.id === card.id ? { ...entry, linkedResourceId: resource!.id, updatedAt: timestamp } : entry
+                ),
+                updatedAt: timestamp,
+              }
+            : board
+        )
+      );
+    } else {
+      if (resource.name !== card.title || resource.folderId !== boardFolder.id) {
+        const nextResource = {
+          ...resource,
+          name: card.title || resource.name,
+          folderId: boardFolder.id,
+        };
+        resource = nextResource;
+        setResources((prev) => prev.map((entry) => (entry.id === nextResource.id ? nextResource : entry)));
+      }
+      if (card.linkedResourceId !== resource.id) {
+        setKanbanBoards((prev) =>
+          prev.map((board) =>
+            board.id === card.boardId
+              ? {
+                  ...board,
+                  cards: board.cards.map((entry) =>
+                    entry.id === card.id ? { ...entry, linkedResourceId: resource!.id, updatedAt: timestamp } : entry
+                  ),
+                  updatedAt: timestamp,
+                }
+              : board
+          )
+        );
+      }
+    }
+
+    openGeneralPopup(resource.id, null);
+  }, [openGeneralPopup, resourceFolders, resources, selectedBoard?.name, selectedProject?.name, setKanbanBoards, setResourceFolders, setResources]);
+
   const selectedLists = useMemo(() => {
     if (!selectedBoard) return [] as KanbanList[];
     const listMap = new Map(selectedBoard.lists.map((list) => [list.id, list]));
@@ -852,16 +1234,33 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
   const filteredCardIds = useMemo(() => {
     if (!selectedBoard) return new Set<string>();
     const query = search.trim().toLowerCase();
+    const selectedFeatureKey = selectedFeatureResource?.id && selectedFeatureFilterId
+      ? `${selectedFeatureResource.id}:${selectedFeatureFilterId}`
+      : '';
     return new Set(
       selectedBoard.cards
         .filter((card) => !card.archived)
         .filter((card) => {
-          if (!query) return true;
-          return `${card.title} ${card.description}`.toLowerCase().includes(query);
+          const linkedFeatureIds = card.linkedFeaturePointIds?.length
+            ? card.linkedFeaturePointIds
+            : card.linkedFeaturePointId
+              ? [card.linkedFeaturePointId]
+              : [];
+          const linkedFeatureName = card.linkedFeatureResourceId
+            ? linkedFeatureIds
+                .map((pointId) => linkedFeatureLookup.get(`${card.linkedFeatureResourceId}:${pointId}`) || '')
+                .filter(Boolean)
+                .join(' ')
+            : '';
+          const matchesQuery = !query || `${card.title} ${card.description} ${linkedFeatureName}`.toLowerCase().includes(query);
+          const matchesFeatureFilter =
+            !selectedFeatureKey ||
+            linkedFeatureIds.some((pointId) => `${card.linkedFeatureResourceId || ''}:${pointId}` === selectedFeatureKey);
+          return matchesQuery && matchesFeatureFilter;
         })
         .map((card) => card.id)
     );
-  }, [selectedBoard, search]);
+  }, [linkedFeatureLookup, search, selectedBoard, selectedFeatureFilterId, selectedFeatureResource]);
 
   const cardsByList = useMemo(() => {
     if (!selectedBoard) return new Map<string, KanbanCard[]>();
@@ -884,6 +1283,58 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
     return selectedBoard.cards.find((card) => card.id === selectedCardId) || null;
   }, [selectedBoard, selectedCardId]);
 
+  const getLinkedFeatureNames = useCallback(
+    (card: KanbanCard) => {
+      const ids = card.linkedFeaturePointIds?.length
+        ? card.linkedFeaturePointIds
+        : card.linkedFeaturePointId
+          ? [card.linkedFeaturePointId]
+          : [];
+      if (!card.linkedFeatureResourceId || ids.length === 0) return [];
+      return ids
+        .map((pointId) => linkedFeatureLookup.get(`${card.linkedFeatureResourceId}:${pointId}`) || '')
+        .filter(Boolean);
+    },
+    [linkedFeatureLookup]
+  );
+
+  useEffect(() => {
+    if (!selectedProjectBoard || !selectedFeatureResource) return;
+
+    const doneList = getDoneList(selectedProjectBoard);
+    if (!doneList) return;
+
+    setResources((prev) => {
+      let didChange = false;
+
+      const nextResources = prev.map((resource) => {
+        if (resource.id !== selectedFeatureResource.id) return resource;
+
+        const nextPoints = resource.points.map((point) => {
+          const linkedCards = selectedProjectBoard.cards.filter(
+            (card) =>
+              !card.archived &&
+              card.linkedFeatureResourceId === resource.id &&
+              card.linkedFeaturePointId === point.id
+          );
+
+          const shouldBeChecked = linkedCards.length > 0 && linkedCards.every((card) => card.listId === doneList.id);
+          if (point.checked === shouldBeChecked) return point;
+
+          didChange = true;
+          return {
+            ...point,
+            checked: shouldBeChecked,
+          };
+        });
+
+        return didChange ? { ...resource, points: nextPoints } : resource;
+      });
+
+      return didChange ? nextResources : prev;
+    });
+  }, [selectedFeatureResource, selectedProjectBoard, setResources]);
+
   const isBugCard = selectedCard?.cardKind === 'bug';
 
   const selectedListIndex = useMemo(() => {
@@ -893,6 +1344,7 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
 
   const isReviewCard = Boolean(
     selectedCard &&
+      boardMode === 'project' &&
       !isBugCard &&
       (selectedListIndex === 2 || (selectedLists.length > 0 && selectedListIndex === selectedLists.length - 1))
   );
@@ -926,13 +1378,16 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
       description: selectedCard.description,
       dueDate: selectedCard.dueDate || '',
       labelIds: [...selectedCard.labelIds],
+      linkedFeaturePointId: selectedCard.linkedFeaturePointId || '',
+      linkedFeaturePointIds: [...(selectedCard.linkedFeaturePointIds || (selectedCard.linkedFeaturePointId ? [selectedCard.linkedFeaturePointId] : []))],
+      brandingType: selectedCard.brandingType || 'blog',
       linkedIntentionIds: [...selectedCard.linkedIntentionIds],
       checklist: selectedCard.checklist.map((item) => ({ ...item })),
     });
     setCardLabelsDraft(selectedBoard?.labels || []);
     setNewLabelTitle('');
     setNewLabelColor(LABEL_COLOR_PALETTE[0]);
-    setSelectedIntentionMicroSkillId(availableMicroSkills[0]?.id || '');
+    setSelectedIntentionMicroSkillIds(availableMicroSkills[0] ? [availableMicroSkills[0].id] : []);
     setNewIntentionName('');
     setNewBugIssueName('');
     setPendingNewIntentions([]);
@@ -954,6 +1409,10 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
   };
 
   const openCard = (card: KanbanCard) => {
+    if (onSelectCard) {
+      onSelectCard(card);
+      return;
+    }
     setSelectedCardId(card.id);
   };
 
@@ -973,6 +1432,10 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
       checklist: [],
       attachmentIds: [],
       commentIds: [],
+      linkedFeatureResourceId: selectedFeatureResource?.id || null,
+      linkedFeaturePointId: null,
+      linkedFeaturePointIds: [],
+      brandingType: boardMode === 'branding' ? 'blog' : null,
       linkedIntentionIds: [],
       workflowStageKey: null,
       parentCardId: null,
@@ -981,6 +1444,8 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
       resolvedAt: null,
       linkedProjectId: selectedBoard.projectId || null,
       linkedReleaseId: selectedBoard.releaseId || null,
+      linkedResourceId: null,
+      totalLoggedMinutes: 0,
       archived: false,
       position: (selectedBoard.cards.filter((card) => card.listId === listId).length) + 1,
       createdAt: timestamp,
@@ -1187,7 +1652,7 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
     setCardLabelsDraft([]);
     setNewLabelTitle('');
     setNewLabelColor(LABEL_COLOR_PALETTE[0]);
-    setSelectedIntentionMicroSkillId('');
+    setSelectedIntentionMicroSkillIds([]);
     setNewIntentionName('');
     setNewBugIssueName('');
     setPendingNewIntentions([]);
@@ -1250,42 +1715,58 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
     ));
   };
 
-  const selectedMicroSkillName = useMemo(
-    () => availableMicroSkills.find((microSkill) => microSkill.id === selectedIntentionMicroSkillId)?.name || '',
-    [availableMicroSkills, selectedIntentionMicroSkillId]
+  const selectedIntentionMicroSkills = useMemo(
+    () => availableMicroSkills.filter((microSkill) => selectedIntentionMicroSkillIds.includes(microSkill.id)),
+    [availableMicroSkills, selectedIntentionMicroSkillIds]
   );
 
-  const existingIntentionsForMicroSkill = useMemo(() => {
-    if (!selectedProject || !selectedMicroSkillName) return [] as ExerciseDefinition[];
+  const existingProjectIntentions = useMemo(() => {
+    if (!selectedProject) return [] as ExerciseDefinition[];
     return deepWorkDefinitions.filter((definition) => {
       if (definition.nodeType !== 'Intention') return false;
       const projectMatch =
         definition.primaryProjectId === selectedProject.id ||
         Boolean(definition.linkedProjectIds?.includes(selectedProject.id));
       if (!projectMatch) return false;
-      return definition.category === selectedMicroSkillName;
+      if (selectedIntentionMicroSkillIds.length === 0) return true;
+      return (
+        Boolean(definition.linkedMicroSkillIds?.some((id) => selectedIntentionMicroSkillIds.includes(id))) ||
+        selectedIntentionMicroSkills.some((microSkill) => microSkill.name === definition.category)
+      );
     });
-  }, [deepWorkDefinitions, selectedProject, selectedMicroSkillName]);
+  }, [deepWorkDefinitions, selectedIntentionMicroSkillIds, selectedIntentionMicroSkills, selectedProject]);
 
   const visibleIntentionOptions = useMemo(() => {
     const pending = pendingNewIntentions
-      .filter((draft) => draft.microSkillId === selectedIntentionMicroSkillId)
+      .filter((draft) =>
+        selectedIntentionMicroSkillIds.length === 0 ||
+        draft.microSkillIds.some((id) => selectedIntentionMicroSkillIds.includes(id))
+      )
       .map((draft) => ({
-          id: draft.tempId,
+        id: draft.tempId,
         name: draft.name,
         description: '',
+        microSkillNames: draft.microSkillNames,
         kind: 'pending' as const,
       }));
 
-    const existing = existingIntentionsForMicroSkill.map((definition) => ({
+    const existing = existingProjectIntentions.map((definition) => ({
       id: definition.id,
       name: definition.name,
       description: definition.description || '',
+      microSkillNames:
+        availableMicroSkills
+          .filter((microSkill) => (definition.linkedMicroSkillIds || []).includes(microSkill.id))
+          .map((microSkill) => microSkill.name)
+          .concat(
+            definition.linkedMicroSkillIds?.length ? [] : definition.category ? [definition.category] : []
+          )
+          .filter((name, index, list) => list.indexOf(name) === index),
       kind: 'existing' as const,
     }));
 
     return [...pending, ...existing].filter((option) => !cardDraft?.linkedIntentionIds.includes(option.id));
-  }, [cardDraft?.linkedIntentionIds, existingIntentionsForMicroSkill, pendingNewIntentions, selectedIntentionMicroSkillId]);
+  }, [availableMicroSkills, cardDraft?.linkedIntentionIds, existingProjectIntentions, pendingNewIntentions, selectedIntentionMicroSkillIds]);
 
   const openBugCardsByIntention = useMemo(() => {
     const map = new Map<string, KanbanCard>();
@@ -1468,6 +1949,8 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
       resolvedAt: null,
       linkedProjectId: selectedBoard.projectId || null,
       linkedReleaseId: selectedBoard.releaseId || null,
+      linkedResourceId: null,
+      totalLoggedMinutes: 0,
       archived: false,
       position: selectedBoard.cards.filter((card) => card.listId === targetList.id && !card.archived).length + 1,
       createdAt: timestamp,
@@ -1524,14 +2007,14 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
 
   const handleAddNewIntentionDraft = () => {
     const name = newIntentionName.trim();
-    if (!name || !selectedIntentionMicroSkillId || !selectedMicroSkillName) return;
+    if (!name || selectedIntentionMicroSkills.length === 0) return;
 
     const tempId = `temp-intention-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const nextDraft: PendingIntentionDraft = {
       tempId,
       name,
-      microSkillId: selectedIntentionMicroSkillId,
-      microSkillName: selectedMicroSkillName,
+      microSkillIds: selectedIntentionMicroSkills.map((microSkill) => microSkill.id),
+      microSkillNames: selectedIntentionMicroSkills.map((microSkill) => microSkill.name),
     };
 
     setPendingNewIntentions((prev) => [...prev, nextDraft]);
@@ -1576,10 +2059,11 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
             return {
               id: realId,
               name: draft.name,
-              category: draft.microSkillName as ExerciseDefinition['category'],
+              category: (draft.microSkillNames[0] || 'Commentary') as ExerciseDefinition['category'],
               description: '',
               linkedProjectIds: selectedProject ? [selectedProject.id] : [],
               primaryProjectId: selectedProject?.id || null,
+              linkedMicroSkillIds: draft.microSkillIds,
               nodeType: 'Intention',
             };
           });
@@ -1589,6 +2073,13 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
     }
 
     const finalLinkedIntentionIds = cardDraft.linkedIntentionIds.map((id) => pendingIdMap.get(id) || id);
+    const finalLinkedFeaturePointIds = boardMode === 'branding'
+      ? cardDraft.linkedFeaturePointIds
+      : (cardDraft.linkedFeaturePointId ? [cardDraft.linkedFeaturePointId] : []);
+    const primaryLinkedFeaturePointId =
+      boardMode === 'branding'
+        ? finalLinkedFeaturePointIds[0] || null
+        : (cardDraft.linkedFeaturePointId || null);
     const finalChecklist = cardDraft.checklist.map((item) => ({
       ...item,
       linkedIntentionId: item.linkedIntentionId ? pendingIdMap.get(item.linkedIntentionId) || item.linkedIntentionId : undefined,
@@ -1610,6 +2101,10 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
                 description: cardDraft.description.trim(),
                 dueDate: cardDraft.dueDate || null,
                 labelIds: cardDraft.labelIds,
+                linkedFeatureResourceId: selectedFeatureResource?.id || null,
+                linkedFeaturePointId: primaryLinkedFeaturePointId,
+                linkedFeaturePointIds: finalLinkedFeaturePointIds,
+                brandingType: boardMode === 'branding' ? cardDraft.brandingType : null,
                 linkedIntentionIds: finalLinkedIntentionIds,
                 checklist: finalChecklist,
                 updatedAt: timestamp,
@@ -1743,6 +2238,16 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
               </button>
               <button
                 type="button"
+                onClick={() => setBoardMode('branding')}
+                className={cn(
+                  'rounded-md px-3 py-1.5 text-sm transition',
+                  boardMode === 'branding' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                Branding
+              </button>
+              <button
+                type="button"
                 onClick={() => setBoardMode('tasks')}
                 className={cn(
                   'rounded-md px-3 py-1.5 text-sm transition',
@@ -1753,45 +2258,83 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
               </button>
             </div>
 
-            {boardMode === 'project' ? (
-              <div className="min-w-[260px] flex-1 xl:max-w-[420px]">
-                <select
-                  value={selectedBoardId}
-                  onChange={(event) => setSelectedBoardId(event.target.value)}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+            {boardMode === 'project' || boardMode === 'branding' ? (
+              <div className="flex min-w-[260px] flex-1 items-center gap-2 xl:max-w-[420px]">
+                <div className="flex-1">
+                  <select
+                    value={selectedBoardId}
+                    onChange={(event) => setSelectedBoardId(event.target.value)}
+                    className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                  >
+                    <option value="">Select board...</option>
+                    {visibleBoards.map((board) => (
+                      <option key={board.id} value={board.id}>
+                        {board.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={refreshKanbanBoards}
+                  aria-label="Refresh linked project boards"
+                  title="Refresh linked project boards"
+                  className="h-10 w-10 shrink-0"
                 >
-                  <option value="">Select board...</option>
-                  {visibleBoards.map((board) => (
-                    <option key={board.id} value={board.id}>
-                      {board.name}
-                    </option>
-                  ))}
-                </select>
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleOpenFeaturesResource}
+                  disabled={!selectedProjectBoard}
+                  className="h-10 shrink-0"
+                >
+                  <Library className="mr-2 h-4 w-4" />
+                  Add Features
+                </Button>
               </div>
             ) : null}
           </div>
         </div>
 
-        {boardMode === 'project' ? (
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search cards"
-              className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none"
-            />
+        {boardMode === 'project' || boardMode === 'branding' ? (
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search cards or linked features"
+                className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm outline-none"
+              />
+            </div>
+            <select
+              value={selectedFeatureFilterId}
+              onChange={(event) => setSelectedFeatureFilterId(event.target.value)}
+              disabled={!selectedFeatureResource || featurePointOptions.length === 0}
+              className="h-10 min-w-[260px] rounded-md border border-input bg-background px-3 text-sm outline-none disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="">All features</option>
+              {featurePointOptions.map((feature) => (
+                <option key={feature.id} value={feature.id}>
+                  {feature.name}
+                </option>
+              ))}
+            </select>
           </div>
         ) : null}
 
-        {boardMode === 'project' ? (
+        {boardMode === 'project' || boardMode === 'branding' ? (
           selectedBoard ? (
             <>
               <div className="flex flex-wrap items-center gap-2 px-1">
                 {selectedBoardMeta ? (
                   <Badge variant="outline">{selectedBoardMeta.specializationName}</Badge>
                 ) : null}
-                <Badge variant="secondary">Release linked</Badge>
+                <Badge variant="secondary">{boardMode === 'branding' ? 'Branding board' : 'Release linked'}</Badge>
                 <Badge variant="secondary">{selectedLists.length} lists</Badge>
                 <Badge variant="secondary">
                   {selectedBoard.cards.filter((card) => !card.archived).length} cards
@@ -1799,13 +2342,17 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
               </div>
 
               <div className="flex min-h-0 flex-1 overflow-x-auto pb-2">
-                <div className="grid min-h-full min-w-[1450px] auto-cols-fr grid-flow-col gap-3 xl:min-w-0 xl:w-full xl:grid-flow-row xl:grid-cols-5">
+                <div
+                  className="grid min-h-full min-w-[1450px] auto-cols-fr grid-flow-col gap-3 xl:min-w-0 xl:w-full"
+                  style={{ gridTemplateColumns: `repeat(${Math.max(selectedLists.length, 1)}, minmax(0, 1fr))` }}
+                >
                   {selectedLists.map((list) => (
                     <BoardList
                       key={list.id}
                       list={list}
                       cards={cardsByList.get(list.id) || []}
                       labels={selectedBoard.labels}
+                      getLinkedFeatureNames={getLinkedFeatureNames}
                       onOpenCard={openCard}
                       onAddCard={handleAddCard}
                       onCardDragStart={handleCardDragStart}
@@ -1825,6 +2372,7 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
                       onToggleChecklist={toggleChecklistExpansion}
                       onToggleChecklistItem={toggleBoardChecklistItem}
                       onScheduleBug={handleScheduleBug}
+                      onOpenResource={handleOpenCardResource}
                     />
                   ))}
                 </div>
@@ -1849,7 +2397,7 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
 
       {selectedBoard && selectedCard && cardDraft ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-3xl rounded-2xl border border-border/70 bg-card shadow-2xl">
+          <div className="flex h-[min(90vh,860px)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
               <div className="min-w-0 flex-1 space-y-3">
                 <div className="flex flex-wrap items-center gap-3">
@@ -1883,6 +2431,7 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
               </button>
             </div>
 
+            <div className="min-h-0 flex-1 overflow-y-auto">
             {isBugCard ? (
               <div className="p-5">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
@@ -2093,23 +2642,36 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
                       <div className="mb-3 space-y-3">
                         <div>
                           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            Skill / micro-skill context
+                            Linked micro-skills
                           </div>
-                          <select
-                            value={selectedIntentionMicroSkillId}
-                            onChange={(event) => setSelectedIntentionMicroSkillId(event.target.value)}
-                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
-                          >
+                          <div className="max-h-40 space-y-3 overflow-y-auto rounded-md border border-input bg-background p-3">
                             {availableMicroSkillGroups.map((group) => (
-                              <optgroup key={group.skillAreaId} label={group.skillAreaName}>
-                                {group.microSkills.map((microSkill) => (
-                                  <option key={microSkill.id} value={microSkill.id}>
-                                    {microSkill.name}
-                                  </option>
-                                ))}
-                              </optgroup>
+                              <div key={group.skillAreaId} className="space-y-1.5">
+                                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                  {group.skillAreaName}
+                                </div>
+                                <div className="space-y-1">
+                                  {group.microSkills.map((microSkill) => (
+                                    <label key={microSkill.id} className="flex items-center gap-2 text-sm">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedIntentionMicroSkillIds.includes(microSkill.id)}
+                                        onChange={() =>
+                                          setSelectedIntentionMicroSkillIds((prev) =>
+                                            prev.includes(microSkill.id)
+                                              ? prev.filter((id) => id !== microSkill.id)
+                                              : [...prev, microSkill.id]
+                                          )
+                                        }
+                                        className="h-4 w-4"
+                                      />
+                                      <span>{microSkill.name}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
                             ))}
-                          </select>
+                          </div>
                         </div>
                         <div>
                           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -2125,14 +2687,14 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
                                   handleAddNewIntentionDraft();
                                 }
                               }}
-                              placeholder="Add new intention under selected micro-skill"
+                              placeholder="Create a new project intention"
                               className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none"
                             />
                             <Button
                               type="button"
                               variant="outline"
                               onClick={handleAddNewIntentionDraft}
-                              disabled={!newIntentionName.trim() || !selectedIntentionMicroSkillId}
+                              disabled={!newIntentionName.trim() || selectedIntentionMicroSkillIds.length === 0}
                             >
                               Add
                             </Button>
@@ -2195,6 +2757,15 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
                                 {intention.description?.trim() ? (
                                   <div className="line-clamp-2 text-xs text-muted-foreground">{intention.description}</div>
                                 ) : null}
+                                {intention.microSkillNames.length > 0 ? (
+                                  <div className="mt-2 flex flex-wrap gap-1">
+                                    {intention.microSkillNames.map((microSkillName) => (
+                                      <Badge key={`${intention.id}-${microSkillName}`} variant="outline" className="text-[10px]">
+                                        {microSkillName}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                ) : null}
                                 {intention.kind === 'pending' ? (
                                   <div className="text-[11px] uppercase tracking-wide text-amber-500">New draft</div>
                                 ) : null}
@@ -2204,7 +2775,7 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
                         </div>
                       ) : (
                         <div className="text-sm text-muted-foreground">
-                          No existing intentions found for this micro-skill and project.
+                          No existing project intentions found for the selected micro-skill context.
                         </div>
                       )}
                     </div>
@@ -2321,6 +2892,98 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
                   </div>
 
                   <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-foreground">
+                        {boardMode === 'branding' ? 'Linked features' : 'Linked feature'}
+                      </div>
+                      {selectedFeatureResource ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                          onClick={() => openGeneralPopup(selectedFeatureResource.id, null)}
+                        >
+                          Open feature card
+                        </Button>
+                      ) : null}
+                    </div>
+                    {selectedFeatureResource ? (
+                      boardMode === 'branding' ? (
+                        <div className="space-y-4">
+                          <select
+                            value={cardDraft.brandingType}
+                            onChange={(event) =>
+                              setCardDraft((prev) =>
+                                prev ? { ...prev, brandingType: event.target.value === 'video' ? 'video' : 'blog' } : prev
+                              )
+                            }
+                            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                          >
+                            <option value="blog">Blog</option>
+                            <option value="video">Video</option>
+                          </select>
+                          <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-border/60 bg-background/30 p-3">
+                            {featurePointOptions.filter((feature) => {
+                              const point = selectedFeatureResource.points.find((entry) => entry.id === feature.id);
+                              return !!point?.readyForBranding;
+                            }).map((feature) => (
+                              <label key={feature.id} className="flex items-start gap-2 text-sm text-foreground">
+                                <input
+                                  type="checkbox"
+                                  checked={cardDraft.linkedFeaturePointIds.includes(feature.id)}
+                                  onChange={(event) =>
+                                    setCardDraft((prev) => {
+                                      if (!prev) return prev;
+                                      const nextIds = event.target.checked
+                                        ? [...prev.linkedFeaturePointIds, feature.id]
+                                        : prev.linkedFeaturePointIds.filter((id) => id !== feature.id);
+                                      return { ...prev, linkedFeaturePointIds: nextIds, linkedFeaturePointId: nextIds[0] || '' };
+                                    })
+                                  }
+                                  className="mt-0.5 h-4 w-4"
+                                />
+                                <span>{feature.name}</span>
+                              </label>
+                            ))}
+                            {featurePointOptions.every((feature) => {
+                              const point = selectedFeatureResource.points.find((entry) => entry.id === feature.id);
+                              return !point?.readyForBranding;
+                            }) ? (
+                              <div className="text-sm text-muted-foreground">No feature is ready for branding yet.</div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : (
+                        <select
+                          value={cardDraft.linkedFeaturePointId}
+                          onChange={(event) =>
+                            setCardDraft((prev) => (prev ? { ...prev, linkedFeaturePointId: event.target.value } : prev))
+                          }
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                        >
+                          <option value="">No linked feature</option>
+                          {featurePointOptions.map((feature) => (
+                            <option key={feature.id} value={feature.id}>
+                              {feature.name}
+                            </option>
+                          ))}
+                        </select>
+                      )
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="text-sm text-muted-foreground">
+                          No feature resource card found for this board yet.
+                        </div>
+                        <Button type="button" variant="outline" onClick={handleOpenFeaturesResource}>
+                          <Library className="mr-2 h-4 w-4" />
+                          Create feature card
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-border/60 bg-background/40 p-4">
                     <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       Due date
@@ -2357,6 +3020,7 @@ export function KanbanPageContent({ isModal = false }: KanbanPageContentProps) {
                 </div>
               </div>
             )}
+            </div>
             <div className="flex items-center justify-between gap-3 border-t border-border/60 px-5 py-4">
               <Button variant="destructive" onClick={handleDeleteSelectedCard}>
                 <Trash2 className="mr-2 h-4 w-4" />

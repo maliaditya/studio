@@ -34,7 +34,7 @@ export async function POST(request: Request) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return NextResponse.json(
       {
-        error: 'Cloud authentication is currently unavailable. Internet access is required for first login on this device.',
+        error: 'Cloud authentication is not configured for this build. Set BLOB_READ_WRITE_TOKEN or use a deployed auth service before first login on this device.',
         code: 'CLOUD_AUTH_UNAVAILABLE',
       },
       { status: 503 }
@@ -111,6 +111,6 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error(`Blob storage login error for user ${normalizedUsername}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-    return NextResponse.json({ error: `Failed to read data from Blob storage: ${errorMessage}` }, { status: 500 });
+    return NextResponse.json({ error: `Cloud authentication request failed: ${errorMessage}` }, { status: 500 });
   }
 }

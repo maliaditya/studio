@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Repeat, Focus, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
+import { Repeat, Focus, Calendar as CalendarIcon, Trash2, BookOpenCheck } from 'lucide-react';
 import { Button } from './ui/button';
 import { SpacedRepetitionModal } from './SpacedRepetitionModal';
 import type { MicroSkill } from '@/types/workout';
@@ -14,9 +14,11 @@ import { format, parseISO, addDays, differenceInDays, isBefore, isToday, startOf
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
+import { buildFlashcardTaskKey, getFlashcardSessionsForTask } from '@/lib/flashcards';
+import { FlashcardReviewModal } from './FlashcardReviewModal';
 
 export function SpacedRepetitionPopup() {
-    const { coreSkills, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, getDeepWorkNodeType, getUpskillNodeType, scheduleTaskFromMindMap, currentSlot, handleToggleMicroSkillRepetition } = useAuth();
+    const { coreSkills, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, getDeepWorkNodeType, getUpskillNodeType, scheduleTaskFromMindMap, currentSlot, handleToggleMicroSkillRepetition, settings } = useAuth();
     const [isClient, setIsClient] = useState(false);
     
     const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -25,6 +27,7 @@ export function SpacedRepetitionPopup() {
 
     const [repetitionModalState, setRepetitionModalState] = useState<{ isOpen: boolean; skill: MicroSkill | null }>({ isOpen: false, skill: null });
     const [showOnlyToday, setShowOnlyToday] = useState(false);
+    const [flashcardReviewState, setFlashcardReviewState] = useState<{ open: boolean; taskKey: string | null; title: string }>({ open: false, taskKey: null, title: "" });
     const { toast } = useToast();
 
     useEffect(() => {
@@ -74,7 +77,12 @@ export function SpacedRepetitionPopup() {
             const deepworkFallback = intentions.find((def) => getDeepWorkNodeType(def) === 'Intention') || intentions[0];
             const upskillFallback = curiosities.find((def) => getUpskillNodeType(def) === 'Curiosity') || curiosities[0];
             const fallbackDefinition = deepworkFallback || upskillFallback;
-            const fallbackActivityType = deepworkFallback ? 'deepwork' : (upskillFallback ? 'upskill' : null);
+            const fallbackActivityType: 'deepwork' | 'upskill' | null =
+                deepworkFallback ? 'deepwork' : (upskillFallback ? 'upskill' : null);
+            const reviewTaskKey = mainIntention?.id
+                ? buildFlashcardTaskKey('deepwork', mainIntention.id)
+                : buildFlashcardTaskKey(fallbackActivityType, fallbackDefinition?.id || null);
+            const flashcardSessionCount = getFlashcardSessionsForTask(settings, reviewTaskKey).length;
             const deepWorkLeafNodes = intentions.flatMap(intention => getDescendantLeafNodes(intention.id, 'deepwork'));
             const upskillLeafNodes = curiosities.flatMap(curiosity => getDescendantLeafNodes(curiosity.id, 'upskill'));
             const allTrackableNodes = [...deepWorkLeafNodes, ...upskillLeafNodes];
@@ -109,6 +117,8 @@ export function SpacedRepetitionPopup() {
                 mainIntentionId: mainIntention?.id,
                 fallbackDefinitionId: fallbackDefinition?.id,
                 fallbackActivityType,
+                reviewTaskKey,
+                flashcardSessionCount,
                 nextReviewDate: sortedDates.length > 0 ? nextReviewDate : new Date(),
                 isOverdue: sortedDates.length > 0 && isBefore(nextReviewDate, startOfToday()),
             };
@@ -123,7 +133,7 @@ export function SpacedRepetitionPopup() {
 
         return skillsToReview.sort((a, b) => a.nextReviewDate.getTime() - b.nextReviewDate.getTime());
 
-    }, [coreSkills, deepWorkDefinitions, upskillDefinitions, getDescendantLeafNodes, getDeepWorkNodeType, getUpskillNodeType, showOnlyToday]);
+    }, [coreSkills, deepWorkDefinitions, getDeepWorkNodeType, getDescendantLeafNodes, getUpskillNodeType, settings, showOnlyToday, upskillDefinitions]);
     
     const handleMouseDown = (e: React.MouseEvent) => {
         const target = e.target as HTMLElement;
@@ -252,6 +262,24 @@ export function SpacedRepetitionPopup() {
                                                 variant="ghost"
                                                 size="icon"
                                                 className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-secondary/70"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setFlashcardReviewState({
+                                                        open: true,
+                                                        taskKey: skill.reviewTaskKey || null,
+                                                        title: skill.name,
+                                                    });
+                                                }}
+                                                aria-label={`Review ${skill.name} flashcards`}
+                                                title="Review flashcards"
+                                                disabled={!skill.reviewTaskKey || skill.flashcardSessionCount <= 0}
+                                            >
+                                                <BookOpenCheck className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-secondary/70"
                                                 onClick={(e) => handleScheduleClick(e, skill)}
                                                 aria-label={`Schedule ${skill.name}`}
                                                 title="Schedule task"
@@ -285,6 +313,12 @@ export function SpacedRepetitionPopup() {
             <SpacedRepetitionModal
                 modalState={repetitionModalState}
                 onOpenChange={(isOpen) => setRepetitionModalState(prev => ({...prev, isOpen}))}
+            />
+            <FlashcardReviewModal
+                open={flashcardReviewState.open}
+                onOpenChange={(open) => setFlashcardReviewState((prev) => ({ ...prev, open }))}
+                taskKey={flashcardReviewState.taskKey}
+                title={flashcardReviewState.title}
             />
         </>
     );

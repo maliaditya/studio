@@ -58,6 +58,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Progress } from '@/components/ui/progress';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { FocusAreaProgressModal } from '@/components/FocusAreaProgressModal';
 import { MindMapViewer } from '@/components/MindMapViewer';
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, DragOverlay, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core';
@@ -688,6 +689,7 @@ function ProjectTreeNode({
   node,
   allDefinitions,
   getDeepWorkNodeType,
+  microSkillNamesById,
   onSelect,
   activeId,
   depth = 0,
@@ -695,6 +697,7 @@ function ProjectTreeNode({
   node: ExerciseDefinition;
   allDefinitions: ExerciseDefinition[];
   getDeepWorkNodeType: (def: ExerciseDefinition) => string;
+  microSkillNamesById: Map<string, string>;
   onSelect: (def: ExerciseDefinition) => void;
   activeId?: string | null;
   depth?: number;
@@ -703,6 +706,9 @@ function ProjectTreeNode({
     .map((id) => allDefinitions.find((def) => def.id === id))
     .filter((def): def is ExerciseDefinition => !!def);
   const nodeType = getDeepWorkNodeType(node);
+  const linkedMicroSkillNames = (node.linkedMicroSkillIds || [])
+    .map((id) => microSkillNamesById.get(id))
+    .filter((name): name is string => Boolean(name));
 
   return (
     <div className="space-y-2">
@@ -721,6 +727,15 @@ function ProjectTreeNode({
             <span className="truncate font-medium">{node.name}</span>
           </div>
           <div className="mt-1 text-[11px] uppercase tracking-wide text-muted-foreground">{nodeType}</div>
+          {linkedMicroSkillNames.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {linkedMicroSkillNames.map((name) => (
+                <Badge key={`${node.id}-${name}`} variant="secondary" className="text-[10px]">
+                  {name}
+                </Badge>
+              ))}
+            </div>
+          ) : null}
         </div>
         {node.primaryProjectId ? <Badge variant="outline" className="ml-3 shrink-0">Primary</Badge> : null}
       </button>
@@ -732,6 +747,7 @@ function ProjectTreeNode({
               node={child}
               allDefinitions={allDefinitions}
               getDeepWorkNodeType={getDeepWorkNodeType}
+              microSkillNamesById={microSkillNamesById}
               onSelect={onSelect}
               activeId={activeId}
               depth={depth + 1}
@@ -801,7 +817,7 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
   const [isLoadingPage, setIsLoadingPage] = useState(true);
 
   const [viewMode, setViewMode] = useState<'session' | 'library'>('library');
-  const [libraryView, setLibraryView] = useState<'deepwork' | 'upskill'>('deepwork');
+  const [libraryView, setLibraryView] = useState<'deepwork' | 'upskill'>('upskill');
   
   const [isManageLinksModalOpen, setIsManageLinksModalOpen] = useState(false);
   const [manageLinksConfig, setManageLinksConfig] = useState<{ parent: ExerciseDefinition } | null>(null);
@@ -815,13 +831,140 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
   const [isNewFocusAreaModalOpen, setIsNewFocusAreaModalOpen] = useState(false);
   const [newFocusAreaType, setNewFocusAreaType] = useState<'deepwork' | 'upskill'>('deepwork');
   const [newFocusAreaData, setNewFocusAreaData] = useState({ name: '', description: '', hours: '', minutes: '', link: '' });
-  const [projectIntentionMicroSkillId, setProjectIntentionMicroSkillId] = useState<string>('');
+  const [projectIntentionMicroSkillIds, setProjectIntentionMicroSkillIds] = useState<string[]>([]);
+  const [isCanvasLinkerOpen, setIsCanvasLinkerOpen] = useState(false);
 
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [isMindMapModalOpen, setIsMindMapModalOpen] = useState(false);
   const [mindMapRootFocusAreaId, setMindMapRootFocusAreaId] = useState<string | null>(null);
   
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
+  const normalizeCanvasKey = useCallback((value: string) => value.replace(/\s+/g, ' ').trim().toLowerCase(), []);
+
+  const availableCanvasPoints = useMemo(() => {
+    return resources.flatMap((resource) => (
+      (resource.points || [])
+        .filter((point) => point.type === 'paint' && point.drawing)
+        .map((point) => {
+          let resolvedResourceId = resource.id;
+          let resolvedPointId = point.id;
+          let resolvedTitle = point.text || resource.name || 'Untitled Canvas';
+
+          if (typeof point.drawing === 'string' && point.drawing.startsWith('canvas://')) {
+            const [linkedResourceId, linkedPointId] = point.drawing.replace('canvas://', '').split('/');
+            const linkedResource = resources.find((entry) => entry.id === linkedResourceId);
+            const linkedPoint = linkedResource?.points?.find((entry) => entry.id === linkedPointId);
+            if (linkedResource && linkedPoint) {
+              resolvedResourceId = linkedResource.id;
+              resolvedPointId = linkedPoint.id;
+              resolvedTitle = linkedPoint.text || linkedResource.name || resolvedTitle;
+            }
+          }
+
+          return {
+            id: `${resource.id}:${point.id}`,
+            sourceResourceId: resource.id,
+            sourcePointId: point.id,
+            resolvedResourceId,
+            resolvedPointId,
+            resourceName: resource.name,
+            title: resolvedTitle,
+          };
+        })
+    ));
+  }, [resources]);
+
+  const handleCreateCuriosityFromCanvas = useCallback((canvas: {
+    resolvedResourceId: string;
+    resolvedPointId: string;
+    title: string;
+  }) => {
+    if (!selectedMicroSkill) {
+      toast({ title: 'Select a micro-skill', description: 'Choose a micro-skill before linking a canvas.', variant: 'destructive' });
+      return;
+    }
+
+    const canvasTitle = canvas.title.trim() || 'Untitled Canvas';
+    const canvasLink = `canvas://${canvas.resolvedResourceId}/${canvas.resolvedPointId}`;
+    const canvasResourceId = canvas.resolvedResourceId;
+    const existingCuriosity = upskillDefinitions.find((definition) =>
+      getUpskillNodeType(definition) === 'Curiosity' &&
+      definition.category === selectedMicroSkill.name &&
+      normalizeCanvasKey(definition.name) === normalizeCanvasKey(canvasTitle)
+    );
+
+    const existingVisualization = existingCuriosity
+      ? upskillDefinitions.find((definition) =>
+          (existingCuriosity.linkedUpskillIds || []).includes(definition.id) &&
+          getUpskillNodeType(definition) === 'Visualization' &&
+          (definition.link === canvasLink || (definition.linkedResourceIds || []).includes(canvasResourceId))
+        )
+      : null;
+
+    if (existingVisualization) {
+      setIsCanvasLinkerOpen(false);
+      toast({
+        title: 'Canvas already linked',
+        description: `"${canvasTitle}" already exists under this micro-skill.`,
+      });
+      return;
+    }
+
+    const curiosityId = existingCuriosity?.id || `def_${Date.now()}_${Math.random()}`;
+    const visualizationId = `def_${Date.now()}_${Math.random()}`;
+    const visualizationName = existingCuriosity ? `${canvasTitle} Canvas` : `Visualize ${canvasTitle}`;
+
+    const visualization: ExerciseDefinition = {
+      id: visualizationId,
+      name: visualizationName,
+      category: selectedMicroSkill.name as ExerciseCategory,
+      description: `Linked canvas for "${canvasTitle}".`,
+      loggedDuration: 0,
+      link: canvasLink,
+      linkedResourceIds: [canvasResourceId],
+      linkedMicroSkillIds: [selectedMicroSkill.id],
+      nodeType: 'Visualization',
+    };
+
+    setUpskillDefinitions((prev) => {
+      const next = [...prev];
+      if (existingCuriosity) {
+        const curiosityIndex = next.findIndex((definition) => definition.id === existingCuriosity.id);
+        if (curiosityIndex >= 0) {
+          const childIds = new Set(next[curiosityIndex].linkedUpskillIds || []);
+          childIds.add(visualizationId);
+          next[curiosityIndex] = {
+            ...next[curiosityIndex],
+            linkedUpskillIds: Array.from(childIds),
+          };
+        }
+      } else {
+        next.push({
+          id: curiosityId,
+          name: canvasTitle,
+          category: selectedMicroSkill.name as ExerciseCategory,
+          description: `Curiosity created from linked canvas "${canvasTitle}".`,
+          loggedDuration: 0,
+          linkedUpskillIds: [visualizationId],
+          linkedResourceIds: [canvasResourceId],
+          linkedMicroSkillIds: [selectedMicroSkill.id],
+          nodeType: 'Curiosity',
+        });
+      }
+
+      next.push(visualization);
+      return next;
+    });
+
+    setIsCanvasLinkerOpen(false);
+    toast({
+      title: existingCuriosity ? 'Visualization added' : 'Curiosity created',
+      description: existingCuriosity
+        ? `"${canvasTitle}" received a linked visualization card.`
+        : `"${canvasTitle}" was added as a curiosity with its first visualization card.`,
+    });
+  }, [getUpskillNodeType, normalizeCanvasKey, selectedMicroSkill, toast, upskillDefinitions]);
   
   const [selectedSpecializationId, setSelectedSpecializationId] = useState<string | null>(null);
   
@@ -939,7 +1082,7 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
         return;
     }
     if (type === 'deepwork' && selectedProject && !selectedMicroSkill) {
-      setProjectIntentionMicroSkillId((prev) => prev || projectMicroSkills[0]?.id || '');
+      setProjectIntentionMicroSkillIds((prev) => prev.length > 0 ? prev : (projectMicroSkills[0] ? [projectMicroSkills[0].id] : []));
     }
     setNewFocusAreaType(type);
     setIsNewFocusAreaModalOpen(true);
@@ -970,14 +1113,20 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
     return domainCoreSkills.flatMap((skill) => skill.skillAreas.flatMap((area) => area.microSkills));
   }, [selectedProject, coreSkills]);
 
+  const microSkillNamesById = useMemo(
+    () => new Map(Array.from(microSkillMap.entries()).map(([id, entry]) => [id, entry.microSkillName])),
+    [microSkillMap]
+  );
+
   useEffect(() => {
     if (!selectedProject) {
-      setProjectIntentionMicroSkillId('');
+      setProjectIntentionMicroSkillIds([]);
       return;
     }
-    setProjectIntentionMicroSkillId((prev) => {
-      if (prev && projectMicroSkills.some((skill) => skill.id === prev)) return prev;
-      return projectMicroSkills[0]?.id || '';
+    setProjectIntentionMicroSkillIds((prev) => {
+      const validIds = prev.filter((id) => projectMicroSkills.some((skill) => skill.id === id));
+      if (validIds.length > 0) return validIds;
+      return projectMicroSkills[0] ? [projectMicroSkills[0].id] : [];
     });
   }, [selectedProject, projectMicroSkills]);
 
@@ -1515,14 +1664,14 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
   };
 
   const handleCreateFocusArea = () => {
-    const targetMicroSkill =
-      selectedMicroSkill ||
-      (newFocusAreaType === 'deepwork' && selectedProject
-        ? projectMicroSkills.find((skill) => skill.id === projectIntentionMicroSkillId) || null
-        : null);
+    const selectedProjectMicroSkills =
+      newFocusAreaType === 'deepwork' && selectedProject
+        ? projectMicroSkills.filter((skill) => projectIntentionMicroSkillIds.includes(skill.id))
+        : [];
+    const targetMicroSkill = selectedMicroSkill || selectedProjectMicroSkills[0] || null;
 
-    if (!targetMicroSkill || !newFocusAreaData.name.trim()) {
-        toast({ title: "Error", description: "Name is required.", variant: "destructive" });
+    if (!newFocusAreaData.name.trim() || !targetMicroSkill) {
+        toast({ title: "Error", description: "Name and at least one micro-skill are required.", variant: "destructive" });
         return;
     }
 
@@ -1541,6 +1690,12 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
         iconUrl: getFaviconUrl(newFocusAreaData.link.trim()),
         primaryProjectId: newFocusAreaType === 'deepwork' && selectedProject ? selectedProject.id : null,
         linkedProjectIds: newFocusAreaType === 'deepwork' && selectedProject ? [selectedProject.id] : [],
+        linkedMicroSkillIds:
+          newFocusAreaType === 'deepwork' && selectedProject
+            ? selectedProjectMicroSkills.map((skill) => skill.id)
+            : selectedMicroSkill
+              ? [selectedMicroSkill.id]
+              : undefined,
     };
     
     if (newFocusAreaType === 'deepwork') {
@@ -1551,7 +1706,7 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
     
     setIsNewFocusAreaModalOpen(false);
     setNewFocusAreaData({ name: '', description: '', hours: '', minutes: '', link: '' });
-    setProjectIntentionMicroSkillId('');
+    setProjectIntentionMicroSkillIds(selectedProject && projectMicroSkills[0] ? [projectMicroSkills[0].id] : []);
     
     toast({ title: "Success", description: `Task "${newDef.name}" created.` });
   };
@@ -2270,7 +2425,7 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                 )}
 
                  {!selectedProject && (
-                   <SkillLibrary
+                  <SkillLibrary
                       selectedMicroSkill={selectedMicroSkill}
                       onSelectMicroSkill={onSelectMicroSkill}
                       onSelectFocusArea={handleSelectFocusArea}
@@ -2284,6 +2439,7 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                       addToRecents={addToRecents}
                       onOpenLinkProjectModal={handleOpenLinkProjectModal}
                       onToggleReadyForBranding={handleToggleReadyForBranding}
+                      onOpenCanvasLinker={() => setIsCanvasLinkerOpen(true)}
                       libraryView={libraryView}
                       setLibraryView={setLibraryView}
                   />
@@ -2475,7 +2631,7 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                                                         New Intention
                                                     </Button>
                                                 </div>
-                                                <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                                <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                                                     <div className="rounded-2xl border border-border/50 bg-background/60 p-4">
                                                         <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Primary Intentions</div>
                                                         <div className="mt-2 text-3xl font-semibold">{selectedProjectPrimaryCount}</div>
@@ -2483,10 +2639,6 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                                                     <div className="rounded-2xl border border-border/50 bg-background/60 p-4">
                                                         <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Execution Nodes</div>
                                                         <div className="mt-2 text-3xl font-semibold">{selectedProjectActionCount}</div>
-                                                    </div>
-                                                    <div className="rounded-2xl border border-border/50 bg-background/60 p-4">
-                                                        <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Skill Contexts</div>
-                                                        <div className="mt-2 text-3xl font-semibold">{projectMicroSkills.length}</div>
                                                     </div>
                                                     <div className="rounded-2xl border border-border/50 bg-background/60 p-4">
                                                         <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Feature Tracks</div>
@@ -2507,18 +2659,6 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                                                         <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
                                                             <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Domain</div>
                                                             <div className="mt-2 font-medium">{selectedProjectDomain?.name || 'Unknown domain'}</div>
-                                                        </div>
-                                                        <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
-                                                            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Micro-skills</div>
-                                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                                {projectMicroSkills.length > 0 ? projectMicroSkills.map((skill) => (
-                                                                    <Badge key={skill.id} variant="secondary" className="bg-secondary/60">
-                                                                        {skill.name}
-                                                                    </Badge>
-                                                                )) : (
-                                                                    <span className="text-sm text-muted-foreground">No linked micro-skills yet.</span>
-                                                                )}
-                                                            </div>
                                                         </div>
                                                         <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
                                                             <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Feature Tracks</div>
@@ -2555,6 +2695,7 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                                                                 node={intention}
                                                                 allDefinitions={deepWorkDefinitions}
                                                                 getDeepWorkNodeType={getDeepWorkNodeType}
+                                                                microSkillNamesById={microSkillNamesById}
                                                                 onSelect={handleCardClick}
                                                                 activeId={currentTask?.id || null}
                                                             />
@@ -2632,17 +2773,29 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                 <div className="space-y-4 py-4">
                     {selectedProject && !selectedMicroSkill && newFocusAreaType === 'deepwork' && (
                        <div className="space-y-1">
-                          <Label htmlFor="project-intention-microskill">Micro-skill Context</Label>
-                          <Select value={projectIntentionMicroSkillId} onValueChange={setProjectIntentionMicroSkillId}>
-                            <SelectTrigger id="project-intention-microskill">
-                              <SelectValue placeholder="Select a micro-skill" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {projectMicroSkills.map((skill) => (
-                                <SelectItem key={skill.id} value={skill.id}>{skill.name}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <Label>Linked Micro-skills</Label>
+                          <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
+                            {projectMicroSkills.length > 0 ? projectMicroSkills.map((skill) => {
+                              const checked = projectIntentionMicroSkillIds.includes(skill.id);
+                              return (
+                                <label key={skill.id} className="flex items-center gap-3 rounded-md px-2 py-1 text-sm hover:bg-muted/40">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => setProjectIntentionMicroSkillIds((prev) => (
+                                      prev.includes(skill.id)
+                                        ? prev.filter((id) => id !== skill.id)
+                                        : [...prev, skill.id]
+                                    ))}
+                                    className="h-4 w-4"
+                                  />
+                                  <span>{skill.name}</span>
+                                </label>
+                              );
+                            }) : (
+                              <div className="text-sm text-muted-foreground">No micro-skills available in this project domain.</div>
+                            )}
+                          </div>
                        </div>
                     )}
                     <div className="space-y-1">
@@ -2668,6 +2821,37 @@ export function DeepWorkPageContent({ isModal = false, onClose }: { isModal?: bo
                     <Button variant="outline" onClick={() => setIsNewFocusAreaModalOpen(false)}>Cancel</Button>
                     <Button onClick={handleCreateFocusArea}>Create Task</Button>
                 </DialogFooter>
+            </DialogContent>
+        </Dialog>
+        <Dialog open={isCanvasLinkerOpen} onOpenChange={setIsCanvasLinkerOpen}>
+            <DialogContent className="sm:max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>Link Canvas</DialogTitle>
+                    <DialogDescription>
+                        Pick a canvas to create a curiosity and its first visualization under {selectedMicroSkill?.name || 'this micro-skill'}.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="py-2">
+                    <Command className="rounded-xl border border-border/60">
+                        <CommandInput placeholder="Search canvases..." />
+                        <CommandList>
+                            <CommandEmpty>No canvases found.</CommandEmpty>
+                            <CommandGroup>
+                                {availableCanvasPoints.map((canvas) => (
+                                    <CommandItem
+                                        key={canvas.id}
+                                        value={`${canvas.title} ${canvas.resourceName}`}
+                                        onSelect={() => handleCreateCuriosityFromCanvas(canvas)}
+                                        className="flex items-center justify-between gap-3"
+                                    >
+                                        <span className="truncate">{canvas.title}</span>
+                                        <span className="text-xs text-muted-foreground">{canvas.resourceName}</span>
+                                    </CommandItem>
+                                ))}
+                            </CommandGroup>
+                        </CommandList>
+                    </Command>
+                </div>
             </DialogContent>
         </Dialog>
         {editingFocusArea && (

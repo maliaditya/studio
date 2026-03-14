@@ -13,6 +13,7 @@ export type DesktopServiceCheck = {
   version?: string;
   error?: string;
   baseUrl?: string;
+  details?: string[];
 };
 
 export type DesktopEnvironmentStatus = {
@@ -27,6 +28,7 @@ export type DesktopEnvironmentStatus = {
     hasConfiguredModel?: boolean;
   };
   kokoro: DesktopServiceCheck;
+  xtts: DesktopServiceCheck;
   stt: DesktopServiceCheck;
 };
 
@@ -72,6 +74,9 @@ export function getDesktopFallbackMessages(status: DesktopEnvironmentStatus, mic
   if (!status.stt.healthy) {
     notes.push("Microphone transcription will fall back to non-local paths only if a cloud AI provider is configured.");
   }
+  if (status.xtts?.baseUrl && !status.xtts.healthy) {
+    notes.push("XTTS voice cloning is configured but offline. Cloned local voice playback will be unavailable until XTTS is running.");
+  }
   if (microphone === "denied") {
     notes.push("Microphone access is blocked. Voice chat and transcription will fail until permission is re-enabled.");
   }
@@ -95,8 +100,8 @@ export function getDesktopReadinessScore(status: DesktopEnvironmentStatus, micro
 export function getDesktopReadinessStatusLabel(score: number): string {
   if (score >= 90) return "Ready";
   if (score >= 65) return "Almost ready";
-  if (score >= 35) return "Needs setup";
-  return "Blocked";
+  if (score >= 35) return "Limited local AI";
+  return "App can still run";
 }
 
 export function shouldShowDesktopReadinessPrompt(
@@ -104,11 +109,6 @@ export function shouldShowDesktopReadinessPrompt(
   microphone: MicrophoneStatus
 ): boolean {
   if (!status) return false;
-  if (!status.docker.running) return true;
-  if (!status.ollama.healthy) return true;
-  if (status.ollama.configuredModel && !status.ollama.hasConfiguredModel) return true;
-  if (!status.kokoro.healthy) return true;
-  if (!status.stt.healthy) return true;
   if (microphone === "denied") return true;
   return false;
 }

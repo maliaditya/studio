@@ -30,6 +30,20 @@ const validateProviderConfig = (aiConfig: AiRequestConfig): string | null => {
   return null;
 };
 
+const buildReplyLanguageInstruction = (value: unknown) => {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "auto";
+  switch (normalized) {
+    case "english":
+      return "Respond in English.";
+    case "hindi":
+      return "Respond in Hindi using Devanagari script.";
+    case "hinglish":
+      return "Respond in Hinglish: Hindi phrasing written in English letters (Roman script), natural and conversational.";
+    default:
+      return "Match the user's language automatically. If the user writes in Hindi using English letters, reply in natural Hinglish. If the user writes in Hindi in Devanagari, reply in Devanagari Hindi. If the user writes in English, reply in English.";
+  }
+};
+
 export async function POST(request: Request) {
   try {
     const startedAt = Date.now();
@@ -41,6 +55,7 @@ export async function POST(request: Request) {
     const history = Array.isArray(body?.history) ? body.history : [];
     const appContext = (body?.appContext || {}) as Record<string, unknown>;
     const openMode = Boolean(body?.openMode);
+    const replyLanguageInstruction = buildReplyLanguageInstruction(body?.replyLanguage);
     const aiConfigInput = (body?.aiConfig || {}) as Partial<AiRequestConfig>;
 
     if (!question) {
@@ -69,7 +84,7 @@ export async function POST(request: Request) {
     if (!shivV2Enabled) {
       return NextResponse.json(
         {
-          error: "SHIV_V2 is disabled. Set SHIV_V2=1 to enable Ask Shiv pipeline.",
+          error: "SHIV_V2 is disabled. Set SHIV_V2=1 to enable Ask Astra pipeline.",
         },
         { status: 503 }
       );
@@ -98,7 +113,7 @@ export async function POST(request: Request) {
         {
           role: "system" as const,
           content:
-            "You are Shiv for Dock app. Open chat mode is enabled. Answer naturally and helpfully in plain text only. Use evidence when relevant, but you may answer general questions too. Do not dump JSON/metadata (eid/domain/payload/field names) unless user explicitly asks for debug structure. Answer directly first in short form.",
+            `You are Astra for Dock app. Open chat mode is enabled. Answer naturally and helpfully in plain text only. Use evidence when relevant, but you may answer general questions too. Do not dump JSON/metadata (eid/domain/payload/field names) unless user explicitly asks for debug structure. Answer directly first in short form. ${replyLanguageInstruction}`,
         },
         ...history
           .filter((message: any) => message && (message.role === "user" || message.role === "assistant") && typeof message.content === "string")
@@ -114,7 +129,7 @@ export async function POST(request: Request) {
       if (!result.ok) {
         return NextResponse.json(
           {
-            error: "Unable to get Shiv answer.",
+            error: "Unable to get Astra answer.",
             details: String(result.details || "AI provider call failed."),
           },
           { status: 502 }
@@ -160,7 +175,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: missingConfigError }, { status: 400 });
     }
 
-    const decision = await resolveShivAnswer(query, appContext, aiConfig);
+    const decision = await resolveShivAnswer(query, appContext, aiConfig, {
+      languageInstructionOverride: replyLanguageInstruction,
+    });
     const latencyMs = Date.now() - startedAt;
 
     const meta: ShivAnswerMeta = {
@@ -207,7 +224,7 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
       {
-        error: "Unable to get Shiv answer.",
+        error: "Unable to get Astra answer.",
         details: message,
       },
       { status: 500 }

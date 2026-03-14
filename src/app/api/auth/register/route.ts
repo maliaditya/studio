@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return NextResponse.json(
       {
-        error: 'Cloud authentication is currently unavailable. Internet access is required for first-time registration.',
+        error: 'Cloud authentication is not configured for this build. Set BLOB_READ_WRITE_TOKEN or use a deployed auth service before first-time registration.',
         code: 'CLOUD_AUTH_UNAVAILABLE',
       },
       { status: 503 }

@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer, PlusCircle, FileText } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer, PlusCircle, FileText, Bot, Loader2, Bug } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,6 +14,12 @@ import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { EditableActivityText } from './EditableActivityText';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/hooks/use-toast';
+import { getAiConfigFromSettings } from '@/lib/ai/config';
+import type { TaskBciContext, TaskBciLinkedBothering } from '@/lib/taskBci';
+import { getEffectiveConstraintTasks } from '@/lib/botheringUtils';
+import { buildFlashcardTaskKey, getFlashcardSessionsForTask } from '@/lib/flashcards';
+import { FlashcardReviewModal } from './FlashcardReviewModal';
 
 
 const activityIcons: Record<ActivityType, React.ReactNode> = {
@@ -31,6 +37,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     mindset: <Brain className="h-4 w-4" />,
     'spaced-repetition': <Repeat className="h-4 w-4 text-blue-500" />,
     pomodoro: <Timer className="h-4 w-4" />,
+    bugs: <Bug className="h-4 w-4 text-rose-400" />,
 };
 
 interface AgendaWidgetItemProps {
@@ -48,6 +55,17 @@ interface AgendaWidgetItemProps {
     expectedDuration?: string;
     hasLoggedStopper?: boolean;
 }
+
+const sourceTypeByCardId: Record<string, TaskBciLinkedBothering['type']> = {
+    mindset_botherings_external: 'external',
+    mindset_botherings_mismatch: 'mismatch',
+    mindset_botherings_constraint: 'constraint',
+};
+
+const normalizeText = (value: unknown) =>
+    String(value || '')
+        .replace(/\s+/g, ' ')
+        .trim();
 
 export const AgendaWidgetItem = React.memo(({ 
     activity,
@@ -71,14 +89,23 @@ export const AgendaWidgetItem = React.memo(({
         highlightedTaskIds,
         currentSlot,
         coreSkills,
+        projects,
+        skillDomains,
+        microSkillMap,
         resources,
         openPdfViewer,
         offerizationPlans,
+        skillAcquisitionPlans,
         upskillDefinitions,
         deepWorkDefinitions,
+        kanbanBoards,
+        mindsetCards,
         settings,
     } = useAuth();
     const router = useRouter();
+    const { toast } = useToast();
+    const [isOpeningAstraScript, setIsOpeningAstraScript] = useState(false);
+    const [isFlashcardReviewOpen, setIsFlashcardReviewOpen] = useState(false);
 
     const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition', 'spaced-repetition'].includes(activity.type);
     const isAgendaContext = context === 'agenda';
@@ -118,6 +145,114 @@ export const AgendaWidgetItem = React.memo(({
         highlightedTaskIds?.has(baseId) ||
         (activity.taskIds || []).some(id => highlightedTaskIds?.has(id));
     const shouldStrike = activity.completed || !!hasLoggedStopper;
+    const taskInfo = useMemo(() => {
+        const allDefs = [...(deepWorkDefinitions || []), ...(upskillDefinitions || [])];
+        const normalizeLookup = (value?: string) => normalizeText(value).toLowerCase();
+        const taskIdCandidates = [
+            activity.taskIds?.[0],
+            activity.id,
+        ]
+            .map((value) => String(value || '').trim())
+            .filter(Boolean);
+        const detailsKey = normalizeLookup(activity.details);
+        const task = allDefs.find((definition) =>
+            taskIdCandidates.some((candidate) => candidate === definition.id || candidate.startsWith(definition.id)) ||
+            (!!detailsKey && normalizeLookup(definition.name) === detailsKey)
+        );
+
+        if (!task) return null;
+
+        const parent = allDefs.find((definition) =>
+            (definition.linkedDeepWorkIds?.includes(task.id)) ||
+            (definition.linkedUpskillIds?.includes(task.id))
+        );
+
+        const linkedProjectId =
+            parent?.primaryProjectId ||
+            (parent?.linkedProjectIds && parent.linkedProjectIds.length > 0 ? parent.linkedProjectIds[0] : null);
+        const linkedProject = linkedProjectId
+            ? (projects || []).find((project) => project.id === linkedProjectId)
+            : null;
+
+        const microSkillId = Array.from((microSkillMap || new Map()).entries()).find(([, value]) => value.microSkillName === task.category)?.[0];
+        const microSkillInfo = microSkillId ? microSkillMap.get(microSkillId) : null;
+
+        let domain: (typeof skillDomains)[number] | undefined;
+        let coreSkill: (typeof coreSkills)[number] | undefined;
+        let skillArea: (typeof coreSkills)[number]["skillAreas"][number] | undefined;
+
+        if (microSkillInfo) {
+            const foundCoreSkill = (coreSkills || []).find((skill) => skill.name === microSkillInfo.coreSkillName);
+            if (foundCoreSkill) {
+                coreSkill = foundCoreSkill;
+                domain = (skillDomains || []).find((entry) => entry.id === foundCoreSkill.domainId);
+                skillArea = foundCoreSkill.skillAreas.find((area) => area.microSkills.some((micro) => micro.id === microSkillId));
+            }
+        }
+
+        return {
+            task,
+            parent,
+            project: linkedProject,
+            domain,
+            coreSkill,
+            skillArea,
+        };
+    }, [activity.details, activity.id, activity.taskIds, coreSkills, deepWorkDefinitions, microSkillMap, projects, skillDomains, upskillDefinitions]);
+    const rootTask = useMemo(() => findRootTask(activity), [activity, findRootTask]);
+    const mismatchPointById = useMemo(() => {
+        const mismatchCard = (mindsetCards || []).find((card) => card.id === 'mindset_botherings_mismatch');
+        return new Map((mismatchCard?.points || []).map((point) => [point.id, point] as const));
+    }, [mindsetCards]);
+    const externalPointById = useMemo(() => {
+        const externalCard = (mindsetCards || []).find((card) => card.id === 'mindset_botherings_external');
+        return new Map((externalCard?.points || []).map((point) => [point.id, point] as const));
+    }, [mindsetCards]);
+    const linkedBotherings = useMemo(() => {
+        const currentTaskId = String(taskInfo?.task.id || '');
+        const currentActivityId = String(activity.id || '');
+        const normalizedTaskName = normalizeText(taskInfo?.task.name || activity.details).toLowerCase();
+        const normalizedActivityDetails = normalizeText(activity.details).toLowerCase();
+
+        const matchesTaskRef = (taskRef: any) => {
+            const taskRefId = String(taskRef.id || '');
+            const taskRefActivityId = String(taskRef.activityId || '');
+            const taskRefDetails = normalizeText(taskRef.details).toLowerCase();
+            return (
+                taskRefActivityId === currentActivityId ||
+                taskRefId === currentActivityId ||
+                taskRefId === currentTaskId ||
+                taskRefActivityId === currentTaskId ||
+                (!!taskRefDetails && (
+                    taskRefDetails === normalizedTaskName ||
+                    taskRefDetails === normalizedActivityDetails
+                ))
+            );
+        };
+
+        const matches: Array<TaskBciLinkedBothering & { id: string }> = [];
+        (mindsetCards || []).forEach((card) => {
+            const sourceType = sourceTypeByCardId[card.id];
+            if (!sourceType) return;
+            (card.points || []).forEach((point) => {
+                const directTasks = Array.isArray(point.tasks) ? point.tasks : [];
+                const effectiveTasks =
+                    sourceType === 'constraint'
+                        ? getEffectiveConstraintTasks(point, mismatchPointById, externalPointById)
+                        : directTasks;
+                if (!effectiveTasks.some(matchesTaskRef)) return;
+                matches.push({
+                    id: point.id,
+                    type: sourceType,
+                    text: normalizeText(point.text) || 'Untitled bothering',
+                    resolution: normalizeText(point.resolution) || undefined,
+                    mismatchType: point.mismatchType,
+                });
+            });
+        });
+
+        return matches.filter((entry, index, all) => all.findIndex((item) => item.id === entry.id) === index);
+    }, [activity.details, activity.id, externalPointById, mindsetCards, mismatchPointById, taskInfo]);
     const learningContext = useMemo(() => {
         if (!(activity.type === 'upskill' || activity.type === 'deepwork')) return null;
         const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -150,6 +285,71 @@ export const AgendaWidgetItem = React.memo(({
 
         return { spec: matchedSpec, microSkillName, matchedAreaId };
     }, [activity.details, activity.id, activity.type, coreSkills, deepWorkDefinitions, upskillDefinitions]);
+    const resolvedSpecialization = useMemo(() => {
+        if (!taskInfo) return null;
+        if (taskInfo.coreSkill?.type === 'Specialization') return taskInfo.coreSkill;
+
+        const candidates = [
+            taskInfo.task.category,
+            taskInfo.parent?.category,
+            rootTask?.category,
+            taskInfo.coreSkill?.name,
+        ]
+            .map((entry) => normalizeText(entry).toLowerCase())
+            .filter(Boolean);
+
+        return (
+            (coreSkills || []).find(
+                (skill) =>
+                    skill.type === 'Specialization' &&
+                    candidates.includes(normalizeText(skill.name).toLowerCase())
+            ) || null
+        );
+    }, [coreSkills, rootTask, taskInfo]);
+    const learningPlanContext = useMemo(() => {
+        const specializationId = resolvedSpecialization?.id;
+        if (!specializationId) return null;
+
+        const learningPlan = offerizationPlans?.[specializationId]?.learningPlan;
+        const acquisitionPlan = (skillAcquisitionPlans || []).find((plan) => plan.specializationId === specializationId);
+        if (!learningPlan && !acquisitionPlan) return null;
+
+        return {
+            specializationName: resolvedSpecialization?.name || '',
+            targetDate: acquisitionPlan?.targetDate || null,
+            requiredHours: acquisitionPlan?.requiredHours ?? null,
+            requiredMoney: acquisitionPlan?.requiredMoney ?? null,
+            books: (learningPlan?.bookWebpageResources || []).map((resource) => resource.name).filter(Boolean),
+            audioVideo: (learningPlan?.audioVideoResources || []).map((resource) => resource.name).filter(Boolean),
+            paths: (learningPlan?.skillTreePaths || []).map((path) => path.name).filter(Boolean),
+        };
+    }, [offerizationPlans, resolvedSpecialization, skillAcquisitionPlans]);
+    const projectPlanContext = useMemo(() => {
+        if (!taskInfo?.project && !resolvedSpecialization) return null;
+
+        const releasePlans = resolvedSpecialization?.id
+            ? offerizationPlans?.[resolvedSpecialization.id]?.releases || []
+            : [];
+        const workflowStageSummary = releasePlans.flatMap((release) => {
+            if (!release.workflowStages) return [];
+            return [
+                `${release.name}: idea ${release.workflowStages.ideaItems.length}, code ${release.workflowStages.codeItems.length}, break ${release.workflowStages.breakItems.length}, fix ${release.workflowStages.fixItems.length}`,
+            ];
+        });
+
+        if (!taskInfo?.project?.productPlan && !taskInfo?.project?.name && releasePlans.length === 0) {
+            return null;
+        }
+
+        return {
+            projectName: taskInfo?.project?.name || '',
+            targetDate: taskInfo?.project?.productPlan?.targetDate || null,
+            requiredHours: taskInfo?.project?.productPlan?.requiredHours ?? null,
+            requiredMoney: taskInfo?.project?.productPlan?.requiredMoney ?? null,
+            releaseNames: releasePlans.map((release) => release.launchDate ? `${release.name} (${release.launchDate})` : release.name),
+            workflowStageSummary: workflowStageSummary.slice(0, 4),
+        };
+    }, [offerizationPlans, resolvedSpecialization, taskInfo]);
     const learningTargetLabel = useMemo(() => {
         if (!(activity.type === 'upskill' || activity.type === 'deepwork')) return null;
         const matchedSpec = learningContext?.spec;
@@ -348,6 +548,64 @@ export const AgendaWidgetItem = React.memo(({
         const pdfResources = (resources || []).filter((resource) => resource.type === 'pdf');
         return pdfResources.find((resource) => linkedPdfIds.includes(resource.id)) || null;
     }, [learningContext, offerizationPlans, resources]);
+    const linkedResourceNames = useMemo(() => {
+        if (!taskInfo) return [];
+        const resourceIds = Array.from(
+            new Set([
+                ...(taskInfo.task.linkedResourceIds || []),
+                ...(taskInfo.parent?.linkedResourceIds || []),
+                ...(taskInfo.coreSkill?.linkedResourceIds || []),
+                ...(taskInfo.coreSkill?.linkedPdfResourceId ? [taskInfo.coreSkill.linkedPdfResourceId] : []),
+            ])
+        );
+        return resourceIds
+            .map((resourceId) => (resources || []).find((resource) => resource.id === resourceId)?.name || '')
+            .map((name) => normalizeText(name))
+            .filter(Boolean);
+    }, [resources, taskInfo]);
+    const flashcardReviewTaskKey = useMemo(() => {
+        if (activity.type !== 'spaced-repetition') return null;
+        const reviewActivityType =
+            activity.linkedActivityType === 'deepwork' || activity.linkedActivityType === 'upskill'
+                ? activity.linkedActivityType
+                : null;
+        return buildFlashcardTaskKey(reviewActivityType, activity.taskIds?.[0] || taskInfo?.task.id || null);
+    }, [activity.linkedActivityType, activity.taskIds, activity.type, taskInfo?.task.id]);
+    const flashcardReviewSessionCount = useMemo(
+        () => getFlashcardSessionsForTask(settings, flashcardReviewTaskKey).length,
+        [flashcardReviewTaskKey, settings]
+    );
+    const pdfLaunchActivityType =
+        activity.type === 'spaced-repetition'
+            ? (activity.linkedActivityType === 'deepwork' || activity.linkedActivityType === 'upskill'
+                ? activity.linkedActivityType
+                : null)
+            : (activity.type === 'deepwork' || activity.type === 'upskill'
+                ? activity.type
+                : null);
+    const bciContext = useMemo<TaskBciContext | null>(() => {
+        return {
+            taskName: taskInfo?.task.name || activity.details || activity.type,
+            taskType: activity.type,
+            taskDetails: activity.details || taskInfo?.task.name || activity.type,
+            taskDescription: taskInfo?.task.description,
+            taskCategory: taskInfo?.task.category || activity.type,
+            slotName: activity.slot,
+            parentTaskName: taskInfo?.parent?.name,
+            rootTaskName: rootTask?.name,
+            nodeType: taskInfo?.task.nodeType,
+            projectName: taskInfo?.project?.name,
+            skillDomainName: taskInfo?.domain?.name,
+            coreSkillName: taskInfo?.coreSkill?.name,
+            skillAreaName: taskInfo?.skillArea?.name,
+            linkedBotherings,
+            learningContext: learningPlanContext || undefined,
+            projectContext: projectPlanContext || undefined,
+            resourceNames: linkedResourceNames,
+        };
+    }, [activity.details, activity.slot, activity.type, learningPlanContext, linkedBotherings, linkedResourceNames, projectPlanContext, rootTask, taskInfo]);
+
+    const canOpenTaskContext = Boolean(activity.id);
 
     const slotOrder = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
     const isPastSlot =
@@ -371,8 +629,88 @@ export const AgendaWidgetItem = React.memo(({
             },
         }));
     };
+    const handleOpenAstraScript = async (e: React.MouseEvent | React.PointerEvent) => {
+        e.stopPropagation();
+        if (isOpeningAstraScript) return;
+
+        setIsOpeningAstraScript(true);
+        try {
+            const isDesktopRuntime =
+                typeof window !== 'undefined' &&
+                (Boolean((window as any)?.studioDesktop?.isDesktop) || navigator.userAgent.toLowerCase().includes(' electron/'));
+            const aiConfig = getAiConfigFromSettings(settings, isDesktopRuntime);
+
+            const bciResponse = await fetch('/api/ai/task-bci', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+                },
+                body: JSON.stringify({
+                    context: bciContext,
+                    aiConfig,
+                }),
+            });
+            const bciResult = await bciResponse.json().catch(() => ({}));
+            if (!bciResponse.ok) {
+                throw new Error(String(bciResult?.error || bciResult?.details || 'Failed to generate task context.'));
+            }
+
+            const scriptResponse = await fetch('/api/ai/task-convincer-script', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+                },
+                body: JSON.stringify({
+                    context: bciContext,
+                    bci: bciResult?.bci || null,
+                    aiConfig,
+                }),
+            });
+            const scriptResult = await scriptResponse.json().catch(() => ({}));
+            if (!scriptResponse.ok) {
+                throw new Error(String(scriptResult?.error || scriptResult?.details || 'Failed to generate Astra script.'));
+            }
+
+            const content = String(scriptResult?.script || '').trim();
+            if (!content) {
+                throw new Error('Astra script came back empty.');
+            }
+
+            if (typeof window !== 'undefined') {
+                window.dispatchEvent(
+                    new CustomEvent('open-astra-task-script', {
+                        detail: {
+                            taskName: taskInfo?.task.name || activity.details || activity.type,
+                            content,
+                        },
+                    })
+                );
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to open the task script in Astra.';
+            toast({
+                title: 'Could not open in Astra',
+                description: message,
+                variant: 'destructive',
+            });
+        } finally {
+            setIsOpeningAstraScript(false);
+        }
+    };
+
+    const hasLinkedKanbanCard = useMemo(() => {
+        if (activity.type !== 'deepwork' || activity.completed) return false;
+        const candidateIds = new Set(activity.taskIds || []);
+        if (candidateIds.size === 0) return false;
+        return (kanbanBoards || []).some((board) =>
+            (board.cards || []).some((card) => !card.archived && candidateIds.has(card.id))
+        );
+    }, [activity.completed, activity.taskIds, activity.type, kanbanBoards]);
 
     return (
+        <>
         <li 
             className={cn(
                 "flex items-start gap-2 p-2 rounded-lg border border-transparent group transition-all",
@@ -383,7 +721,16 @@ export const AgendaWidgetItem = React.memo(({
             onClick={handleItemClick}
         >
             <div className="mt-0.5 flex flex-col items-center gap-1">
-                <button onClick={(e) => { e.stopPropagation(); onToggleComplete(activity.slot, activity.id); }}>
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (hasLinkedKanbanCard && onStartFocus) {
+                            onStartFocus(activity, e);
+                            return;
+                        }
+                        onToggleComplete(activity.slot, activity.id);
+                    }}
+                >
                 {activity.completed ? <CheckCircle2 className="h-5 w-5 text-green-500" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
                 </button>
                 {isPastSlot && (
@@ -438,8 +785,22 @@ export const AgendaWidgetItem = React.memo(({
                         <Badge variant="secondary">{loggedDuration}</Badge>
                     )}
                 </div>
-                {!activity.completed && linkedLearningPdfResource && (
-                    <div className="mt-1 flex justify-end">
+                {(!activity.completed && linkedLearningPdfResource) || canOpenTaskContext || flashcardReviewSessionCount > 0 ? (
+                    <div className="mt-1 flex justify-end gap-1">
+                        {canOpenTaskContext && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                onClick={handleOpenAstraScript}
+                                disabled={isOpeningAstraScript}
+                                title="Open task script in Astra"
+                            >
+                                {isOpeningAstraScript ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bot className="h-3.5 w-3.5" />}
+                            </Button>
+                        )}
+                        {!activity.completed && linkedLearningPdfResource && (
                         <Button
                             type="button"
                             variant="ghost"
@@ -447,16 +808,43 @@ export const AgendaWidgetItem = React.memo(({
                             className="h-6 w-6 text-muted-foreground hover:text-foreground"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                openPdfViewer(linkedLearningPdfResource);
+                                openPdfViewer(linkedLearningPdfResource, {
+                                    sourceActivityId: activity.id,
+                                    sourceDefinitionId: taskInfo?.task.id || activity.taskIds?.[0] || null,
+                                    sourceTaskActivityType: pdfLaunchActivityType,
+                                });
                             }}
                             title={`Open linked PDF: ${linkedLearningPdfResource.name}`}
                         >
                             <FileText className="h-3.5 w-3.5" />
                         </Button>
+                        )}
+                        {flashcardReviewSessionCount > 0 && flashcardReviewTaskKey && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setIsFlashcardReviewOpen(true);
+                                }}
+                                title={`Review ${flashcardReviewSessionCount} linked flashcard session${flashcardReviewSessionCount === 1 ? '' : 's'}`}
+                            >
+                                <BookOpenCheck className="h-3.5 w-3.5" />
+                            </Button>
+                        )}
                     </div>
-                )}
+                ) : null}
             </div>
         </li>
+        <FlashcardReviewModal
+            open={isFlashcardReviewOpen}
+            onOpenChange={setIsFlashcardReviewOpen}
+            taskKey={flashcardReviewTaskKey}
+            title={activity.details}
+        />
+        </>
     );
 });
 AgendaWidgetItem.displayName = 'AgendaWidgetItem';

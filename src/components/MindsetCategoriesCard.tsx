@@ -27,6 +27,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { useRouter } from 'next/navigation';
+import { getConstraintLinkTargetType, getEffectiveConstraintTasks } from '@/lib/botheringUtils';
 
 
 const EditableBrainHack = React.memo(({ hack, onUpdate, onDelete, onOpenNested, onOpenLink, onEditLinkText }: {
@@ -401,12 +402,14 @@ export function MindsetCategoriesCard() {
     const [isAddPopoverOpen, setIsAddPopoverOpen] = useState(false);
     const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
     const [botheringPopup, setBotheringPopup] = useState<{ type: 'mismatch' | 'constraint' | 'external'; pointId: string } | null>(null);
+    const [botheringSelectorTarget, setBotheringSelectorTarget] = useState<{ resourceId: string } | null>(null);
     const [selectedBotheringHabitId, setSelectedBotheringHabitId] = useState('');
     const [newBotheringText, setNewBotheringText] = useState('');
     const [newMismatchType, setNewMismatchType] = useState<MindsetPoint['mismatchType']>('mental-model');
     const [botheringType, setBotheringType] = useState<'mismatch' | 'constraint' | 'external'>('mismatch');
     const [pendingBotheringTaskIds, setPendingBotheringTaskIds] = useState<Set<string> | null>(null);
     const [selectedMismatchLinkId, setSelectedMismatchLinkId] = useState('');
+    const [selectedExternalLinkId, setSelectedExternalLinkId] = useState('');
     const [consistencyModal, setConsistencyModal] = useState<{ pointId: string; title: string; data: { date: string; fullDate: string; score: number }[] } | null>(null);
     const [isEditingBotheringTitle, setIsEditingBotheringTitle] = useState(false);
 
@@ -523,6 +526,7 @@ export function MindsetCategoriesCard() {
             text: newBotheringText.trim(),
             coreDomainId: DEFAULT_CORE_BY_BOTHERING[botheringType],
             ...(botheringType === 'mismatch' ? { mismatchType: newMismatchType } : {}),
+            ...(botheringType === 'constraint' ? { constraintType: 'externally-imposed' as const } : {}),
         };
         setMindsetCards(prev => prev.map(c => c.id === card.id ? { ...c, points: [...c.points, newPoint] } : c));
         setNewBotheringText('');
@@ -539,6 +543,9 @@ export function MindsetCategoriesCard() {
     const mismatchPointById = useMemo(() => {
         return new Map((mismatchCard?.points || []).map((point) => [point.id, point] as const));
     }, [mismatchCard?.points]);
+    const externalPointById = useMemo(() => {
+        return new Map((externalCard?.points || []).map((point) => [point.id, point] as const));
+    }, [externalCard?.points]);
     const constraintPointIdSet = useMemo(() => {
         return new Set((constraintCard?.points || []).map((point) => point.id));
     }, [constraintCard?.points]);
@@ -546,24 +553,8 @@ export function MindsetCategoriesCard() {
         if (!point) return [] as NonNullable<MindsetPoint['tasks']>;
         const directTasks = point.tasks || [];
         if (!constraintPointIdSet.has(point.id)) return directTasks;
-
-        const merged = [...directTasks];
-        const seen = new Set<string>();
-        merged.forEach(task => {
-            seen.add(task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ''}`);
-        });
-        (point.linkedMismatchIds || []).forEach(mismatchId => {
-            const mismatch = mismatchPointById.get(mismatchId);
-            if (!mismatch?.tasks?.length) return;
-            mismatch.tasks.forEach(task => {
-                const key = task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ''}`;
-                if (seen.has(key)) return;
-                seen.add(key);
-                merged.push(task);
-            });
-        });
-        return merged;
-    }, [constraintPointIdSet, mismatchPointById]);
+        return getEffectiveConstraintTasks(point, mismatchPointById, externalPointById);
+    }, [constraintPointIdSet, mismatchPointById, externalPointById]);
 
     const activeBotheringCard =
         botheringPopup?.type === 'mismatch'
@@ -1198,7 +1189,18 @@ export function MindsetCategoriesCard() {
     const globallyLinkedMismatchIds = useMemo(() => {
         const ids = new Set<string>();
         (constraintCard?.points || []).forEach(point => {
+            if (getConstraintLinkTargetType(point) !== 'mismatch') return;
             (point.linkedMismatchIds || []).forEach(id => {
+                if (id) ids.add(id);
+            });
+        });
+        return ids;
+    }, [constraintCard?.points]);
+    const globallyLinkedExternalIds = useMemo(() => {
+        const ids = new Set<string>();
+        (constraintCard?.points || []).forEach(point => {
+            if (getConstraintLinkTargetType(point) !== 'external') return;
+            (point.linkedExternalIds || []).forEach(id => {
                 if (id) ids.add(id);
             });
         });
@@ -1211,6 +1213,9 @@ export function MindsetCategoriesCard() {
     const linkableMismatchBotherings = useMemo(() => {
         return (mismatchCard?.points || []).filter(point => !point.completed && !globallyLinkedMismatchIds.has(point.id));
     }, [mismatchCard?.points, globallyLinkedMismatchIds]);
+    const linkableExternalBotherings = useMemo(() => {
+        return (externalCard?.points || []).filter(point => !point.completed && !globallyLinkedExternalIds.has(point.id));
+    }, [externalCard?.points, globallyLinkedExternalIds]);
     useEffect(() => {
         if (!activeBotheringPoint) {
             setIsEditingBotheringTitle(false);
@@ -1400,6 +1405,8 @@ export function MindsetCategoriesCard() {
     useEffect(() => {
         if (!botheringPopup?.pointId) return;
         setSelectedBotheringHabitId('');
+        setSelectedMismatchLinkId('');
+        setSelectedExternalLinkId('');
     }, [botheringPopup]);
 
     const updateBotheringPoint = useCallback((type: 'mismatch' | 'constraint' | 'external', pointId: string, updater: (point: MindsetPoint) => MindsetPoint) => {
@@ -1416,6 +1423,15 @@ export function MindsetCategoriesCard() {
             (point) => ({ ...point, coreDomainId: point.coreDomainId || fallbackCore })
         );
     }, [botheringPopup?.type, activeBotheringPoint?.id, activeBotheringPoint?.coreDomainId, updateBotheringPoint]);
+
+    useEffect(() => {
+        if (botheringPopup?.type !== 'constraint' || !activeBotheringPoint) return;
+        if (activeBotheringPoint.constraintType) return;
+        updateBotheringPoint('constraint', activeBotheringPoint.id, (point) => ({
+            ...point,
+            constraintType: point.constraintType || 'externally-imposed',
+        }));
+    }, [botheringPopup?.type, activeBotheringPoint, updateBotheringPoint]);
 
     useEffect(() => {
         if (!botheringPopup || !activeBotheringPoint) return;
@@ -1481,6 +1497,49 @@ export function MindsetCategoriesCard() {
         window.addEventListener('open-bothering-popup', handler as EventListener);
         return () => window.removeEventListener('open-bothering-popup', handler as EventListener);
     }, [setIsMindsetModalOpen]);
+
+    useEffect(() => {
+        const handler = (event: Event) => {
+            const detail = (event as CustomEvent).detail as {
+                targetResourceId?: string;
+                type?: 'mismatch' | 'constraint' | 'external';
+                pointId?: string;
+            } | undefined;
+            if (!detail?.targetResourceId) return;
+            setBotheringSelectorTarget({ resourceId: detail.targetResourceId });
+            setBotheringType(detail.type || 'external');
+            if (detail.pointId && detail.type) {
+                setBotheringPopup({ type: detail.type, pointId: detail.pointId });
+            } else {
+                setBotheringPopup(null);
+            }
+            setIsMindsetModalOpen(true);
+        };
+        window.addEventListener('open-bothering-selector', handler as EventListener);
+        return () => window.removeEventListener('open-bothering-selector', handler as EventListener);
+    }, [setIsMindsetModalOpen]);
+
+    useEffect(() => {
+        if (!isMindsetModalOpen) {
+            setBotheringSelectorTarget(null);
+        }
+    }, [isMindsetModalOpen]);
+
+    const handleSelectBotheringForResource = useCallback((type: 'mismatch' | 'constraint' | 'external', pointId: string) => {
+        if (!botheringSelectorTarget) {
+            setBotheringPopup({ type, pointId });
+            return;
+        }
+        window.dispatchEvent(new CustomEvent('bothering-selected', {
+            detail: {
+                targetResourceId: botheringSelectorTarget.resourceId,
+                botheringId: pointId,
+                botheringType: type,
+            },
+        }));
+        setBotheringSelectorTarget(null);
+        setBotheringPopup({ type, pointId });
+    }, [botheringSelectorTarget]);
 
     useEffect(() => {
         const handler = (event: Event) => {
@@ -2012,7 +2071,7 @@ export function MindsetCategoriesCard() {
                                                                     <button
                                                                         type="button"
                                                                         className="flex-1 min-w-0 text-left"
-                                                                        onClick={() => setBotheringPopup({ type: 'mismatch', pointId: point.id })}
+                                                                        onClick={() => handleSelectBotheringForResource('mismatch', point.id)}
                                                                     >
                                                                         <div className="flex items-center gap-2">
                                                                             {isDoneToday ? <Check className="h-4 w-4 text-emerald-400" /> : null}
@@ -2084,7 +2143,7 @@ export function MindsetCategoriesCard() {
                                                                     <button
                                                                         type="button"
                                                                         className="flex-1 min-w-0 text-left"
-                                                                        onClick={() => setBotheringPopup({ type: 'constraint', pointId: point.id })}
+                                                                        onClick={() => handleSelectBotheringForResource('constraint', point.id)}
                                                                     >
                                                                         <div className="flex items-center gap-2">
                                                                             {isDoneToday ? <Check className="h-4 w-4 text-emerald-400" /> : null}
@@ -2146,7 +2205,7 @@ export function MindsetCategoriesCard() {
                                     <button
                                         type="button"
                                         className="flex-1 min-w-0 text-left"
-                                        onClick={() => setBotheringPopup({ type: 'external', pointId: point.id })}
+                                        onClick={() => handleSelectBotheringForResource('external', point.id)}
                                     >
                                         <div className="flex items-center gap-2">
                                             {isDoneToday ? <Check className="h-4 w-4 text-emerald-400" /> : null}
@@ -2288,6 +2347,36 @@ export function MindsetCategoriesCard() {
                                                         <SelectItem value="cognitive-load">Cognitive load mismatch</SelectItem>
                                                         <SelectItem value="threat-prediction">Threat prediction mismatch</SelectItem>
                                                         <SelectItem value="action-sequencing">Action sequencing mismatch</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        )}
+                                        {botheringPopup.type === 'constraint' && (
+                                            <div>
+                                                <div className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Constraint Type</div>
+                                                <Select
+                                                    value={activeBotheringPoint.constraintType ?? 'externally-imposed'}
+                                                    onValueChange={(v) =>
+                                                        updateBotheringPoint(
+                                                            'constraint',
+                                                            activeBotheringPoint.id,
+                                                            (point) => ({
+                                                                ...point,
+                                                                constraintType: v as MindsetPoint['constraintType'],
+                                                                linkedMismatchIds:
+                                                                    v === 'externally-imposed' ? (point.linkedMismatchIds || []) : [],
+                                                                linkedExternalIds:
+                                                                    v === 'self-imposed' ? (point.linkedExternalIds || []) : [],
+                                                            })
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger className="h-9 w-full">
+                                                        <SelectValue placeholder="Constraint type" />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="z-[200]">
+                                                        <SelectItem value="externally-imposed">Externally imposed</SelectItem>
+                                                        <SelectItem value="self-imposed">Self-imposed</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
@@ -2703,7 +2792,9 @@ export function MindsetCategoriesCard() {
         {(getEffectiveBotheringTasks(activeBotheringPoint).length === 0) && (
             <div className="text-xs text-muted-foreground">
                 {botheringPopup?.type === 'constraint'
-                    ? 'No linked mismatch tasks yet. Link mismatch botherings below.'
+                    ? ((activeBotheringPoint?.constraintType ?? 'externally-imposed') === 'self-imposed'
+                        ? 'No linked external tasks yet. Link external botherings below.'
+                        : 'No linked mismatch tasks yet. Link mismatch botherings below.')
                     : 'No tasks yet. Link a routine to start.'}
             </div>
         )}
@@ -2713,26 +2804,58 @@ export function MindsetCategoriesCard() {
                                 )}
                                 {botheringPopup.type === 'constraint' && (
                                     <div className="lg:col-span-7 rounded-xl border border-white/10 bg-white/[0.02] p-4 space-y-3 max-h-[calc(88vh-240px)] overflow-y-auto pr-2">
-                                        <div className="text-xs uppercase tracking-wide text-muted-foreground">Linked mismatches</div>
+                                        <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                                            {(activeBotheringPoint.constraintType ?? 'externally-imposed') === 'self-imposed' ? 'Linked externals' : 'Linked mismatches'}
+                                        </div>
                                         <div className="rounded-lg border border-white/10 bg-black/20 p-2 space-y-2">
-                                            <div className="text-xs uppercase tracking-wide text-muted-foreground">Link mismatch bothering</div>
+                                            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                                                {(activeBotheringPoint.constraintType ?? 'externally-imposed') === 'self-imposed' ? 'Link external bothering' : 'Link mismatch bothering'}
+                                            </div>
                                             <div className="flex gap-2">
-                                                <Select value={selectedMismatchLinkId} onValueChange={setSelectedMismatchLinkId}>
+                                                <Select
+                                                    value={(activeBotheringPoint.constraintType ?? 'externally-imposed') === 'self-imposed' ? selectedExternalLinkId : selectedMismatchLinkId}
+                                                    onValueChange={(value) => {
+                                                        if ((activeBotheringPoint.constraintType ?? 'externally-imposed') === 'self-imposed') {
+                                                            setSelectedExternalLinkId(value);
+                                                        } else {
+                                                            setSelectedMismatchLinkId(value);
+                                                        }
+                                                    }}
+                                                >
                                                     <SelectTrigger className="flex-1">
-                                                        <SelectValue placeholder="Select mismatch..." />
+                                                        <SelectValue placeholder={(activeBotheringPoint.constraintType ?? 'externally-imposed') === 'self-imposed' ? 'Select external...' : 'Select mismatch...'} />
                                                     </SelectTrigger>
                                                     <SelectContent className="z-[200]">
-                                                        {linkableMismatchBotherings.length === 0 ? (
-                                                            <SelectItem value="__none__" disabled>No unlinked mismatches available</SelectItem>
+                                                        {(activeBotheringPoint.constraintType ?? 'externally-imposed') === 'self-imposed' ? (
+                                                            linkableExternalBotherings.length === 0 ? (
+                                                                <SelectItem value="__none__" disabled>No unlinked externals available</SelectItem>
+                                                            ) : (
+                                                                linkableExternalBotherings.map(point => (
+                                                                    <SelectItem key={point.id} value={point.id}>{point.text}</SelectItem>
+                                                                ))
+                                                            )
                                                         ) : (
-                                                            linkableMismatchBotherings.map(point => (
-                                                                <SelectItem key={point.id} value={point.id}>{point.text}</SelectItem>
-                                                            ))
+                                                            linkableMismatchBotherings.length === 0 ? (
+                                                                <SelectItem value="__none__" disabled>No unlinked mismatches available</SelectItem>
+                                                            ) : (
+                                                                linkableMismatchBotherings.map(point => (
+                                                                    <SelectItem key={point.id} value={point.id}>{point.text}</SelectItem>
+                                                                ))
+                                                            )
                                                         )}
                                                     </SelectContent>
                                                 </Select>
                                                 <Button
                                                     onClick={() => {
+                                                        if ((activeBotheringPoint.constraintType ?? 'externally-imposed') === 'self-imposed') {
+                                                            if (!selectedExternalLinkId) return;
+                                                            updateBotheringPoint('constraint', activeBotheringPoint.id, (point) => ({
+                                                                ...point,
+                                                                linkedExternalIds: Array.from(new Set([...(point.linkedExternalIds || []), selectedExternalLinkId])),
+                                                            }));
+                                                            setSelectedExternalLinkId('');
+                                                            return;
+                                                        }
                                                         if (!selectedMismatchLinkId) return;
                                                         updateBotheringPoint('constraint', activeBotheringPoint.id, (point) => ({
                                                             ...point,
@@ -2745,41 +2868,77 @@ export function MindsetCategoriesCard() {
                                                 </Button>
                                             </div>
                                             <div className="space-y-2">
-                                                {(activeBotheringPoint.linkedMismatchIds || []).map(mid => {
-                                                    const mismatch = mismatchCard?.points?.find(p => p.id === mid);
-                                                    if (!mismatch) return null;
-                                                    const data = buildBotheringConsistency(mismatch);
-                                                    const lastScore = data.length ? data[data.length - 1].score : 0;
-                                                    return (
-                                                        <div key={mid} className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
-                                                            <div className="min-w-0">
-                                                                <div className="truncate font-medium">{mismatch.text}</div>
-                                                                <div className="text-xs text-muted-foreground">Consistency: {lastScore}%</div>
+                                                {(activeBotheringPoint.constraintType ?? 'externally-imposed') === 'self-imposed'
+                                                    ? (activeBotheringPoint.linkedExternalIds || []).map(eid => {
+                                                        const external = externalCard?.points?.find(p => p.id === eid);
+                                                        if (!external) return null;
+                                                        const data = buildBotheringConsistency(external);
+                                                        const lastScore = data.length ? data[data.length - 1].score : 0;
+                                                        return (
+                                                            <div key={eid} className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
+                                                                <div className="min-w-0">
+                                                                    <div className="truncate font-medium">{external.text}</div>
+                                                                    <div className="text-xs text-muted-foreground">Consistency: {lastScore}%</div>
+                                                                </div>
+                                                                <div className="flex items-center gap-1">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6"
+                                                                        onClick={() => setConsistencyModal({ pointId: external.id, title: external.text, data })}
+                                                                    >
+                                                                        <LineChart className="h-3.5 w-3.5 text-blue-500" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6"
+                                                                        onClick={() => updateBotheringPoint('constraint', activeBotheringPoint.id, (point) => ({
+                                                                            ...point,
+                                                                            linkedExternalIds: (point.linkedExternalIds || []).filter(id => id !== eid),
+                                                                        }))}
+                                                                    >
+                                                                        <Trash2 className="h-3 w-3" />
+                                                                    </Button>
+                                                                </div>
                                                             </div>
-                                                            <div className="flex items-center gap-1">
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-6 w-6"
-                                                                    onClick={() => setConsistencyModal({ pointId: mismatch.id, title: mismatch.text, data })}
-                                                                >
-                                                                    <LineChart className="h-3.5 w-3.5 text-blue-500" />
-                                                                </Button>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="icon"
-                                                                    className="h-6 w-6"
-                                                                    onClick={() => updateBotheringPoint('constraint', activeBotheringPoint.id, (point) => ({
-                                                                        ...point,
-                                                                        linkedMismatchIds: (point.linkedMismatchIds || []).filter(id => id !== mid),
-                                                                    }))}
-                                                                >
-                                                                    <Trash2 className="h-3 w-3" />
-                                                                </Button>
+                                                        );
+                                                    })
+                                                    : (activeBotheringPoint.linkedMismatchIds || []).map(mid => {
+                                                        const mismatch = mismatchCard?.points?.find(p => p.id === mid);
+                                                        if (!mismatch) return null;
+                                                        const data = buildBotheringConsistency(mismatch);
+                                                        const lastScore = data.length ? data[data.length - 1].score : 0;
+                                                        return (
+                                                            <div key={mid} className="flex items-center justify-between text-sm p-2 rounded-lg bg-muted/30 border border-white/5">
+                                                                <div className="min-w-0">
+                                                                    <div className="truncate font-medium">{mismatch.text}</div>
+                                                                    <div className="text-xs text-muted-foreground">Consistency: {lastScore}%</div>
+                                                                </div>
+                                                                <div className="flex items-center gap-1">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6"
+                                                                        onClick={() => setConsistencyModal({ pointId: mismatch.id, title: mismatch.text, data })}
+                                                                    >
+                                                                        <LineChart className="h-3.5 w-3.5 text-blue-500" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-6 w-6"
+                                                                        onClick={() => updateBotheringPoint('constraint', activeBotheringPoint.id, (point) => ({
+                                                                            ...point,
+                                                                            linkedMismatchIds: (point.linkedMismatchIds || []).filter(id => id !== mid),
+                                                                        }))}
+                                                                    >
+                                                                        <Trash2 className="h-3 w-3" />
+                                                                    </Button>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    );
-                                                })}
+                                                        );
+                                                    })}
                                             </div>
                                         </div>
                                     </div>

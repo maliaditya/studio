@@ -5,7 +5,7 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise, DrawingCanvasPopupState, PdfViewerPopupState, FormalizationItem, AbandonmentLog, RecurrenceRule, KanbanBoard, KanbanList, KanbanCard, KanbanAttachment, KanbanComment, KanbanChecklistItem } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, MindsetPoint, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise, DrawingCanvasPopupState, PdfViewerPopupState, FormalizationItem, AbandonmentLog, RecurrenceRule, KanbanBoard, KanbanList, KanbanCard, KanbanAttachment, KanbanComment, KanbanChecklistItem, SkillAcquisitionPlan, DailyJournalSession, MindsetSession, PdfViewerLaunchContext } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
@@ -42,6 +42,7 @@ import { HabitDetailPopup } from '@/components/HabitDetailPopup';
 import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, storeExcalidrawFile, type ExcalidrawFileRecord, storeAudio, getAudioForResource, storePdf, getPdfForResource, getAllPdfKeys } from '@/lib/audioDB';
 import { uploadPdfToSupabase, downloadPdfFromSupabase } from '@/lib/supabasePdfStorage';
 import { normalizeAiSettings } from '@/lib/ai/config';
+import { buildDefaultPointsForResourceType, createDefaultTextPoint } from '@/lib/resourceDefaults';
 
 // Helper: convert ArrayBuffer to base64 in safe chunks to avoid "call stack size exceeded"
 const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
@@ -104,7 +105,7 @@ interface AuthContextType {
   setPlaybackRequest: React.Dispatch<React.SetStateAction<PlaybackRequest | null>>;
   pdfViewerState: PdfViewerPopupState | null;
   setPdfViewerState: React.Dispatch<React.SetStateAction<PdfViewerPopupState | null>>;
-  openPdfViewer: (resource: Resource) => void;
+  openPdfViewer: (resource: Resource, launchContext?: PdfViewerLaunchContext | null) => void;
   handlePdfViewerPopupDragEnd: (event: DragEndEvent) => void;
   drawingCanvasState: DrawingCanvasPopupState | null;
   setDrawingCanvasState: React.Dispatch<React.SetStateAction<DrawingCanvasPopupState | null>>;
@@ -177,6 +178,7 @@ interface AuthContextType {
   focusActivity: Activity | null;
   setFocusActivity: React.Dispatch<React.SetStateAction<Activity | null>>;
   focusDuration: number;
+  setFocusDuration: React.Dispatch<React.SetStateAction<number>>;
   onOpenFocusModal: (activity: Activity) => boolean;
   handleStartFocusSession: (activity: Activity, duration: number) => void;
   onLogDuration: (
@@ -220,6 +222,7 @@ interface AuthContextType {
   setOfferizationPlans: React.Dispatch<React.SetStateAction<Record<string, ProductizationPlan>>>;
   kanbanBoards: KanbanBoard[];
   setKanbanBoards: React.Dispatch<React.SetStateAction<KanbanBoard[]>>;
+  refreshKanbanBoards: () => void;
   addFeatureToRelease: (release: Release, topic: string, featureName: string, type: 'product' | 'service') => void;
   
   copyOffer: (topic: string, offerId: string) => void;
@@ -274,6 +277,7 @@ interface AuthContextType {
   closeGeneralPopup: (popupId: string) => void;
   navigateGeneralPopupPath: (popupId: string, resourceId: string) => void;
   updateGeneralPopupSize: (popupId: string, resourceId: string, width: number, height: number) => void;
+  updateGeneralPopupPosition: (popupId: string, resourceId: string, x: number, y: number) => void;
   handleUpdateResource: (resource: Resource) => void;
   handleOpenNestedPopup: (resourceId: string, event: React.MouseEvent, parentPopupState?: PopupState) => void;
   
@@ -337,6 +341,48 @@ interface AuthContextType {
   // Mindset
   mindsetCards: MindsetCard[];
   setMindsetCards: React.Dispatch<React.SetStateAction<MindsetCard[]>>;
+  createShivGuideFlow: (input: {
+    botheringType: 'external' | 'mismatch' | 'constraint';
+    botheringText: string;
+    domainId?: string | null;
+    domainName?: string;
+    specializationId?: string | null;
+    specializationName?: string;
+    learningPlans: Array<{
+      type: 'audio' | 'book' | 'path';
+      title: string;
+      subtitle?: string;
+      targetDate?: string;
+      requiredHours?: number | null;
+      totalPages?: number | null;
+      requiredMoney?: number | null;
+      targetMicroSkills?: number | null;
+      linkedPdfResourceId?: string | null;
+    }>;
+    projectPlan?: {
+      enabled: boolean;
+      domainId?: string | null;
+      projectName?: string;
+      endDate?: string;
+      specializationId?: string | null;
+    };
+    routine?: {
+      activityType?: ActivityType;
+      specializationId?: string | null;
+      details: string;
+      slot: SlotName;
+      recurrence: RecurrenceRule;
+      startDate?: string;
+      linkToBothering?: boolean;
+    };
+  }) => {
+    botheringId: string;
+    domainId: string;
+    specializationId: string;
+    routineId: string | null;
+    projectId: string | null;
+    releaseId: string | null;
+  };
   
   // Pistons
   isPistonsHeadOpen: boolean;
@@ -422,6 +468,10 @@ interface AuthContextType {
   toggleRoutine: (activity: Activity, rule: RecurrenceRule | null, baseDate?: string) => void;
   missedSlotReviews: Record<string, MissedSlotReview>;
   setMissedSlotReviews: React.Dispatch<React.SetStateAction<Record<string, MissedSlotReview>>>;
+  journalSessions: DailyJournalSession[];
+  setJournalSessions: React.Dispatch<React.SetStateAction<DailyJournalSession[]>>;
+  mindsetSessions: MindsetSession[];
+  setMindsetSessions: React.Dispatch<React.SetStateAction<MindsetSession[]>>;
   
   // Mindset Technique Popup
   linkedResistancePopup: MindsetTechniquePopupState | null;
@@ -548,11 +598,30 @@ const KANBAN_STAGE_MIGRATION: Array<{ key: 'ideaItems' | 'codeItems' | 'breakIte
   { key: 'fixItems', title: 'Fix', color: '#9333ea' },
 ];
 
+const DEFAULT_PROJECT_KANBAN_LIST_TEMPLATES = [
+  { key: 'idea', title: 'Idea', color: '#2563eb' },
+  { key: 'code', title: 'Code', color: '#059669' },
+  { key: 'break', title: 'Break', color: '#d97706' },
+  { key: 'fix', title: 'Fix', color: '#9333ea' },
+  { key: 'done', title: 'Done', color: '#0f766e' },
+] as const;
+
 const buildReleaseBoardId = (specializationId: string, releaseId: string) =>
   `kanban_release_${specializationId}_${releaseId}`;
 
 const buildKanbanMigrationId = (prefix: string, boardId: string, suffix: string) =>
   `${prefix}_${boardId}_${suffix}`;
+
+const buildDefaultProjectLists = (boardId: string): KanbanList[] =>
+  DEFAULT_PROJECT_KANBAN_LIST_TEMPLATES.map((list, index) => ({
+    id: `${boardId}_${list.key}`,
+    boardId,
+    title: list.title,
+    color: list.color,
+    cardOrder: [],
+    position: index,
+    archived: false,
+  }));
 
 const normalizeKanbanBoards = (
   rawBoards: unknown,
@@ -566,10 +635,12 @@ const normalizeKanbanBoards = (
     .map((board, boardIndex) => {
       const boardId = board.id;
       const labels = Array.isArray(board.labels) ? board.labels : [];
-      const lists = Array.isArray(board.lists) ? board.lists : [];
+      const rawLists = Array.isArray(board.lists) ? board.lists : [];
       const cards = Array.isArray(board.cards) ? board.cards : [];
       const attachments = Array.isArray(board.attachments) ? board.attachments : [];
       const comments = Array.isArray(board.comments) ? board.comments : [];
+      const boardType = board.boardType === 'branding' ? 'branding' : 'project';
+      const lists = rawLists.length > 0 ? rawLists : (boardType === 'project' ? buildDefaultProjectLists(boardId) : []);
       return {
         id: boardId,
         name: typeof board.name === 'string' && board.name.trim() ? board.name : `Board ${boardIndex + 1}`,
@@ -579,7 +650,17 @@ const normalizeKanbanBoards = (
         specializationId: typeof board.specializationId === 'string' ? board.specializationId : null,
         createdAt: typeof board.createdAt === 'string' ? board.createdAt : now,
         updatedAt: typeof board.updatedAt === 'string' ? board.updatedAt : now,
-        listOrder: Array.isArray(board.listOrder) ? board.listOrder.filter((id: unknown) => typeof id === 'string') : [],
+        listOrder:
+          Array.isArray(board.listOrder) && board.listOrder.some((id: unknown) => typeof id === 'string')
+            ? board.listOrder.filter((id: unknown) => typeof id === 'string')
+            : lists
+                .filter((list): list is Record<string, any> => !!list && typeof list === 'object' && typeof list.id === 'string')
+                .sort((a, b) => {
+                  const aPos = typeof a.position === 'number' ? a.position : 0;
+                  const bPos = typeof b.position === 'number' ? b.position : 0;
+                  return aPos - bPos;
+                })
+                .map((list) => list.id),
         labels: labels
           .filter((label): label is Record<string, any> => !!label && typeof label === 'object' && typeof label.id === 'string')
           .map((label) => ({
@@ -633,6 +714,17 @@ const normalizeKanbanBoards = (
                 : null,
             linkedProjectId: typeof card.linkedProjectId === 'string' ? card.linkedProjectId : null,
             linkedReleaseId: typeof card.linkedReleaseId === 'string' ? card.linkedReleaseId : null,
+            linkedResourceId: typeof card.linkedResourceId === 'string' ? card.linkedResourceId : null,
+            linkedFeatureResourceId: typeof card.linkedFeatureResourceId === 'string' ? card.linkedFeatureResourceId : null,
+            linkedFeaturePointId: typeof card.linkedFeaturePointId === 'string' ? card.linkedFeaturePointId : null,
+            linkedFeaturePointIds: Array.isArray(card.linkedFeaturePointIds)
+              ? card.linkedFeaturePointIds.filter((id: unknown) => typeof id === 'string')
+              : [],
+            brandingType:
+              card.brandingType === 'blog' || card.brandingType === 'video'
+                ? card.brandingType
+                : null,
+            totalLoggedMinutes: typeof card.totalLoggedMinutes === 'number' ? Math.max(0, card.totalLoggedMinutes) : 0,
             archived: !!card.archived,
             position: typeof card.position === 'number' ? card.position : index,
             createdAt: typeof card.createdAt === 'string' ? card.createdAt : now,
@@ -655,6 +747,7 @@ const normalizeKanbanBoards = (
             body: typeof item.body === 'string' ? item.body : '',
             createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
           })),
+        boardType,
         migratedFromReleaseWorkflow: !!board.migratedFromReleaseWorkflow,
       };
     });
@@ -731,6 +824,8 @@ const normalizeKanbanBoards = (
           workflowStageKey,
           linkedProjectId: matchingProject?.id || null,
           linkedReleaseId: release.id,
+          linkedResourceId: null,
+          totalLoggedMinutes: 0,
           archived: false,
           position,
           createdAt: nowStamp,
@@ -865,8 +960,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pdfDailyPageTargetByResourceId: {},
     pdfDailyPageStatsByResourceId: {},
     pdfAnnotationsByResourceId: {},
+    flashcardSessions: [],
+    flashcardTopicTablesBySpecializationId: {},
     learningPerformanceDailyLogs: {},
     supabasePdfBucket: 'pdfs',
+    xttsTtsBaseUrl: '',
+    xttsVoiceSamplePath: '',
+    xttsVoiceName: 'my_voice',
+    xttsLanguage: 'en',
+    astraReplyLanguage: 'auto',
     localSttBaseUrl: '',
     means: {
       entries: [],
@@ -952,6 +1054,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   // End-of-slot review state
   const [missedSlotReviews, setMissedSlotReviews] = useState<Record<string, MissedSlotReview>>({});
+  const [journalSessions, setJournalSessions] = useState<DailyJournalSession[]>([]);
+  const [mindsetSessions, setMindsetSessions] = useState<MindsetSession[]>([]);
 
   // Sidebar State
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
@@ -1257,6 +1361,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     }
 
+    if (activity.type === 'deepwork' && duration > 0) {
+      const linkedCardIds = new Set(activity.taskIds || []);
+      if (linkedCardIds.size > 0) {
+        setKanbanBoards((prevBoards) =>
+          prevBoards.map((board) => {
+            let boardChanged = false;
+            const nextCards = (board.cards || []).map((card) => {
+              if (!linkedCardIds.has(card.id)) return card;
+              boardChanged = true;
+              return {
+                ...card,
+                totalLoggedMinutes: Math.max(0, card.totalLoggedMinutes || 0) + duration,
+                updatedAt: new Date().toISOString(),
+              };
+            });
+            return boardChanged ? { ...board, cards: nextCards, updatedAt: new Date().toISOString() } : board;
+          })
+        );
+      }
+    }
+
     const itemsDelta = Math.max(0, progress?.itemsCompleted || 0);
     const hoursDelta = Math.max(0, progress?.hoursCompleted || 0);
     const pagesDelta = Math.max(0, progress?.pagesCompleted || 0);
@@ -1480,7 +1605,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             folderId: scratchpadFolder.id,
             type: 'card',
             createdAt: new Date().toISOString(),
-            points: [],
+            points: buildDefaultPointsForResourceType('card', []),
         };
         updatedResources.push(scratchpadResource);
     }
@@ -1532,6 +1657,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         type: 'card',
         createdAt: new Date().toISOString(),
         points: [
+          createDefaultTextPoint(),
           { id: `point_canvas_${Date.now()}`, text: 'Canvas', type: 'paint' }
         ],
       };
@@ -1633,7 +1759,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  const openPdfViewer = (resource: Resource) => {
+  const openPdfViewer = (resource: Resource, launchContext?: PdfViewerLaunchContext | null) => {
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const minWidth = 500;
@@ -1659,7 +1785,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isOpen: true,
       resource,
       position: { x: clampedX, y: clampedY },
-      size: { width: initialWidth, height: initialHeight }
+      size: { width: initialWidth, height: initialHeight },
+      launchContext: launchContext || null,
     });
   };
 
@@ -1956,6 +2083,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         pathNodes,
         mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation,
         missedSlotReviews,
+        journalSessions,
+        mindsetSessions,
         topPriorities,
         brainHacks,
         settings,
@@ -1973,7 +2102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
   }, [
-    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, kanbanBoards, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, topPriorities, brainHacks, settings, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, selectedFormalizationSpecId, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pipState, spacedRepetitionData, dailyReviewLogs, abandonmentLogs
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, kanbanBoards, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, journalSessions, mindsetSessions, topPriorities, brainHacks, settings, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, selectedFormalizationSpecId, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pipState, spacedRepetitionData, dailyReviewLogs, abandonmentLogs
   ]);
 
   const stripLocalOnlySecretsFromPayload = useCallback((payload: any) => {
@@ -2039,7 +2168,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
 
           localStorage.removeItem(mainRefKey);
-          void deleteBackup(getMainBackupKey(storageUsername)).catch(() => undefined);
+          // Best-effort backup cleanup can thrash a broken IndexedDB instance and freeze normal edits.
+          // Keep the stale backup around; localStorage stays the source of truth when mainRefKey is absent.
           return true;
         };
 
@@ -2273,6 +2403,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setAutoSuggestions(sanitizedMain.autoSuggestions || {});
     setPathNodes(sanitizedMain.pathNodes || []);
     setMissedSlotReviews(sanitizedMain.missedSlotReviews || {});
+    setJournalSessions(sanitizedMain.journalSessions || []);
+    setMindsetSessions(sanitizedMain.mindsetSessions || []);
     setTopPriorities(sanitizedMain.topPriorities || []);
     setBrainHacks(sanitizedMain.brainHacks || []);
     setSpacedRepetitionData(sanitizedMain.spacedRepetitionData || {});
@@ -2341,8 +2473,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           pdfDailyPageTargetByResourceId: {},
           pdfDailyPageStatsByResourceId: {},
           pdfAnnotationsByResourceId: {},
+          flashcardSessions: [],
+          flashcardTopicTablesBySpecializationId: {},
           learningPerformanceDailyLogs: {},
           supabasePdfBucket: 'pdfs',
+          xttsTtsBaseUrl: '',
+          xttsVoiceSamplePath: '',
+          xttsVoiceName: 'my_voice',
+          xttsLanguage: 'en',
+          astraReplyLanguage: 'auto',
           localSttBaseUrl: '',
           ai: normalizeAiSettings(undefined, typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop)),
       };
@@ -2360,6 +2499,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         },
         typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop)
       ),
+      flashcardSessions: Array.isArray(incomingSettings.flashcardSessions)
+        ? incomingSettings.flashcardSessions
+        : defaultSettings.flashcardSessions,
+      flashcardTopicTablesBySpecializationId:
+        incomingSettings.flashcardTopicTablesBySpecializationId &&
+        typeof incomingSettings.flashcardTopicTablesBySpecializationId === 'object'
+          ? incomingSettings.flashcardTopicTablesBySpecializationId
+          : defaultSettings.flashcardTopicTablesBySpecializationId,
       supabaseServiceRoleKey: incomingSettings.supabaseServiceRoleKey ?? prev.supabaseServiceRoleKey,
       // Keep local hash maps if imported payload does not include them.
       githubModuleHashes:
@@ -3594,6 +3741,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     persistGeneralPopupSize(resourceId, normalizedWidth, normalizedHeight);
   }, [persistGeneralPopupSize]);
 
+  const updateGeneralPopupPosition = useCallback((popupId: string, resourceId: string, x: number, y: number) => {
+    setGeneralPopups(prev => {
+      const newPopups = new Map(prev);
+      const popup = newPopups.get(popupId);
+      if (!popup) return newPopups;
+      const nextX = Math.round(x);
+      const nextY = Math.round(y);
+      if (popup.x === nextX && popup.y === nextY) return newPopups;
+      newPopups.set(popupId, { ...popup, x: nextX, y: nextY });
+      return newPopups;
+    });
+  }, []);
+
   const navigateGeneralPopupPath = useCallback((popupId: string, resourceId: string) => {
     setGeneralPopups(prev => {
       const newPopups = new Map(prev);
@@ -3702,9 +3862,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         onUpdate={handleUpdateResource}
         onOpenNestedPopup={handleOpenNestedPopup}
         onResize={updateGeneralPopupSize}
+        onPositionChange={updateGeneralPopupPosition}
       />
     )
-  }, [resources, closeGeneralPopup, navigateGeneralPopupPath, handleUpdateResource, handleOpenNestedPopup, updateGeneralPopupSize]);
+  }, [resources, closeGeneralPopup, navigateGeneralPopupPath, handleUpdateResource, handleOpenNestedPopup, updateGeneralPopupSize, updateGeneralPopupPosition]);
   
   const handlePopupDragEnd = (event: DragEndEvent) => {
     const { active, delta } = event;
@@ -4352,7 +4513,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         name: pointToConvert ? pointToConvert.text : 'New Card',
         folderId: currentParentId!,
         type: type,
-        points: [],
+        points: buildDefaultPointsForResourceType(type, []),
         icon: 'Library',
         createdAt: new Date().toISOString(),
       };
@@ -4540,7 +4701,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       return newSchedule;
     });
   };
-  
+
   const toggleRoutine = (activity: Activity, rule: RecurrenceRule | null, baseDate?: string) => {
     setSettings(prev => {
       const rawId = activity.id || '';
@@ -4565,6 +4726,399 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       return {...prev, routines: newRoutines};
     });
   };
+
+  const createShivGuideFlow = useCallback((input: {
+    botheringType: 'external' | 'mismatch' | 'constraint';
+    botheringText: string;
+    domainId?: string | null;
+    domainName?: string;
+    specializationId?: string | null;
+    specializationName?: string;
+    learningPlans: Array<{
+      type: 'audio' | 'book' | 'path';
+      title: string;
+      subtitle?: string;
+      targetDate?: string;
+      requiredHours?: number | null;
+      totalPages?: number | null;
+      requiredMoney?: number | null;
+      targetMicroSkills?: number | null;
+      linkedPdfResourceId?: string | null;
+    }>;
+    projectPlan?: {
+      enabled: boolean;
+      domainId?: string | null;
+      projectName?: string;
+      endDate?: string;
+      specializationId?: string | null;
+    };
+    routine?: {
+      details: string;
+      slot: SlotName;
+      recurrence: RecurrenceRule;
+      startDate?: string;
+      linkToBothering?: boolean;
+    };
+  }) => {
+    const normalizeName = (value?: string | null) => String(value || '').trim().toLowerCase();
+    const botheringText = String(input.botheringText || '').trim();
+    const isExternalFlow = input.botheringType === 'external';
+    if (!botheringText) throw new Error('Bothering text is required.');
+
+    const typeToCardId: Record<'external' | 'mismatch' | 'constraint', string> = {
+      external: 'mindset_botherings_external',
+      mismatch: 'mindset_botherings_mismatch',
+      constraint: 'mindset_botherings_constraint',
+    };
+    const titleMap: Record<'external' | 'mismatch' | 'constraint', string> = {
+      external: 'External Botherings',
+      mismatch: 'Mismatch Botherings',
+      constraint: 'Constraint Botherings',
+    };
+
+    let domainId = '';
+    let specializationId = '';
+    if (!isExternalFlow) {
+      const domainName = String(input.domainName || '').trim();
+      const requestedDomainId = String(input.domainId || '').trim();
+      domainId = requestedDomainId;
+      const existingDomain = domainId
+        ? skillDomains.find((domain) => domain.id === domainId)
+        : skillDomains.find((domain) => normalizeName((domain as any).name) === normalizeName(domainName));
+
+      if (existingDomain) {
+        domainId = existingDomain.id;
+      } else {
+        if (!domainName) throw new Error('Choose an existing domain or enter a new domain name.');
+        const newDomain: SkillDomain = { id: `d_${Date.now()}`, name: domainName };
+        const foundationSkill: CoreSkill = {
+          id: `cs_${Date.now()}_f`,
+          domainId: newDomain.id,
+          name: 'Realization',
+          type: 'Foundation',
+          skillAreas: [],
+          parentId: null,
+        };
+        domainId = newDomain.id;
+        setSkillDomains((prev) => [...prev, newDomain]);
+        setCoreSkills((prev) => [...prev, foundationSkill]);
+      }
+
+      const specializationName = String(input.specializationName || '').trim();
+      const requestedSpecializationId = String(input.specializationId || '').trim();
+      specializationId = requestedSpecializationId;
+      const existingSpecialization = specializationId
+        ? coreSkills.find((skill) => skill.id === specializationId && skill.type === 'Specialization')
+        : coreSkills.find(
+            (skill) =>
+              skill.type === 'Specialization' &&
+              skill.domainId === domainId &&
+              normalizeName(skill.name) === normalizeName(specializationName)
+          );
+
+      if (existingSpecialization) {
+        specializationId = existingSpecialization.id;
+      } else {
+        if (!specializationName) throw new Error('Choose an existing specialization or enter a new specialization name.');
+        const newSkill: CoreSkill = {
+          id: `cs_${Date.now()}_s`,
+          domainId,
+          name: specializationName,
+          type: 'Specialization',
+          skillAreas: [],
+          parentId: null,
+        };
+        specializationId = newSkill.id;
+        setCoreSkills((prev) => [...prev, newSkill]);
+      }
+    }
+
+    const cardId = typeToCardId[input.botheringType];
+    const botheringId = `bother_${Date.now()}`;
+    setMindsetCards((prev) => {
+      const point: MindsetPoint = {
+        id: botheringId,
+        text: botheringText,
+        tasks: [],
+      };
+      const existingCard = prev.find((card) => card.id === cardId);
+      if (existingCard) {
+        return prev.map((card) => (card.id === cardId ? { ...card, points: [...card.points, point] } : card));
+      }
+      return [
+        ...prev,
+        {
+          id: cardId,
+          title: titleMap[input.botheringType],
+          icon: 'Brain',
+          points: [point],
+        },
+      ];
+    });
+
+    const learningPlans = Array.isArray(input.learningPlans) ? input.learningPlans : [];
+    const normalizedLearningPlans = learningPlans
+      .map((plan) => ({
+        ...plan,
+        title: String(plan?.title || '').trim(),
+        subtitle: String(plan?.subtitle || '').trim(),
+        targetDate: String(plan?.targetDate || ''),
+        linkedPdfResourceId: typeof plan?.linkedPdfResourceId === 'string' ? plan.linkedPdfResourceId : null,
+      }))
+      .filter((plan) => plan.title.length > 0);
+
+    if (!isExternalFlow && normalizedLearningPlans.length === 0) {
+      throw new Error('Add at least one learning path.');
+    }
+
+    if (!isExternalFlow) {
+      setSkillAcquisitionPlans((prev) => {
+      const hours = normalizedLearningPlans
+        .map((plan) => plan.requiredHours)
+        .find((value) => typeof value === 'number' && Number.isFinite(value));
+      const money = normalizedLearningPlans
+        .map((plan) => plan.requiredMoney)
+        .find((value) => typeof value === 'number' && Number.isFinite(value));
+      const targetDate = normalizedLearningPlans.map((plan) => plan.targetDate).find((value) => value) || '';
+      const nextPlan = {
+        specializationId,
+        targetDate,
+        requiredMoney: money ?? null,
+        requiredHours: hours ?? null,
+        linkedRuleEquationIds: [] as string[],
+      };
+      const existingIndex = prev.findIndex((plan) => plan.specializationId === specializationId);
+      if (existingIndex > -1) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          ...nextPlan,
+          linkedRuleEquationIds: updated[existingIndex].linkedRuleEquationIds || [],
+        };
+        return updated;
+      }
+      return [...prev, nextPlan];
+      });
+
+      setOfferizationPlans((prev) => {
+      const current = prev[specializationId] || {};
+      const learningPlan = { ...(current.learningPlan || {}) };
+      normalizedLearningPlans.forEach((plan) => {
+        if (plan.type === 'audio') {
+          learningPlan.audioVideoResources = [
+            ...(learningPlan.audioVideoResources || []),
+            {
+              id: id('audio_plan'),
+              name: plan.title,
+              tutor: plan.subtitle || '',
+              totalItems: null,
+              totalHours: plan.requiredHours ?? null,
+              startDate: null,
+              completionDate: plan.targetDate || null,
+            },
+          ];
+          return;
+        }
+        if (plan.type === 'book') {
+          learningPlan.bookWebpageResources = [
+            ...(learningPlan.bookWebpageResources || []),
+            {
+              id: id('book_plan'),
+              name: plan.title,
+              author: plan.subtitle || '',
+              totalPages: plan.totalPages ?? null,
+              startDate: null,
+              completionDate: plan.targetDate || null,
+              linkedPdfResourceId: plan.linkedPdfResourceId || null,
+            },
+          ];
+          return;
+        }
+        learningPlan.skillTreePaths = [
+          ...(learningPlan.skillTreePaths || []),
+          {
+            id: id('path_plan'),
+            name: plan.title,
+            skillAreaIds: [],
+            targetMicroSkills: plan.targetMicroSkills ?? null,
+            completionDate: plan.targetDate || null,
+            linkedPdfResourceId: plan.linkedPdfResourceId || null,
+          },
+        ];
+      });
+
+      return {
+        ...prev,
+        [specializationId]: {
+          ...current,
+          learningPlan,
+        },
+      };
+      });
+    }
+
+    let projectId: string | null = null;
+    let releaseId: string | null = null;
+    const projectPlan = input.projectPlan;
+    if (!isExternalFlow && projectPlan?.enabled) {
+      const projectName = String(projectPlan.projectName || '').trim();
+      const projectDomainId = String(projectPlan.domainId || domainId).trim() || domainId;
+      const projectSpecializationId = String(projectPlan.specializationId || specializationId).trim() || specializationId;
+      const endDate = String(projectPlan.endDate || '').trim();
+
+      if (!projectName) throw new Error('Project name is required when project plan is enabled.');
+      if (!endDate) throw new Error('Project end date is required when project plan is enabled.');
+
+      const existingProject = projects.find(
+        (project) => project.domainId === projectDomainId && normalizeName(project.name) === normalizeName(projectName)
+      );
+
+      projectId = existingProject?.id || `proj_${Date.now()}`;
+      if (!existingProject) {
+        const newProject: Project = {
+          id: projectId,
+          name: projectName,
+          domainId: projectDomainId,
+          features: [],
+        };
+        setProjects((prev) => [...prev, newProject]);
+      }
+
+      releaseId = `release_${projectId}_${projectSpecializationId}`;
+      setOfferizationPlans((prev) => {
+        const plan = prev[projectSpecializationId] || { offers: [], releases: [] };
+        const alreadyLinked = (plan.releases || []).some((release) => release.id === releaseId || release.name === projectName);
+        if (alreadyLinked) {
+          return {
+            ...prev,
+            [projectSpecializationId]: {
+              ...plan,
+              releases: (plan.releases || []).map((release) =>
+                release.id === releaseId || release.name === projectName
+                  ? { ...release, launchDate: endDate }
+                  : release
+              ),
+            },
+          };
+        }
+        return {
+          ...prev,
+          [projectSpecializationId]: {
+            ...plan,
+            releases: [
+              ...(plan.releases || []),
+              {
+                id: releaseId,
+                name: projectName,
+                description: '',
+                launchDate: endDate,
+                focusAreaIds: [],
+                workflowStages: {
+                  botheringPointId: botheringId,
+                  botheringText,
+                  stageLabels: {
+                    idea: 'Idea -> pick simplest solution',
+                    code: 'Code -> make it run',
+                    break: 'Break -> observe failure',
+                    fix: 'Fix -> improve system',
+                  },
+                  ideaItems: [],
+                  codeItems: [],
+                  breakItems: [],
+                  fixItems: [],
+                },
+                features: [],
+              },
+            ],
+          },
+        };
+      });
+      setSelectedProjectId(projectId);
+    }
+
+    let routineId: string | null = null;
+    if (input.routine?.details?.trim()) {
+      const routineActivityType: ActivityType =
+        input.routine.activityType === 'workout' ||
+        input.routine.activityType === 'upskill' ||
+        input.routine.activityType === 'deepwork' ||
+        input.routine.activityType === 'essentials'
+          ? input.routine.activityType
+          : 'upskill';
+      const linkedSpecializationId =
+        routineActivityType === 'upskill' || routineActivityType === 'deepwork'
+          ? String(input.routine.specializationId || specializationId || '').trim()
+          : '';
+      const activity: Activity = {
+        id: id('routine'),
+        type: routineActivityType,
+        details: input.routine.details.trim(),
+        completed: false,
+        slot: input.routine.slot,
+        linkedEntityType: linkedSpecializationId ? 'specialization' : undefined,
+      };
+      const normalizedId = activity.id.replace(/_(\d{4}-\d{2}-\d{2})$/, '');
+      routineId = normalizedId || `routine_${activity.type}_${activity.details.replace(/\s/g, '')}`;
+      toggleRoutine(activity, input.routine.recurrence, input.routine.startDate);
+
+      if (input.routine.linkToBothering) {
+        const dateKey = String(input.routine.startDate || new Date().toISOString().slice(0, 10));
+        setMindsetCards((prev) =>
+          prev.map((card) =>
+            card.id !== cardId
+              ? card
+              : {
+                  ...card,
+                  points: card.points.map((point) =>
+                    point.id !== botheringId
+                      ? point
+                      : {
+                          ...point,
+                          tasks: [
+                            ...(point.tasks || []),
+                            {
+                              id: routineId as string,
+                              type: routineActivityType,
+                              details: activity.details,
+                              completed: false,
+                              activityId: routineId as string,
+                              slotName: input.routine.slot,
+                              dateKey,
+                              startDate: dateKey,
+                              recurrence: input.routine.recurrence.type,
+                              repeatInterval: input.routine.recurrence.repeatInterval,
+                              repeatUnit: input.routine.recurrence.repeatUnit,
+                            },
+                          ],
+                        }
+                  ),
+                }
+          )
+        );
+      }
+    }
+
+    setSelectedDomainId(domainId);
+    setSelectedSkillId(specializationId);
+    if (!projectId) {
+      setSelectedProjectId(null);
+    }
+
+    return { botheringId, domainId, specializationId, routineId, projectId, releaseId };
+  }, [
+    coreSkills,
+    projects,
+    skillDomains,
+    setCoreSkills,
+    setMindsetCards,
+    setOfferizationPlans,
+    setSelectedDomainId,
+    setSelectedProjectId,
+    setSelectedSkillId,
+    setSkillAcquisitionPlans,
+    setSkillDomains,
+    toggleRoutine,
+  ]);
   
   const openLinkedResistancePopup = (techniqueId: string, event: React.MouseEvent) => {
     const popupWidth = 384;
@@ -4802,6 +5356,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
           folderId: folderId,
           type: 'card',
           createdAt: new Date().toISOString(),
+          points: buildDefaultPointsForResourceType('card', []),
       };
       setResources(prev => [...prev, newCard]);
       return newCard;
@@ -5575,6 +6130,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       autoSuggestions: main.autoSuggestions,
       pathNodes: main.pathNodes,
       missedSlotReviews: main.missedSlotReviews,
+      journalSessions: main.journalSessions,
+      mindsetSessions: main.mindsetSessions,
       topPriorities: main.topPriorities,
       brainHacks: main.brainHacks,
       spacedRepetitionData: main.spacedRepetitionData,
@@ -7098,6 +7655,10 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     return idSet;
   }, [allDeepWorkLogs, allUpskillLogs, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType]);
 
+  const refreshKanbanBoards = useCallback(() => {
+    setKanbanBoards((prevBoards) => normalizeKanbanBoards(prevBoards, offerizationPlans, projects));
+  }, [offerizationPlans, projects]);
+
   const value: AuthContextType = {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
@@ -7138,13 +7699,13 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     dailyPurposes, setDailyPurposes, isAgendaDocked, setIsAgendaDocked,
     onLogDuration,
     findRootTask,
-    focusSessionModalOpen, setFocusSessionModalOpen, focusActivity, setFocusActivity, focusDuration, onOpenFocusModal, handleStartFocusSession,
+    focusSessionModalOpen, setFocusSessionModalOpen, focusActivity, setFocusActivity, focusDuration, setFocusDuration, onOpenFocusModal, handleStartFocusSession,
     activeFocusSession, setActiveFocusSession,
     workoutMode, setWorkoutMode, strengthTrainingMode, setStrengthTrainingMode, workoutPlanRotation, setWorkoutPlanRotation, workoutPlans, setWorkoutPlans, exerciseDefinitions, setExerciseDefinitions,
     upskillDefinitions, setUpskillDefinitions, topicGoals, setTopicGoals,
     deepWorkDefinitions, setDeepWorkDefinitions, getDeepWorkNodeType, getUpskillNodeType, updateTaskDuration,
     leadGenDefinitions, setLeadGenDefinitions,
-    productizationPlans, setProductizationPlans, offerizationPlans, setOfferizationPlans, kanbanBoards, setKanbanBoards,
+    productizationPlans, setProductizationPlans, offerizationPlans, setOfferizationPlans, kanbanBoards, setKanbanBoards, refreshKanbanBoards,
     addFeatureToRelease,
     copyOffer,
     mindProgrammingDefinitions, setMindProgrammingDefinitions,
@@ -7166,7 +7727,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     handlePopupDragEnd,
     ResourcePopup,
     intentionPopups, openIntentionPopup, closeIntentionPopup,
-    generalPopups, openGeneralPopup, closeGeneralPopup, navigateGeneralPopupPath, updateGeneralPopupSize,
+    generalPopups, openGeneralPopup, closeGeneralPopup, navigateGeneralPopupPath, updateGeneralPopupSize, updateGeneralPopupPosition,
     handleUpdateResource, handleOpenNestedPopup,
     ruleDetailPopup, openRuleDetailPopup, closeRuleDetailPopup, handleRulePopupDragEnd,
     pillarPopupState, openPillarPopup, closePillarPopup, handlePillarPopupDragEnd,
@@ -7180,7 +7741,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     logMindsetSet, deleteMindsetSet,
     canvasLayout, setCanvasLayout, globalElements, allComponentsForSpec,
     addGlobalElement, updateGlobalElement, deleteGlobalElement, handleAddNewResourceCard,
-    mindsetCards, setMindsetCards,
+    mindsetCards, setMindsetCards, createShivGuideFlow,
     isPistonsHeadOpen, setIsPistonsHeadOpen,
     pistons, setPistons,
     pistonsInitialState, openPistonsFor,
@@ -7227,6 +7788,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     handleLinkHabit,
     toggleRoutine,
     missedSlotReviews, setMissedSlotReviews,
+    journalSessions, setJournalSessions,
+    mindsetSessions, setMindsetSessions,
     linkedResistancePopup, setLinkedResistancePopup, openLinkedResistancePopup,
     stopperProgressPopup, openStopperProgressPopup, setStopperProgressPopup,
     topPriorities, setTopPriorities,

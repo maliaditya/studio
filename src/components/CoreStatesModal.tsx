@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,13 +11,13 @@ import {
 import { ScrollArea } from "./ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Badge } from "./ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Progress } from "./ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
 import { addDays, differenceInCalendarDays, differenceInDays, differenceInMonths, format, getDay, parseISO, startOfDay } from "date-fns";
 import type { CoreDomainId, MindsetPoint } from "@/types/workout";
 import { cn } from "@/lib/utils";
-import { Activity, AlertTriangle, ArrowRight, Blocks, Compass, HandHeart, HeartPulse, Palette, Sparkles, Target, Users, Wallet, Wrench } from "lucide-react";
+import { getEffectiveConstraintTasks } from "@/lib/botheringUtils";
+import { Activity, AlertTriangle, Blocks, Compass, HandHeart, HeartPulse, Palette, Sparkles, Users, Wallet, Wrench } from "lucide-react";
 
 interface CoreStatesModalProps {
   isOpen: boolean;
@@ -34,21 +34,107 @@ const CORE_DEFS: Array<{
   icon: React.ReactNode;
   dominantType: BotheringType;
 }> = [
+  { id: "autonomy", label: "Autonomy", icon: <Blocks className="h-4 w-4" />, dominantType: "Constraint" },
+  { id: "competence", label: "Competence", icon: <Wrench className="h-4 w-4" />, dominantType: "Mismatch" },
+  { id: "transcendence", label: "Relatedness", icon: <Sparkles className="h-4 w-4" />, dominantType: "Mismatch" },
   { id: "health", label: "Health", icon: <HeartPulse className="h-4 w-4" />, dominantType: "External" },
   { id: "wealth", label: "Wealth", icon: <Wallet className="h-4 w-4" />, dominantType: "Constraint" },
   { id: "relations", label: "Relations", icon: <Users className="h-4 w-4" />, dominantType: "External" },
   { id: "meaning", label: "Meaning / Direction", icon: <Compass className="h-4 w-4" />, dominantType: "Mismatch" },
-  { id: "competence", label: "Competence / Skill", icon: <Wrench className="h-4 w-4" />, dominantType: "Mismatch" },
-  { id: "autonomy", label: "Autonomy", icon: <Blocks className="h-4 w-4" />, dominantType: "Constraint" },
   { id: "creativity", label: "Creativity / Expression", icon: <Palette className="h-4 w-4" />, dominantType: "External" },
   { id: "contribution", label: "Contribution", icon: <HandHeart className="h-4 w-4" />, dominantType: "Constraint" },
-  { id: "transcendence", label: "Transcendence", icon: <Sparkles className="h-4 w-4" />, dominantType: "Mismatch" },
 ];
 
-const CORE_LABEL_BY_ID = CORE_DEFS.reduce((acc, core) => {
-  acc[core.id] = core.label;
-  return acc;
-}, {} as Record<CoreDomainId, string>);
+const CORE_INLINE_SUFFIX: Partial<Record<CoreDomainId, string>> = {
+  autonomy: "(Right action)",
+  competence: "(Right Understanding)",
+  transcendence: "(Right connection)",
+};
+
+const CORE_BACK_CONTENT: Record<
+  CoreDomainId,
+  {
+    externalState: string;
+    typicalBothering: string;
+    gap: string;
+    coreNeed: string;
+    actionType: string;
+    expectedOutcome: string;
+  }
+> = {
+  autonomy: {
+    externalState: "Autonomy",
+    typicalBothering: "Feeling trapped, controlled, or unable to choose",
+    gap: "Ownership, freedom, or permission is missing",
+    coreNeed: "Autonomy",
+    actionType: "Boundary setting, decision making, self-direction",
+    expectedOutcome: "Agency, freedom, self-leadership",
+  },
+  competence: {
+    externalState: "Competence",
+    typicalBothering: "Self-doubt, confusion, inability to perform",
+    gap: "Skill, clarity, or capability is missing",
+    coreNeed: "Competence",
+    actionType: "Learning, practice, feedback, implementation",
+    expectedOutcome: "Mastery, confidence, capability",
+  },
+  transcendence: {
+    externalState: "Relatedness",
+    typicalBothering: "Disconnection, isolation, feeling unseen",
+    gap: "Trust, support, or genuine connection is missing",
+    coreNeed: "Relatedness",
+    actionType: "Reaching out, vulnerability, support, service",
+    expectedOutcome: "Belonging, connection, emotional grounding",
+  },
+  health: {
+    externalState: "Health",
+    typicalBothering: "Low energy, illness, burnout",
+    gap: "Physical care / discipline missing",
+    coreNeed: "Autonomy + Competence",
+    actionType: "Exercise, sleep discipline, nutrition, recovery routines",
+    expectedOutcome: "Energy, vitality, physical stability",
+  },
+  wealth: {
+    externalState: "Wealth",
+    typicalBothering: "Not earning enough, financial pressure",
+    gap: "Marketable skills or value creation",
+    coreNeed: "Competence",
+    actionType: "Skill building, productive work, value creation",
+    expectedOutcome: "Income, financial security",
+  },
+  relations: {
+    externalState: "Relations",
+    typicalBothering: "Conflict, loneliness",
+    gap: "Communication or empathy gap",
+    coreNeed: "Relatedness",
+    actionType: "Honest conversation, listening, relationship effort",
+    expectedOutcome: "Trust, stronger relationships",
+  },
+  meaning: {
+    externalState: "Meaning",
+    typicalBothering: "Feeling lost, pointless work",
+    gap: "Clear direction or values missing",
+    coreNeed: "Autonomy",
+    actionType: "Reflection, goal setting, choosing purposeful work",
+    expectedOutcome: "Purpose, life direction",
+  },
+  creativity: {
+    externalState: "Creativity",
+    typicalBothering: "Can't build ideas, creative block",
+    gap: "Knowledge or experimentation gap",
+    coreNeed: "Competence + Autonomy",
+    actionType: "Learning, experimentation, building prototypes",
+    expectedOutcome: "Creation, innovation",
+  },
+  contribution: {
+    externalState: "Contribution",
+    typicalBothering: "Feeling useless, not helping others",
+    gap: "Opportunity to serve others",
+    coreNeed: "Relatedness",
+    actionType: "Teaching, helping, collaboration, service",
+    expectedOutcome: "Impact, social value",
+  },
+};
 
 const STATE_META: Record<CoreStateId, { label: string; badgeClass: string; cardClass: string }> = {
   S0: { label: "S0 Absent", badgeClass: "border-slate-400/40 text-slate-200 bg-slate-500/10", cardClass: "border-slate-500/30" },
@@ -117,30 +203,23 @@ const CORE_PRIORITY_ORDER: CoreDomainId[] = [
   "transcendence",
 ];
 
-const ENTRY_EFFECT_MAP: Record<CoreDomainId, CoreDomainId[]> = {
-  health: ["competence", "relations", "autonomy"],
-  wealth: ["health", "relations", "autonomy"],
-  relations: [],
-  competence: ["wealth", "autonomy", "meaning", "contribution"],
-  autonomy: ["meaning", "creativity", "contribution"],
-  meaning: ["competence"],
-  creativity: ["meaning", "relations"],
-  contribution: ["meaning"],
-  transcendence: ["meaning"],
-};
-
 const BLOCKING_STATES = new Set<CoreStateId>(["S0", "S1", "S2"]);
 
 const normalizeText = (value?: string) => (value || "").toLowerCase();
 
 export function CoreStatesModal({ isOpen, onOpenChange }: CoreStatesModalProps) {
-  const { mindsetCards, schedule, habitCards, settings, setSettings } = useAuth();
+  const { mindsetCards, schedule, habitCards, settings } = useAuth();
+  const [flippedCards, setFlippedCards] = useState<Set<CoreDomainId>>(new Set());
   const today = startOfDay(new Date());
   const todayKey = format(today, "yyyy-MM-dd");
 
   const mismatchPointById = useMemo(() => {
     const mismatchPoints = mindsetCards.find((c) => c.id === "mindset_botherings_mismatch")?.points || [];
     return new Map(mismatchPoints.map((point) => [point.id, point] as const));
+  }, [mindsetCards]);
+  const externalPointById = useMemo(() => {
+    const externalPoints = mindsetCards.find((c) => c.id === "mindset_botherings_external")?.points || [];
+    return new Map(externalPoints.map((point) => [point.id, point] as const));
   }, [mindsetCards]);
 
   const activityMapByDate = useMemo(() => {
@@ -251,26 +330,8 @@ export function CoreStatesModal({ isOpen, onOpenChange }: CoreStatesModalProps) 
   const getEffectiveTasks = useCallback((point: MindsetPoint, type: BotheringType): BotheringTask[] => {
     const directTasks = point.tasks || [];
     if (type !== "Constraint") return directTasks;
-
-    const merged: BotheringTask[] = [...directTasks];
-    const seen = new Set<string>();
-    merged.forEach((task) => {
-      seen.add(task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`);
-    });
-
-    (point.linkedMismatchIds || []).forEach((mismatchId) => {
-      const mismatch = mismatchPointById.get(mismatchId);
-      if (!mismatch?.tasks?.length) return;
-      mismatch.tasks.forEach((task) => {
-        const key = task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        merged.push(task);
-      });
-    });
-
-    return merged;
-  }, [mismatchPointById]);
+    return getEffectiveConstraintTasks(point, mismatchPointById, externalPointById);
+  }, [externalPointById, mismatchPointById]);
 
   const scoreCoreFromText = (text: string, coreId: CoreDomainId) => {
     const haystack = normalizeText(text);
@@ -495,19 +556,17 @@ export function CoreStatesModal({ isOpen, onOpenChange }: CoreStatesModalProps) 
     });
   }, [allBotherings, isTaskCompletedOnDate, isTaskDueOnDate, isTaskScheduledOnDate, stopperTimestampsById, today]);
 
-  const sortedOverrides = useMemo(() => {
-    return [...allBotherings].sort((a, b) => {
-      if (a.type !== b.type) return a.type.localeCompare(b.type);
-      return a.point.text.localeCompare(b.point.text);
+  const toggleCardFlip = useCallback((coreId: CoreDomainId) => {
+    setFlippedCards((prev) => {
+      const next = new Set(prev);
+      if (next.has(coreId)) {
+        next.delete(coreId);
+      } else {
+        next.add(coreId);
+      }
+      return next;
     });
-  }, [allBotherings]);
-
-  const coreCardById = useMemo(() => {
-    return coreCards.reduce((acc, item) => {
-      acc[item.core.id] = item;
-      return acc;
-    }, {} as Record<CoreDomainId, (typeof coreCards)[number]>);
-  }, [coreCards]);
+  }, []);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -535,194 +594,150 @@ export function CoreStatesModal({ isOpen, onOpenChange }: CoreStatesModalProps) 
                 const completionPct = Math.round(item.completion21 * 100);
                 const trendPct = Math.round(item.trend * 100);
                 const priorityIndex = CORE_PRIORITY_ORDER.indexOf(item.core.id);
-                const blockers = CORE_PRIORITY_ORDER.slice(0, Math.max(priorityIndex, 0)).filter((coreId) => {
-                  const candidate = coreCardById[coreId];
-                  return candidate ? BLOCKING_STATES.has(candidate.state) : false;
-                });
-                const helps = (ENTRY_EFFECT_MAP[item.core.id] || []).filter((id) => id !== item.core.id);
                 const isFixFirstCore = priorityIndex <= 2 && BLOCKING_STATES.has(item.state);
+                const isFlipped = flippedCards.has(item.core.id);
+                const back = CORE_BACK_CONTENT[item.core.id];
                 return (
-                  <Card key={item.core.id} className={cn("bg-background/40", meta.cardClass)}>
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <CardTitle className="text-sm flex items-center gap-2">
-                          {item.core.icon}
-                          {item.core.label}
-                        </CardTitle>
-                        <Badge variant="outline" className={meta.badgeClass}>
-                          {meta.label}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">
-                          {item.core.dominantType} dominant
-                        </Badge>
-                        <Badge variant="outline">
-                          {item.botherings.length} bothering{item.botherings.length === 1 ? "" : "s"}
-                        </Badge>
-                        {isFixFirstCore ? (
-                          <Badge variant="outline" className="border-red-500/40 text-red-200 bg-red-500/10">
-                            <AlertTriangle className="h-3 w-3 mr-1" />
-                            Fix First
-                          </Badge>
-                        ) : null}
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-md border border-white/10 p-2">
-                          <div className="text-muted-foreground">7d completion</div>
-                          <div className="font-semibold">{Math.round(item.completion7 * 100)}%</div>
-                        </div>
-                        <div className="rounded-md border border-white/10 p-2">
-                          <div className="text-muted-foreground">Backlog</div>
-                          <div className="font-semibold">{item.backlog}</div>
-                        </div>
-                        <div className="rounded-md border border-white/10 p-2">
-                          <div className="text-muted-foreground">Trend</div>
-                          <div className={cn("font-semibold", trendPct < 0 ? "text-red-300" : "text-emerald-300")}>
-                            {trendPct >= 0 ? "+" : ""}{trendPct}%
-                          </div>
-                        </div>
-                        <div className="rounded-md border border-white/10 p-2">
-                          <div className="text-muted-foreground">Risk cards</div>
-                          <div className="font-semibold">{item.highRiskCount}</div>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-                          <span>21d stability</span>
-                          <span>{completionPct}%</span>
-                        </div>
-                        <Progress value={completionPct} />
-                      </div>
-                      <div className="space-y-2">
-                        {blockers.length > 0 ? (
-                          <div className="rounded-md border border-red-500/25 bg-red-500/5 p-2">
-                            <div className="text-[11px] text-red-200 flex items-center gap-1 mb-1">
-                              <AlertTriangle className="h-3.5 w-3.5" />
-                              First fix these lower cores
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                              {blockers.map((coreId) => {
-                                const core = CORE_DEFS.find((c) => c.id === coreId);
-                                if (!core) return null;
-                                return (
-                                  <Badge key={`${item.core.id}-block-${coreId}`} variant="secondary" className="text-[10px]">
-                                    <span className="mr-1">{core.icon}</span>
-                                    {core.label}
-                                  </Badge>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="rounded-md border border-emerald-500/25 bg-emerald-500/5 p-2 text-[11px] text-emerald-200 flex items-center gap-1">
-                            <Target className="h-3.5 w-3.5" />
-                            Entry point ready
-                          </div>
+                  <button
+                    key={item.core.id}
+                    type="button"
+                    className="group h-[272px] w-full text-left [perspective:1400px]"
+                    onClick={() => toggleCardFlip(item.core.id)}
+                    aria-pressed={isFlipped}
+                    title={isFlipped ? "Flip back" : "Flip card"}
+                  >
+                    <div
+                      className="relative h-full w-full transition-transform duration-700 [transform-style:preserve-3d]"
+                      style={{ transform: isFlipped ? "rotateY(180deg)" : "rotateY(0deg)" }}
+                    >
+                      <Card
+                        className={cn(
+                          "absolute inset-0 bg-background/40 [backface-visibility:hidden]",
+                          meta.cardClass
                         )}
-                        {helps.length > 0 ? (
-                          <div className="rounded-md border border-white/10 p-2">
-                            <div className="text-[11px] text-muted-foreground flex items-center gap-1 mb-1">
-                              <ArrowRight className="h-3.5 w-3.5" />
-                              Then this can help
+                      >
+                        <CardHeader className="pb-1.5 pt-4">
+                          <div className="flex items-center justify-between gap-2">
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              {item.core.icon}
+                              <span className="leading-tight">
+                                <span className="block">{item.core.label}</span>
+                                {CORE_INLINE_SUFFIX[item.core.id] ? (
+                                  <span className="block text-[11px] font-normal text-muted-foreground">
+                                    {CORE_INLINE_SUFFIX[item.core.id]}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </CardTitle>
+                            <Badge variant="outline" className={meta.badgeClass}>
+                              {meta.label}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <Badge variant="outline" className="px-2 py-0 text-[10px]">
+                              {item.core.dominantType} dominant
+                            </Badge>
+                            <Badge variant="outline" className="px-2 py-0 text-[10px]">
+                              {item.botherings.length} bothering{item.botherings.length === 1 ? "" : "s"}
+                            </Badge>
+                            {isFixFirstCore ? (
+                              <Badge variant="outline" className="border-red-500/40 text-red-200 bg-red-500/10 px-2 py-0 text-[10px]">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                Fix First
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-2.5">
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
+                            <div className="flex items-baseline justify-between gap-3 border-b border-white/5 pb-1">
+                              <span className="text-muted-foreground">7d completion</span>
+                              <span className="font-semibold">{Math.round(item.completion7 * 100)}%</span>
                             </div>
-                            <div className="flex flex-wrap gap-1">
-                              {helps.map((coreId) => {
-                                const core = CORE_DEFS.find((c) => c.id === coreId);
-                                if (!core) return null;
-                                return (
-                                  <Badge key={`${item.core.id}-help-${coreId}`} variant="outline" className="text-[10px]">
-                                    <span className="mr-1">{core.icon}</span>
-                                    {core.label}
-                                  </Badge>
-                                );
-                              })}
+                            <div className="flex items-baseline justify-between gap-3 border-b border-white/5 pb-1">
+                              <span className="text-muted-foreground">Backlog</span>
+                              <span className="font-semibold">{item.backlog}</span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3 border-b border-white/5 pb-1">
+                              <span className="text-muted-foreground">Trend</span>
+                              <span className={cn("font-semibold", trendPct < 0 ? "text-red-300" : "text-emerald-300")}>
+                                {trendPct >= 0 ? "+" : ""}{trendPct}%
+                              </span>
+                            </div>
+                            <div className="flex items-baseline justify-between gap-3 border-b border-white/5 pb-1">
+                              <span className="text-muted-foreground">Risk cards</span>
+                              <span className="font-semibold">{item.highRiskCount}</span>
                             </div>
                           </div>
-                        ) : null}
-                      </div>
-                      <div className="text-xs text-muted-foreground">{item.reason}</div>
-                      <div className="flex flex-wrap gap-2">
-                        {item.botherings.slice(0, 3).map((b) => (
-                          <Badge key={b.id} variant="secondary" className="max-w-full truncate">
-                            {b.point.text}
-                          </Badge>
-                        ))}
-                        {item.botherings.length > 3 ? <Badge variant="outline">+{item.botherings.length - 3} more</Badge> : null}
-                      </div>
-                    </CardContent>
-                  </Card>
+                          <div>
+                            <div className="mb-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                              <span>21d stability</span>
+                              <span>{completionPct}%</span>
+                            </div>
+                            <Progress value={completionPct} />
+                          </div>
+                          <div className="rounded-md border border-white/10 bg-background/20 p-1.5 text-[11px] text-muted-foreground">
+                            {item.botherings.length > 0
+                              ? `${item.botherings.length} bothering signal${item.botherings.length === 1 ? "" : "s"} active in this domain.`
+                              : "No active bothering signals in this domain."}
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card
+                        className={cn(
+                          "absolute inset-0 overflow-hidden bg-background/95 [backface-visibility:hidden]",
+                          meta.cardClass
+                        )}
+                        style={{ transform: "rotateY(180deg)" }}
+                      >
+                        <CardHeader className="pb-2 pt-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <CardTitle className="text-sm flex items-center gap-2">
+                              {item.core.icon}
+                              <span className="leading-tight">
+                                <span className="block">{back.externalState}</span>
+                                <span className="block text-[11px] font-normal text-muted-foreground">
+                                  Diagnostic Map
+                                </span>
+                              </span>
+                            </CardTitle>
+                            <Badge variant="outline" className="text-[10px]">
+                              Back
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="h-[calc(100%-64px)] overflow-y-auto space-y-1.5 pr-1 text-[11px] leading-snug">
+                          <div className="rounded-md border border-white/10 bg-background/40 p-1.5">
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Typical Bothering</div>
+                            <div className="mt-1 text-foreground/90">{back.typicalBothering}</div>
+                          </div>
+                          <div className="rounded-md border border-white/10 bg-background/40 p-1.5">
+                            <div className="text-foreground/90">
+                              <span className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Gap:</span>{" "}
+                              {back.gap}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-1.5">
+                            <div className="rounded-md border border-white/10 bg-background/40 p-1.5">
+                              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Core Need</div>
+                              <div className="mt-1 text-foreground/90">{back.coreNeed}</div>
+                            </div>
+                            <div className="rounded-md border border-white/10 bg-background/40 p-1.5">
+                              <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Expected Outcome</div>
+                              <div className="mt-1 text-foreground/90">{back.expectedOutcome}</div>
+                            </div>
+                          </div>
+                          <div className="rounded-md border border-white/10 bg-background/40 p-1.5">
+                            <div className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Action Type</div>
+                            <div className="mt-1 text-foreground/90">{back.actionType}</div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </button>
                 );
               })}
             </div>
-
-            <Card className="border-white/10 bg-background/30">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Manual Overrides</CardTitle>
-                <DialogDescription>
-                  Saved core on bothering card has priority. Manual override is used only when no saved core is set.
-                </DialogDescription>
-              </CardHeader>
-              <CardContent>
-                {sortedOverrides.length === 0 ? (
-                  <div className="text-sm text-muted-foreground">No active botherings.</div>
-                ) : (
-                  <div className="space-y-2">
-                    {sortedOverrides.map((entry) => (
-                      <div key={entry.id} className="grid grid-cols-1 md:grid-cols-[1fr_240px] gap-2 items-center rounded-md border border-white/10 p-2">
-                        <div className="min-w-0">
-                          <div className="text-sm truncate">{entry.point.text}</div>
-                          <div className="text-xs text-muted-foreground flex items-center gap-2">
-                            <span>{entry.type}</span>
-                            {entry.savedCore ? <span>Saved: {CORE_LABEL_BY_ID[entry.savedCore]}</span> : null}
-                            <span>Auto: {CORE_LABEL_BY_ID[entry.autoCore]}</span>
-                          </div>
-                        </div>
-                        {entry.savedCore ? (
-                          <div className="h-8 rounded-md border border-white/10 px-3 text-xs text-muted-foreground flex items-center">
-                            Core locked from bothering card
-                          </div>
-                        ) : (
-                          <Select
-                            value={(() => {
-                              const allowedCoreIds = CORE_GROUP_BY_TYPE[entry.type];
-                              const current = manualOverrides[entry.id];
-                              return current && allowedCoreIds.includes(current) ? current : "__auto__";
-                            })()}
-                            onValueChange={(value) => {
-                              const allowedCoreIds = CORE_GROUP_BY_TYPE[entry.type];
-                              setSettings((prev) => {
-                                const nextOverrides = { ...(prev.coreStateManualOverrides || {}) };
-                                if (value === "__auto__") {
-                                  delete nextOverrides[entry.id];
-                                } else if (allowedCoreIds.includes(value as CoreDomainId)) {
-                                  nextOverrides[entry.id] = value as CoreDomainId;
-                                }
-                                return { ...prev, coreStateManualOverrides: nextOverrides };
-                              });
-                            }}
-                          >
-                            <SelectTrigger className="h-8">
-                              <SelectValue placeholder="Auto" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="__auto__">Auto</SelectItem>
-                              {CORE_DEFS.filter((core) => CORE_GROUP_BY_TYPE[entry.type].includes(core.id)).map((core) => (
-                                <SelectItem key={core.id} value={core.id}>
-                                  {core.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </div>
         </ScrollArea>
       </DialogContent>

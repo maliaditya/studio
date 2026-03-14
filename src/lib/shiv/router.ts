@@ -16,10 +16,10 @@ const clarifyAnswer = (query: ShivQuery, evidence: ShivEvidence[]) => {
   const shortPrompt = query.meaningfulTokens.length <= 2;
 
   if (thanks) {
-    return "You're welcome. I can help with today tasks, routines, botherings, resources, skills, and health.";
+    return "You're welcome. I can help with today tasks, routines, botherings, resources, skills, health, and journal data.";
   }
   if (greeting || (query.intent.intentId === "general" && shortPrompt)) {
-    return "Hi. Ask me about your app data, for example: \"what are today's tasks\", \"next hair cutting date\", or \"current weight\".";
+    return "Hi. Ask me about your app data, for example: \"what are today's tasks\", \"next hair cutting date\", \"current weight\", or a recent journal pattern.";
   }
   if (!evidence.length) {
     return "I couldn't map that to app data yet. Try adding a task/resource name, slot, or date scope (today/current slot/next).";
@@ -48,6 +48,7 @@ const filterByDomainRecord = (
     skill: domains.includes("skill") ? byDomain.skill : empty,
     health: domains.includes("health") ? byDomain.health : empty,
     canvas: domains.includes("canvas") ? byDomain.canvas : empty,
+    journal: domains.includes("journal") ? byDomain.journal : empty,
   };
 };
 
@@ -82,7 +83,8 @@ const domainsFromEvidence = (evidence: ShivEvidence[]): Domain[] => {
 export const resolveShivAnswer = async (
   query: ShivQuery,
   appContext: Record<string, unknown>,
-  aiConfig: AiRequestConfig
+  aiConfig: AiRequestConfig,
+  options?: { languageInstructionOverride?: string }
 ): Promise<ShivDecision> => {
   const index = buildShivIndex(appContext);
   const retrieved = retrieveEvidence(query, index);
@@ -169,7 +171,7 @@ export const resolveShivAnswer = async (
   }
 
   const aiEvidence = evidence.slice(0, 12);
-  let aiResult = await runShivAiFallback(query, aiEvidence, aiConfig);
+  let aiResult = await runShivAiFallback(query, aiEvidence, aiConfig, options);
 
   if (!aiResult.ok) {
     const clarifyEvidence = evidence.slice(0, 3);
@@ -190,7 +192,7 @@ export const resolveShivAnswer = async (
   let aiAnswer = aiResult.answer;
   const contract = validateCriticalAnswer(query, aiAnswer, aiEvidence);
   if (!contract.valid) {
-    const retry = await runShivAiFallback(query, aiEvidence, aiConfig);
+    const retry = await runShivAiFallback(query, aiEvidence, aiConfig, options);
     if (retry.ok) {
       aiResult = retry;
       aiAnswer = retry.answer;

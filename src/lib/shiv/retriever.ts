@@ -7,7 +7,7 @@ type RetrieveResult = {
   byDomain: Record<Domain, ShivEvidence[]>;
 };
 
-const domainList: Domain[] = ["task", "routine", "bothering", "resource", "skill", "health", "canvas"];
+const domainList: Domain[] = ["task", "routine", "bothering", "resource", "skill", "health", "canvas", "journal"];
 
 const domainAliases = ((aliasesCatalog as Record<string, unknown>).domains || {}) as Record<string, string[]>;
 const EMBED_DIM = 192;
@@ -214,6 +214,7 @@ export const retrieveEvidence = (query: ShivQuery, index: ShivIndex): RetrieveRe
     skill: [] as ShivEvidence[],
     health: [] as ShivEvidence[],
     canvas: [] as ShivEvidence[],
+    journal: [] as ShivEvidence[],
   };
 
   for (const domain of domainList) {

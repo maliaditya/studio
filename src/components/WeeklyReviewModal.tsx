@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getAiConfigFromSettings, normalizeAiSettings } from "@/lib/ai/config";
+import { getEffectiveConstraintTasks } from "@/lib/botheringUtils";
 
 interface WeeklyReviewModalProps {
   isOpen: boolean;
@@ -331,29 +332,15 @@ export function WeeklyReviewModal({ isOpen, onOpenChange }: WeeklyReviewModalPro
     const mismatchPoints = mindsetCards.find((c) => c.id === "mindset_botherings_mismatch")?.points || [];
     return new Map(mismatchPoints.map((point) => [point.id, point] as const));
   }, [mindsetCards]);
+  const externalPointById = useMemo(() => {
+    const externalPoints = mindsetCards.find((c) => c.id === "mindset_botherings_external")?.points || [];
+    return new Map(externalPoints.map((point) => [point.id, point] as const));
+  }, [mindsetCards]);
   const getEffectiveBotheringTasks = useCallback((point: MindsetPoint, type: BotheringType): BotheringTask[] => {
     const directTasks = point.tasks || [];
     if (type !== "Constraint") return directTasks;
-
-    const merged: BotheringTask[] = [...directTasks];
-    const seen = new Set<string>();
-    merged.forEach((task) => {
-      seen.add(task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`);
-    });
-
-    (point.linkedMismatchIds || []).forEach((mismatchId) => {
-      const mismatch = mismatchPointById.get(mismatchId);
-      if (!mismatch?.tasks?.length) return;
-      mismatch.tasks.forEach((task) => {
-        const key = task.activityId || task.id || `${task.details}:${task.startDate || task.dateKey || ""}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        merged.push(task);
-      });
-    });
-
-    return merged;
-  }, [mismatchPointById]);
+    return getEffectiveConstraintTasks(point, mismatchPointById, externalPointById);
+  }, [externalPointById, mismatchPointById]);
 
   const activityMapByDate = useMemo(() => {
     const map = new Map<string, Map<string, { completed?: boolean; duration?: number; focusSessionInitialStartTime?: number; focusSessionEndTime?: number; focusSessionInitialDuration?: number }>>();

@@ -83,6 +83,7 @@ export function FocusSessionModal({
   const [createdTaskInfo, setCreatedTaskInfo] = useState<{ path: string[]; taskName: string } | null>(null);
   const [markCurrentIntentionComplete, setMarkCurrentIntentionComplete] = useState(false);
   const [completedBugIssueIds, setCompletedBugIssueIds] = useState<string[]>([]);
+  const [completedDeepWorkChecklistIds, setCompletedDeepWorkChecklistIds] = useState<string[]>([]);
   
   const specializations = useMemo(() => {
     if (!selectedDomainId) return [];
@@ -285,6 +286,23 @@ export function FocusSessionModal({
     if (!bugCardId) return null;
     for (const board of kanbanBoards) {
       const card = (board.cards || []).find((entry) => entry.id === bugCardId && entry.cardKind === 'bug' && !entry.archived);
+      if (card) {
+        return { board, card };
+      }
+    }
+    return null;
+  }, [activity, kanbanBoards]);
+
+  const currentDeepWorkKanbanCard = useMemo(() => {
+    if (!activity || activity.type !== 'deepwork') return null;
+    const candidateIds = new Set(activity.taskIds || []);
+    if (candidateIds.size === 0) return null;
+
+    for (const board of kanbanBoards) {
+      const card = (board.cards || []).find((entry) =>
+        !entry.archived &&
+        candidateIds.has(entry.id)
+      );
       if (card) {
         return { board, card };
       }
@@ -515,6 +533,7 @@ export function FocusSessionModal({
     setHoursCompletedInput('');
     setMarkCurrentIntentionComplete(false);
     setCompletedBugIssueIds([]);
+    setCompletedDeepWorkChecklistIds([]);
     const shouldPrefillPages =
       (activity?.type === 'upskill' || activity?.type === 'deepwork') &&
       learningContext.hasBooks &&
@@ -556,6 +575,29 @@ export function FocusSessionModal({
       )
     );
     syncKanbanChecklistForCompletedIntention(currentDeepWorkIntention.id);
+  };
+
+  const persistDeepWorkKanbanChecklistSelections = () => {
+    if (!currentDeepWorkKanbanCard || completedDeepWorkChecklistIds.length === 0) return;
+
+    setKanbanBoards((prevBoards) =>
+      prevBoards.map((board) => {
+        if (board.id !== currentDeepWorkKanbanCard.board.id) return board;
+        const nextCards = (board.cards || []).map((card) => {
+          if (card.id !== currentDeepWorkKanbanCard.card.id) return card;
+          return {
+            ...card,
+            checklist: (card.checklist || []).map((item) =>
+              completedDeepWorkChecklistIds.includes(item.id)
+                ? { ...item, completed: true }
+                : item
+            ),
+            updatedAt: new Date().toISOString(),
+          };
+        });
+        return { ...board, cards: nextCards };
+      })
+    );
   };
 
   const handleDomainChange = (domainId: string) => {
@@ -616,6 +658,7 @@ export function FocusSessionModal({
 
   const handleStartClick = () => {
     if (activity) {
+      persistDeepWorkKanbanChecklistSelections();
       const now = Date.now();
       const updatedActivity: Activity = {
         ...activity,
@@ -641,6 +684,7 @@ export function FocusSessionModal({
       if (markCurrentIntentionComplete && currentDeepWorkIntention && !currentDeepWorkIntention.completed) {
         markIntentionComplete();
       }
+      persistDeepWorkKanbanChecklistSelections();
       if (currentBugCard && completedBugIssueIds.length > 0) {
         setKanbanBoards((prevBoards) =>
           prevBoards.map((board) => {
@@ -679,6 +723,7 @@ export function FocusSessionModal({
 
   const handleLogAndMoveClick = () => {
     if (activity && currentSlot) {
+      persistDeepWorkKanbanChecklistSelections();
       const activityToLog: Activity = {
         ...activity,
         linkedActivityType: activity.type === 'pomodoro' ? (linkedActivityType as ActivityType) : undefined,
@@ -873,6 +918,45 @@ export function FocusSessionModal({
                 </div>
               </div>
             )}
+            {currentDeepWorkKanbanCard ? (
+              <div className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  Linked Kanban card: <span className="text-foreground">{currentDeepWorkKanbanCard.card.title}</span>
+                </p>
+                <div className="space-y-2">
+                  {(currentDeepWorkKanbanCard.card.checklist || []).length > 0 ? (
+                    currentDeepWorkKanbanCard.card.checklist.map((item) => {
+                      const checked = item.completed || completedDeepWorkChecklistIds.includes(item.id);
+                      return (
+                        <div key={item.id} className="flex items-start gap-2 rounded border border-white/10 bg-background/40 px-2 py-1.5">
+                          <Checkbox
+                            id={`focus-deepwork-kanban-${item.id}`}
+                            checked={checked}
+                            onCheckedChange={(value) => {
+                              if (item.completed) return;
+                              setCompletedDeepWorkChecklistIds((prev) =>
+                                value
+                                  ? [...prev, item.id]
+                                  : prev.filter((entry) => entry !== item.id)
+                              );
+                            }}
+                            disabled={item.completed}
+                          />
+                          <Label
+                            htmlFor={`focus-deepwork-kanban-${item.id}`}
+                            className={`text-sm leading-snug ${checked ? 'line-through text-muted-foreground' : ''}`}
+                          >
+                            {item.text}
+                          </Label>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No checklist items added to this Kanban card yet.</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
             {currentBugCard ? (
               <div className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-3">
                 <p className="text-xs font-medium text-muted-foreground">

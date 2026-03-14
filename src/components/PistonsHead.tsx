@@ -22,6 +22,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription as DialogDescriptionComponent, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import { EquationEditor } from '@/app/purpose/page';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
@@ -156,6 +157,7 @@ const QuickAccessView = () => {
     const { toast } = useToast();
     const [editingCardId, setEditingCardId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
+    const [quickAccessTab, setQuickAccessTab] = useState<'starred' | 'others'>('starred');
 
     const quickAccessFolder = useMemo(() => (resourceFolders || []).find(f => f.name === 'Quick Access' && !f.parentId), [resourceFolders]);
 
@@ -163,6 +165,18 @@ const QuickAccessView = () => {
         if (!quickAccessFolder) return [];
         return resources.filter(r => r.folderId === quickAccessFolder.id);
     }, [resources, quickAccessFolder]);
+
+    const starredCards = useMemo(
+        () => quickAccessCards.filter((card) => card.isFavorite),
+        [quickAccessCards]
+    );
+
+    const otherCards = useMemo(
+        () => quickAccessCards.filter((card) => !card.isFavorite),
+        [quickAccessCards]
+    );
+
+    const visibleCards = quickAccessTab === 'starred' ? starredCards : otherCards;
 
     const handleAddCard = () => {
         if (!quickAccessFolder) {
@@ -200,18 +214,44 @@ const QuickAccessView = () => {
     };
 
     return (
-        <CardContent className="p-4">
-             <div className="flex justify-between items-center mb-2">
-                <h3 className="font-semibold">Quick Access</h3>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleAddCard}>
-                    <PlusCircle className="h-4 w-4 text-green-500"/>
+        <CardContent className="space-y-4 p-4 pt-3">
+            <div className="flex items-center justify-between gap-3 border-b border-border/60 pb-3">
+                <div className="min-w-0">
+                    <h3 className="text-sm font-semibold">Quick Access</h3>
+                    <p className="text-xs text-muted-foreground">
+                        {quickAccessCards.length} cards
+                        {starredCards.length > 0 ? ` | ${starredCards.length} starred` : ''}
+                    </p>
+                </div>
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 px-3"
+                    onClick={handleAddCard}
+                >
+                    <PlusCircle className="mr-1.5 h-4 w-4" />
+                    New
                 </Button>
             </div>
+            <Tabs value={quickAccessTab} onValueChange={(value) => setQuickAccessTab(value as 'starred' | 'others')}>
+                <TabsList className="grid h-8 w-full grid-cols-2">
+                    <TabsTrigger value="starred" className="text-xs">Starred</TabsTrigger>
+                    <TabsTrigger value="others" className="text-xs">Others</TabsTrigger>
+                </TabsList>
+            </Tabs>
             <ScrollArea className="h-80">
-                <ul className="space-y-2 pr-2">
-                    {quickAccessCards.map(card => (
-                        <li key={card.id} className="p-2 rounded-md border bg-muted/30 hover:bg-muted/50 transition-colors group overflow-hidden">
-                           <div className="flex items-center justify-between min-w-0 gap-2">
+                <ul className="pr-2">
+                    {visibleCards.map(card => (
+                        <li
+                            key={card.id}
+                            className="group border-b border-border/50 py-3 last:border-b-0"
+                        >
+                           <div className="flex items-center justify-between gap-3">
+                                <div className="flex min-w-0 flex-1 items-center gap-3">
+                                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/30 text-muted-foreground">
+                                        <Library className="h-4 w-4" />
+                                    </div>
+                                    <div className="min-w-0 flex-1 overflow-hidden">
                                 {editingCardId === card.id ? (
                                     <Input
                                         value={editingName}
@@ -223,22 +263,41 @@ const QuickAccessView = () => {
                                     />
                                 ) : (
                                     <button
-                                        className="text-sm font-medium text-left flex-1 min-w-0 max-w-[260px] overflow-hidden text-ellipsis whitespace-nowrap"
+                                        className="block w-full max-w-full break-words text-left text-sm font-medium leading-snug text-foreground"
                                         title={card.name}
                                         onClick={(e) => openGeneralPopup(card.id, e)}
                                     >
                                         {card.name}
                                     </button>
                                 )}
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            {(card.points || []).length} points
+                                        </p>
+                                    </div>
+                                </div>
                                 <div className="flex items-center flex-shrink-0">
-                                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toggleFavorite(card.id)}>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-muted-foreground hover:text-yellow-500"
+                                        onClick={() => toggleFavorite(card.id)}
+                                    >
                                         <Star className={cn("h-4 w-4", card.isFavorite ? "text-yellow-400 fill-current" : "text-muted-foreground")} />
                                     </Button>
                                 </div>
-                           </div>
+                            </div>
                         </li>
                     ))}
-                    {quickAccessCards.length === 0 && <p className="text-center text-sm text-muted-foreground pt-8">No quick access cards found.</p>}
+                    {visibleCards.length === 0 && (
+                        <li className="py-10 text-center">
+                            <p className="text-sm font-medium text-foreground">
+                                {quickAccessTab === 'starred' ? 'No starred cards yet.' : 'No other cards yet.'}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                {quickAccessTab === 'starred' ? 'Star a card to pin it here.' : 'Unstarred cards will appear here.'}
+                            </p>
+                        </li>
+                    )}
                 </ul>
             </ScrollArea>
         </CardContent>
