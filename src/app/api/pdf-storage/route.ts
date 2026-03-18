@@ -1,8 +1,8 @@
-import { head } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getSessionUserFromRequest } from '@/lib/serverSession';
 import { decryptSupabaseServiceKeyForUser } from '@/lib/serverSupabaseSecret';
+import { isSupabaseStorageConfigured, readJsonFromStorage } from '@/lib/supabaseStorageServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,12 +10,10 @@ const normalizeUsername = (username: string) => username.trim().toLowerCase();
 const settingsBlobPathForUser = (username: string) => `github-settings/${username}.json`;
 
 async function readUserSyncSettings(username: string): Promise<{ supabaseUrl?: string; supabasePdfBucket?: string } | null> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return null;
+  if (!isSupabaseStorageConfigured()) return null;
   try {
-    const blob = await head(settingsBlobPathForUser(username));
-    const response = await fetch(blob.url);
-    if (!response.ok) return null;
-    const json = await response.json();
+    const json = await readJsonFromStorage<any>(settingsBlobPathForUser(username));
+    if (!json) return null;
     return {
       supabaseUrl: json?.supabaseUrl,
       supabasePdfBucket: json?.supabasePdfBucket,

@@ -6,10 +6,10 @@ import ReactDOM from 'react-dom';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { format, startOfWeek, addDays, isToday, isBefore, startOfToday, parseISO, differenceInDays, getISODay, differenceInMonths } from 'date-fns';
-import { ChevronLeft, ChevronRight, PlusCircle, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, Wind, AlertCircle, Brain, Trash2, Repeat } from 'lucide-react';
+import { format, startOfWeek, addDays, addMonths, isToday, isBefore, startOfToday, parseISO, differenceInDays, getISODay, differenceInMonths } from 'date-fns';
+import { ChevronLeft, ChevronRight, PlusCircle, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, Wind, AlertCircle, Brain, Trash2, Repeat, CircleDollarSign, CreditCard, AlertTriangle, PiggyBank } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import type { Activity, ActivityType, DailySchedule, SlotName, RecurrenceRule, ExerciseDefinition, WorkoutExercise, DatedWorkout } from '@/types/workout';
+import type { Activity, ActivityType, DailySchedule, SlotName, RecurrenceRule, ExerciseDefinition, WorkoutExercise, DatedWorkout, Project } from '@/types/workout';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, DropdownMenuPortal, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -23,6 +23,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     workout: <Dumbbell className="h-4 w-4" />,
     upskill: <BookOpenCheck className="h-4 w-4" />,
     deepwork: <Briefcase className="h-4 w-4" />,
+    finance: <CircleDollarSign className="h-4 w-4" />,
     planning: <ClipboardList className="h-4 w-4" />,
     tracking: <ClipboardCheck className="h-4 w-4" />,
     branding: <Share2 className="h-4 w-4" />,
@@ -50,11 +51,71 @@ const AddActivityMenu = ({
     restoreRoutineOptions?: RestoreRoutineOption[];
     onRestoreRoutine?: (routineId: string) => void;
 }) => {
-    const { coreSkills } = useAuth();
-    const specializations = coreSkills.filter(s => s.type === 'Specialization');
+    const { coreSkills, projects, offerizationPlans } = useAuth();
+    const todayKey = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+    const normalizeDateKey = (value?: string | null) => {
+        if (!value) return null;
+        const trimmed = String(value).trim();
+        if (!trimmed) return null;
+        const parsed = parseISO(trimmed);
+        if (!Number.isNaN(parsed.getTime())) return format(parsed, 'yyyy-MM-dd');
+        return trimmed;
+    };
+    const specializations = useMemo(() => {
+        return coreSkills.filter((spec) => {
+            if (spec.type !== 'Specialization') return false;
+            const plan = offerizationPlans?.[spec.id];
+            if (!plan) return false;
+            const learningPlan = plan.learningPlan;
+            const learningHasItems = !!learningPlan && (
+                (learningPlan.bookWebpageResources?.length || 0) > 0 ||
+                (learningPlan.audioVideoResources?.length || 0) > 0 ||
+                (learningPlan.skillTreePaths?.length || 0) > 0
+            );
+            const learningEndDates = [
+                ...(learningPlan?.bookWebpageResources || []).map((r) => normalizeDateKey(r.completionDate)),
+                ...(learningPlan?.audioVideoResources || []).map((r) => normalizeDateKey(r.completionDate)),
+                ...(learningPlan?.skillTreePaths || []).map((r) => normalizeDateKey(r.completionDate)),
+            ].filter((date): date is string => !!date);
+            const learningEndDate = learningEndDates.reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+            const learningActive = learningHasItems && (!learningEndDate || learningEndDate >= todayKey);
+
+            const releases = plan.releases || [];
+            const projectHasItems = releases.length > 0;
+            const projectEndDates = releases
+                .map((release) => normalizeDateKey(release.launchDate))
+                .filter((date): date is string => !!date);
+            const projectEndDate = projectEndDates.reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+            const projectActive = projectHasItems && (!projectEndDate || projectEndDate >= todayKey);
+
+            return learningActive || projectActive;
+        });
+    }, [coreSkills, offerizationPlans, todayKey]);
+    const deepworkSpecializations = useMemo(() => {
+        return coreSkills.filter((spec) => {
+            if (spec.type !== 'Specialization') return false;
+            const plan = offerizationPlans?.[spec.id];
+            if (!plan) return false;
+            const releases = plan.releases || [];
+            if (releases.length === 0) return false;
+            const projectEndDates = releases
+                .map((release) => normalizeDateKey(release.launchDate))
+                .filter((date): date is string => !!date);
+            const projectEndDate = projectEndDates.reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+            return !projectEndDate || projectEndDate >= todayKey;
+        });
+    }, [coreSkills, offerizationPlans, normalizeDateKey, todayKey]);
+    const projectsBySpecialization = useMemo(() => {
+        const map = new Map<string, Project[]>();
+        specializations.forEach((spec) => {
+            const list = (projects || []).filter((project) => project.domainId === spec.domainId);
+            map.set(spec.id, list);
+        });
+        return map;
+    }, [projects, specializations]);
 
     return (
-        <DropdownMenuContent className="w-56 p-2">
+        <DropdownMenuContent className="w-56 p-2 z-[220]">
             <p className="font-medium text-sm p-2">Select Activity</p>
             {restoreRoutineOptions.length > 0 && onRestoreRoutine && (
                 <>
@@ -81,18 +142,84 @@ const AddActivityMenu = ({
                                 <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
                             </DropdownMenuSubTrigger>
                             <DropdownMenuPortal>
-                                <DropdownMenuSubContent>
+                                <DropdownMenuSubContent className="z-[220]">
                                     <ScrollArea className="h-48">
-                                        {specializations.length > 0 ? (
-                                            specializations.map(spec => (
-                                                <DropdownMenuItem key={spec.id} onClick={() => onAddActivity(activityType, spec.name)}>
-                                                    {spec.name}
-                                                </DropdownMenuItem>
-                                            ))
+                                        {(activityType === 'deepwork' ? deepworkSpecializations : specializations).length > 0 ? (
+                                            (activityType === 'deepwork' ? deepworkSpecializations : specializations).map(spec => {
+                                                if (activityType !== 'deepwork') {
+                                                    return (
+                                                        <DropdownMenuItem key={spec.id} onClick={() => onAddActivity(activityType, spec.name)}>
+                                                            {spec.name}
+                                                        </DropdownMenuItem>
+                                                    );
+                                                }
+                                                const linkedProjects = projectsBySpecialization.get(spec.id) || [];
+                                                return (
+                                                    <DropdownMenuSub key={spec.id}>
+                                                        <DropdownMenuSubTrigger className="w-full justify-start">
+                                                            {spec.name}
+                                                        </DropdownMenuSubTrigger>
+                                                        <DropdownMenuPortal>
+                                                        <DropdownMenuSubContent className="z-[220]">
+                                                                <ScrollArea className="h-48">
+                                                                    <DropdownMenuItem onClick={() => onAddActivity(activityType, spec.name)}>
+                                                                        General {spec.name}
+                                                                    </DropdownMenuItem>
+                                                                    {linkedProjects.length > 0 ? (
+                                                                        linkedProjects.map((project) => (
+                                                                            <DropdownMenuItem
+                                                                                key={project.id}
+                                                                                onClick={() => onAddActivity(activityType, `${spec.name}: ${project.name}`)}
+                                                                            >
+                                                                                {project.name}
+                                                                            </DropdownMenuItem>
+                                                                        ))
+                                                                    ) : (
+                                                                        <DropdownMenuItem disabled>No projects linked</DropdownMenuItem>
+                                                                    )}
+                                                                </ScrollArea>
+                                                            </DropdownMenuSubContent>
+                                                        </DropdownMenuPortal>
+                                                    </DropdownMenuSub>
+                                                );
+                                            })
                                         ) : (
-                                            <DropdownMenuItem disabled>No specializations defined</DropdownMenuItem>
+                                            <DropdownMenuItem disabled>
+                                                {activityType === 'deepwork' ? 'No active project specializations' : 'No specializations defined'}
+                                            </DropdownMenuItem>
                                         )}
                                     </ScrollArea>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                        </DropdownMenuSub>
+                    );
+                }
+                if (activityType === 'finance') {
+                    const financeOptions = [
+                        { label: 'Income', icon: <CircleDollarSign className="h-4 w-4" /> },
+                        { label: 'EMI', icon: <CreditCard className="h-4 w-4" /> },
+                        { label: 'Debt', icon: <AlertTriangle className="h-4 w-4" /> },
+                        { label: 'Saving', icon: <PiggyBank className="h-4 w-4" /> },
+                        { label: 'Emergency', icon: <AlertTriangle className="h-4 w-4" /> },
+                        { label: 'UnPlanned', icon: <AlertCircle className="h-4 w-4" /> },
+                    ];
+                    return (
+                        <DropdownMenuSub key={type}>
+                            <DropdownMenuSubTrigger className="w-full justify-start">
+                                {icon}
+                                <span className="ml-2 capitalize">Finance</span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                                <DropdownMenuSubContent className="z-[220]">
+                                    {financeOptions.map((option) => (
+                                        <DropdownMenuItem
+                                            key={option.label}
+                                            onClick={() => onAddActivity(activityType, option.label)}
+                                        >
+                                            {option.icon}
+                                            <span className="ml-2">{option.label}</span>
+                                        </DropdownMenuItem>
+                                    ))}
                                 </DropdownMenuSubContent>
                             </DropdownMenuPortal>
                         </DropdownMenuSub>
@@ -109,7 +236,7 @@ const AddActivityMenu = ({
     );
 };
 
-const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine }: { activity: Activity, index: number, onRemove: (activity: Activity) => void, onSetRoutine: (rule: RecurrenceRule | null) => void }) => {
+const DraggableActivity = React.memo(({ activity, index, date, onRemove, onSetRoutine }: { activity: Activity, index: number, date: Date, onRemove: (activity: Activity) => void, onSetRoutine: (rule: RecurrenceRule | null) => void }) => {
   const [isBrowser, setIsBrowser] = React.useState(false);
   const [menuPortalContainer, setMenuPortalContainer] = React.useState<HTMLElement | null>(null);
 
@@ -120,10 +247,50 @@ const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine 
 
   const [customInterval, setCustomInterval] = React.useState(1);
   const [customUnit, setCustomUnit] = React.useState<'day' | 'week' | 'month'>('day');
+  const [repeatWindowCount, setRepeatWindowCount] = React.useState(1);
+  const [repeatWindowUnit, setRepeatWindowUnit] = React.useState<'day' | 'week' | 'month'>('day');
+  const [repeatNoEndDate, setRepeatNoEndDate] = React.useState(false);
+  const [avoidWeekends, setAvoidWeekends] = React.useState(false);
+  const [avoidHolidays, setAvoidHolidays] = React.useState(false);
+  const [shiftPolicy, setShiftPolicy] = React.useState<'prepone' | 'postpone'>('postpone');
+
+  React.useEffect(() => {
+    const rule = activity.routine;
+    setRepeatNoEndDate(!rule?.endDate);
+    setAvoidWeekends(!!rule?.avoidWeekends);
+    setAvoidHolidays(!!rule?.avoidHolidays);
+    setShiftPolicy(rule?.shiftPolicy === 'prepone' ? 'prepone' : 'postpone');
+  }, [activity.routine]);
+
+  const getEndDateKey = React.useCallback(() => {
+    if (repeatNoEndDate) return null;
+    const count = Math.max(1, Number(repeatWindowCount) || 1);
+    const startDate = date instanceof Date ? date : new Date(date);
+    if (Number.isNaN(startDate.getTime())) {
+      return format(new Date(), 'yyyy-MM-dd');
+    }
+    if (repeatWindowUnit === 'month') {
+      const end = addDays(addMonths(startDate, count), -1);
+      return format(end, 'yyyy-MM-dd');
+    }
+    const days = repeatWindowUnit === 'week' ? count * 7 : count;
+    const end = addDays(startDate, Math.max(0, days - 1));
+    return format(end, 'yyyy-MM-dd');
+  }, [date, repeatNoEndDate, repeatWindowCount, repeatWindowUnit]);
+
+  const applyQuickRepeat = (type: 'daily' | 'weekly') => {
+    const endDate = getEndDateKey();
+    onSetRoutine(endDate ? { type, endDate, avoidWeekends, avoidHolidays, shiftPolicy } : { type, avoidWeekends, avoidHolidays, shiftPolicy });
+  };
   const applyCustomRepeat = () => {
     const interval = Number(customInterval);
     if (!Number.isFinite(interval) || interval <= 0) return;
-    onSetRoutine({ type: 'custom', repeatInterval: interval, repeatUnit: customUnit });
+    const endDate = getEndDateKey();
+    onSetRoutine(
+      endDate
+        ? { type: 'custom', repeatInterval: interval, repeatUnit: customUnit, endDate, avoidWeekends, avoidHolidays, shiftPolicy }
+        : { type: 'custom', repeatInterval: interval, repeatUnit: customUnit, avoidWeekends, avoidHolidays, shiftPolicy }
+    );
   };
 
   const renderDraggable = (provided: any, snapshot: any) => {
@@ -169,10 +336,10 @@ const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine 
                   <p className="px-2 pb-1 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Quick Repeat</p>
                   <div className="px-2 pb-2">
                       <div className="grid grid-cols-3 gap-2">
-                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => onSetRoutine({ type: 'daily' })}>
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => applyQuickRepeat('daily')}>
                               Daily
                           </Button>
-                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => onSetRoutine({ type: 'weekly' })}>
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => applyQuickRepeat('weekly')}>
                               Weekly
                           </Button>
                           <Button
@@ -184,6 +351,72 @@ const DraggableActivity = React.memo(({ activity, index, onRemove, onSetRoutine 
                           >
                               No Repeat
                           </Button>
+                      </div>
+                  </div>
+                  <DropdownMenuSeparator className="my-1" />
+                  <div className="rounded-md border border-border/70 bg-muted/30 p-2.5 space-y-2">
+                      <div className="text-[11px] font-medium text-muted-foreground">Repeat period</div>
+                      <div className="flex items-center gap-2">
+                          <input
+                              type="number"
+                              min={1}
+                              disabled={repeatNoEndDate}
+                              value={repeatWindowCount}
+                              onChange={(e) => setRepeatWindowCount(Math.max(1, Number(e.target.value || 1)))}
+                              className="h-9 w-16 rounded-md border border-border/70 bg-background px-2 text-xs"
+                          />
+                          <select
+                              value={repeatWindowUnit}
+                              disabled={repeatNoEndDate}
+                              onChange={(e) => setRepeatWindowUnit(e.target.value as 'day' | 'week' | 'month')}
+                              className="h-9 flex-1 rounded-md border border-border/70 bg-background px-2 text-xs"
+                          >
+                              <option value="day">days</option>
+                              <option value="week">weeks</option>
+                              <option value="month">months</option>
+                          </select>
+                      </div>
+                      <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={repeatNoEndDate}
+                          onChange={(e) => setRepeatNoEndDate(e.target.checked)}
+                        />
+                        No end date (life-long)
+                      </label>
+                      <div className="text-[10px] text-muted-foreground">
+                          {repeatNoEndDate ? 'Repeats indefinitely.' : `Repeats through ${getEndDateKey()}.`}
+                      </div>
+                  </div>
+                  <DropdownMenuSeparator className="my-1" />
+                  <div className="rounded-md border border-border/70 bg-muted/30 p-2.5 space-y-2">
+                      <div className="text-[11px] font-medium text-muted-foreground">Intelligent routine</div>
+                      <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={avoidWeekends}
+                          onChange={(e) => setAvoidWeekends(e.target.checked)}
+                        />
+                        Avoid Saturdays & Sundays
+                      </label>
+                      <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={avoidHolidays}
+                          onChange={(e) => setAvoidHolidays(e.target.checked)}
+                        />
+                        Avoid holidays
+                      </label>
+                      <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className="whitespace-nowrap">If blocked:</span>
+                        <select
+                          value={shiftPolicy}
+                          onChange={(e) => setShiftPolicy(e.target.value as 'prepone' | 'postpone')}
+                          className="h-8 flex-1 rounded-md border border-border/70 bg-background px-2 text-xs"
+                        >
+                          <option value="postpone">Postpone (after)</option>
+                          <option value="prepone">Prepone (before)</option>
+                        </select>
                       </div>
                   </div>
                   <DropdownMenuSeparator className="my-1" />
@@ -285,6 +518,7 @@ const DroppableSlot = React.memo(({
                             key={act.id}
                             activity={act}
                             index={index}
+                            date={date}
                             onRemove={onRemoveActivity}
                             onSetRoutine={(rule) => onSetRoutine(act, rule)}
                         />

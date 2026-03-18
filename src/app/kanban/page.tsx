@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { format, isBefore, isSameDay, parseISO, startOfToday } from 'date-fns';
 import { AuthGuard } from '@/components/AuthGuard';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -18,7 +19,10 @@ import {
   Calendar,
   CalendarPlus,
   CheckSquare,
+  Copy,
   Clock3,
+  Eye,
+  Pencil,
   FileText,
   Magnet,
   MessageSquare,
@@ -89,6 +93,14 @@ type PendingIntentionDraft = {
   microSkillNames: string[];
 };
 
+type EditableIntentionOption = {
+  id: string;
+  name: string;
+  description: string;
+  microSkillNames: string[];
+  kind: 'pending' | 'existing';
+};
+
 type DraggedCardState = {
   cardId: string;
   fromListId: string;
@@ -109,6 +121,20 @@ const LABEL_COLOR_PALETTE = [
   '#8b5cf6',
   '#64748b',
 ];
+
+const DEFAULT_KANBAN_LABELS = [
+  { title: 'Todo', color: '#2563eb' },
+  { title: 'In Progress', color: '#f97316' },
+  { title: 'Done', color: '#0f766e' },
+  { title: 'Severity: Low', color: '#22c55e' },
+  { title: 'Severity: Medium', color: '#eab308' },
+  { title: 'Severity: High', color: '#f97316' },
+  { title: 'Severity: Critical', color: '#dc2626' },
+  { title: 'Priority: Low', color: '#38bdf8' },
+  { title: 'Priority: Medium', color: '#6366f1' },
+  { title: 'Priority: High', color: '#f97316' },
+  { title: 'Priority: Blocker', color: '#b91c1c' },
+] as const;
 
 const BRANDING_LIST_TEMPLATES = [
   { key: 'script', title: 'Creating Script', color: '#2563eb' },
@@ -229,6 +255,8 @@ const TaskColumn = ({
 
 const cardChecklistDone = (card: KanbanCard) => card.checklist.filter((item) => item.completed).length;
 
+const normalizeKanbanTitle = (value?: string | null) => value?.trim().toLowerCase() || '';
+
 const formatDueDate = (dueDate?: string | null) => {
   if (!dueDate) return null;
   try {
@@ -242,6 +270,19 @@ const getDescriptionPreview = (description?: string | null, maxLength = 50) => {
   const text = description?.trim();
   if (!text) return null;
   return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+};
+
+const mergeDefaultKanbanLabels = (boardId: string, labels: KanbanLabel[]) => {
+  const normalized = new Set(labels.map((label) => label.title.trim().toLowerCase()));
+  const defaultsToAdd = DEFAULT_KANBAN_LABELS
+    .filter((label) => !normalized.has(label.title.toLowerCase()))
+    .map((label) => ({
+      id: `${boardId}-label-default-${label.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      boardId,
+      title: label.title,
+      color: label.color,
+    }));
+  return [...labels, ...defaultsToAdd];
 };
 
 const formatLoggedMinutes = (minutes?: number) => {
@@ -277,6 +318,114 @@ const getDoneList = (board: KanbanBoard) => {
 
 const hasOpenBugForParent = (board: KanbanBoard, parentCardId: string) =>
   board.cards.some((card) => card.cardKind === 'bug' && !card.archived && card.parentCardId === parentCardId);
+
+const getListByTitle = (board: KanbanBoard, title: string) =>
+  getOrderedBoardLists(board).find((list) => normalizeKanbanTitle(list.title) === normalizeKanbanTitle(title)) || null;
+
+const getStatusLabelTitleForList = (listTitle?: string | null) => {
+  const normalized = normalizeKanbanTitle(listTitle);
+  if (normalized === 'idea') return 'Todo';
+  if (normalized === 'done') return 'Done';
+  return 'In Progress';
+};
+
+const synchronizeBoardAutomation = (board: KanbanBoard, timestamp: string) => {
+  const labels = mergeDefaultKanbanLabels(board.id, board.labels);
+  const labelById = new Map(labels.map((label) => [label.id, label]));
+  const statusLabels = new Map(labels.map((label) => [normalizeKanbanTitle(label.title), label]));
+  const statusLabelTitles = new Set(['todo', 'in progress', 'done']);
+  const orderedLists = getOrderedBoardLists(board);
+  const codeList = getListByTitle(board, 'Code');
+  const breakList = getListByTitle(board, 'Break');
+  const doneList = getDoneList(board);
+  const previousListByCardId = new Map(board.cards.map((card) => [card.id, card.listId]));
+  const previousOrderByListCard = new Map<string, number>();
+
+  board.lists.forEach((list) => {
+    list.cardOrder.forEach((cardId, index) => {
+      previousOrderByListCard.set(`${list.id}:${cardId}`, index);
+    });
+  });
+
+  const openBugParentIds = new Set(
+    board.cards
+      .filter((card) => card.cardKind === 'bug' && !card.archived && card.parentCardId)
+      .map((card) => card.parentCardId as string)
+  );
+
+  const nextCards = board.cards.map((card) => {
+    if (card.archived || card.cardKind === 'bug') {
+      return card;
+    }
+
+    const checklistComplete = card.checklist.length > 0 && card.checklist.every((item) => item.completed);
+    let nextListId = card.listId;
+
+    if (openBugParentIds.has(card.id) && breakList) {
+      nextListId = breakList.id;
+    } else if (checklistComplete && doneList) {
+      nextListId = doneList.id;
+    } else if ((card.listId === breakList?.id || card.listId === doneList?.id) && codeList) {
+      nextListId = codeList.id;
+    }
+
+    const targetList = orderedLists.find((list) => list.id === nextListId) || null;
+    const targetStatusTitle = normalizeKanbanTitle(getStatusLabelTitleForList(targetList?.title));
+    const targetStatusLabel = statusLabels.get(targetStatusTitle) || null;
+    const nonStatusLabelIds = card.labelIds.filter((labelId) => {
+      const label = labelById.get(labelId);
+      return !label || !statusLabelTitles.has(normalizeKanbanTitle(label.title));
+    });
+    const nextLabelIds =
+      targetStatusLabel && !nonStatusLabelIds.includes(targetStatusLabel.id)
+        ? [...nonStatusLabelIds, targetStatusLabel.id]
+        : nonStatusLabelIds;
+
+    return {
+      ...card,
+      listId: nextListId,
+      labelIds: nextLabelIds,
+      updatedAt: nextListId !== card.listId || nextLabelIds.length !== card.labelIds.length || nextLabelIds.some((id, index) => id !== card.labelIds[index])
+        ? timestamp
+        : card.updatedAt,
+    };
+  });
+
+  const nextLists = board.lists.map((list) => {
+    const cardsInList = nextCards
+      .filter((card) => !card.archived && card.listId === list.id)
+      .sort((a, b) => {
+        const aWasHere = previousListByCardId.get(a.id) === list.id;
+        const bWasHere = previousListByCardId.get(b.id) === list.id;
+        if (aWasHere !== bWasHere) return aWasHere ? -1 : 1;
+        if (aWasHere && bWasHere) {
+          const aIndex = previousOrderByListCard.get(`${list.id}:${a.id}`) ?? Number.MAX_SAFE_INTEGER;
+          const bIndex = previousOrderByListCard.get(`${list.id}:${b.id}`) ?? Number.MAX_SAFE_INTEGER;
+          if (aIndex !== bIndex) return aIndex - bIndex;
+        }
+        return (a.position ?? 0) - (b.position ?? 0) || a.createdAt.localeCompare(b.createdAt);
+      });
+
+    return {
+      ...list,
+      cardOrder: cardsInList.map((card) => card.id),
+    };
+  });
+
+  const positionedCards = nextCards.map((card) => {
+    const list = nextLists.find((entry) => entry.id === card.listId);
+    const position = list ? list.cardOrder.indexOf(card.id) : card.position;
+    return position !== card.position ? { ...card, position } : card;
+  });
+
+  return {
+    ...board,
+    labels,
+    cards: positionedCards,
+    lists: nextLists,
+    updatedAt: timestamp,
+  };
+};
 
 const moveCardWithinBoard = (
   board: KanbanBoard,
@@ -409,7 +558,7 @@ const resolveBugCard = (board: KanbanBoard, bugCardId: string, timestamp: string
     }
   }
 
-  return nextBoard;
+  return synchronizeBoardAutomation(nextBoard, timestamp);
 };
 
 const getBoardReleaseOptions = (
@@ -428,6 +577,27 @@ const getBoardReleaseOptions = (
     });
   });
   return options;
+};
+
+const normalizeBoardLookupText = (value?: string | null) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+const getProjectBoardScore = (
+  board: KanbanBoard,
+  projects: Array<{ id: string; name: string }>,
+  releaseOption?: ReleaseOption | null
+) => {
+  const linkedProject = board.projectId ? projects.find((project) => project.id === board.projectId) || null : null;
+  const boardName = normalizeBoardLookupText(board.name);
+  const releaseName = normalizeBoardLookupText(releaseOption?.release.name);
+  let score = 0;
+
+  if (linkedProject) score += 60;
+  if (linkedProject && releaseName && normalizeBoardLookupText(linkedProject.name) === releaseName) score += 100;
+  if (releaseName && boardName === releaseName) score += 80;
+  if ((board.cards || []).some((card) => !card.archived)) score += 20;
+
+  const updatedAtScore = Date.parse(board.updatedAt || '') || 0;
+  return { score, updatedAtScore };
 };
 
 const BoardCard = ({
@@ -488,10 +658,12 @@ const BoardCard = ({
           {labelBars.map((label) => (
             <span
               key={label.id}
-              className="h-2.5 w-10 rounded-full"
+              className="inline-flex max-w-full items-center rounded-full border border-transparent px-2 py-0.5 text-[11px] font-medium text-white"
               style={{ backgroundColor: label.color }}
               title={label.title}
-            />
+            >
+              <span className="truncate">{label.title}</span>
+            </span>
           ))}
         </div>
       ) : null}
@@ -664,7 +836,7 @@ const BoardList = ({
   onScheduleBug: (card: KanbanCard) => void;
   onOpenResource: (card: KanbanCard) => void;
 }) => (
-  <div className="flex min-h-[460px] flex-col rounded-xl border border-border/60 bg-card/70">
+  <div className="flex min-h-[460px] h-[calc(100vh-16rem)] flex-col overflow-hidden rounded-xl border border-border/60 bg-card/70">
     <div className="flex items-center justify-between gap-2 border-b border-border/60 px-3 py-2.5">
       <div className="flex min-w-0 items-center gap-2">
         <div className="h-3 w-3 rounded-full" style={{ backgroundColor: list.color || '#475569' }} />
@@ -775,18 +947,22 @@ export function KanbanPageContent({
     allLeadGenLogs,
     deepWorkDefinitions,
     setDeepWorkDefinitions,
+    setUpskillDefinitions,
     kanbanBoards,
     setKanbanBoards,
     refreshKanbanBoards,
     offerizationPlans,
     coreSkills,
+    setCoreSkills,
     projects,
     resources,
     setResources,
     resourceFolders,
     setResourceFolders,
     openGeneralPopup,
+    mindsetCards,
   } = useAuth();
+  const { toast } = useToast();
 
   const [boardMode, setBoardMode] = useState<BoardMode>(forcedBoardMode || (isModal ? 'tasks' : 'project'));
   const [selectedBoardId, setSelectedBoardId] = useState('');
@@ -798,11 +974,21 @@ export function KanbanPageContent({
   const [newLabelTitle, setNewLabelTitle] = useState('');
   const [newLabelColor, setNewLabelColor] = useState(LABEL_COLOR_PALETTE[0]);
   const [selectedIntentionMicroSkillIds, setSelectedIntentionMicroSkillIds] = useState<string[]>([]);
+  const [selectedSkillAreaId, setSelectedSkillAreaId] = useState('');
+  const [newSkillAreaName, setNewSkillAreaName] = useState('');
+  const [newMicroSkillName, setNewMicroSkillName] = useState('');
+  const [editingMicroSkillId, setEditingMicroSkillId] = useState<string | null>(null);
+  const [editingMicroSkillName, setEditingMicroSkillName] = useState('');
   const [newIntentionName, setNewIntentionName] = useState('');
+  const [editingIntentionId, setEditingIntentionId] = useState<string | null>(null);
+  const [editingIntentionName, setEditingIntentionName] = useState('');
   const [newBugIssueName, setNewBugIssueName] = useState('');
   const [pendingNewIntentions, setPendingNewIntentions] = useState<PendingIntentionDraft[]>([]);
   const [draggedCard, setDraggedCard] = useState<DraggedCardState | null>(null);
   const [dropTarget, setDropTarget] = useState<CardDropTarget | null>(null);
+  const dropTargetRef = useRef<CardDropTarget | null>(null);
+  const pendingDropTargetRef = useRef<CardDropTarget | null>(null);
+  const dragOverFrameRef = useRef<number | null>(null);
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [editingListTitle, setEditingListTitle] = useState('');
   const [expandedChecklistCardIds, setExpandedChecklistCardIds] = useState<string[]>([]);
@@ -871,6 +1057,18 @@ export function KanbanPageContent({
     () => getBoardReleaseOptions(offerizationPlans, specializationNames),
     [offerizationPlans, specializationNames]
   );
+  const releaseOptionByKey = useMemo(
+    () => new Map(releaseOptions.map((option) => [option.key, option] as const)),
+    [releaseOptions]
+  );
+
+  const initialProjectBoard = useMemo(
+    () =>
+      initialBoardId
+        ? kanbanBoards.find((board) => board.id === initialBoardId && (board.boardType || 'project') === 'project') || null
+        : null,
+    [initialBoardId, kanbanBoards]
+  );
 
   const visibleBoards = useMemo(() => {
     const deduped = new Map<string, KanbanBoard>();
@@ -880,13 +1078,29 @@ export function KanbanPageContent({
       if (!board.releaseId || !board.specializationId) return;
       const key = `${board.specializationId}::${board.releaseId}`;
       if (!validReleaseKeys.has(key)) return;
-      if (!deduped.has(key)) {
+      const current = deduped.get(key);
+      if (!current) {
+        deduped.set(key, board);
+        return;
+      }
+
+      const releaseOption = releaseOptionByKey.get(key) || null;
+      const currentRank = getProjectBoardScore(current, projects, releaseOption);
+      const candidateRank = getProjectBoardScore(board, projects, releaseOption);
+      if (
+        candidateRank.score > currentRank.score ||
+        (candidateRank.score === currentRank.score && candidateRank.updatedAtScore > currentRank.updatedAtScore)
+      ) {
         deduped.set(key, board);
       }
     });
 
-    return Array.from(deduped.values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [kanbanBoards, releaseOptions]);
+    const boards = Array.from(deduped.values()).sort((a, b) => a.name.localeCompare(b.name));
+    if (initialProjectBoard && !boards.some((board) => board.id === initialProjectBoard.id)) {
+      return [initialProjectBoard, ...boards];
+    }
+    return boards;
+  }, [initialProjectBoard, kanbanBoards, projects, releaseOptionByKey, releaseOptions]);
 
   useEffect(() => {
     if (forcedBoardMode && boardMode !== forcedBoardMode) {
@@ -903,6 +1117,7 @@ export function KanbanPageContent({
 
   useEffect(() => {
     if (boardMode !== 'project') return;
+    if (initialBoardId) return;
     const specId = searchParams.get('spec') || '';
     const releaseId = searchParams.get('release') || '';
     if (!specId || !releaseId) return;
@@ -917,17 +1132,23 @@ export function KanbanPageContent({
   useEffect(() => {
     if (boardMode !== 'project') return;
     if (!selectedBoardId || !visibleBoards.some((board) => board.id === selectedBoardId)) {
-      setSelectedBoardId(visibleBoards[0]?.id || '');
+      const fallbackBoardId = initialProjectBoard?.id || visibleBoards[0]?.id || '';
+      if (fallbackBoardId !== selectedBoardId) {
+        setSelectedBoardId(fallbackBoardId);
+      }
     }
-  }, [boardMode, selectedBoardId, visibleBoards]);
+  }, [boardMode, initialProjectBoard, selectedBoardId, visibleBoards]);
 
   useEffect(() => {
     setSelectedFeatureFilterId('');
   }, [selectedBoardId]);
 
   const selectedProjectBoard = useMemo(
-    () => visibleBoards.find((board) => board.id === selectedBoardId) || null,
-    [visibleBoards, selectedBoardId]
+    () =>
+      visibleBoards.find((board) => board.id === selectedBoardId) ||
+      initialProjectBoard ||
+      null,
+    [initialProjectBoard, selectedBoardId, visibleBoards]
   );
 
   const selectedBoardMeta = useMemo(() => {
@@ -954,14 +1175,10 @@ export function KanbanPageContent({
 
   const selectedBoard = boardMode === 'branding' ? selectedBrandingBoard : selectedProjectBoard;
 
-  useEffect(() => {
-    if (!initialCardId || !selectedBoard) return;
-    const initialCardKey = `${selectedBoard.id}:${initialCardId}`;
-    if (appliedInitialCardKeyRef.current === initialCardKey) return;
-    if (!selectedBoard.cards.some((card) => card.id === initialCardId)) return;
-    appliedInitialCardKeyRef.current = initialCardKey;
-    setSelectedCardId(initialCardId);
-  }, [initialCardId, selectedBoard]);
+  const linkedBothering = useMemo(() => {
+    if (!selectedBoardMeta?.release?.workflowStages?.botheringText) return null;
+    return selectedBoardMeta.release.workflowStages.botheringText;
+  }, [selectedBoardMeta]);
 
   useEffect(() => {
     if (!initialCardId) {
@@ -1058,7 +1275,7 @@ export function KanbanPageContent({
 
   const featurePointOptions = useMemo(() => {
     return (selectedFeatureResource?.points || [])
-      .filter((point) => (point.type === 'text' || point.type === 'todo') && point.text.trim())
+      .filter((point) => (point.type === 'text' || point.type === 'todo') && point.text?.trim())
       .map((point) => ({
         id: point.id,
         name: point.text.trim(),
@@ -1342,6 +1559,8 @@ export function KanbanPageContent({
     return selectedLists.findIndex((list) => list.id === cardDraft.listId);
   }, [cardDraft, selectedLists]);
 
+  const isBreakColumnCard = selectedListIndex >= 0 && selectedLists[selectedListIndex]?.title?.trim().toLowerCase() === 'break';
+
   const isReviewCard = Boolean(
     selectedCard &&
       boardMode === 'project' &&
@@ -1366,32 +1585,61 @@ export function KanbanPageContent({
     return cardLabelsDraft.find((label) => label.title.toLowerCase() === query) || null;
   }, [cardLabelsDraft, newLabelTitle]);
 
-  useEffect(() => {
-    if (!selectedCard) {
-      setCardDraft(null);
+  const initialMicroSkillId = availableMicroSkills[0]?.id || '';
+  const initialSkillAreaId = selectedSpecialization?.skillAreas?.[0]?.id || '';
+
+  const buildCardDraft = useCallback((card: KanbanCard): CardDraft => ({
+    listId: card.listId,
+    title: card.title,
+    description: card.description,
+    dueDate: card.dueDate || '',
+    labelIds: [...card.labelIds],
+    linkedFeaturePointId: card.linkedFeaturePointId || '',
+    linkedFeaturePointIds: [...(card.linkedFeaturePointIds || (card.linkedFeaturePointId ? [card.linkedFeaturePointId] : []))],
+    brandingType: card.brandingType || 'blog',
+    linkedIntentionIds: [...card.linkedIntentionIds],
+    checklist: card.checklist.map((item) => ({ ...item })),
+  }), []);
+
+  const openCardEditor = useCallback((card: KanbanCard, boardOverride?: KanbanBoard | null) => {
+    if (onSelectCard) {
+      onSelectCard(card);
       return;
     }
-
-    setCardDraft({
-      listId: selectedCard.listId,
-      title: selectedCard.title,
-      description: selectedCard.description,
-      dueDate: selectedCard.dueDate || '',
-      labelIds: [...selectedCard.labelIds],
-      linkedFeaturePointId: selectedCard.linkedFeaturePointId || '',
-      linkedFeaturePointIds: [...(selectedCard.linkedFeaturePointIds || (selectedCard.linkedFeaturePointId ? [selectedCard.linkedFeaturePointId] : []))],
-      brandingType: selectedCard.brandingType || 'blog',
-      linkedIntentionIds: [...selectedCard.linkedIntentionIds],
-      checklist: selectedCard.checklist.map((item) => ({ ...item })),
-    });
-    setCardLabelsDraft(selectedBoard?.labels || []);
+    const sourceBoard = boardOverride || selectedBoard;
+    setSelectedCardId(card.id);
+    setCardDraft(buildCardDraft(card));
+    setCardLabelsDraft(mergeDefaultKanbanLabels(sourceBoard?.id || card.boardId, sourceBoard?.labels || []));
     setNewLabelTitle('');
     setNewLabelColor(LABEL_COLOR_PALETTE[0]);
-    setSelectedIntentionMicroSkillIds(availableMicroSkills[0] ? [availableMicroSkills[0].id] : []);
+    setSelectedIntentionMicroSkillIds(initialMicroSkillId ? [initialMicroSkillId] : []);
+    setSelectedSkillAreaId(initialSkillAreaId);
+    setNewSkillAreaName('');
+    setNewMicroSkillName('');
+    setEditingMicroSkillId(null);
+    setEditingMicroSkillName('');
     setNewIntentionName('');
+    setEditingIntentionId(null);
+    setEditingIntentionName('');
     setNewBugIssueName('');
     setPendingNewIntentions([]);
-  }, [availableMicroSkills, selectedCard, selectedBoard]);
+  }, [
+    buildCardDraft,
+    initialMicroSkillId,
+    initialSkillAreaId,
+    onSelectCard,
+    selectedBoard,
+  ]);
+
+  useEffect(() => {
+    if (!initialCardId || !selectedBoard || onSelectCard) return;
+    const initialCardKey = `${selectedBoard.id}:${initialCardId}`;
+    if (appliedInitialCardKeyRef.current === initialCardKey) return;
+    const initialCard = selectedBoard.cards.find((card) => card.id === initialCardId);
+    if (!initialCard) return;
+    appliedInitialCardKeyRef.current = initialCardKey;
+    openCardEditor(initialCard, selectedBoard);
+  }, [initialCardId, onSelectCard, openCardEditor, selectedBoard]);
 
   const handleDeleteActivity = (slot: string, activityId: string) => {
     const activity = [...taskBoard.pending, ...taskBoard.scheduled, ...taskBoard.logged, ...taskBoard.completed].find((entry) => entry.id === activityId);
@@ -1409,11 +1657,7 @@ export function KanbanPageContent({
   };
 
   const openCard = (card: KanbanCard) => {
-    if (onSelectCard) {
-      onSelectCard(card);
-      return;
-    }
-    setSelectedCardId(card.id);
+    openCardEditor(card, selectedBoard);
   };
 
   const handleAddCard = (listId: string) => {
@@ -1455,7 +1699,7 @@ export function KanbanPageContent({
     setKanbanBoards((prev) =>
       prev.map((board) => {
         if (board.id !== selectedBoard.id) return board;
-        return {
+        return synchronizeBoardAutomation({
           ...board,
           cards: [...board.cards, nextCard],
           lists: board.lists.map((list) =>
@@ -1464,11 +1708,11 @@ export function KanbanPageContent({
               : list
           ),
           updatedAt: timestamp,
-        };
+        }, timestamp);
       })
     );
 
-    setSelectedCardId(nextCardId);
+    openCardEditor(nextCard, selectedBoard);
   };
 
   const handleScheduleBug = (card: KanbanCard) => {
@@ -1514,15 +1758,34 @@ export function KanbanPageContent({
   const handleCardDragEnd = () => {
     setDraggedCard(null);
     setDropTarget(null);
+    dropTargetRef.current = null;
+    pendingDropTargetRef.current = null;
+    if (dragOverFrameRef.current != null) {
+      cancelAnimationFrame(dragOverFrameRef.current);
+      dragOverFrameRef.current = null;
+    }
   };
+
+  const setDropTargetThrottled = useCallback((next: CardDropTarget) => {
+    pendingDropTargetRef.current = next;
+    if (dragOverFrameRef.current != null) return;
+    dragOverFrameRef.current = requestAnimationFrame(() => {
+      dragOverFrameRef.current = null;
+      const pending = pendingDropTargetRef.current;
+      pendingDropTargetRef.current = null;
+      if (!pending) return;
+      const current = dropTargetRef.current;
+      if (current && current.listId === pending.listId && current.beforeCardId === pending.beforeCardId) return;
+      dropTargetRef.current = pending;
+      setDropTarget(pending);
+    });
+  }, []);
 
   const handleCardDragOverList = (event: React.DragEvent<HTMLDivElement>, listId: string) => {
     if (!draggedCard) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
-    setDropTarget((prev) =>
-      prev?.listId === listId && prev.beforeCardId === null ? prev : { listId, beforeCardId: null }
-    );
+    setDropTargetThrottled({ listId, beforeCardId: null });
   };
 
   const handleCardDragOverCard = (event: React.DragEvent<HTMLDivElement>, listId: string, beforeCardId: string) => {
@@ -1530,9 +1793,7 @@ export function KanbanPageContent({
     event.preventDefault();
     event.stopPropagation();
     event.dataTransfer.dropEffect = 'move';
-    setDropTarget((prev) =>
-      prev?.listId === listId && prev.beforeCardId === beforeCardId ? prev : { listId, beforeCardId }
-    );
+    setDropTargetThrottled({ listId, beforeCardId });
   };
 
   const moveCardToTarget = (targetListId: string, beforeCardId: string | null) => {
@@ -1542,12 +1803,21 @@ export function KanbanPageContent({
     setKanbanBoards((prev) =>
       prev.map((board) => {
         if (board.id !== selectedBoard.id) return board;
-        return moveCardWithinBoard(board, draggedCard.cardId, targetListId, beforeCardId, timestamp);
+        return synchronizeBoardAutomation(
+          moveCardWithinBoard(board, draggedCard.cardId, targetListId, beforeCardId, timestamp),
+          timestamp
+        );
       })
     );
 
     setDraggedCard(null);
     setDropTarget(null);
+    dropTargetRef.current = null;
+    pendingDropTargetRef.current = null;
+    if (dragOverFrameRef.current != null) {
+      cancelAnimationFrame(dragOverFrameRef.current);
+      dragOverFrameRef.current = null;
+    }
   };
 
   const handleCardDrop = (event: React.DragEvent<HTMLDivElement>, listId: string, beforeCardId: string | null = null) => {
@@ -1595,7 +1865,7 @@ export function KanbanPageContent({
           toggledCard.checklist.length > 0 &&
           toggledCard.checklist.every((item) => item.completed);
 
-        if (!shouldAdvance || !toggledCard) return nextBoard;
+        if (!shouldAdvance || !toggledCard) return synchronizeBoardAutomation(nextBoard, timestamp);
 
         if (toggledCard.cardKind === 'bug') {
           return resolveBugCard(nextBoard, toggledCard.id, timestamp);
@@ -1606,9 +1876,12 @@ export function KanbanPageContent({
         const doneList = getDoneList(nextBoard);
         const nextList = currentListIndex === 2 ? doneList : currentListIndex >= 0 ? orderedLists[currentListIndex + 1] : null;
 
-        if (!nextList || nextList.id === toggledCard.listId) return nextBoard;
+        if (!nextList || nextList.id === toggledCard.listId) return synchronizeBoardAutomation(nextBoard, timestamp);
 
-        return moveCardWithinBoard(nextBoard, toggledCard.id, nextList.id, null, timestamp);
+        return synchronizeBoardAutomation(
+          moveCardWithinBoard(nextBoard, toggledCard.id, nextList.id, null, timestamp),
+          timestamp
+        );
       })
     );
   };
@@ -1653,7 +1926,14 @@ export function KanbanPageContent({
     setNewLabelTitle('');
     setNewLabelColor(LABEL_COLOR_PALETTE[0]);
     setSelectedIntentionMicroSkillIds([]);
+    setSelectedSkillAreaId('');
+    setNewSkillAreaName('');
+    setNewMicroSkillName('');
+    setEditingMicroSkillId(null);
+    setEditingMicroSkillName('');
     setNewIntentionName('');
+    setEditingIntentionId(null);
+    setEditingIntentionName('');
     setNewBugIssueName('');
     setPendingNewIntentions([]);
   };
@@ -1700,6 +1980,30 @@ export function KanbanPageContent({
     }
 
     handleCreateDraftLabel();
+  };
+
+  const updateDraftLabel = (labelId: string, updates: Partial<KanbanLabel>) => {
+    setCardLabelsDraft((prev) => prev.map((label) => (label.id === labelId ? { ...label, ...updates } : label)));
+  };
+
+  const deleteDraftLabel = (labelId: string) => {
+    setCardLabelsDraft((prev) => prev.filter((label) => label.id !== labelId));
+    setCardDraft((prev) => (prev ? { ...prev, labelIds: prev.labelIds.filter((id) => id !== labelId) } : prev));
+  };
+
+  const addDefaultLabelSet = (prefix: 'Severity' | 'Priority') => {
+    if (!selectedBoard) return;
+    setCardLabelsDraft((prev) => {
+      const next = mergeDefaultKanbanLabels(selectedBoard.id, prev);
+      return next.filter((label, index, list) => list.findIndex((entry) => entry.id === label.id) === index);
+    });
+    const firstMatching = DEFAULT_KANBAN_LABELS.find((label) => label.title.startsWith(prefix));
+    if (firstMatching) {
+      const existing = cardLabelsDraft.find((label) => label.title.toLowerCase() === firstMatching.title.toLowerCase());
+      if (existing && !cardDraft?.labelIds.includes(existing.id)) {
+        toggleDraftLabel(existing.id);
+      }
+    }
   };
 
   const toggleChecklistItem = (itemId: string) => {
@@ -1768,6 +2072,40 @@ export function KanbanPageContent({
     return [...pending, ...existing].filter((option) => !cardDraft?.linkedIntentionIds.includes(option.id));
   }, [availableMicroSkills, cardDraft?.linkedIntentionIds, existingProjectIntentions, pendingNewIntentions, selectedIntentionMicroSkillIds]);
 
+  const editableIntentions = useMemo(() => {
+    const pendingMap = new Map(pendingNewIntentions.map((draft) => [draft.tempId, draft]));
+    return cardDraft?.checklist
+      .map((item) => {
+        const intentionId = item.linkedIntentionId;
+        if (!intentionId) return null;
+        const pending = pendingMap.get(intentionId);
+        if (pending) {
+          return {
+            id: intentionId,
+            name: pending.name,
+            description: '',
+            microSkillNames: pending.microSkillNames,
+            kind: 'pending' as const,
+          } satisfies EditableIntentionOption;
+        }
+        const definition = deepWorkDefinitions.find((entry) => entry.id === intentionId);
+        if (!definition) return null;
+        return {
+          id: intentionId,
+          name: definition.name,
+          description: definition.description || '',
+          microSkillNames:
+            availableMicroSkills
+              .filter((microSkill) => (definition.linkedMicroSkillIds || []).includes(microSkill.id))
+              .map((microSkill) => microSkill.name)
+              .concat(definition.category ? [definition.category] : [])
+              .filter((name, index, list) => list.indexOf(name) === index),
+          kind: 'existing' as const,
+        } satisfies EditableIntentionOption;
+      })
+      .filter((value): value is EditableIntentionOption => !!value) || [];
+  }, [availableMicroSkills, cardDraft?.checklist, deepWorkDefinitions, pendingNewIntentions]);
+
   const openBugCardsByIntention = useMemo(() => {
     const map = new Map<string, KanbanCard>();
     if (!selectedBoard || !selectedCard) return map;
@@ -1818,6 +2156,11 @@ export function KanbanPageContent({
     if (!selectedCard?.linkedBugIntentionId) return null;
     return deepWorkDefinitions.find((definition) => definition.id === selectedCard.linkedBugIntentionId) || null;
   }, [deepWorkDefinitions, selectedCard]);
+
+  const selectedBugParentCard = useMemo(() => {
+    if (!selectedBoard || !selectedCard?.parentCardId) return null;
+    return selectedBoard.cards.find((card) => card.id === selectedCard.parentCardId) || null;
+  }, [selectedBoard, selectedCard]);
 
   const syncChecklistWithIntentions = (linkedIntentionIds: string[], previousChecklist: KanbanCard['checklist']) => {
     const previousByIntentionId = new Map(
@@ -1903,7 +2246,12 @@ export function KanbanPageContent({
   };
 
   const openBugCard = (bugCardId: string) => {
-    setSelectedCardId(bugCardId);
+    const bugCard = selectedBoard?.cards.find((card) => card.id === bugCardId) || null;
+    if (!bugCard) {
+      setSelectedCardId(bugCardId);
+      return;
+    }
+    openCardEditor(bugCard, selectedBoard);
   };
 
   const handleCreateBugCard = (intentionId: string, intentionText: string) => {
@@ -1915,15 +2263,8 @@ export function KanbanPageContent({
       return;
     }
 
-    const currentListIndex = selectedLists.findIndex((list) => list.id === cardDraft.listId);
-    const reviewList = selectedLists[2] || null;
-    const doneList = selectedLists.length > 0 ? selectedLists[selectedLists.length - 1] : null;
-    const targetList =
-      currentListIndex >= 0
-        ? currentListIndex === selectedLists.length - 1
-          ? selectedLists[Math.max(selectedLists.length - 2, 0)] || selectedLists[currentListIndex]
-          : selectedLists[currentListIndex + 1] || selectedLists[currentListIndex]
-        : null;
+    const breakList = selectedLists.find((list) => normalizeKanbanTitle(list.title) === 'break') || null;
+    const targetList = breakList || (selectedLists.find((list) => list.id === cardDraft.listId) ?? null);
     if (!targetList) return;
 
     const parentChecklistItem = cardDraft.checklist.find((item) => item.linkedIntentionId === intentionId);
@@ -1984,11 +2325,7 @@ export function KanbanPageContent({
           updatedAt: timestamp,
         };
 
-        if (doneList && reviewList && selectedCard.listId === doneList.id && reviewList.id !== doneList.id) {
-          nextBoard = moveCardWithinBoard(nextBoard, selectedCard.id, reviewList.id, null, timestamp);
-        }
-
-        return nextBoard;
+        return synchronizeBoardAutomation(nextBoard, timestamp);
       })
     );
 
@@ -1996,7 +2333,7 @@ export function KanbanPageContent({
       prev
         ? {
             ...prev,
-            listId: doneList && reviewList && selectedCard.listId === doneList.id ? reviewList.id : prev.listId,
+            listId: breakList?.id || prev.listId,
             checklist: prev.checklist.map((item) =>
               item.linkedIntentionId === intentionId ? { ...item, completed: false } : item
             ),
@@ -2039,10 +2376,269 @@ export function KanbanPageContent({
     setNewIntentionName('');
   };
 
+  const startEditingIntention = (intentionId: string, currentName: string) => {
+    setEditingIntentionId(intentionId);
+    setEditingIntentionName(currentName);
+  };
+
+  const saveIntentionEdit = () => {
+    const nextName = editingIntentionName.trim();
+    if (!editingIntentionId || !nextName) return;
+
+    setPendingNewIntentions((prev) =>
+      prev.map((draft) => (draft.tempId === editingIntentionId ? { ...draft, name: nextName } : draft))
+    );
+    setDeepWorkDefinitions((prev) =>
+      prev.map((definition) => (definition.id === editingIntentionId ? { ...definition, name: nextName } : definition))
+    );
+    setCardDraft((prev) =>
+      prev
+        ? {
+            ...prev,
+            checklist: prev.checklist.map((item) =>
+              item.linkedIntentionId === editingIntentionId ? { ...item, text: nextName } : item
+            ),
+          }
+        : prev
+    );
+    setEditingIntentionId(null);
+    setEditingIntentionName('');
+  };
+
+  const deleteIntentionFromPopup = (intentionId: string) => {
+    setPendingNewIntentions((prev) => prev.filter((draft) => draft.tempId !== intentionId));
+    setDeepWorkDefinitions((prev) => prev.filter((definition) => definition.id !== intentionId));
+    removeLinkedIntention(intentionId);
+    if (editingIntentionId === intentionId) {
+      setEditingIntentionId(null);
+      setEditingIntentionName('');
+    }
+  };
+
+  const startEditingMicroSkill = (microSkillId: string, currentName: string) => {
+    setEditingMicroSkillId(microSkillId);
+    setEditingMicroSkillName(currentName);
+  };
+
+  const saveMicroSkillEdit = (skillAreaId: string, microSkillId: string) => {
+    const nextName = editingMicroSkillName.trim();
+    if (!selectedSpecialization || !nextName) return;
+
+    let oldName = '';
+    setCoreSkills((prev) =>
+      prev.map((skill) => {
+        if (skill.id !== selectedSpecialization.id) return skill;
+        return {
+          ...skill,
+          skillAreas: skill.skillAreas.map((area) => {
+            if (area.id !== skillAreaId) return area;
+            return {
+              ...area,
+              microSkills: area.microSkills.map((microSkill) => {
+                if (microSkill.id !== microSkillId) return microSkill;
+                oldName = microSkill.name;
+                return { ...microSkill, name: nextName };
+              }),
+            };
+          }),
+        };
+      })
+    );
+
+    if (oldName && oldName !== nextName) {
+      const updateCategory = (definitions: ExerciseDefinition[]) =>
+        definitions.map((definition) => (definition.category === oldName ? { ...definition, category: nextName as any } : definition));
+      setDeepWorkDefinitions((prev) => updateCategory(prev));
+      setUpskillDefinitions((prev) => updateCategory(prev));
+      setPendingNewIntentions((prev) =>
+        prev.map((draft) => ({
+          ...draft,
+          microSkillNames: draft.microSkillNames.map((name) => (name === oldName ? nextName : name)),
+        }))
+      );
+    }
+
+    setEditingMicroSkillId(null);
+    setEditingMicroSkillName('');
+  };
+
+  const deleteMicroSkillFromPopup = (skillAreaId: string, microSkillId: string) => {
+    if (!selectedSpecialization) return;
+
+    let deletedName = '';
+    setCoreSkills((prev) =>
+      prev.map((skill) => {
+        if (skill.id !== selectedSpecialization.id) return skill;
+        return {
+          ...skill,
+          skillAreas: skill.skillAreas.map((area) => {
+            if (area.id !== skillAreaId) return area;
+            const target = area.microSkills.find((microSkill) => microSkill.id === microSkillId);
+            if (target) deletedName = target.name;
+            return {
+              ...area,
+              microSkills: area.microSkills.filter((microSkill) => microSkill.id !== microSkillId),
+            };
+          }),
+        };
+      })
+    );
+
+    setSelectedIntentionMicroSkillIds((prev) => prev.filter((id) => id !== microSkillId));
+    setPendingNewIntentions((prev) =>
+      prev.map((draft) => ({
+        ...draft,
+        microSkillIds: draft.microSkillIds.filter((id) => id !== microSkillId),
+        microSkillNames: deletedName ? draft.microSkillNames.filter((name) => name !== deletedName) : draft.microSkillNames,
+      }))
+    );
+
+    if (deletedName) {
+      setDeepWorkDefinitions((prev) => prev.filter((definition) => definition.category !== deletedName));
+      setUpskillDefinitions((prev) => prev.filter((definition) => definition.category !== deletedName));
+    }
+
+    if (editingMicroSkillId === microSkillId) {
+      setEditingMicroSkillId(null);
+      setEditingMicroSkillName('');
+    }
+  };
+
+  const addMicroSkillFromPopup = () => {
+    const nextMicroSkillName = newMicroSkillName.trim();
+    if (!selectedSpecialization || !nextMicroSkillName) return;
+
+    const usingNewSkillArea = selectedSkillAreaId === '__new__';
+    const nextSkillAreaName = usingNewSkillArea ? newSkillAreaName.trim() : '';
+    if (usingNewSkillArea && !nextSkillAreaName) {
+      toast({ title: 'Skill area required', description: 'Create or choose a skill area first.', variant: 'destructive' });
+      return;
+    }
+
+    let createdAreaId = '';
+    let createdMicroSkillId = '';
+    let duplicateFound = false;
+
+    setCoreSkills((prev) =>
+      prev.map((skill) => {
+        if (skill.id !== selectedSpecialization.id) return skill;
+
+        const nextSkillAreas = [...skill.skillAreas];
+        let targetAreaIndex = nextSkillAreas.findIndex((area) => area.id === selectedSkillAreaId);
+
+        if (usingNewSkillArea) {
+          createdAreaId = `sa_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+          nextSkillAreas.push({
+            id: createdAreaId,
+            name: nextSkillAreaName,
+            purpose: '',
+            microSkills: [],
+          });
+          targetAreaIndex = nextSkillAreas.length - 1;
+        }
+
+        if (targetAreaIndex < 0) return skill;
+
+        const targetArea = nextSkillAreas[targetAreaIndex];
+        if (targetArea.microSkills.some((microSkill) => microSkill.name.trim().toLowerCase() === nextMicroSkillName.toLowerCase())) {
+          duplicateFound = true;
+          return skill;
+        }
+
+        createdMicroSkillId = `ms_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        nextSkillAreas[targetAreaIndex] = {
+          ...targetArea,
+          microSkills: [
+            ...targetArea.microSkills,
+            {
+              id: createdMicroSkillId,
+              name: nextMicroSkillName,
+              isReadyForRepetition: false,
+            },
+          ],
+        };
+
+        return {
+          ...skill,
+          skillAreas: nextSkillAreas,
+        };
+      })
+    );
+
+    if (duplicateFound) {
+      toast({ title: 'Micro-skill already exists', description: `"${nextMicroSkillName}" is already in that skill area.`, variant: 'destructive' });
+      return;
+    }
+
+    if (createdAreaId) {
+      setSelectedSkillAreaId(createdAreaId);
+      setNewSkillAreaName('');
+    }
+    if (createdMicroSkillId) {
+      setSelectedIntentionMicroSkillIds((prev) => (prev.includes(createdMicroSkillId) ? prev : [...prev, createdMicroSkillId]));
+    }
+    setNewMicroSkillName('');
+  };
+
+  const getDraftFeatureNames = () => {
+    if (!selectedFeatureResource || !cardDraft) return [] as string[];
+    const pointIds =
+      boardMode === 'branding'
+        ? cardDraft.linkedFeaturePointIds
+        : cardDraft.linkedFeaturePointId
+          ? [cardDraft.linkedFeaturePointId]
+          : [];
+    return pointIds
+      .map((pointId) => selectedFeatureResource.points.find((point) => point.id === pointId)?.text?.trim() || '')
+      .filter(Boolean);
+  };
+
+  const copyIntentionsToClipboard = async () => {
+    if (!cardDraft) return;
+    const featureNames = getDraftFeatureNames();
+    const intentionLines = cardDraft.checklist.map((item) => `- ${item.text}`);
+    const text = [
+      `Task Card: ${cardDraft.title.trim() || 'Untitled card'}`,
+      `Feature Name: ${featureNames.length > 0 ? featureNames.join(', ') : 'None'}`,
+      'Intentions:',
+      ...(intentionLines.length > 0 ? intentionLines : ['- None']),
+    ].join('\n');
+
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: 'Copied', description: 'Task title, feature name, and intentions were copied.' });
+    } catch {
+      toast({ title: 'Copy failed', description: 'Could not copy intentions to the clipboard.', variant: 'destructive' });
+    }
+  };
+
+  const copyBugIssuesToClipboard = async () => {
+    if (!cardDraft) return;
+    const parentCardName = selectedBugParentCard?.title?.trim() || 'Unknown parent card';
+    const featureNames = selectedBugParentCard ? getLinkedFeatureNames(selectedBugParentCard) : [];
+    const issueLines = cardDraft.checklist.map((item) => `- ${item.text}`);
+    const text = [
+      `Parent Card: ${parentCardName}`,
+      `Feature Name: ${featureNames.length > 0 ? featureNames.join(', ') : 'None'}`,
+      'Issues:',
+      ...(issueLines.length > 0 ? issueLines : ['- None']),
+    ].join('\n');
+
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ title: 'Copied', description: 'Parent card, feature name, and issues were copied.' });
+    } catch {
+      toast({ title: 'Copy failed', description: 'Could not copy issues to the clipboard.', variant: 'destructive' });
+    }
+  };
+
   const handleSaveCard = () => {
     if (!selectedBoard || !selectedCard || !cardDraft) return;
     const nextTitle = cardDraft.title.trim();
     if (!nextTitle) return;
+    const sanitizedLabels = cardLabelsDraft
+      .map((label) => ({ ...label, title: label.title.trim() }))
+      .filter((label) => label.title);
 
     const isSavingBugCard = selectedCard.cardKind === 'bug';
     const previousListId = selectedCard.listId;
@@ -2126,7 +2722,7 @@ export function KanbanPageContent({
 
         let nextBoard: KanbanBoard = {
           ...board,
-          labels: cardLabelsDraft,
+          labels: sanitizedLabels,
           cards: nextCards,
           lists: nextLists,
           updatedAt: timestamp,
@@ -2149,7 +2745,7 @@ export function KanbanPageContent({
           }
         }
 
-        return nextBoard;
+        return synchronizeBoardAutomation(nextBoard, timestamp);
       })
     );
 
@@ -2196,7 +2792,7 @@ export function KanbanPageContent({
           );
         }
 
-        return {
+        return synchronizeBoardAutomation({
           ...board,
           cards: nextCards,
           lists: board.lists.map((list) => ({
@@ -2204,7 +2800,7 @@ export function KanbanPageContent({
             cardOrder: list.cardOrder.filter((cardId) => cardId !== selectedCard.id),
           })),
           updatedAt: timestamp,
-        };
+        }, timestamp);
       })
     );
 
@@ -2220,7 +2816,7 @@ export function KanbanPageContent({
           : 'h-[calc(100vh-4rem)] w-full px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8 2xl:px-10'
       )}
     >
-      {!isModal ? <h1 className="text-3xl font-bold tracking-tight">Kanban</h1> : null}
+      {!isModal ? null : null}
 
       <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-card/50 p-3">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -2245,16 +2841,6 @@ export function KanbanPageContent({
                 )}
               >
                 Branding
-              </button>
-              <button
-                type="button"
-                onClick={() => setBoardMode('tasks')}
-                className={cn(
-                  'rounded-md px-3 py-1.5 text-sm transition',
-                  boardMode === 'tasks' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                Task Board
               </button>
             </div>
 
@@ -2301,7 +2887,7 @@ export function KanbanPageContent({
         </div>
 
         {boardMode === 'project' || boardMode === 'branding' ? (
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -2324,23 +2910,18 @@ export function KanbanPageContent({
                 </option>
               ))}
             </select>
+            {linkedBothering ? (
+              <div className="rounded-lg border border-border/60 bg-background/60 px-3 py-2 text-xs text-muted-foreground xl:ml-3 xl:max-w-[320px]">
+                <div className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground/80">Linked Bothering</div>
+                <div className="mt-1 line-clamp-2 text-sm text-foreground/90">{linkedBothering}</div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
         {boardMode === 'project' || boardMode === 'branding' ? (
           selectedBoard ? (
             <>
-              <div className="flex flex-wrap items-center gap-2 px-1">
-                {selectedBoardMeta ? (
-                  <Badge variant="outline">{selectedBoardMeta.specializationName}</Badge>
-                ) : null}
-                <Badge variant="secondary">{boardMode === 'branding' ? 'Branding board' : 'Release linked'}</Badge>
-                <Badge variant="secondary">{selectedLists.length} lists</Badge>
-                <Badge variant="secondary">
-                  {selectedBoard.cards.filter((card) => !card.archived).length} cards
-                </Badge>
-              </div>
-
               <div className="flex min-h-0 flex-1 overflow-x-auto pb-2">
                 <div
                   className="grid min-h-full min-w-[1450px] auto-cols-fr grid-flow-col gap-3 xl:min-w-0 xl:w-full"
@@ -2397,29 +2978,95 @@ export function KanbanPageContent({
 
       {selectedBoard && selectedCard && cardDraft ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 p-4 backdrop-blur-sm">
-          <div className="flex h-[min(90vh,860px)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-2xl">
+          <div className="flex h-[min(90vh,860px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-border/60 px-5 py-4">
               <div className="min-w-0 flex-1 space-y-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <select
-                    value={cardDraft.listId}
-                    onChange={(event) => setCardDraft((prev) => (prev ? { ...prev, listId: event.target.value } : prev))}
-                    className="h-9 min-w-[240px] rounded-md border border-input bg-background px-3 text-sm outline-none"
-                  >
-                    {selectedLists.map((list) => (
-                      <option key={list.id} value={list.id}>
-                        {list.title}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="text-sm text-muted-foreground">Edit card</span>
-                </div>
                 <input
                   value={cardDraft.title}
                   onChange={(event) => setCardDraft((prev) => (prev ? { ...prev, title: event.target.value } : prev))}
                   placeholder="Card title"
                   className="w-full border-0 bg-transparent p-0 text-3xl font-bold tracking-tight text-foreground outline-none"
                 />
+                {boardMode !== 'branding' ? (
+                  <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/40 p-3 lg:flex-row lg:items-end">
+                    <div className="min-w-[220px] lg:w-[240px]">
+                      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Stage
+                      </div>
+                      <select
+                        value={cardDraft.listId}
+                        onChange={(event) => setCardDraft((prev) => (prev ? { ...prev, listId: event.target.value } : prev))}
+                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                      >
+                        {selectedLists.map((list) => (
+                          <option key={list.id} value={list.id}>
+                            {list.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Linked feature
+                      </div>
+                      {selectedFeatureResource ? (
+                        <select
+                          value={cardDraft.linkedFeaturePointId}
+                          onChange={(event) =>
+                            setCardDraft((prev) => (prev ? { ...prev, linkedFeaturePointId: event.target.value } : prev))
+                          }
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                        >
+                          <option value="">No linked feature</option>
+                          {featurePointOptions.map((feature) => (
+                            <option key={feature.id} value={feature.id}>
+                              {feature.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="flex h-10 items-center rounded-md border border-input bg-background px-3 text-sm text-muted-foreground">
+                          No feature resource card found for this board yet.
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-[220px] lg:w-[240px]">
+                      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Due date
+                      </div>
+                      <input
+                        type="date"
+                        value={cardDraft.dueDate}
+                        onChange={(event) => setCardDraft((prev) => (prev ? { ...prev, dueDate: event.target.value } : prev))}
+                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                      />
+                    </div>
+                    {!selectedFeatureResource ? (
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button type="button" variant="outline" className="h-10" onClick={handleOpenFeaturesResource}>
+                          <Library className="mr-2 h-4 w-4" />
+                          Create feature card
+                        </Button>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+                {boardMode === 'branding' ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <select
+                      value={cardDraft.listId}
+                      onChange={(event) => setCardDraft((prev) => (prev ? { ...prev, listId: event.target.value } : prev))}
+                      className="h-9 min-w-[240px] rounded-md border border-input bg-background px-3 text-sm outline-none"
+                    >
+                      {selectedLists.map((list) => (
+                        <option key={list.id} value={list.id}>
+                          {list.title}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-sm text-muted-foreground">Edit card</span>
+                  </div>
+                ) : null}
               </div>
               <button
                 type="button"
@@ -2434,7 +3081,7 @@ export function KanbanPageContent({
             <div className="min-h-0 flex-1 overflow-y-auto">
             {isBugCard ? (
               <div className="p-5">
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)]">
                   <div className="rounded-xl border border-border/60 bg-background/40 p-4">
                     <div className="mb-3 flex items-center justify-between gap-3">
                       <div>
@@ -2448,9 +3095,14 @@ export function KanbanPageContent({
                           </div>
                         ) : null}
                       </div>
-                      <Badge variant="secondary">
-                        {cardDraft.checklist.filter((item) => item.completed).length}/{cardDraft.checklist.length}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">
+                          {cardDraft.checklist.filter((item) => item.completed).length}/{cardDraft.checklist.length}
+                        </Badge>
+                        <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={copyBugIssuesToClipboard} aria-label="Copy issues">
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                     <div className="mb-4 flex gap-2">
                       <input
@@ -2507,115 +3159,48 @@ export function KanbanPageContent({
                         </div>
                       )}
                     </div>
+                    <div className="mt-4">
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Steps to reproduce
+                      </div>
+                      <textarea
+                        value={cardDraft.description}
+                        onChange={(event) => setCardDraft((prev) => (prev ? { ...prev, description: event.target.value } : prev))}
+                        placeholder="List the steps needed to reproduce this bug."
+                        className="min-h-[140px] w-full rounded-xl border border-input bg-background px-3 py-3 text-sm outline-none"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-4">
                     <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-                      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        Due date
-                      </div>
-                      <Input
-                        type="date"
-                        value={cardDraft.dueDate ? cardDraft.dueDate.slice(0, 10) : ''}
-                        onChange={(event) =>
-                          setCardDraft((current) => ({
-                            ...current,
-                            dueDate: event.target.value ? `${event.target.value}T00:00:00.000Z` : undefined,
-                          }))
-                        }
-                        className="border-white/10 bg-black/20 text-white"
-                      />
+                      <div className="mb-3 text-sm font-semibold text-foreground">Labels</div>
+                      {cardDraft.labelIds.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {cardDraft.labelIds.map((labelId) => {
+                            const label = cardLabelsDraft.find((entry) => entry.id === labelId);
+                            if (!label) return null;
+                            return (
+                              <span
+                                key={label.id}
+                                className="inline-flex items-center rounded-full border border-transparent px-3 py-1.5 text-xs font-medium text-white"
+                                style={{ backgroundColor: label.color }}
+                                title={label.title}
+                              >
+                                {label.title}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">No labels added to this card yet.</div>
+                      )}
                     </div>
                   </div>
                 </div>
               </div>
             ) : isReviewCard ? (
-              <div className="p-5">
-                <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <CheckSquare className="h-4 w-4 text-muted-foreground" />
-                      Intention checklist
-                    </div>
-                    <Badge variant="secondary">
-                      {cardDraft.checklist.filter((item) => item.completed).length}/{cardDraft.checklist.length}
-                    </Badge>
-                  </div>
-                  <div className="space-y-3">
-                    {cardDraft.checklist.length > 0 ? (
-                      cardDraft.checklist.map((item) => {
-                        const linkedIntentionId = item.linkedIntentionId || '';
-                        const linkedOpenBugCard = linkedIntentionId ? openBugCardsByIntention.get(linkedIntentionId) : null;
-                        const bugHistory = linkedIntentionId ? bugHistoryByIntention.get(linkedIntentionId) || [] : [];
-                        const canCreateBug = Boolean(linkedIntentionId) && !linkedIntentionId.startsWith('temp-intention-');
-
-                        return (
-                          <div key={item.id} className="rounded-lg border border-border/60 bg-background/60 px-3 py-3">
-                            <div className="flex items-start gap-3">
-                              <input
-                                type="checkbox"
-                                checked={!linkedOpenBugCard && item.completed}
-                                disabled={Boolean(linkedOpenBugCard)}
-                                onChange={() => toggleChecklistItem(item.id)}
-                                className="mt-1 h-4 w-4"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <div className={cn('text-sm', !linkedOpenBugCard && item.completed && 'text-muted-foreground line-through')}>
-                                  {item.text}
-                                </div>
-                                {linkedOpenBugCard ? (
-                                  <div className="mt-1 text-xs text-amber-500">
-                                    Blocked by open bug card: {linkedOpenBugCard.title}
-                                  </div>
-                                ) : null}
-                                {bugHistory.length > 0 ? (
-                                  <div className="mt-2 space-y-1">
-                                    <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                      Bug history
-                                    </div>
-                                    {bugHistory.map((historyCard) => (
-                                      <div key={historyCard.id} className="text-xs text-muted-foreground">
-                                        {historyCard.title} ? {historyCard.checklist.length} issue{historyCard.checklist.length === 1 ? '' : 's'} ? {historyCard.resolvedAt ? format(parseISO(historyCard.resolvedAt), 'MMM d') : 'Resolved'}
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : null}
-                              </div>
-                              <div className="flex shrink-0 items-center gap-1">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => (linkedOpenBugCard ? openBugCard(linkedOpenBugCard.id) : handleCreateBugCard(linkedIntentionId, item.text))}
-                                  disabled={!canCreateBug}
-                                >
-                                  {linkedOpenBugCard ? 'Open Bug' : 'Add Bug'}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7"
-                                  onClick={() => removeLinkedIntention(item.linkedIntentionId, item.id)}
-                                >
-                                  <X className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="rounded-lg border border-dashed border-border/60 px-3 py-6 text-center text-sm text-muted-foreground">
-                        No intentions linked to this card yet.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
+              <div className="grid gap-4 p-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(300px,0.9fr)]">
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                     <MessageSquare className="h-4 w-4 text-muted-foreground" />
@@ -2625,7 +3210,7 @@ export function KanbanPageContent({
                     value={cardDraft.description}
                     onChange={(event) => setCardDraft((prev) => (prev ? { ...prev, description: event.target.value } : prev))}
                     placeholder="Describe the work, context, or acceptance notes."
-                    className="min-h-[220px] w-full resize-none rounded-xl border border-input bg-background p-3 text-sm outline-none"
+                    className="min-h-[180px] w-full rounded-xl border border-input bg-background px-3 py-3 text-sm outline-none"
                   />
 
                   <div className="rounded-xl border border-border/60 bg-background/40 p-4">
@@ -2634,17 +3219,354 @@ export function KanbanPageContent({
                         <CheckSquare className="h-4 w-4 text-muted-foreground" />
                         Intention checklist
                       </div>
-                      <Badge variant="secondary">
-                        {cardDraft.checklist.filter((item) => item.completed).length}/{cardDraft.checklist.length}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">
+                          {cardDraft.checklist.filter((item) => item.completed).length}/{cardDraft.checklist.length}
+                        </Badge>
+                        <Button type="button" variant="outline" size="icon" className="h-9 w-9" onClick={copyIntentionsToClipboard} aria-label="Copy intentions">
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    {availableMicroSkills.length > 0 ? (
-                      <div className="mb-3 space-y-3">
+                    <div className="space-y-3">
+                      {cardDraft.checklist.length > 0 ? (
+                        cardDraft.checklist.map((item) => {
+                          const linkedIntentionId = item.linkedIntentionId || '';
+                          const linkedOpenBugCard = linkedIntentionId ? openBugCardsByIntention.get(linkedIntentionId) : null;
+                          const bugHistory = linkedIntentionId ? bugHistoryByIntention.get(linkedIntentionId) || [] : [];
+                          const canCreateBug = Boolean(linkedIntentionId) && !linkedIntentionId.startsWith('temp-intention-');
+                          const editableIntention = editableIntentions.find((entry) => entry.id === linkedIntentionId) || null;
+
+                          return (
+                            <div key={item.id} className="rounded-lg border border-border/60 bg-background/60 px-3 py-3">
+                              <div className="flex items-start gap-3">
+                                <input
+                                  type="checkbox"
+                                  checked={!linkedOpenBugCard && item.completed}
+                                  disabled={Boolean(linkedOpenBugCard)}
+                                  onChange={() => toggleChecklistItem(item.id)}
+                                  className="mt-1 h-4 w-4"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  {editingIntentionId === linkedIntentionId ? (
+                                    <input
+                                      value={editingIntentionName}
+                                      onChange={(event) => setEditingIntentionName(event.target.value)}
+                                      onKeyDown={(event) => {
+                                        if (event.key === 'Enter') {
+                                          event.preventDefault();
+                                          saveIntentionEdit();
+                                        }
+                                      }}
+                                      className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm outline-none"
+                                    />
+                                  ) : (
+                                    <div className={cn('text-sm font-medium', !linkedOpenBugCard && item.completed && 'text-muted-foreground line-through')}>
+                                      {item.text}
+                                    </div>
+                                  )}
+                                  {linkedOpenBugCard ? (
+                                    <div className="mt-1 text-xs text-amber-500">
+                                      Blocked by open bug card: {linkedOpenBugCard.title}
+                                    </div>
+                                  ) : null}
+                                  {bugHistory.length > 0 ? (
+                                    <div className="mt-2 space-y-1">
+                                      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                                        Bug history
+                                      </div>
+                                      <div className="flex flex-wrap gap-2">
+                                        {bugHistory.map((historyCard) => (
+                                          <button
+                                            key={historyCard.id}
+                                            type="button"
+                                            onClick={() => openBugCard(historyCard.id)}
+                                            className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/60 px-2 py-1 text-xs text-muted-foreground transition hover:border-border hover:bg-background hover:text-foreground"
+                                            aria-label={`View ${historyCard.title}`}
+                                          >
+                                            <Eye className="h-3.5 w-3.5" />
+                                            <span>
+                                              {historyCard.title} - {historyCard.checklist.length} issue{historyCard.checklist.length === 1 ? '' : 's'} - {historyCard.resolvedAt ? format(parseISO(historyCard.resolvedAt), 'MMM d') : 'Resolved'}
+                                            </span>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                </div>
+                                <div className="flex shrink-0 items-start gap-1 pt-0.5">
+                                  {editingIntentionId === linkedIntentionId ? (
+                                    <>
+                                      <Button type="button" variant="outline" size="sm" onClick={saveIntentionEdit}>
+                                        Save
+                                      </Button>
+                                      <Button type="button" variant="ghost" size="sm" onClick={() => { setEditingIntentionId(null); setEditingIntentionName(''); }}>
+                                        Cancel
+                                      </Button>
+                                    </>
+                                  ) : (
+                                    <>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className={cn('h-7 w-7', linkedOpenBugCard && 'text-amber-500')}
+                                      onClick={() => (linkedOpenBugCard ? openBugCard(linkedOpenBugCard.id) : handleCreateBugCard(linkedIntentionId, item.text))}
+                                      disabled={!canCreateBug}
+                                      aria-label={linkedOpenBugCard ? `Open ${linkedOpenBugCard.title}` : `Add bug for ${item.text}`}
+                                    >
+                                      {linkedOpenBugCard ? <Eye className="h-3.5 w-3.5" /> : <Plus className="h-3.5 w-3.5" />}
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => startEditingIntention(linkedIntentionId, editableIntention?.name || item.text)}
+                                      aria-label={`Edit ${editableIntention?.name || item.text}`}
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-destructive"
+                                      onClick={() => deleteIntentionFromPopup(linkedIntentionId)}
+                                      aria-label={`Delete ${editableIntention?.name || item.text}`}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => removeLinkedIntention(item.linkedIntentionId, item.id)}
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </Button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-border/60 px-3 py-6 text-center text-sm text-muted-foreground">
+                          No intentions linked to this card yet.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                    <div className="mb-3 text-sm font-semibold text-foreground">Labels</div>
+                    {isBreakColumnCard ? (
+                      cardDraft.labelIds.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {cardDraft.labelIds.map((labelId) => {
+                            const label = cardLabelsDraft.find((entry) => entry.id === labelId);
+                            if (!label) return null;
+                            return (
+                              <span
+                                key={label.id}
+                                className="inline-flex items-center rounded-full border border-transparent px-3 py-1.5 text-xs font-medium text-white"
+                                style={{ backgroundColor: label.color }}
+                                title={label.title}
+                              >
+                                {label.title}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground">No labels added to this card yet.</div>
+                      )
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="rounded-lg border border-border/60 bg-background/60 p-3">
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Default label sets
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button type="button" variant="outline" size="sm" onClick={() => addDefaultLabelSet('Severity')}>
+                              Add Severity
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => addDefaultLabelSet('Priority')}>
+                              Add Priority
+                            </Button>
+                          </div>
+                        </div>
+
+                        {cardDraft.labelIds.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {cardDraft.labelIds.map((labelId) => {
+                              const label = cardLabelsDraft.find((entry) => entry.id === labelId);
+                              if (!label) return null;
+                              return (
+                                <span
+                                  key={label.id}
+                                  className="inline-flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 text-xs font-medium text-white"
+                                  style={{ backgroundColor: label.color }}
+                                  title={label.title}
+                                >
+                                  {label.title}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleDraftLabel(label.id)}
+                                    className="rounded-full bg-black/20 p-0.5 text-white/90 transition hover:bg-black/35 hover:text-white"
+                                    aria-label={`Remove ${label.title} label`}
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">No labels added to this card yet.</div>
+                        )}
+
+                        <div className="rounded-lg border border-border/60 bg-background/60 p-3">
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Select or create label
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <div className="min-w-0 flex-1">
+                              <input
+                                value={newLabelTitle}
+                                onChange={(event) => setNewLabelTitle(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    handleApplyLabelInput();
+                                  }
+                                }}
+                                placeholder="Search or create label"
+                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                              />
+                              <div className="mt-2 max-h-32 overflow-y-auto rounded-md border border-border/60 bg-background/50">
+                                {filteredLabelOptions.length > 0 ? (
+                                  filteredLabelOptions.map((label) => (
+                                    <button
+                                      key={label.id}
+                                      type="button"
+                                      onClick={() => toggleDraftLabel(label.id)}
+                                      className="flex w-full items-center gap-2 border-b border-border/40 px-3 py-2 text-left text-sm transition last:border-b-0 hover:bg-background/70"
+                                    >
+                                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: label.color }} />
+                                      <span className="truncate">{label.title}</span>
+                                    </button>
+                                  ))
+                                ) : newLabelTitle.trim() ? (
+                                  <button
+                                    type="button"
+                                    onClick={handleCreateDraftLabel}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-background/70"
+                                  >
+                                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: newLabelColor }} />
+                                    <span>Create "{newLabelTitle.trim()}"</span>
+                                  </button>
+                                ) : (
+                                  <div className="px-3 py-2 text-sm text-muted-foreground">No available labels.</div>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={handleApplyLabelInput}
+                              disabled={!newLabelTitle.trim()}
+                              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background/70 text-foreground transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-50"
+                              aria-label={exactExistingLabel ? 'Add existing label' : 'Create label'}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {LABEL_COLOR_PALETTE.map((color) => (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => setNewLabelColor(color)}
+                                className={cn(
+                                  'h-7 w-7 rounded-full border-2 transition',
+                                  newLabelColor === color ? 'border-white' : 'border-transparent'
+                                )}
+                                style={{ backgroundColor: color }}
+                                aria-label={`Select ${color} label color`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                    <div className="mb-2 text-sm font-semibold text-foreground">Card snapshot</div>
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Checklist</span>
+                        <span>{cardDraft.checklist.filter((item) => item.completed).length}/{cardDraft.checklist.length}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Attachments</span>
+                        <span>{selectedCard.attachmentIds.length}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Comments</span>
+                        <span>{selectedCard.commentIds.length}</span>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <span>Labels</span>
+                        <span>{cardDraft.labelIds.length}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-3 p-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(280px,0.8fr)]">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <MessageSquare className="h-4 w-4 text-muted-foreground" />
+                    Description
+                  </div>
+                  <textarea
+                    value={cardDraft.description}
+                    onChange={(event) => setCardDraft((prev) => (prev ? { ...prev, description: event.target.value } : prev))}
+                    placeholder="Describe the work, context, or acceptance notes."
+                    className="min-h-[180px] w-full rounded-xl border border-input bg-background px-3 py-3 text-sm outline-none"
+                  />
+
+                  <div className="rounded-xl border border-border/60 bg-background/40 p-3">
+                    <div className="mb-2.5 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <CheckSquare className="h-4 w-4 text-muted-foreground" />
+                        Intention checklist
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">
+                          {cardDraft.checklist.filter((item) => item.completed).length}/{cardDraft.checklist.length}
+                        </Badge>
+                        <Button type="button" variant="outline" size="icon" className="h-8 w-8" onClick={copyIntentionsToClipboard} aria-label="Copy intentions">
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    {selectedSpecialization ? (
+                      <div className="mb-2.5 space-y-2.5">
                         <div>
                           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Linked micro-skills
                           </div>
-                          <div className="max-h-40 space-y-3 overflow-y-auto rounded-md border border-input bg-background p-3">
+                          <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border border-input bg-background p-2.5">
                             {availableMicroSkillGroups.map((group) => (
                               <div key={group.skillAreaId} className="space-y-1.5">
                                 <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -2652,7 +3574,7 @@ export function KanbanPageContent({
                                 </div>
                                 <div className="space-y-1">
                                   {group.microSkills.map((microSkill) => (
-                                    <label key={microSkill.id} className="flex items-center gap-2 text-sm">
+                                    <div key={microSkill.id} className="flex items-center gap-2 rounded-md border border-border/50 px-2 py-1.5 text-sm">
                                       <input
                                         type="checkbox"
                                         checked={selectedIntentionMicroSkillIds.includes(microSkill.id)}
@@ -2665,19 +3587,115 @@ export function KanbanPageContent({
                                         }
                                         className="h-4 w-4"
                                       />
-                                      <span>{microSkill.name}</span>
-                                    </label>
+                                      {editingMicroSkillId === microSkill.id ? (
+                                        <input
+                                          value={editingMicroSkillName}
+                                          onChange={(event) => setEditingMicroSkillName(event.target.value)}
+                                          onKeyDown={(event) => {
+                                            if (event.key === 'Enter') {
+                                              event.preventDefault();
+                                              saveMicroSkillEdit(group.skillAreaId, microSkill.id);
+                                            }
+                                          }}
+                                          className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-sm outline-none"
+                                        />
+                                      ) : (
+                                        <span className="flex-1">{microSkill.name}</span>
+                                      )}
+                                      {editingMicroSkillId === microSkill.id ? (
+                                        <>
+                                          <Button type="button" variant="outline" size="sm" className="h-7 px-2" onClick={() => saveMicroSkillEdit(group.skillAreaId, microSkill.id)}>
+                                            Save
+                                          </Button>
+                                          <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => { setEditingMicroSkillId(null); setEditingMicroSkillName(''); }}>
+                                            Cancel
+                                          </Button>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7"
+                                            onClick={() => startEditingMicroSkill(microSkill.id, microSkill.name)}
+                                            aria-label={`Edit ${microSkill.name}`}
+                                          >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-destructive"
+                                            onClick={() => deleteMicroSkillFromPopup(group.skillAreaId, microSkill.id)}
+                                            aria-label={`Delete ${microSkill.name}`}
+                                          >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                          </Button>
+                                        </>
+                                      )}
+                                    </div>
                                   ))}
                                 </div>
                               </div>
                             ))}
                           </div>
                         </div>
+                        <div className="rounded-lg border border-border/60 bg-background/60 p-2.5">
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Add micro-skill
+                          </div>
+                          <div className="space-y-1.5">
+                            <select
+                              value={selectedSkillAreaId}
+                              onChange={(event) => setSelectedSkillAreaId(event.target.value)}
+                              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                            >
+                              {(selectedSpecialization?.skillAreas || []).map((area) => (
+                                <option key={area.id} value={area.id}>
+                                  {area.name}
+                                </option>
+                              ))}
+                              <option value="__new__">Create new skill area</option>
+                            </select>
+                            {selectedSkillAreaId === '__new__' ? (
+                              <input
+                                value={newSkillAreaName}
+                                onChange={(event) => setNewSkillAreaName(event.target.value)}
+                                placeholder="New skill area name"
+                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                              />
+                            ) : null}
+                            <div className="flex gap-1.5">
+                              <input
+                                value={newMicroSkillName}
+                                onChange={(event) => setNewMicroSkillName(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    addMicroSkillFromPopup();
+                                  }
+                                }}
+                                placeholder="New micro-skill"
+                                className="h-10 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-none"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={addMicroSkillFromPopup}
+                                disabled={!newMicroSkillName.trim() || (!selectedSkillAreaId && !selectedSpecialization?.skillAreas?.length)}
+                              >
+                                Add
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
                         <div>
                           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             New intention
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-1.5">
                             <input
                               value={newIntentionName}
                               onChange={(event) => setNewIntentionName(event.target.value)}
@@ -2701,50 +3719,109 @@ export function KanbanPageContent({
                           </div>
                         </div>
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="mb-3 rounded-lg border border-dashed border-border/60 px-3 py-4 text-sm text-muted-foreground">
+                        This board is not linked to a specialization with editable micro-skills yet.
+                      </div>
+                    )}
                     <div className="space-y-2">
-                      {cardDraft.checklist.length > 0 ? (
-                        cardDraft.checklist.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex items-center gap-3 rounded-lg border border-border/60 bg-background/60 px-3 py-2"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={item.completed}
-                              onChange={() => toggleChecklistItem(item.id)}
-                              className="h-4 w-4"
-                            />
-                            <span className={cn('flex-1 text-sm', item.completed && 'text-muted-foreground line-through')}>
-                              {item.text}
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 shrink-0"
-                              onClick={() => removeLinkedIntention(item.linkedIntentionId, item.id)}
+                      {editableIntentions.length > 0 ? (
+                        editableIntentions.map((intention) => {
+                          const checklistItem = cardDraft.checklist.find((item) => item.linkedIntentionId === intention.id) || null;
+                          if (!checklistItem) return null;
+                          return (
+                            <div
+                              key={checklistItem.id}
+                              className="rounded-lg border border-border/60 bg-background/60 px-2.5 py-2"
                             >
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        ))
+                              <div className="flex items-center gap-2.5">
+                                <input
+                                  type="checkbox"
+                                  checked={checklistItem.completed}
+                                  onChange={() => toggleChecklistItem(checklistItem.id)}
+                                  className="h-4 w-4"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  {editingIntentionId === intention.id ? (
+                                    <input
+                                      value={editingIntentionName}
+                                      onChange={(event) => setEditingIntentionName(event.target.value)}
+                                      onKeyDown={(event) => {
+                                        if (event.key === 'Enter') {
+                                          event.preventDefault();
+                                          saveIntentionEdit();
+                                        }
+                                      }}
+                                      className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm outline-none"
+                                    />
+                                  ) : (
+                                    <div className={cn('text-sm font-medium', checklistItem.completed && 'text-muted-foreground line-through')}>
+                                      {checklistItem.text}
+                                    </div>
+                                  )}
+                                </div>
+                                {editingIntentionId === intention.id ? (
+                                  <>
+                                    <Button type="button" variant="outline" size="sm" className="h-7 px-2" onClick={saveIntentionEdit}>
+                                      Save
+                                    </Button>
+                                    <Button type="button" variant="ghost" size="sm" className="h-7 px-2" onClick={() => { setEditingIntentionId(null); setEditingIntentionName(''); }}>
+                                      Cancel
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7"
+                                      onClick={() => startEditingIntention(intention.id, intention.name)}
+                                      aria-label={`Edit ${intention.name}`}
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-destructive"
+                                      onClick={() => deleteIntentionFromPopup(intention.id)}
+                                      aria-label={`Delete ${intention.name}`}
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6.5 w-6.5 shrink-0"
+                                      onClick={() => removeLinkedIntention(checklistItem.linkedIntentionId, checklistItem.id)}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
                       ) : (
                         <div className="rounded-lg border border-dashed border-border/60 px-3 py-6 text-center text-sm text-muted-foreground">
                           No intentions linked to this card yet.
                         </div>
                       )}
                     </div>
-                    <div className="mt-4 rounded-lg border border-border/60 bg-background/60 p-3">
+                    <div className="mt-3 rounded-lg border border-border/60 bg-background/60 p-2.5">
                       <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         Existing intentions
                       </div>
                       {visibleIntentionOptions.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           {visibleIntentionOptions.map((intention) => (
                             <label
                               key={intention.id}
-                              className="flex cursor-pointer items-start gap-3 rounded-md border border-border/60 px-3 py-2 text-sm"
+                              className="flex cursor-pointer items-start gap-2.5 rounded-md border border-border/60 px-2.5 py-2 text-sm"
                             >
                               <input
                                 type="checkbox"
@@ -2756,15 +3833,6 @@ export function KanbanPageContent({
                                 <div className="font-medium text-foreground">{intention.name}</div>
                                 {intention.description?.trim() ? (
                                   <div className="line-clamp-2 text-xs text-muted-foreground">{intention.description}</div>
-                                ) : null}
-                                {intention.microSkillNames.length > 0 ? (
-                                  <div className="mt-2 flex flex-wrap gap-1">
-                                    {intention.microSkillNames.map((microSkillName) => (
-                                      <Badge key={`${intention.id}-${microSkillName}`} variant="outline" className="text-[10px]">
-                                        {microSkillName}
-                                      </Badge>
-                                    ))}
-                                  </div>
                                 ) : null}
                                 {intention.kind === 'pending' ? (
                                   <div className="text-[11px] uppercase tracking-wide text-amber-500">New draft</div>
@@ -2782,11 +3850,11 @@ export function KanbanPageContent({
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-border/60 bg-background/40 p-3">
                     <div className="mb-3 text-sm font-semibold text-foreground">Labels</div>
-                    <div className="space-y-3">
-                      {cardDraft.labelIds.length > 0 ? (
+                    {isBreakColumnCard ? (
+                      cardDraft.labelIds.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
                           {cardDraft.labelIds.map((labelId) => {
                             const label = cardLabelsDraft.find((entry) => entry.id === labelId);
@@ -2794,104 +3862,142 @@ export function KanbanPageContent({
                             return (
                               <span
                                 key={label.id}
-                                className="inline-flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 text-xs font-medium text-white"
+                                className="inline-flex items-center rounded-full border border-transparent px-3 py-1.5 text-xs font-medium text-white"
                                 style={{ backgroundColor: label.color }}
                                 title={label.title}
                               >
                                 {label.title}
-                                <button
-                                  type="button"
-                                  onClick={() => toggleDraftLabel(label.id)}
-                                  className="rounded-full bg-black/20 p-0.5 text-white/90 transition hover:bg-black/35 hover:text-white"
-                                  aria-label={`Remove ${label.title} label`}
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
                               </span>
                             );
                           })}
                         </div>
                       ) : (
                         <div className="text-sm text-muted-foreground">No labels added to this card yet.</div>
-                      )}
-
-                      <div className="rounded-lg border border-border/60 bg-background/60 p-3">
-                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                          Select or create label
+                      )
+                    ) : (
+                      <div className="space-y-2.5">
+                        <div className="rounded-lg border border-border/60 bg-background/60 p-2.5">
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Default label sets
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <Button type="button" variant="outline" size="sm" onClick={() => addDefaultLabelSet('Severity')}>
+                              Add Severity
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => addDefaultLabelSet('Priority')}>
+                              Add Priority
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-start gap-2">
-                          <div className="min-w-0 flex-1">
-                            <input
-                              value={newLabelTitle}
-                              onChange={(event) => setNewLabelTitle(event.target.value)}
-                              onKeyDown={(event) => {
-                                if (event.key === 'Enter') {
-                                  event.preventDefault();
-                                  handleApplyLabelInput();
-                                }
-                              }}
-                              placeholder="Search or create label"
-                              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
-                            />
-                            <div className="mt-2 max-h-32 overflow-y-auto rounded-md border border-border/60 bg-background/50">
-                              {filteredLabelOptions.length > 0 ? (
-                                filteredLabelOptions.map((label) => (
+
+                        {cardDraft.labelIds.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {cardDraft.labelIds.map((labelId) => {
+                              const label = cardLabelsDraft.find((entry) => entry.id === labelId);
+                              if (!label) return null;
+                              return (
+                                <span
+                                  key={label.id}
+                                  className="inline-flex items-center gap-2 rounded-full border border-transparent px-3 py-1.5 text-xs font-medium text-white"
+                                  style={{ backgroundColor: label.color }}
+                                  title={label.title}
+                                >
+                                  {label.title}
                                   <button
-                                    key={label.id}
                                     type="button"
                                     onClick={() => toggleDraftLabel(label.id)}
-                                    className="flex w-full items-center gap-2 border-b border-border/40 px-3 py-2 text-left text-sm transition last:border-b-0 hover:bg-background/70"
+                                    className="rounded-full bg-black/20 p-0.5 text-white/90 transition hover:bg-black/35 hover:text-white"
+                                    aria-label={`Remove ${label.title} label`}
                                   >
-                                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: label.color }} />
-                                    <span className="truncate">{label.title}</span>
+                                    <X className="h-3 w-3" />
                                   </button>
-                                ))
-                              ) : newLabelTitle.trim() ? (
-                                <button
-                                  type="button"
-                                  onClick={handleCreateDraftLabel}
-                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-background/70"
-                                >
-                                  <span className="h-3 w-3 rounded-full" style={{ backgroundColor: newLabelColor }} />
-                                  <span>Create "{newLabelTitle.trim()}"</span>
-                                </button>
-                              ) : (
-                                <div className="px-3 py-2 text-sm text-muted-foreground">No available labels.</div>
-                              )}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">No labels added to this card yet.</div>
+                        )}
+
+                        <div className="rounded-lg border border-border/60 bg-background/60 p-2.5">
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Select or create label
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <div className="min-w-0 flex-1">
+                              <input
+                                value={newLabelTitle}
+                                onChange={(event) => setNewLabelTitle(event.target.value)}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter') {
+                                    event.preventDefault();
+                                    handleApplyLabelInput();
+                                  }
+                                }}
+                                placeholder="Search or create label"
+                                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                              />
+                              <div className="mt-2 max-h-32 overflow-y-auto rounded-md border border-border/60 bg-background/50">
+                                {filteredLabelOptions.length > 0 ? (
+                                  filteredLabelOptions.map((label) => (
+                                    <button
+                                      key={label.id}
+                                      type="button"
+                                      onClick={() => toggleDraftLabel(label.id)}
+                                      className="flex w-full items-center gap-2 border-b border-border/40 px-3 py-2 text-left text-sm transition last:border-b-0 hover:bg-background/70"
+                                    >
+                                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: label.color }} />
+                                      <span className="truncate">{label.title}</span>
+                                    </button>
+                                  ))
+                                ) : newLabelTitle.trim() ? (
+                                  <button
+                                    type="button"
+                                    onClick={handleCreateDraftLabel}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition hover:bg-background/70"
+                                  >
+                                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: newLabelColor }} />
+                                    <span>Create "{newLabelTitle.trim()}"</span>
+                                  </button>
+                                ) : (
+                                  <div className="px-3 py-2 text-sm text-muted-foreground">No available labels.</div>
+                                )}
+                              </div>
                             </div>
+
+                            <button
+                              type="button"
+                              onClick={handleApplyLabelInput}
+                              disabled={!newLabelTitle.trim()}
+                              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background/70 text-foreground transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-50"
+                              aria-label={exactExistingLabel ? 'Add existing label' : 'Create label'}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
                           </div>
 
-                          <button
-                            type="button"
-                            onClick={handleApplyLabelInput}
-                            disabled={!newLabelTitle.trim()}
-                            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-border/60 bg-background/70 text-foreground transition hover:bg-background disabled:cursor-not-allowed disabled:opacity-50"
-                            aria-label={exactExistingLabel ? 'Add existing label' : 'Create label'}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {LABEL_COLOR_PALETTE.map((color) => (
-                            <button
-                              key={color}
-                              type="button"
-                              onClick={() => setNewLabelColor(color)}
-                              className={cn(
-                                'h-7 w-7 rounded-full border-2 transition',
-                                newLabelColor === color ? 'border-white' : 'border-transparent'
-                              )}
-                              style={{ backgroundColor: color }}
-                              aria-label={`Select ${color} label color`}
-                            />
-                          ))}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {LABEL_COLOR_PALETTE.map((color) => (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => setNewLabelColor(color)}
+                                className={cn(
+                                  'h-7 w-7 rounded-full border-2 transition',
+                                  newLabelColor === color ? 'border-white' : 'border-transparent'
+                                )}
+                                style={{ backgroundColor: color }}
+                                aria-label={`Select ${color} label color`}
+                              />
+                            ))}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
-                  <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                  {boardMode === 'branding' ? (
+                  <div className="rounded-xl border border-border/60 bg-background/40 p-3">
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <div className="text-sm font-semibold text-foreground">
                         {boardMode === 'branding' ? 'Linked features' : 'Linked feature'}
@@ -2910,7 +4016,7 @@ export function KanbanPageContent({
                     </div>
                     {selectedFeatureResource ? (
                       boardMode === 'branding' ? (
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           <select
                             value={cardDraft.brandingType}
                             onChange={(event) =>
@@ -2923,7 +4029,7 @@ export function KanbanPageContent({
                             <option value="blog">Blog</option>
                             <option value="video">Video</option>
                           </select>
-                          <div className="max-h-48 space-y-2 overflow-y-auto rounded-lg border border-border/60 bg-background/30 p-3">
+                          <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-lg border border-border/60 bg-background/30 p-2.5">
                             {featurePointOptions.filter((feature) => {
                               const point = selectedFeatureResource.points.find((entry) => entry.id === feature.id);
                               return !!point?.readyForBranding;
@@ -2982,21 +4088,24 @@ export function KanbanPageContent({
                       </div>
                     )}
                   </div>
+                  ) : null}
 
-                  <div className="rounded-xl border border-border/60 bg-background/40 p-4">
-                    <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      Due date
+                  {boardMode === 'branding' ? (
+                    <div className="rounded-xl border border-border/60 bg-background/40 p-3">
+                      <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        Due date
+                      </div>
+                      <input
+                        type="date"
+                        value={cardDraft.dueDate}
+                        onChange={(event) => setCardDraft((prev) => (prev ? { ...prev, dueDate: event.target.value } : prev))}
+                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
+                      />
                     </div>
-                    <input
-                      type="date"
-                      value={cardDraft.dueDate}
-                      onChange={(event) => setCardDraft((prev) => (prev ? { ...prev, dueDate: event.target.value } : prev))}
-                      className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm outline-none"
-                    />
-                  </div>
+                  ) : null}
 
-                  <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                  <div className="rounded-xl border border-border/60 bg-background/40 p-3">
                     <div className="mb-2 text-sm font-semibold text-foreground">Card snapshot</div>
                     <div className="space-y-2 text-sm text-muted-foreground">
                       <div className="flex items-center justify-between gap-3">

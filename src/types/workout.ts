@@ -169,7 +169,7 @@ export interface EditableMealPlan {
 
 export type UserDietPlan = EditableMealPlan[];
 
-export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation' | 'interrupt' | 'essentials' | 'nutrition' | 'mindset' | 'distraction' | 'spaced-repetition' | 'pomodoro' | 'bugs';
+export type ActivityType = 'workout' | 'upskill' | 'deepwork' | 'planning' | 'tracking' | 'branding' | 'lead-generation' | 'finance' | 'interrupt' | 'essentials' | 'nutrition' | 'mindset' | 'distraction' | 'spaced-repetition' | 'pomodoro' | 'bugs';
 
 export interface PauseEvent {
   pauseTime: number;
@@ -193,6 +193,10 @@ export type RecurrenceRule = {
   days?: number; // legacy custom day interval
   repeatInterval?: number;
   repeatUnit?: 'day' | 'week' | 'month';
+  endDate?: string;
+  avoidWeekends?: boolean;
+  avoidHolidays?: boolean;
+  shiftPolicy?: 'prepone' | 'postpone';
 }
 
 export interface Activity {
@@ -210,6 +214,9 @@ export interface Activity {
   focusSessionPauses?: PauseEvent[]; // Detailed pause tracking
   focusSessionInitialDuration?: number;
   postSessionReview?: PostSessionReview;
+  cost?: number | null;
+  costIn?: number | null;
+  costOut?: number | null;
   duration?: number; // For interruptions
   subTasks?: SubTask[]; // Added for sub-task functionality
   routine?: RecurrenceRule | null;
@@ -263,6 +270,18 @@ export interface Release {
   githubLink?: string;
   demoLink?: string;
   addToPortfolio?: boolean;
+  technicalDetails?: ProjectTechnicalSection[];
+}
+
+export interface ProjectTechnicalSection {
+  title:
+    | 'Problem / Goal'
+    | 'System Architecture'
+    | 'Core Implementation'
+    | 'Technologies Used'
+    | 'Optimization / Challenges'
+    | 'Result / Output';
+  content: string[];
 }
 
 export interface WorkflowStageChecklistItem {
@@ -367,7 +386,7 @@ export interface KanbanBoard {
   cards: KanbanCard[];
   attachments: KanbanAttachment[];
   comments: KanbanComment[];
-  boardType?: 'project' | 'branding';
+  boardType?: 'project' | 'branding' | 'funnel';
   migratedFromReleaseWorkflow?: boolean;
 }
 
@@ -1173,12 +1192,23 @@ export interface MeansState {
   entries: MeansEntry[];
 }
 
+export interface HolidayEntry {
+  date: string;
+  name: string;
+}
+
 export interface UserSettings {
   ispSimpleMode?: boolean;
   ispSimpleKeepCanvasAndBotherings?: boolean;
   carryForward: boolean;
   autoPush: boolean;
   autoPushLimit: number;
+  debtBalance?: number;
+  financeMonthKey?: string;
+  financeMonthlyIncome?: number;
+  financeMonthlyOutflow?: number;
+  financeNetBalance?: number;
+  holidays?: Array<string | HolidayEntry>;
   dailyProductiveHoursGoal?: number;
   carryForwardEssentials: boolean;
   carryForwardNutrition: boolean;

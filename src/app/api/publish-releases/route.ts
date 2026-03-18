@@ -1,6 +1,6 @@
 
-import { put, list } from '@vercel/blob';
 import { NextResponse } from 'next/server';
+import { isSupabaseStorageConfigured, readJsonFromStorage, writeJsonToStorage } from '@/lib/supabaseStorageServer';
 
 export const dynamic = 'force-dynamic';
 const BLOB_PATHNAME = 'dock-releases.json';
@@ -9,29 +9,14 @@ const ADMIN_USERNAME = "Lonewolf";
 export async function GET() {
     // This is a public endpoint, but the `list` function requires a token.
     // We assume it's configured for other parts of the app.
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    if (!isSupabaseStorageConfigured()) {
         // Return empty if blob isn't configured, so the app doesn't break.
         return NextResponse.json({ releases: [] });
     }
 
     try {
-        const { blobs } = await list({ prefix: BLOB_PATHNAME, limit: 1 });
-        
-        if (blobs.length === 0 || blobs[0]?.pathname !== BLOB_PATHNAME) {
-            return NextResponse.json({ releases: [] });
-        }
-
-        const response = await fetch(blobs[0].url);
-        if (!response.ok) {
-            throw new Error(`Failed to download release plan. Status: ${response.status}`);
-        }
-        
-        const textData = await response.text();
-        if (!textData) {
-            return NextResponse.json({ releases: [] });
-        }
-        
-        const data = JSON.parse(textData);
+        const data = await readJsonFromStorage<{ releases?: unknown[] }>(BLOB_PATHNAME);
+        if (!data) return NextResponse.json({ releases: [] });
         // Assuming the file format is { releases: Release[] }
         return NextResponse.json({ releases: data.releases || [] });
 
@@ -43,8 +28,8 @@ export async function GET() {
 
 // POST handler to update the release plan
 export async function POST(request: Request) {
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-        return NextResponse.json({ error: 'Vercel Blob is not configured on the server.' }, { status: 500 });
+    if (!isSupabaseStorageConfigured()) {
+        return NextResponse.json({ error: 'Supabase storage is not configured on the server.' }, { status: 500 });
     }
 
     try {
@@ -59,13 +44,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid payload: "releases" must be an array.' }, { status: 400 });
         }
 
-        const dataToStore = JSON.stringify({ releases }, null, 2);
-
-        await put(BLOB_PATHNAME, dataToStore, {
-            access: 'public',
-            contentType: 'application/json',
-            addRandomSuffix: false,
-        });
+        await writeJsonToStorage(BLOB_PATHNAME, { releases });
 
         return NextResponse.json({ success: true, message: 'Dock release plan updated successfully.' });
 

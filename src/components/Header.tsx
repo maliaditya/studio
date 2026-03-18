@@ -23,6 +23,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { TimesheetPageContent } from '@/app/timesheet/page';
@@ -175,24 +177,26 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
   const navLinks: Array<{ href: string; label: string; icon?: React.ComponentType<{ className?: string }> }> = simpleMode
     ? [
         { href: '/my-plate', label: 'Dashboard' },
-        { href: '/timetable', label: 'Timetable' },
         { href: '/resources', label: 'Resources' },
         { href: '/skill', label: 'Skill Tree' },
         { href: '/deep-work', label: 'Deep Work' },
         { href: '/kanban', label: 'Kanban' },
-        { href: '/means', label: 'Means' },
+        { href: '/finance', label: 'Finance' },
+        // Portfolio moved to More menu
         { href: '/strategic-planning', label: 'Strategy' },
+        { href: '/truth', label: 'Truth' },
         { href: '/support', label: 'Support' },
         ...(isAdminUser ? [{ href: '/admin/monetization', label: 'Admin' }] : []),
       ]
     : [
         { href: '/my-plate', label: 'Dashboard' },
-        { href: '/timetable', label: 'Timetable' },
         { href: '/resources', label: 'Resources' },
         { href: '/skill', label: 'Skill Tree' },
         { href: '/kanban', label: 'Kanban' },
-        { href: '/means', label: 'Means' },
+        { href: '/finance', label: 'Finance' },
+        // Portfolio moved to More menu
         { href: '/strategic-planning', label: 'Strategy' },
+        { href: '/truth', label: 'Truth' },
         { href: '/graph', label: 'Graph', icon: Workflow },
         ...(isAdminUser ? [{ href: '/admin/monetization', label: 'Admin' }] : []),
       ];
@@ -227,8 +231,11 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
           <DropdownMenuItem asChild><Link href="/mind-programming">Mind Programming</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/upskill">Upskill</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/deep-work">Deep Work</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/timetable">Timetable</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/personal-branding">Branding</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/lead-generation">Lead Gen</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/finance">Finance</Link></DropdownMenuItem>
+          <DropdownMenuItem asChild><Link href="/portfolio">Portfolio</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/support">Support</Link></DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem asChild><Link href="/gamified-skills">Gamified Skills</Link></DropdownMenuItem>
@@ -293,10 +300,13 @@ function UpcomingTasksModal({
     const { toast } = useToast();
     const [activeTab, setActiveTab] = useState<OverviewTab>(initialTab);
     const [routineSourceFilter, setRoutineSourceFilter] = useState<RoutineSourceFilter>('all');
+    const [routineSearch, setRoutineSearch] = useState('');
     const [isCreateRoutineOpen, setIsCreateRoutineOpen] = useState(false);
     const [newRoutineDetails, setNewRoutineDetails] = useState('');
     const [newRoutineSlot, setNewRoutineSlot] = useState<SlotName>('Morning');
     const [newRoutineType, setNewRoutineType] = useState<ActivityType>('essentials');
+    const [newRoutineCostIn, setNewRoutineCostIn] = useState('');
+    const [newRoutineCostOut, setNewRoutineCostOut] = useState('');
     const [newRoutineRuleType, setNewRoutineRuleType] = useState<'daily' | 'weekly' | 'custom'>('daily');
     const [newRoutineInterval, setNewRoutineInterval] = useState('2');
     const [newRoutineRepeatUnit, setNewRoutineRepeatUnit] = useState<'day' | 'week' | 'month'>('day');
@@ -309,6 +319,8 @@ function UpcomingTasksModal({
     const [editRoutineDetails, setEditRoutineDetails] = useState('');
     const [editRoutineSlot, setEditRoutineSlot] = useState<SlotName>('Morning');
     const [editRoutineType, setEditRoutineType] = useState<ActivityType>('essentials');
+    const [editRoutineCostIn, setEditRoutineCostIn] = useState('');
+    const [editRoutineCostOut, setEditRoutineCostOut] = useState('');
     const [editRoutineRuleType, setEditRoutineRuleType] = useState<'daily' | 'weekly' | 'custom'>('daily');
     const [editRoutineInterval, setEditRoutineInterval] = useState('2');
     const [editRoutineRepeatUnit, setEditRoutineRepeatUnit] = useState<'day' | 'week' | 'month'>('day');
@@ -571,9 +583,17 @@ function UpcomingTasksModal({
     }, [routineTasks]);
 
     const displayedRoutineTasks = useMemo(() => {
+        const query = routineSearch.trim().toLowerCase();
         const filtered = routineTasks.filter((task) => {
             if (routineSourceFilter === 'all') return true;
             return task.routineSource === routineSourceFilter;
+        }).filter((task) => {
+            if (!query) return true;
+            const details = task.details?.toLowerCase() || '';
+            const type = task.type?.toLowerCase() || '';
+            const slot = String(task.slot || '').toLowerCase();
+            const source = task.routineSource.toLowerCase();
+            return details.includes(query) || type.includes(query) || slot.includes(query) || source.includes(query);
         });
 
         const sourceRank: Record<RoutineSourceType, number> = {
@@ -587,7 +607,7 @@ function UpcomingTasksModal({
             if (rankDiff !== 0) return rankDiff;
             return a.details.localeCompare(b.details);
         });
-    }, [routineTasks, routineSourceFilter]);
+    }, [routineTasks, routineSourceFilter, routineSearch]);
 
     const displayedRoutineTasksBySlot = useMemo(() => {
         const bySlot = new Map<string, RoutineTaskView[]>();
@@ -712,6 +732,8 @@ function UpcomingTasksModal({
         setEditRoutineDetails(task.details || '');
         setEditRoutineSlot((slotOrder.includes(task.slot as SlotName) ? task.slot : 'Morning') as SlotName);
         setEditRoutineType(task.type);
+        setEditRoutineCostIn(task.costIn != null ? String(task.costIn) : '');
+        setEditRoutineCostOut(task.costOut != null ? String(task.costOut) : task.cost != null ? String(task.cost) : '');
         setEditRoutineRuleType(recurrence);
         setEditRoutineInterval(String(Math.max(1, task.routine?.repeatInterval ?? task.routine?.days ?? 2)));
         setEditRoutineRepeatUnit((task.routine?.repeatUnit || 'day') as 'day' | 'week' | 'month');
@@ -748,6 +770,12 @@ function UpcomingTasksModal({
             toast({ title: 'Select Bothering', description: 'Choose a bothering for External/Mismatch link.', variant: 'destructive' });
             return;
         }
+        const costInRaw = editRoutineCostIn.trim();
+        const costOutRaw = editRoutineCostOut.trim();
+        const costInValue = costInRaw === '' ? null : Number(costInRaw);
+        const costOutValue = costOutRaw === '' ? null : Number(costOutRaw);
+        const normalizedCostIn = Number.isFinite(costInValue as number) ? Math.max(0, costInValue as number) : null;
+        const normalizedCostOut = Number.isFinite(costOutValue as number) ? Math.max(0, costOutValue as number) : null;
 
         const updatedRule: RecurrenceRule =
             editRoutineRuleType === 'custom'
@@ -768,6 +796,9 @@ function UpcomingTasksModal({
             details,
             slot: editRoutineSlot,
             type: editRoutineType,
+            costIn: normalizedCostIn,
+            costOut: normalizedCostOut,
+            cost: normalizedCostOut,
             routine: updatedRule,
         };
 
@@ -811,6 +842,9 @@ function UpcomingTasksModal({
                             details,
                             type: editRoutineType,
                             slot: editRoutineSlot,
+                            costIn: normalizedCostIn,
+                            costOut: normalizedCostOut,
+                            cost: normalizedCostOut,
                         });
                     });
                     if (slotChanged) day[slotName as SlotName] = kept;
@@ -862,6 +896,8 @@ function UpcomingTasksModal({
         editRoutineDetails,
         editRoutineId,
         editRoutineInterval,
+        editRoutineCostIn,
+        editRoutineCostOut,
         editRoutineRepeatUnit,
         editRoutineRuleType,
         editRoutineSlot,
@@ -886,6 +922,12 @@ function UpcomingTasksModal({
             toast({ title: 'Select Bothering', description: 'Choose a bothering when linking External/Mismatch.', variant: 'destructive' });
             return;
         }
+        const costInRaw = newRoutineCostIn.trim();
+        const costOutRaw = newRoutineCostOut.trim();
+        const costInValue = costInRaw === '' ? null : Number(costInRaw);
+        const costOutValue = costOutRaw === '' ? null : Number(costOutRaw);
+        const normalizedCostIn = Number.isFinite(costInValue as number) ? Math.max(0, costInValue as number) : null;
+        const normalizedCostOut = Number.isFinite(costOutValue as number) ? Math.max(0, costOutValue as number) : null;
 
         const rule: RecurrenceRule =
             newRoutineRuleType === 'custom'
@@ -903,6 +945,9 @@ function UpcomingTasksModal({
             details,
             completed: false,
             slot: newRoutineSlot,
+            costIn: normalizedCostIn,
+            costOut: normalizedCostOut,
+            cost: normalizedCostOut,
             routine: rule,
             isRoutine: true,
             baseDate: format(new Date(), 'yyyy-MM-dd'),
@@ -930,6 +975,8 @@ function UpcomingTasksModal({
         setNewRoutineRepeatUnit('day');
         setNewRoutineType('essentials');
         setNewRoutineSlot('Morning');
+        setNewRoutineCostIn('');
+        setNewRoutineCostOut('');
         setNewRoutineSource('none');
         setNewRoutineBotheringId('');
         setIsCreateRoutineOpen(false);
@@ -939,6 +986,8 @@ function UpcomingTasksModal({
         newRoutineBotheringId,
         newRoutineDetails,
         newRoutineInterval,
+        newRoutineCostIn,
+        newRoutineCostOut,
         newRoutineRepeatUnit,
         newRoutineRuleType,
         newRoutineSlot,
@@ -1041,7 +1090,16 @@ function UpcomingTasksModal({
                                 })}
                             </div>
                             {activeTab === 'routine' && (
-                                <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                <div className="flex flex-wrap items-center justify-end gap-2">
+                                    <div className="relative">
+                                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                        <Input
+                                            value={routineSearch}
+                                            onChange={(e) => setRoutineSearch(e.target.value)}
+                                            placeholder="Search routines..."
+                                            className="h-6 w-44 rounded-md pl-7 text-[11px] md:w-52"
+                                        />
+                                    </div>
                                     <Button
                                         size="sm"
                                         className="h-6 px-2 text-[11px]"
@@ -1174,10 +1232,11 @@ function UpcomingTasksModal({
                         </ScrollArea>
                     )}
                     {activeTab === 'routine' && (
-                        <div className="h-full pr-2">
+                        <div className="h-full min-h-0 pr-2">
                             {displayedRoutineTasks.length > 0 ? (
-                                <div className="h-full pr-4">
-                                    <div className="grid h-full grid-cols-3 grid-rows-2 gap-3">
+                                <div className="h-full min-h-0 pr-4">
+                                    <div className="h-full min-h-0 overflow-x-auto">
+                                        <div className="grid h-full min-h-0 min-w-[1500px] grid-cols-6 gap-3">
                                         {displayedRoutineTasksBySlot.gridSlots.map((group) => (
                                             <div key={group.slot} className="min-h-0 h-full rounded-lg border border-border/60 bg-muted/20 flex flex-col">
                                                 <div className="flex items-center justify-between border-b border-border/50 px-4 py-3">
@@ -1186,7 +1245,7 @@ function UpcomingTasksModal({
                                                         {(group.slot === 'Night' ? group.tasks.length + displayedRoutineTasksBySlot.other.length : group.tasks.length)}
                                                     </Badge>
                                                 </div>
-                                                <ScrollArea className="flex-1">
+                                                <ScrollArea className="flex-1 min-h-0">
                                                     <div className="space-y-2 p-3">
                                                         {(group.slot === 'Night' ? [...group.tasks, ...displayedRoutineTasksBySlot.other] : group.tasks).length > 0 ? (
                                                             (group.slot === 'Night' ? [...group.tasks, ...displayedRoutineTasksBySlot.other] : group.tasks).map((task, index) => (
@@ -1252,6 +1311,7 @@ function UpcomingTasksModal({
                                                 </ScrollArea>
                                             </div>
                                         ))}
+                                        </div>
                                     </div>
                                 </div>
                             ) : (
@@ -1301,10 +1361,34 @@ function UpcomingTasksModal({
                                         onChange={(e) => setNewRoutineType(e.target.value as ActivityType)}
                                         className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
                                     >
-                                        {['essentials', 'interrupt', 'planning', 'upskill', 'deepwork', 'branding', 'lead-generation', 'mindset', 'tracking', 'workout', 'nutrition'].map((type) => (
+                                        {['essentials', 'interrupt', 'planning', 'upskill', 'deepwork', 'branding', 'lead-generation', 'finance', 'mindset', 'tracking', 'workout', 'nutrition'].map((type) => (
                                             <option key={type} value={type}>{type}</option>
                                         ))}
                                     </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-xs font-medium text-muted-foreground">Cost In (optional)</p>
+                                    <input
+                                        value={newRoutineCostIn}
+                                        onChange={(e) => setNewRoutineCostIn(e.target.value)}
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        placeholder="0"
+                                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                    />
+                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                    <p className="text-xs font-medium text-muted-foreground">Cost Out (optional)</p>
+                                    <input
+                                        value={newRoutineCostOut}
+                                        onChange={(e) => setNewRoutineCostOut(e.target.value)}
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        placeholder="0"
+                                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                    />
                                 </div>
                             </div>
 
@@ -1442,10 +1526,34 @@ function UpcomingTasksModal({
                                         onChange={(e) => setEditRoutineType(e.target.value as ActivityType)}
                                         className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
                                     >
-                                        {['essentials', 'interrupt', 'planning', 'upskill', 'deepwork', 'branding', 'lead-generation', 'mindset', 'tracking', 'workout', 'nutrition'].map((type) => (
+                                        {['essentials', 'interrupt', 'planning', 'upskill', 'deepwork', 'branding', 'lead-generation', 'finance', 'mindset', 'tracking', 'workout', 'nutrition'].map((type) => (
                                             <option key={type} value={type}>{type}</option>
                                         ))}
                                     </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-xs font-medium text-muted-foreground">Cost In (optional)</p>
+                                    <input
+                                        value={editRoutineCostIn}
+                                        onChange={(e) => setEditRoutineCostIn(e.target.value)}
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        placeholder="0"
+                                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                    />
+                                </div>
+                                <div className="space-y-1 md:col-span-2">
+                                    <p className="text-xs font-medium text-muted-foreground">Cost Out (optional)</p>
+                                    <input
+                                        value={editRoutineCostOut}
+                                        onChange={(e) => setEditRoutineCostOut(e.target.value)}
+                                        type="number"
+                                        min={0}
+                                        step="0.01"
+                                        placeholder="0"
+                                        className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm"
+                                    />
                                 </div>
                             </div>
                             <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
@@ -1620,14 +1728,15 @@ export function Header() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto flex h-14 items-center justify-between">
-          <div className="flex items-center gap-6">
+      <div className="h-14" />
+      <header className="fixed top-0 left-0 right-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="flex h-14 w-full items-center justify-between px-4">
+          <div className="flex items-center gap-3">
+            <SidebarTrigger className="h-8 w-8" />
             <Link href="/" className="flex items-center gap-2">
               <BrainCircuit className="h-6 w-6 text-primary" />
               <span className="font-bold">Dock</span>
             </Link>
-            <NavigationMenu simpleMode={simpleMode} />
           </div>
           
           <div className="flex items-center gap-2">
@@ -1641,18 +1750,6 @@ export function Header() {
                   <Heart className="h-4 w-4" />
                   <span className="sr-only">Support</span>
                 </Link>
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => {
-                  setUpcomingTasksInitialTab('scheduled');
-                  setIsUpcomingTasksModalOpen(true);
-                }}
-              >
-                <Repeat className="h-4 w-4" />
-                <span className="sr-only">Spaced Repetition</span>
               </Button>
               {!simpleMode && (
               <>

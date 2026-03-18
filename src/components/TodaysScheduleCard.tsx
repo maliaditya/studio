@@ -5,8 +5,8 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow, Target, Calendar, X, Wallet, Users, Wrench, Blocks, HandHeart, Sparkles, HeartPulse, Palette, Bug } from 'lucide-react';
-import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule, Resource, Stopper, MindsetPoint, CoreDomainId, SlotName } from '@/types/workout';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Compass, Grab, Dock, Move, PieChart, Flame, Shield, Paintbrush, BrainCircuit, ListChecks, CheckCircle2, Circle, Trash2, Play, History, Repeat, Link as LinkIcon, ArrowRight, Save, Github, UploadCloud, DownloadCloud, Workflow, Target, Calendar, X, Wallet, Users, Wrench, Blocks, HandHeart, Sparkles, HeartPulse, Palette, Bug, CircleDollarSign, CreditCard, AlertTriangle, PiggyBank } from 'lucide-react';
+import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule, Resource, Stopper, MindsetPoint, CoreDomainId, SlotName, Project } from '@/types/workout';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { Textarea } from './ui/textarea';
@@ -35,6 +35,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     workout: <Dumbbell className="h-4 w-4" />,
     upskill: <BookOpenCheck className="h-4 w-4" />,
     deepwork: <Briefcase className="h-4 w-4" />,
+    finance: <CircleDollarSign className="h-4 w-4" />,
     planning: <ClipboardList className="h-4 w-4" />,
     tracking: <ClipboardCheck className="h-4 w-4" />,
     branding: <Share2 className="h-4 w-4" />,
@@ -60,8 +61,68 @@ const AddActivityMenu = ({
     onAddRoutineToday: (routine: Activity) => void;
     selectedSlotName: string;
 }) => {
-    const { coreSkills, settings, kanbanBoards, projects } = useAuth();
-    const specializations = coreSkills.filter(s => s.type === 'Specialization');
+    const { coreSkills, settings, kanbanBoards, projects, offerizationPlans } = useAuth();
+    const todayKey = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+    const normalizeDateKey = (value?: string | null) => {
+        if (!value) return null;
+        const trimmed = String(value).trim();
+        if (!trimmed) return null;
+        const parsed = parseISO(trimmed);
+        if (!Number.isNaN(parsed.getTime())) return format(parsed, 'yyyy-MM-dd');
+        return trimmed;
+    };
+    const specializations = useMemo(() => {
+        return coreSkills.filter((spec) => {
+            if (spec.type !== 'Specialization') return false;
+            const plan = offerizationPlans?.[spec.id];
+            if (!plan) return false;
+            const learningPlan = plan.learningPlan;
+            const learningHasItems = !!learningPlan && (
+                (learningPlan.bookWebpageResources?.length || 0) > 0 ||
+                (learningPlan.audioVideoResources?.length || 0) > 0 ||
+                (learningPlan.skillTreePaths?.length || 0) > 0
+            );
+            const learningEndDates = [
+                ...(learningPlan?.bookWebpageResources || []).map((r) => normalizeDateKey(r.completionDate)),
+                ...(learningPlan?.audioVideoResources || []).map((r) => normalizeDateKey(r.completionDate)),
+                ...(learningPlan?.skillTreePaths || []).map((r) => normalizeDateKey(r.completionDate)),
+            ].filter((date): date is string => !!date);
+            const learningEndDate = learningEndDates.reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+            const learningActive = learningHasItems && (!learningEndDate || learningEndDate >= todayKey);
+
+            const releases = plan.releases || [];
+            const projectHasItems = releases.length > 0;
+            const projectEndDates = releases
+                .map((release) => normalizeDateKey(release.launchDate))
+                .filter((date): date is string => !!date);
+            const projectEndDate = projectEndDates.reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+            const projectActive = projectHasItems && (!projectEndDate || projectEndDate >= todayKey);
+
+            return learningActive || projectActive;
+        });
+    }, [coreSkills, offerizationPlans, todayKey]);
+    const deepworkSpecializations = useMemo(() => {
+        return coreSkills.filter((spec) => {
+            if (spec.type !== 'Specialization') return false;
+            const plan = offerizationPlans?.[spec.id];
+            if (!plan) return false;
+            const releases = plan.releases || [];
+            if (releases.length === 0) return false;
+            const projectEndDates = releases
+                .map((release) => normalizeDateKey(release.launchDate))
+                .filter((date): date is string => !!date);
+            const projectEndDate = projectEndDates.reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+            return !projectEndDate || projectEndDate >= todayKey;
+        });
+    }, [coreSkills, offerizationPlans, normalizeDateKey, todayKey]);
+    const projectsBySpecialization = useMemo(() => {
+        const map = new Map<string, Project[]>();
+        specializations.forEach((spec) => {
+            const list = (projects || []).filter((project) => project.domainId === spec.domainId);
+            map.set(spec.id, list);
+        });
+        return map;
+    }, [projects, specializations]);
     const openBugGroups = useMemo(() => {
         const projectNameById = new Map((projects || []).map(project => [project.id, project.name] as const));
         return (kanbanBoards || [])
@@ -113,7 +174,7 @@ const AddActivityMenu = ({
     }, [selectedSlotName, settings.routines]);
 
     return (
-        <DropdownMenuContent className="w-56 p-2">
+        <DropdownMenuContent className="w-56 p-2 z-[220]">
             <p className="font-medium text-sm p-2">Select Activity</p>
             <DropdownMenuSub>
                 <DropdownMenuSubTrigger className="w-full justify-start">
@@ -188,18 +249,84 @@ const AddActivityMenu = ({
                                 <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
                             </DropdownMenuSubTrigger>
                             <DropdownMenuPortal>
-                                <DropdownMenuSubContent>
+                                <DropdownMenuSubContent className="z-[220]">
                                     <ScrollArea className="h-48">
-                                        {specializations.length > 0 ? (
-                                            specializations.map(spec => (
-                                                <DropdownMenuItem key={spec.id} onClick={() => onAddActivity(activityType, spec.name)}>
-                                                    {spec.name}
-                                                </DropdownMenuItem>
-                                            ))
+                                        {(activityType === 'deepwork' ? deepworkSpecializations : specializations).length > 0 ? (
+                                            (activityType === 'deepwork' ? deepworkSpecializations : specializations).map(spec => {
+                                                if (activityType !== 'deepwork') {
+                                                    return (
+                                                        <DropdownMenuItem key={spec.id} onClick={() => onAddActivity(activityType, spec.name)}>
+                                                            {spec.name}
+                                                        </DropdownMenuItem>
+                                                    );
+                                                }
+                                                const linkedProjects = projectsBySpecialization.get(spec.id) || [];
+                                                return (
+                                                    <DropdownMenuSub key={spec.id}>
+                                                        <DropdownMenuSubTrigger className="w-full justify-start">
+                                                            {spec.name}
+                                                        </DropdownMenuSubTrigger>
+                                                        <DropdownMenuPortal>
+                                                            <DropdownMenuSubContent>
+                                                                <ScrollArea className="h-48">
+                                                                    <DropdownMenuItem onClick={() => onAddActivity(activityType, spec.name)}>
+                                                                        General {spec.name}
+                                                                    </DropdownMenuItem>
+                                                                    {linkedProjects.length > 0 ? (
+                                                                        linkedProjects.map((project) => (
+                                                                            <DropdownMenuItem
+                                                                                key={project.id}
+                                                                                onClick={() => onAddActivity(activityType, `${spec.name}: ${project.name}`)}
+                                                                            >
+                                                                                {project.name}
+                                                                            </DropdownMenuItem>
+                                                                        ))
+                                                                    ) : (
+                                                                        <DropdownMenuItem disabled>No projects linked</DropdownMenuItem>
+                                                                    )}
+                                                                </ScrollArea>
+                                                            </DropdownMenuSubContent>
+                                                        </DropdownMenuPortal>
+                                                    </DropdownMenuSub>
+                                                );
+                                            })
                                         ) : (
-                                            <DropdownMenuItem disabled>No specializations defined</DropdownMenuItem>
+                                            <DropdownMenuItem disabled>
+                                                {activityType === 'deepwork' ? 'No active project specializations' : 'No specializations defined'}
+                                            </DropdownMenuItem>
                                         )}
                                     </ScrollArea>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                        </DropdownMenuSub>
+                    );
+                }
+                if (activityType === 'finance') {
+                    const financeOptions = [
+                        { label: 'Income', icon: <CircleDollarSign className="h-4 w-4" /> },
+                        { label: 'EMI', icon: <CreditCard className="h-4 w-4" /> },
+                        { label: 'Debt', icon: <AlertTriangle className="h-4 w-4" /> },
+                        { label: 'Saving', icon: <PiggyBank className="h-4 w-4" /> },
+                        { label: 'Emergency', icon: <AlertTriangle className="h-4 w-4" /> },
+                        { label: 'UnPlanned', icon: <AlertCircle className="h-4 w-4" /> },
+                    ];
+                    return (
+                        <DropdownMenuSub key={type}>
+                            <DropdownMenuSubTrigger className="w-full justify-start">
+                                {icon}
+                                <span className="ml-2 capitalize">Finance</span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                                <DropdownMenuSubContent className="z-[220]">
+                                    {financeOptions.map((option) => (
+                                        <DropdownMenuItem
+                                            key={option.label}
+                                            onClick={() => onAddActivity(activityType, option.label)}
+                                        >
+                                            {option.icon}
+                                            <span className="ml-2">{option.label}</span>
+                                        </DropdownMenuItem>
+                                    ))}
                                 </DropdownMenuSubContent>
                             </DropdownMenuPortal>
                         </DropdownMenuSub>

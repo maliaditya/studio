@@ -1,7 +1,7 @@
 
-import { put, head } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import type { Resource, ResourceFolder } from '@/types/workout';
+import { isSupabaseStorageConfigured, readJsonFromStorage, writeJsonToStorage } from '@/lib/supabaseStorageServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,8 +14,8 @@ interface ShareFolderPayload {
 
 // POST handler to create or update a shared folder's public data
 export async function POST(request: Request) {
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-        return NextResponse.json({ error: 'Vercel Blob is not configured on the server.' }, { status: 500 });
+    if (!isSupabaseStorageConfigured()) {
+        return NextResponse.json({ error: 'Supabase storage is not configured on the server.' }, { status: 500 });
     }
 
     try {
@@ -62,11 +62,7 @@ export async function POST(request: Request) {
             sharedBy: username 
         }, null, 2);
 
-        await put(blobPathname, dataToStore, {
-            access: 'public',
-            contentType: 'application/json',
-            addRandomSuffix: false,
-        });
+        await writeJsonToStorage(blobPathname, JSON.parse(dataToStore));
 
         const publicUrl = `/p/${folder.id}`;
 
@@ -84,7 +80,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const folderId = searchParams.get('folderId');
 
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    if (!isSupabaseStorageConfigured()) {
         // Silently fail for public fetching if not configured
         return NextResponse.json({ error: "Service not configured" }, { status: 503 });
     }
@@ -96,20 +92,13 @@ export async function GET(request: Request) {
     const blobPathname = `shared/folders/${folderId}.json`;
 
     try {
-        const blob = await head(blobPathname);
-        
-        const response = await fetch(blob.url);
-        if (!response.ok) {
-            throw new Error(`Failed to download shared folder data. Status: ${response.status}`);
+        const data = await readJsonFromStorage<any>(blobPathname);
+        if (!data) {
+            return NextResponse.json({ error: "Shared folder not found." }, { status: 404 });
         }
-        
-        const data = await response.json();
         return NextResponse.json(data);
 
     } catch (error) {
-         if (error instanceof Error && error.message.includes('404')) {
-            return NextResponse.json({ error: "Shared folder not found." }, { status: 404 });
-        }
         console.error(`GET /api/share/folder error for ID ${folderId}:`, error);
         return NextResponse.json({ error: "Failed to fetch shared folder data." }, { status: 500 });
     }

@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/componen
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { ScrollArea } from './ui/scroll-area';
-import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, History, LineChart, Workflow, ChevronLeft, Calendar as CalendarIcon, X, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, AlertCircle, Wind, Timer, Check, Repeat } from 'lucide-react';
+import { Brain, PlusCircle, Trash2, GitBranch, Link as LinkIcon, Globe, Play, History, LineChart, Workflow, ChevronLeft, Calendar as CalendarIcon, X, Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, CheckSquare, Utensils, AlertCircle, Wind, Timer, Check, Repeat, CircleDollarSign } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -147,6 +147,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     workout: <Dumbbell className="h-4 w-4" />,
     upskill: <BookOpenCheck className="h-4 w-4" />,
     deepwork: <Briefcase className="h-4 w-4" />,
+    finance: <CircleDollarSign className="h-4 w-4" />,
     planning: <ClipboardList className="h-4 w-4" />,
     tracking: <ClipboardCheck className="h-4 w-4" />,
     branding: <Share2 className="h-4 w-4" />,
@@ -403,6 +404,8 @@ export function MindsetCategoriesCard() {
     const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
     const [botheringPopup, setBotheringPopup] = useState<{ type: 'mismatch' | 'constraint' | 'external'; pointId: string } | null>(null);
     const [botheringSelectorTarget, setBotheringSelectorTarget] = useState<{ resourceId: string } | null>(null);
+    const [botheringSelectorOpen, setBotheringSelectorOpen] = useState(false);
+    const [botheringSelectorForcedType, setBotheringSelectorForcedType] = useState<'mismatch' | 'constraint' | 'external' | null>(null);
     const [selectedBotheringHabitId, setSelectedBotheringHabitId] = useState('');
     const [newBotheringText, setNewBotheringText] = useState('');
     const [newMismatchType, setNewMismatchType] = useState<MindsetPoint['mismatchType']>('mental-model');
@@ -1242,6 +1245,7 @@ export function MindsetCategoriesCard() {
         const stats = getTodayTaskStats(point);
         return !!point && stats.total > 0 && stats.completed < stats.total;
     };
+
     const isTaskDueOnDate = (task: MindsetPoint['tasks'][number], dateKey: string) => {
         const startKey = task.startDate || task.dateKey;
         if (!startKey) return false;
@@ -1402,6 +1406,7 @@ export function MindsetCategoriesCard() {
         return `${diff}d left`;
     };
 
+
     useEffect(() => {
         if (!botheringPopup?.pointId) return;
         setSelectedBotheringHabitId('');
@@ -1507,23 +1512,26 @@ export function MindsetCategoriesCard() {
             } | undefined;
             if (!detail?.targetResourceId) return;
             setBotheringSelectorTarget({ resourceId: detail.targetResourceId });
-            setBotheringType(detail.type || 'external');
+            const nextType = detail.type || 'external';
+            setBotheringType(nextType);
+            setBotheringSelectorForcedType(detail.type || null);
             if (detail.pointId && detail.type) {
                 setBotheringPopup({ type: detail.type, pointId: detail.pointId });
             } else {
                 setBotheringPopup(null);
             }
-            setIsMindsetModalOpen(true);
+            setBotheringSelectorOpen(true);
         };
         window.addEventListener('open-bothering-selector', handler as EventListener);
         return () => window.removeEventListener('open-bothering-selector', handler as EventListener);
-    }, [setIsMindsetModalOpen]);
+    }, []);
 
     useEffect(() => {
-        if (!isMindsetModalOpen) {
+        if (!isMindsetModalOpen && !botheringSelectorOpen) {
             setBotheringSelectorTarget(null);
+            setBotheringSelectorForcedType(null);
         }
-    }, [isMindsetModalOpen]);
+    }, [isMindsetModalOpen, botheringSelectorOpen]);
 
     const handleSelectBotheringForResource = useCallback((type: 'mismatch' | 'constraint' | 'external', pointId: string) => {
         if (!botheringSelectorTarget) {
@@ -1538,8 +1546,73 @@ export function MindsetCategoriesCard() {
             },
         }));
         setBotheringSelectorTarget(null);
-        setBotheringPopup({ type, pointId });
+        setBotheringSelectorOpen(false);
     }, [botheringSelectorTarget]);
+
+    const renderBotheringSelectorList = useCallback((type: 'mismatch' | 'constraint' | 'external', points: MindsetPoint[]) => {
+        return (
+            <ScrollArea className="h-[420px] pr-2">
+                <ul className="space-y-2">
+                    {points
+                        .slice()
+                        .sort((a, b) => {
+                            const aActive = isBotheringActive(a);
+                            const bActive = isBotheringActive(b);
+                            if (aActive !== bActive) return aActive ? -1 : 1;
+                            if (!!a.completed !== !!b.completed) return a.completed ? 1 : -1;
+                            return 0;
+                        })
+                        .map((point) => {
+                            const stats = getTodayTaskStats(point);
+                            const isDoneToday = stats.total > 0 && stats.completed === stats.total;
+                            return (
+                                <li
+                                    key={point.id}
+                                    className={cn(
+                                        "flex items-center justify-between text-sm p-2 rounded-xl border",
+                                        isDoneToday
+                                            ? "mindset-bothering-item-done"
+                                            : isBotheringActive(point)
+                                                ? "mindset-bothering-item-active"
+                                                : "mindset-bothering-item-idle"
+                                    )}
+                                >
+                                    <button
+                                        type="button"
+                                        className="flex-1 min-w-0 text-left"
+                                        onClick={() => handleSelectBotheringForResource(type, point.id)}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            {isDoneToday ? <Check className="h-4 w-4 text-emerald-400" /> : null}
+                                            <span className={cn(isDoneToday && "line-through text-muted-foreground")}>{point.text}</span>
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                            {getDaysLeftLabel(point.endDate) ? (
+                                                <span className="mindset-deadline-pill px-2 py-0.5 rounded-full border">
+                                                    {getDaysLeftLabel(point.endDate)}
+                                                </span>
+                                            ) : (
+                                                <span className="mindset-no-end-pill px-2 py-0.5 rounded-full border">
+                                                    No end date
+                                                </span>
+                                            )}
+                                            {stats.total > 0 && (
+                                                <span className="text-muted-foreground">
+                                                    {stats.completed}/{stats.total}
+                                                </span>
+                                            )}
+                                            {isBotheringActive(point) && (
+                                                <span className="h-2 w-2 rounded-full bg-emerald-400/80" />
+                                            )}
+                                        </div>
+                                    </button>
+                                </li>
+                            );
+                        })}
+                </ul>
+            </ScrollArea>
+        );
+    }, [getDaysLeftLabel, getTodayTaskStats, handleSelectBotheringForResource, isBotheringActive]);
 
     useEffect(() => {
         const handler = (event: Event) => {
@@ -1986,10 +2059,10 @@ export function MindsetCategoriesCard() {
                                             <div
                                                 className="flex justify-between items-start w-full text-left"
                                             >
-                                                <div 
-                                                    className={cn("flex-grow pr-2 cursor-pointer", dormant && "line-through text-muted-foreground")}
-                                                    onClick={(e) => handleResistanceClick(e, link)}
-                                                >
+                                                    <div 
+                                                        className={cn("flex-grow pr-2 cursor-pointer", dormant && "line-through text-muted-foreground")}
+                                                        onClick={(e) => handleResistanceClick(e, link)}
+                                                    >
                                                     <p className="font-semibold">{link.stopper.text}</p>
                                                     <p className="text-xs text-muted-foreground mt-1">
                                                         {link.isUrge ? 'Urge' : 'Resistance'} in: {link.habitName}
@@ -2249,6 +2322,56 @@ export function MindsetCategoriesCard() {
             </div>
             )}
             
+            <Dialog
+                open={botheringSelectorOpen}
+                onOpenChange={(open) => {
+                    setBotheringSelectorOpen(open);
+                    if (!open) {
+                        setBotheringSelectorForcedType(null);
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-[560px]">
+                    <DialogHeader>
+                        <DialogTitle>Botherings</DialogTitle>
+                        <DialogDescription>Select a bothering to link.</DialogDescription>
+                    </DialogHeader>
+                    <Tabs
+                        value={botheringSelectorForcedType || botheringType}
+                        onValueChange={(v) => {
+                            if (botheringSelectorForcedType) return;
+                            setBotheringType(v as any);
+                        }}
+                    >
+                        {!botheringSelectorForcedType && (
+                            <TabsList className="grid w-full grid-cols-3 mb-3">
+                                <TabsTrigger value="mismatch">Mismatch</TabsTrigger>
+                                <TabsTrigger value="constraint">Constraint</TabsTrigger>
+                                <TabsTrigger value="external">External</TabsTrigger>
+                            </TabsList>
+                        )}
+                        <TabsContent value="mismatch" className="space-y-3">
+                            <div className="text-xs text-muted-foreground">
+                                Expectation vs Reality. Cognitive. Debuggable by understanding.
+                            </div>
+                            {renderBotheringSelectorList('mismatch', mismatchCard?.points || [])}
+                        </TabsContent>
+                        <TabsContent value="constraint" className="space-y-3">
+                            <div className="text-xs text-muted-foreground">
+                                Capacity &gt; Allowed space. Energy &gt; Channel. Growth &gt; Container. Produces ghutan and baichaini.
+                            </div>
+                            {renderBotheringSelectorList('constraint', constraintCard?.points || [])}
+                        </TabsContent>
+                        <TabsContent value="external" className="space-y-3">
+                            <div className="text-xs text-muted-foreground">
+                                External friction: people, environment, systems, or context outside you.
+                            </div>
+                            {renderBotheringSelectorList('external', externalCard?.points || [])}
+                        </TabsContent>
+                    </Tabs>
+                </DialogContent>
+            </Dialog>
+
             <LinkTechniqueModal
                 modalState={linkTechniqueModalState}
                 onOpenChange={(isOpen) => setLinkTechniqueModalState(prev => ({ ...prev, isOpen }))}

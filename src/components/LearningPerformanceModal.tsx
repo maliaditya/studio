@@ -236,35 +236,70 @@ export function LearningPerformanceModal({ isOpen, onOpenChange }: Props) {
                 <Card key={card.specId} className="border-white/10 bg-background/40">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm">{card.specName}</CardTitle>
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                      <span className="rounded-full border border-border/60 bg-muted/30 px-2 py-0.5">
+                        Logs: {card.logsCount}
+                      </span>
+                      {card.hasBooksPlan && <span className="rounded-full border border-border/60 bg-muted/30 px-2 py-0.5">Reading</span>}
+                      {card.hasAudioPlan && <span className="rounded-full border border-border/60 bg-muted/30 px-2 py-0.5">Audio</span>}
+                      {card.hasSkillTreePlan && <span className="rounded-full border border-border/60 bg-muted/30 px-2 py-0.5">Skill Tree</span>}
+                      {card.hasProjectPlan && <span className="rounded-full border border-border/60 bg-muted/30 px-2 py-0.5">Project</span>}
+                    </div>
                   </CardHeader>
-                  <CardContent className="space-y-2 text-xs">
-                    <div>Logs captured: {card.logsCount}</div>
+                  <CardContent className="space-y-3 text-xs">
                     {card.hasBooksPlan && (
-                      <div>Reading speed: {card.readingPerSession} pages/session, {card.readingPerDay} pages/day</div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Reading speed</span>
+                          <span className="font-medium">{card.readingPerSession} pages/session</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>{card.readingPerDay} pages/day</span>
+                          <span>Ends {card.bookEndDate || "N/A"}{card.daysToBookEnd != null ? ` • ${card.daysToBookEnd} days` : ""}</span>
+                        </div>
+                      </div>
                     )}
                     {card.hasAudioPlan && (
-                      <div>Audio speed: {card.audioPerSession} hrs/session, {card.audioPerDay} hrs/day</div>
-                    )}
-                    {card.hasProjectPlan && (
-                      <div>Project speed: {card.projectItemsPerDay} items/day</div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Audio speed</span>
+                          <span className="font-medium">{card.audioPerSession} hrs/session</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>{card.audioPerDay} hrs/day</span>
+                          <span>Ends {card.audioEndDate || "N/A"}{card.daysToAudioEnd != null ? ` • ${card.daysToAudioEnd} days` : ""}</span>
+                        </div>
+                      </div>
                     )}
                     {card.hasSkillTreePlan && (
-                      <div>Skill-tree speed: {card.skillItemsPerDay} items/day</div>
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Skill-tree speed</span>
+                          <span className="font-medium">{card.skillItemsPerDay} items/day</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>Sessions till end: {card.plannedSkillSessions ?? "N/A"}</span>
+                          <span>Ends {card.skillEndDate || "N/A"}{card.daysToSkillEnd != null ? ` • ${card.daysToSkillEnd} days` : ""}</span>
+                        </div>
+                      </div>
                     )}
-                    <div className="pt-2 border-t border-white/10 space-y-1">
-                      {card.hasBooksPlan && (
-                        <div>Books/Webpages sessions till end ({card.bookEndDate || "N/A"}): {card.plannedBookSessions ?? "N/A"} {card.daysToBookEnd != null ? `(in ${card.daysToBookEnd} days)` : ""}</div>
-                      )}
-                      {card.hasAudioPlan && (
-                        <div>Audio/Video sessions till end ({card.audioEndDate || "N/A"}): {card.plannedAudioSessions ?? "N/A"} {card.daysToAudioEnd != null ? `(in ${card.daysToAudioEnd} days)` : ""}</div>
-                      )}
-                      {card.hasSkillTreePlan && (
-                        <div>Skill-tree sessions till end ({card.skillEndDate || "N/A"}): {card.plannedSkillSessions ?? "N/A"} {card.daysToSkillEnd != null ? `(in ${card.daysToSkillEnd} days)` : ""}</div>
-                      )}
-                      {card.hasProjectPlan && (
-                        <div>Project sessions till end ({card.projectEndDate || "N/A"}): {card.plannedProjectSessions ?? "N/A"} {card.daysToProjectEnd != null ? `(in ${card.daysToProjectEnd} days)` : ""}</div>
-                      )}
-                    </div>
+                    {card.hasProjectPlan && (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Project speed</span>
+                          <span className="font-medium">{card.projectItemsPerDay} items/day</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                          <span>Sessions till end: {card.plannedProjectSessions ?? "N/A"}</span>
+                          <span>Ends {card.projectEndDate || "N/A"}{card.daysToProjectEnd != null ? ` • ${card.daysToProjectEnd} days` : ""}</span>
+                        </div>
+                      </div>
+                    )}
+                    {(card.hasBooksPlan || card.hasAudioPlan || card.hasSkillTreePlan || card.hasProjectPlan) && (
+                      <div className="rounded-md border border-border/60 bg-muted/20 p-2 text-[11px] text-muted-foreground">
+                        Tip: Focus on the plan with the shortest end date to avoid bottlenecks.
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))

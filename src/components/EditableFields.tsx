@@ -481,7 +481,7 @@ export const EditableResponse = ({ field, label, resource, onUpdate, onOpenNeste
                         <LinkIcon className="h-3 w-3" />
                     </button>
                 </PopoverTrigger>
-                <PopoverContent className="w-56 p-0">
+                <PopoverContent className="w-56 p-0" side="top" align="start" sideOffset={6}>
                     <div className="p-1">
                         <Button
                             type="button"
@@ -497,7 +497,7 @@ export const EditableResponse = ({ field, label, resource, onUpdate, onOpenNeste
                         <SelectTrigger className="w-full border-0 focus:ring-0">
                             <SelectValue placeholder="Link a mechanism..." />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent side="top" align="start" sideOffset={4}>
                             {resources.filter(r => r.type === 'mechanism').map(r => (
                                 <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                             ))}

@@ -11,7 +11,7 @@ type SessionPayload = {
 
 const getSessionSecret = () => {
   // Prefer dedicated session secret; fallback keeps dev usable.
-  return process.env.LIFEOS_SESSION_SECRET || process.env.BLOB_READ_WRITE_TOKEN || 'lifeos-dev-session-secret';
+  return process.env.LIFEOS_SESSION_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || 'lifeos-dev-session-secret';
 };
 
 const toBase64Url = (value: string) => Buffer.from(value, 'utf8').toString('base64url');

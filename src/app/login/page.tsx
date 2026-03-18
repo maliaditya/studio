@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [sessionBlockedMessage, setSessionBlockedMessage] = useState('');
+  const [isDesktopRuntime, setIsDesktopRuntime] = useState(false);
   const router = useRouter();
   
   const { signIn, register, loading, currentUser } = useAuth();
@@ -46,6 +47,11 @@ export default function LoginPage() {
     } catch {
       // ignore malformed stored login data
     }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setIsDesktopRuntime(Boolean((window as any)?.studioDesktop?.isDesktop));
   }, []);
 
   useEffect(() => {
@@ -94,8 +100,17 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <div className="text-center text-sm text-muted-foreground p-3 mb-4 border rounded-md bg-muted/50 space-y-1">
-            <p>After first successful sign-in on this device, offline resume is available and the app can be accessed without internet.</p>
-            <p>First sign-in still depends on a working cloud auth backend, not just internet connectivity.</p>
+            {isDesktopRuntime ? (
+              <>
+                <p>After first successful sign-in on this device, offline resume is available and the app can be accessed without internet.</p>
+                <p>First sign-in still depends on a working cloud auth backend, not just internet connectivity.</p>
+              </>
+            ) : (
+              <>
+                <p>Sign in to sync your workspace to the cloud and access it from any device.</p>
+                <p>Internet connection is required for web access.</p>
+              </>
+            )}
             <p>Demo access: <strong className="text-primary font-mono">demo</strong>/<strong className="text-primary font-mono">demo</strong>.</p>
             <p>
               Like the product?{" "}

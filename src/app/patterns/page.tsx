@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow, ArrowRight, Brain, HeartPulse, HandHeart, TrendingUp, Edit, MinusCircle } from 'lucide-react';
+import { FileText, Lightbulb, Zap, PlusCircle, Trash2, BookOpen, Workflow, ArrowRight, Brain, HeartPulse, HandHeart, TrendingUp, Edit, MinusCircle, ChevronDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Pattern, PatternPhrase, MetaRule, Resource } from '@/types/workout';
 import { cn } from '@/lib/utils';
@@ -195,6 +195,9 @@ const GROWTH_ACTION_OUTCOME_BY_STATE: Record<(typeof PATTERN_STATE_OPTIONS)[numb
     },
 };
 
+const PATTERN_BOTHERING_TARGET_NEW = 'patterns-builder-new';
+const PATTERN_BOTHERING_TARGET_EDIT = 'patterns-builder-edit';
+
 const getActionTypeOptions = (patternCategory: string) => {
     if (patternCategory === 'Resistance') return RESISTANCE_ACTION_TYPE_OPTIONS;
     if (patternCategory === 'Avoidance') return AVOIDANCE_ACTION_TYPE_OPTIONS;
@@ -243,6 +246,17 @@ const getGrowthOutcomeOptions = (state: string) => {
 const getGrowthOutcomeMeta = (state: string, actionType: string) => {
     const outcome = GROWTH_ACTION_OUTCOME_BY_STATE[state as keyof typeof GROWTH_ACTION_OUTCOME_BY_STATE]?.[actionType];
     return outcome ? { outcome } : null;
+};
+
+const formatMechanismAction = (mechanism?: Resource | null) => {
+    const action = String(mechanism?.trigger?.action || '').trim();
+    if (!action) return '';
+    const responseRaw = String(mechanism?.response?.visualize || '').trim();
+    const response = responseRaw.replace(/[.]+$/, '').trim();
+    if (response) {
+        return `When I ${action}, it causes ${response} internally.`;
+    }
+    return `When I ${action},`;
 };
 
 const buildPatternName = ({
@@ -295,6 +309,20 @@ const getPatternPathSummary = (pattern: Pattern) => {
     return { threatPath, growthPath };
 };
 
+const buildPatternPathText = ({
+    signal,
+    action,
+    actionType,
+    outcome,
+}: {
+    signal?: string;
+    action?: string;
+    actionType?: string;
+    outcome?: string;
+}) => {
+    return [signal, action, actionType, outcome].filter(Boolean).join(STEP_ARROW);
+};
+
 
 const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' | 'Negative' }) => {
     const parts = name.split(STEP_ARROW).map((p) => p.trim());
@@ -314,6 +342,28 @@ const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' |
 
     const colors = type === 'Positive' ? positiveColors : negativeColors;
 
+    if (parts.length >= 8) {
+        return (
+            <span className="font-semibold">
+                <span className={colors.cause}>{parts[0]}</span>
+                <span className={`mx-1 ${colors.plus}`}>+</span>
+                <span className={colors.action}>{parts[1]}</span>
+                <span className="mx-1 text-muted-foreground">{STEP_ARROW.trim()}</span>
+                <span className="text-muted-foreground">{parts[2]}</span>
+                <span className="mx-1 text-muted-foreground">{STEP_ARROW.trim()}</span>
+                <span className={colors.outcome}>{parts[3]}</span>
+                <span className="mx-1 text-muted-foreground">{STEP_ARROW.trim()}</span>
+                <span className={colors.cause}>{parts[4]}</span>
+                <span className={`mx-1 ${colors.plus}`}>+</span>
+                <span className={colors.action}>{parts[5]}</span>
+                <span className="mx-1 text-muted-foreground">{STEP_ARROW.trim()}</span>
+                <span className="text-muted-foreground">{parts[6]}</span>
+                <span className="mx-1 text-muted-foreground">{STEP_ARROW.trim()}</span>
+                <span className={colors.outcome}>{parts[7]}</span>
+            </span>
+        );
+    }
+
     if (parts.length >= 6) {
         return (
             <span className="font-semibold">
@@ -328,6 +378,20 @@ const FormattedPatternName = ({ name, type }: { name: string; type: 'Positive' |
                 <span className={colors.action}>{parts[4]}</span>
                 <span className="mx-1 text-muted-foreground">{STEP_ARROW.trim()}</span>
                 <span className={colors.outcome}>{parts[5]}</span>
+            </span>
+        );
+    }
+
+    if (parts.length >= 4) {
+        return (
+            <span className="font-semibold">
+                <span className={colors.cause}>{parts[0]}</span>
+                <span className={`mx-1 ${colors.plus}`}>+</span>
+                <span className={colors.action}>{parts[1]}</span>
+                <span className="mx-1 text-muted-foreground">{STEP_ARROW.trim()}</span>
+                <span className="text-muted-foreground">{parts[2]}</span>
+                <span className="mx-1 text-muted-foreground">{STEP_ARROW.trim()}</span>
+                <span className={colors.outcome}>{parts[3]}</span>
             </span>
         );
     }
@@ -378,6 +442,55 @@ const PatternSelectNode = ({ label, value, onChange, placeholder, options }: {
                 ))}
             </SelectContent>
         </Select>
+    </div>
+);
+
+const PatternStaticNode = ({ label, value, placeholder, sublabel, compact = false, inlineLabel = false }: {
+    label: string;
+    value?: string;
+    placeholder: string;
+    sublabel?: string;
+    compact?: boolean;
+    inlineLabel?: boolean;
+}) => (
+    <div className={cn("rounded-xl border border-border/60 bg-muted/20", compact ? "p-2" : "p-3")}>
+        {!inlineLabel && <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>}
+        {sublabel && <div className={cn("text-xs text-muted-foreground", compact ? "mt-1" : "mt-2")}>{sublabel}</div>}
+        <div className={cn(
+            "rounded-md border border-border/40 bg-muted/5 text-sm text-foreground/90",
+            compact ? "mt-1 px-2 py-1.5" : "mt-2 px-3 py-2"
+        )}>
+            {inlineLabel ? (
+                <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                    {label}:{" "}
+                    <span className="normal-case text-foreground/90">{value || placeholder}</span>
+                </span>
+            ) : (
+                value || <span className="text-muted-foreground">{placeholder}</span>
+            )}
+        </div>
+    </div>
+);
+
+const PatternBotheringNode = ({ label, value, placeholder, onSelect }: {
+    label: string;
+    value: string;
+    placeholder: string;
+    onSelect: () => void;
+}) => (
+    <div className="rounded-xl border border-border/60 bg-muted/20 p-3">
+        <Label className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Label>
+        <Button
+            type="button"
+            variant="outline"
+            className="mt-2 w-full justify-between"
+            onClick={onSelect}
+        >
+            <span className={cn("truncate text-left", value ? "text-foreground" : "text-muted-foreground")}>
+                {value || placeholder}
+            </span>
+            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        </Button>
     </div>
 );
 
@@ -807,9 +920,9 @@ const PatternBuilderPanel = ({
                 const mechanism = mechanismId
                     ? mechanismCards.find((resource) => resource.id === mechanismId)
                     : null;
-                return mechanism?.name?.trim();
+                return formatMechanismAction(mechanism);
             })
-            .filter((mechanismName): mechanismName is string => Boolean(mechanismName))
+            .filter((actionText): actionText is string => Boolean(actionText))
     ));
     const selectedLinkedBotheringOptions = Array.from(new Set(
         selectedPhrases
@@ -833,9 +946,9 @@ const PatternBuilderPanel = ({
                 const mechanism = mechanismId
                     ? mechanismCards.find((resource) => resource.id === mechanismId)
                     : null;
-                return mechanism?.name?.trim();
+                return formatMechanismAction(mechanism);
             })
-            .filter((mechanismName): mechanismName is string => Boolean(mechanismName))
+            .filter((actionText): actionText is string => Boolean(actionText))
     ));
 
     const handleNewActionTypeChange = (value: string) => {
@@ -943,52 +1056,71 @@ const PatternBuilderPanel = ({
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <PatternSelectNode label="Cause" value={newSharedCause} onChange={setNewSharedCause} placeholder="Select linked bothering" options={selectedLinkedBotheringOptions} />
-                            <div className="grid gap-4 xl:grid-cols-2">
-                                <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-3">
-                                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">Threat Mode</Label>
-                                    {newPatternCategoryOptions.length > 0 && (
-                                        <PatternSelectNode label="Pattern" value={newPatternCategory} onChange={handleNewPatternCategoryChange} placeholder="Select pattern" options={newPatternCategoryOptions} />
-                                    )}
-                                    <PatternSelectNode label="Interpretation" value={newThreatInterpretation?.interpretation || ''} onChange={() => {}} placeholder="Select interpretation" options={newThreatInterpretation ? [newThreatInterpretation.interpretation] : []} />
-                                    {newThreatInterpretation && (
-                                        <p className="px-1 text-xs text-muted-foreground">Typical Thought: {newThreatInterpretation.thought}</p>
-                                    )}
-                                    <PatternSelectNode label="Signal" value={newPatternCause} onChange={handleNewThreatSignalChange} placeholder="Select signal" options={newThreatSignalOptions} />
-                                    {newThreatSignalCategory && (
-                                        <p className="px-1 text-xs text-muted-foreground">Category: {newThreatSignalCategory}</p>
-                                    )}
-                                    <PatternActionNode label="Actions" value={newPatternAction} onChange={setNewPatternAction} placeholder="Select negative mechanism" options={selectedThreatMechanismOptions} />
-                                    {newActionTypeOptions && (
-                                        <PatternSelectNode label="Action Type" value={newPatternActionType} onChange={handleNewActionTypeChange} placeholder="Select action type" options={newActionTypeOptions} />
-                                    )}
-                                    <PatternSelectNode label="Outcome" value={newPatternOutcome} onChange={setNewPatternOutcome} placeholder="Select outcome" options={newOutcomeOptions} />
-                                    {newResistanceOutcomeMeta && (
-                                        <p className="px-1 text-xs text-muted-foreground">{newResistanceOutcomeMeta.why}</p>
-                                    )}
-                                    {newAvoidanceOutcomeMeta && (
-                                        <p className="px-1 text-xs text-muted-foreground">{newAvoidanceOutcomeMeta.why}</p>
-                                    )}
-                                    {newEmotionalDistressOutcomeMeta && (
-                                        <p className="px-1 text-xs text-muted-foreground">{newEmotionalDistressOutcomeMeta.why}</p>
-                                    )}
+                            <PatternBotheringNode
+                                label="Cause"
+                                value={newSharedCause}
+                                placeholder="Select linked bothering"
+                                onSelect={() => {
+                                    const stateToType: Record<string, 'mismatch' | 'constraint' | 'external'> = {
+                                        Autonomy: 'constraint',
+                                        Competence: 'mismatch',
+                                        Relatedness: 'external',
+                                    };
+                                    const preferredType = stateToType[newPatternState] || 'external';
+                                    window.dispatchEvent(new CustomEvent('open-bothering-selector', {
+                                        detail: { targetResourceId: PATTERN_BOTHERING_TARGET_NEW, type: preferredType },
+                                    }));
+                                }}
+                            />
+                            {newPatternState && newSharedCause && (
+                                <div className="grid gap-4 xl:grid-cols-2">
+                                    <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-3">
+                                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Threat Mode</Label>
+                                        <PatternStaticNode label="Pattern" value={newPatternCategory} placeholder="Select pattern" compact inlineLabel />
+                                        <PatternStaticNode
+                                            label="Interpretation"
+                                            value={newThreatInterpretation?.interpretation}
+                                            placeholder="Select interpretation"
+                                            sublabel={newThreatInterpretation?.thought ? `Typical Thought: ${newThreatInterpretation.thought}` : undefined}
+                                        />
+                                        <PatternSelectNode label="Signal" value={newPatternCause} onChange={handleNewThreatSignalChange} placeholder="Select signal" options={newThreatSignalOptions} />
+                                        {newThreatSignalCategory && (
+                                            <p className="px-1 text-xs text-muted-foreground">Category: {newThreatSignalCategory}</p>
+                                        )}
+                                        <PatternActionNode label="Actions" value={newPatternAction} onChange={setNewPatternAction} placeholder="Select negative mechanism" options={selectedThreatMechanismOptions} />
+                                        {newActionTypeOptions && (
+                                            <PatternSelectNode label="Action Type" value={newPatternActionType} onChange={handleNewActionTypeChange} placeholder="Select action type" options={newActionTypeOptions} />
+                                        )}
+                                        <PatternSelectNode label="Outcome" value={newPatternOutcome} onChange={setNewPatternOutcome} placeholder="Select outcome" options={newOutcomeOptions} />
+                                        {newResistanceOutcomeMeta && (
+                                            <p className="px-1 text-xs text-muted-foreground">{newResistanceOutcomeMeta.why}</p>
+                                        )}
+                                        {newAvoidanceOutcomeMeta && (
+                                            <p className="px-1 text-xs text-muted-foreground">{newAvoidanceOutcomeMeta.why}</p>
+                                        )}
+                                        {newEmotionalDistressOutcomeMeta && (
+                                            <p className="px-1 text-xs text-muted-foreground">{newEmotionalDistressOutcomeMeta.why}</p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-3">
+                                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Growth Mode</Label>
+                                        <PatternStaticNode label="Pattern" value={newGrowthPattern} placeholder="Select pattern" compact inlineLabel />
+                                        <PatternStaticNode
+                                            label="Interpretation"
+                                            value={newGrowthInterpretation?.interpretation}
+                                            placeholder="Select interpretation"
+                                            sublabel={newGrowthInterpretation?.thought ? `Typical Thought: ${newGrowthInterpretation.thought}` : undefined}
+                                        />
+                                        <PatternSelectNode label="Signal" value={newPatternCause2} onChange={handleNewGrowthSignalChange} placeholder="Select signal" options={newGrowthSignalOptions} />
+                                        {newGrowthSignalCategory && (
+                                            <p className="px-1 text-xs text-muted-foreground">Category: {newGrowthSignalCategory}</p>
+                                        )}
+                                        <PatternActionNode label="Actions" value={newPatternAction2} onChange={setNewPatternAction2} placeholder="Select positive mechanism" options={selectedGrowthMechanismOptions} />
+                                        <PatternSelectNode label="Action Type" value={newGrowthActionType} onChange={handleNewGrowthActionTypeChange} placeholder="Select action type" options={newGrowthActionTypeOptions} />
+                                        <PatternSelectNode label="Outcome" value={newPatternOutcome2} onChange={setNewPatternOutcome2} placeholder="Select outcome" options={newGrowthOutcomeOptions} />
+                                    </div>
                                 </div>
-                                <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-3">
-                                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">Growth Mode</Label>
-                                    <PatternSelectNode label="Pattern" value={newGrowthPattern} onChange={() => {}} placeholder="Select pattern" options={GROWTH_PATTERN_CATEGORY_OPTIONS} />
-                                    <PatternSelectNode label="Interpretation" value={newGrowthInterpretation?.interpretation || ''} onChange={() => {}} placeholder="Select interpretation" options={newGrowthInterpretation ? [newGrowthInterpretation.interpretation] : []} />
-                                    {newGrowthInterpretation && (
-                                        <p className="px-1 text-xs text-muted-foreground">Typical Thought: {newGrowthInterpretation.thought}</p>
-                                    )}
-                                    <PatternSelectNode label="Signal" value={newPatternCause2} onChange={handleNewGrowthSignalChange} placeholder="Select signal" options={newGrowthSignalOptions} />
-                                    {newGrowthSignalCategory && (
-                                        <p className="px-1 text-xs text-muted-foreground">Category: {newGrowthSignalCategory}</p>
-                                    )}
-                                    <PatternActionNode label="Actions" value={newPatternAction2} onChange={setNewPatternAction2} placeholder="Select positive mechanism" options={selectedGrowthMechanismOptions} />
-                                    <PatternSelectNode label="Action Type" value={newGrowthActionType} onChange={handleNewGrowthActionTypeChange} placeholder="Select action type" options={newGrowthActionTypeOptions} />
-                                    <PatternSelectNode label="Outcome" value={newPatternOutcome2} onChange={setNewPatternOutcome2} placeholder="Select outcome" options={newGrowthOutcomeOptions} />
-                                </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 ) : (
@@ -1008,52 +1140,71 @@ const PatternBuilderPanel = ({
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <PatternSelectNode label="Cause" value={editedPatternFields.sharedCause} onChange={(value) => setEditedPatternFields((f) => ({ ...f, sharedCause: value }))} placeholder="Select linked bothering" options={selectedLinkedBotheringOptions} />
-                            <div className="grid gap-4 xl:grid-cols-2">
-                                <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-3">
-                                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">Threat Mode</Label>
-                                    {editedPatternCategoryOptions.length > 0 && (
-                                        <PatternSelectNode label="Pattern" value={editedPatternFields.patternCategory} onChange={handleEditedPatternCategoryChange} placeholder="Select pattern" options={editedPatternCategoryOptions} />
-                                    )}
-                                    <PatternSelectNode label="Interpretation" value={editedThreatInterpretation?.interpretation || ''} onChange={() => {}} placeholder="Select interpretation" options={editedThreatInterpretation ? [editedThreatInterpretation.interpretation] : []} />
-                                    {editedThreatInterpretation && (
-                                        <p className="px-1 text-xs text-muted-foreground">Typical Thought: {editedThreatInterpretation.thought}</p>
-                                    )}
-                                    <PatternSelectNode label="Signal" value={editedPatternFields.cause1} onChange={handleEditedThreatSignalChange} placeholder="Select signal" options={editedThreatSignalOptions} />
-                                    {editedPatternFields.threatSignalCategory && (
-                                        <p className="px-1 text-xs text-muted-foreground">Category: {editedPatternFields.threatSignalCategory}</p>
-                                    )}
-                                    <PatternActionNode label="Actions" value={editedPatternFields.action1} onChange={(value) => setEditedPatternFields((f) => ({ ...f, action1: value }))} placeholder="Select negative mechanism" options={selectedThreatMechanismOptions} />
-                                    {editedActionTypeOptions && (
-                                        <PatternSelectNode label="Action Type" value={editedPatternFields.actionType} onChange={handleEditedActionTypeChange} placeholder="Select action type" options={editedActionTypeOptions} />
-                                    )}
-                                    <PatternSelectNode label="Outcome" value={editedPatternFields.outcome} onChange={(value) => setEditedPatternFields((f) => ({ ...f, outcome: value }))} placeholder="Select outcome" options={editedOutcomeOptions} />
-                                    {editedResistanceOutcomeMeta && (
-                                        <p className="px-1 text-xs text-muted-foreground">{editedResistanceOutcomeMeta.why}</p>
-                                    )}
-                                    {editedAvoidanceOutcomeMeta && (
-                                        <p className="px-1 text-xs text-muted-foreground">{editedAvoidanceOutcomeMeta.why}</p>
-                                    )}
-                                    {editedEmotionalDistressOutcomeMeta && (
-                                        <p className="px-1 text-xs text-muted-foreground">{editedEmotionalDistressOutcomeMeta.why}</p>
-                                    )}
+                            <PatternBotheringNode
+                                label="Cause"
+                                value={editedPatternFields.sharedCause}
+                                placeholder="Select linked bothering"
+                                onSelect={() => {
+                                    const stateToType: Record<string, 'mismatch' | 'constraint' | 'external'> = {
+                                        Autonomy: 'constraint',
+                                        Competence: 'mismatch',
+                                        Relatedness: 'external',
+                                    };
+                                    const preferredType = stateToType[editedPatternFields.state] || 'external';
+                                    window.dispatchEvent(new CustomEvent('open-bothering-selector', {
+                                        detail: { targetResourceId: PATTERN_BOTHERING_TARGET_EDIT, type: preferredType },
+                                    }));
+                                }}
+                            />
+                            {editedPatternFields.state && editedPatternFields.sharedCause && (
+                                <div className="grid gap-4 xl:grid-cols-2">
+                                    <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-3">
+                                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Threat Mode</Label>
+                                        <PatternStaticNode label="Pattern" value={editedPatternFields.patternCategory} placeholder="Select pattern" compact inlineLabel />
+                                        <PatternStaticNode
+                                            label="Interpretation"
+                                            value={editedThreatInterpretation?.interpretation}
+                                            placeholder="Select interpretation"
+                                            sublabel={editedThreatInterpretation?.thought ? `Typical Thought: ${editedThreatInterpretation.thought}` : undefined}
+                                        />
+                                        <PatternSelectNode label="Signal" value={editedPatternFields.cause1} onChange={handleEditedThreatSignalChange} placeholder="Select signal" options={editedThreatSignalOptions} />
+                                        {editedPatternFields.threatSignalCategory && (
+                                            <p className="px-1 text-xs text-muted-foreground">Category: {editedPatternFields.threatSignalCategory}</p>
+                                        )}
+                                        <PatternActionNode label="Actions" value={editedPatternFields.action1} onChange={(value) => setEditedPatternFields((f) => ({ ...f, action1: value }))} placeholder="Select negative mechanism" options={selectedThreatMechanismOptions} />
+                                        {editedActionTypeOptions && (
+                                            <PatternSelectNode label="Action Type" value={editedPatternFields.actionType} onChange={handleEditedActionTypeChange} placeholder="Select action type" options={editedActionTypeOptions} />
+                                        )}
+                                        <PatternSelectNode label="Outcome" value={editedPatternFields.outcome} onChange={(value) => setEditedPatternFields((f) => ({ ...f, outcome: value }))} placeholder="Select outcome" options={editedOutcomeOptions} />
+                                        {editedResistanceOutcomeMeta && (
+                                            <p className="px-1 text-xs text-muted-foreground">{editedResistanceOutcomeMeta.why}</p>
+                                        )}
+                                        {editedAvoidanceOutcomeMeta && (
+                                            <p className="px-1 text-xs text-muted-foreground">{editedAvoidanceOutcomeMeta.why}</p>
+                                        )}
+                                        {editedEmotionalDistressOutcomeMeta && (
+                                            <p className="px-1 text-xs text-muted-foreground">{editedEmotionalDistressOutcomeMeta.why}</p>
+                                        )}
+                                    </div>
+                                    <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-3">
+                                        <Label className="text-xs uppercase tracking-wide text-muted-foreground">Growth Mode</Label>
+                                        <PatternStaticNode label="Pattern" value={editedGrowthPattern} placeholder="Select pattern" compact inlineLabel />
+                                        <PatternStaticNode
+                                            label="Interpretation"
+                                            value={editedGrowthInterpretation?.interpretation}
+                                            placeholder="Select interpretation"
+                                            sublabel={editedGrowthInterpretation?.thought ? `Typical Thought: ${editedGrowthInterpretation.thought}` : undefined}
+                                        />
+                                        <PatternSelectNode label="Signal" value={editedPatternFields.cause2} onChange={handleEditedGrowthSignalChange} placeholder="Select signal" options={editedGrowthSignalOptions} />
+                                        {editedPatternFields.growthSignalCategory && (
+                                            <p className="px-1 text-xs text-muted-foreground">Category: {editedPatternFields.growthSignalCategory}</p>
+                                        )}
+                                        <PatternActionNode label="Actions" value={editedPatternFields.action2} onChange={(value) => setEditedPatternFields((f) => ({ ...f, action2: value }))} placeholder="Select positive mechanism" options={selectedGrowthMechanismOptions} />
+                                        <PatternSelectNode label="Action Type" value={editedPatternFields.growthActionType} onChange={handleEditedGrowthActionTypeChange} placeholder="Select action type" options={editedGrowthActionTypeOptions} />
+                                        <PatternSelectNode label="Outcome" value={editedPatternFields.outcome2} onChange={(value) => setEditedPatternFields((f) => ({ ...f, outcome2: value }))} placeholder="Select outcome" options={editedGrowthOutcomeOptions} />
+                                    </div>
                                 </div>
-                                <div className="space-y-3 rounded-xl border border-border/60 bg-muted/10 p-3">
-                                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">Growth Mode</Label>
-                                    <PatternSelectNode label="Pattern" value={editedGrowthPattern} onChange={() => {}} placeholder="Select pattern" options={GROWTH_PATTERN_CATEGORY_OPTIONS} />
-                                    <PatternSelectNode label="Interpretation" value={editedGrowthInterpretation?.interpretation || ''} onChange={() => {}} placeholder="Select interpretation" options={editedGrowthInterpretation ? [editedGrowthInterpretation.interpretation] : []} />
-                                    {editedGrowthInterpretation && (
-                                        <p className="px-1 text-xs text-muted-foreground">Typical Thought: {editedGrowthInterpretation.thought}</p>
-                                    )}
-                                    <PatternSelectNode label="Signal" value={editedPatternFields.cause2} onChange={handleEditedGrowthSignalChange} placeholder="Select signal" options={editedGrowthSignalOptions} />
-                                    {editedPatternFields.growthSignalCategory && (
-                                        <p className="px-1 text-xs text-muted-foreground">Category: {editedPatternFields.growthSignalCategory}</p>
-                                    )}
-                                    <PatternActionNode label="Actions" value={editedPatternFields.action2} onChange={(value) => setEditedPatternFields((f) => ({ ...f, action2: value }))} placeholder="Select positive mechanism" options={selectedGrowthMechanismOptions} />
-                                    <PatternSelectNode label="Action Type" value={editedPatternFields.growthActionType} onChange={handleEditedGrowthActionTypeChange} placeholder="Select action type" options={editedGrowthActionTypeOptions} />
-                                    <PatternSelectNode label="Outcome" value={editedPatternFields.outcome2} onChange={(value) => setEditedPatternFields((f) => ({ ...f, outcome2: value }))} placeholder="Select outcome" options={editedGrowthOutcomeOptions} />
-                                </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -1102,8 +1253,18 @@ const PatternPreviewCard = ({ type, name, selectedPhrases, state, sharedCause, t
     growthOutcome?: string;
 }) => {
     const linkedHabitCount = new Set(selectedPhrases.filter((p) => p.category === 'Habit Cards').map((p) => p.mechanismCardId)).size;
-    const threatPreview = [threatSignal, threatAction, threatOutcome].filter(Boolean).join(STEP_ARROW);
-    const growthPreview = [growthSignal, growthAction, growthOutcome].filter(Boolean).join(STEP_ARROW);
+    const threatPreview = buildPatternPathText({
+        signal: threatSignal,
+        action: threatAction,
+        actionType: threatActionType,
+        outcome: threatOutcome,
+    });
+    const growthPreview = buildPatternPathText({
+        signal: growthSignal,
+        action: growthAction,
+        actionType: growthActionType,
+        outcome: growthOutcome,
+    });
     return (
         <Card className="min-w-0">
             <CardHeader>
@@ -1207,6 +1368,19 @@ const ExistingPatternsPanel = ({
                         {patterns.map((p) => {
                             const isSelected = selectedPatternForRule === p.id;
                             const linkedHabits = isSelected ? getHabitLinksForRule({ id: p.id, patternId: p.id, text: p.name }) : [];
+                            const { threatPath, growthPath } = getPatternPathSummary(p);
+                            const threatPathText = buildPatternPathText({
+                                signal: threatPath.signal,
+                                action: threatPath.action,
+                                actionType: p.actionType,
+                                outcome: threatPath.outcome,
+                            });
+                            const growthPathText = buildPatternPathText({
+                                signal: growthPath.signal,
+                                action: growthPath.action,
+                                actionType: p.growthActionType,
+                                outcome: growthPath.outcome,
+                            });
                             return (
                                 <Card key={p.id} className={cn("transition-all", isSelected && "ring-2 ring-primary")}>
                                     <CardHeader className="p-3">
@@ -1240,6 +1414,36 @@ const ExistingPatternsPanel = ({
                                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); handleDeletePattern(p.id); }}>
                                                     <Trash2 className="h-4 w-4 text-destructive" />
                                                 </Button>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 rounded-xl border border-border/60 bg-muted/10 p-3">
+                                            <div className="grid gap-3 md:grid-cols-2">
+                                                <div>
+                                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">State</p>
+                                                    <p className="mt-1 text-sm font-medium">{p.state || '...'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Cause</p>
+                                                    <p className="mt-1 text-sm font-medium">{p.sharedCause || '...'}</p>
+                                                </div>
+                                            </div>
+                                            <div className="mt-3 space-y-3 rounded-xl border border-border/50 bg-background/30 p-3">
+                                                <div>
+                                                    <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Threat Path</p>
+                                                    {threatPathText ? (
+                                                        <FormattedPatternName name={threatPathText} type="Negative" />
+                                                    ) : (
+                                                        <p className="text-sm text-muted-foreground">No threat path saved.</p>
+                                                    )}
+                                                </div>
+                                                <div className="border-t border-border/50 pt-3">
+                                                    <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">Growth Path</p>
+                                                    {growthPathText ? (
+                                                        <FormattedPatternName name={growthPathText} type="Positive" />
+                                                    ) : (
+                                                        <p className="text-sm text-muted-foreground">No growth path saved.</p>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </CardHeader>
@@ -1328,6 +1532,37 @@ function PatternsPageContent() {
         const mechanisms = resources.filter(r => r.type === 'mechanism');
         return { habitCards: habits, mechanismCards: mechanisms };
     }, [resources]);
+
+    const getBotheringTextById = React.useCallback(
+        (type?: 'mismatch' | 'constraint' | 'external', pointId?: string) => {
+            if (!type || !pointId) return '';
+            const cardId = `mindset_botherings_${type}`;
+            const botheringCard = (mindsetCards || []).find((card: any) => card.id === cardId);
+            const botheringPoint = botheringCard?.points?.find((point: any) => point.id === pointId);
+            return String(botheringPoint?.text || '').trim();
+        },
+        [mindsetCards]
+    );
+
+    useEffect(() => {
+        const handler = (event: Event) => {
+            const detail = (event as CustomEvent).detail as {
+                targetResourceId?: string;
+                botheringId?: string;
+                botheringType?: 'mismatch' | 'constraint' | 'external';
+            } | undefined;
+            if (!detail?.targetResourceId || !detail?.botheringId) return;
+            const botheringText = getBotheringTextById(detail.botheringType, detail.botheringId);
+            if (detail.targetResourceId === PATTERN_BOTHERING_TARGET_NEW) {
+                setNewSharedCause(botheringText);
+            }
+            if (detail.targetResourceId === PATTERN_BOTHERING_TARGET_EDIT) {
+                setEditedPatternFields((f) => ({ ...f, sharedCause: botheringText }));
+            }
+        };
+        window.addEventListener('bothering-selected', handler as EventListener);
+        return () => window.removeEventListener('bothering-selected', handler as EventListener);
+    }, [getBotheringTextById]);
 
     useEffect(() => {
         if (selectedPatternToUpdate) {

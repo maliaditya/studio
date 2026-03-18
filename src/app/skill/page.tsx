@@ -2193,6 +2193,9 @@ function SkillPageContent() {
                                                   </CardContent>
                                                    <CardFooter className="p-2 opacity-0 group-hover/item:opacity-100 transition-opacity">
                                                         <div className="flex justify-end w-full">
+                                                            <span className="mr-2 self-center text-xs text-muted-foreground">
+                                                                {micro.completedPages || 0} pages
+                                                            </span>
                                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingMicroSkill({skillId: selectedCoreSkill.id, areaId: area.id, microSkill: micro})}><Edit className="h-4 w-4"/></Button>
                                                             <AlertDialog>
                                                             <AlertDialogTrigger asChild><Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-destructive"/></Button></AlertDialogTrigger>

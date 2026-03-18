@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 const HABIT_STATE_OPTIONS = ['Health', 'Wealth', 'Relations', 'Meaning', 'Creativity', 'Contribution'] as const;
 
@@ -28,7 +29,7 @@ interface HabitResourceCardProps {
 }
 
 export function HabitResourceCard({ resource, onUpdate, onDelete, onLinkClick, linkingFromId, onOpenNestedPopup }: HabitResourceCardProps) {
-    const { mindsetCards, mechanismCards } = useAuth();
+    const { mindsetCards, mechanismCards, resources, setResources, openGeneralPopup } = useAuth();
     const [isBotheringPickerOpen, setIsBotheringPickerOpen] = React.useState(false);
     const [botheringTab, setBotheringTab] = React.useState<'mismatch' | 'constraint' | 'external'>(
         resource.linkedBotheringType || 'external'
@@ -69,6 +70,40 @@ export function HabitResourceCard({ resource, onUpdate, onDelete, onLinkClick, l
     const negativeCost = negativeMechanism?.benefit || negativeMechanism?.reward || '';
     const positiveBenefit = positiveMechanism?.benefit || positiveMechanism?.reward || '';
 
+    const linkMechanism = (field: 'response' | 'newResponse', mechanismId?: string) => {
+        onUpdate({
+            ...resource,
+            [field]: { ...(resource[field] || {}), resourceId: mechanismId, text: mechanismId ? '' : resource[field]?.text },
+        });
+    };
+
+    const createMechanism = (field: 'response' | 'newResponse') => {
+        const mechanismFramework = field === 'response' ? 'negative' : 'positive';
+        const resourceLabel = field === 'response' ? 'Negative Mechanism' : 'Positive Mechanism';
+        const newMechanismId = `res_${Date.now()}`;
+        const textSeed = String(resource[field]?.text || '').trim();
+        const newMechanism: Resource = {
+            id: newMechanismId,
+            name: `${resource.name} ${resourceLabel}`.trim(),
+            folderId: resource.folderId,
+            type: 'mechanism',
+            createdAt: new Date().toISOString(),
+            mechanismFramework,
+            trigger: {
+                action: textSeed,
+            },
+            response: mechanismFramework === 'negative'
+                ? { visualize: textSeed }
+                : undefined,
+            newResponse: mechanismFramework === 'positive'
+                ? { action: textSeed }
+                : undefined,
+        };
+        setResources((prev) => [...prev, newMechanism]);
+        linkMechanism(field, newMechanismId);
+        openGeneralPopup(newMechanismId, null);
+    };
+
     const openBotheringSelector = () => {
         setBotheringTab(resource.linkedBotheringType || 'external');
         setIsBotheringPickerOpen(true);
@@ -81,6 +116,12 @@ export function HabitResourceCard({ resource, onUpdate, onDelete, onLinkClick, l
             linkedBotheringType: botheringType,
         });
         setIsBotheringPickerOpen(false);
+        window.dispatchEvent(new CustomEvent('open-bothering-popup', {
+            detail: {
+                type: botheringType,
+                pointId: botheringId,
+            },
+        }));
     };
 
     const openLinkedBothering = () => {
@@ -139,7 +180,7 @@ export function HabitResourceCard({ resource, onUpdate, onDelete, onLinkClick, l
                             {resource.hasLocalAudio && (
                                 <AudioMiniPlayer resource={resource} />
                             )}
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onLinkClick(resource.id)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openBotheringSelector}>
                                 <LinkIcon className="h-4 w-4" />
                             </Button>
                             <DropdownMenu>
@@ -207,6 +248,58 @@ export function HabitResourceCard({ resource, onUpdate, onDelete, onLinkClick, l
                         {negativeCost ? (
                             <p className="text-xs text-muted-foreground">Cost: {negativeCost}</p>
                         ) : null}
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                            {negativeMechanism ? (
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={(e) => onOpenNestedPopup(negativeMechanism.id, e)}
+                                    >
+                                        Open mechanism
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs text-muted-foreground"
+                                        onClick={() => linkMechanism('response', undefined)}
+                                    >
+                                        Clear link
+                                    </Button>
+                                </>
+                            ) : (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs">
+                                            Link mechanism
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-64 p-2 z-[220]" side="top" align="start">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="w-full justify-start text-xs"
+                                            onClick={() => createMechanism('response')}
+                                        >
+                                            Create negative mechanism
+                                        </Button>
+                                        <Select onValueChange={(val) => linkMechanism('response', val)}>
+                                            <SelectTrigger className="mt-1 h-8 text-xs">
+                                                <SelectValue placeholder="Link existing..." />
+                                            </SelectTrigger>
+                                            <SelectContent side="top" align="start">
+                                                {resources.filter(r => r.type === 'mechanism').map(r => (
+                                                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </PopoverContent>
+                                </Popover>
+                            )}
+                        </div>
                     </div>
                     <div className="space-y-1">
                         <p className="text-sm text-muted-foreground">Positive:</p>
@@ -214,6 +307,58 @@ export function HabitResourceCard({ resource, onUpdate, onDelete, onLinkClick, l
                         {positiveBenefit ? (
                             <p className="text-xs text-muted-foreground">Benefit: {positiveBenefit}</p>
                         ) : null}
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                            {positiveMechanism ? (
+                                <>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={(e) => onOpenNestedPopup(positiveMechanism.id, e)}
+                                    >
+                                        Open mechanism
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs text-muted-foreground"
+                                        onClick={() => linkMechanism('newResponse', undefined)}
+                                    >
+                                        Clear link
+                                    </Button>
+                                </>
+                            ) : (
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs">
+                                            Link mechanism
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-64 p-2 z-[220]" side="top" align="start">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            className="w-full justify-start text-xs"
+                                            onClick={() => createMechanism('newResponse')}
+                                        >
+                                            Create positive mechanism
+                                        </Button>
+                                        <Select onValueChange={(val) => linkMechanism('newResponse', val)}>
+                                            <SelectTrigger className="mt-1 h-8 text-xs">
+                                                <SelectValue placeholder="Link existing..." />
+                                            </SelectTrigger>
+                                            <SelectContent side="top" align="start">
+                                                {resources.filter(r => r.type === 'mechanism').map(r => (
+                                                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </PopoverContent>
+                                </Popover>
+                            )}
+                        </div>
                     </div>
                 </CardContent>
                 <CardFooter>

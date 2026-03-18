@@ -1,14 +1,14 @@
 
-import { put, head } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { getSessionUserFromRequest } from '@/lib/serverSession';
+import { isSupabaseStorageConfigured, readJsonFromStorage, writeJsonToStorage } from '@/lib/supabaseStorageServer';
 
 export const dynamic = 'force-dynamic';
 const normalizeUsername = (username: string) => username.trim().toLowerCase();
 
 /**
  * POST /api/github-settings
- * Uploads a user's GitHub sync settings to Vercel Blob storage.
+ * Uploads a user's GitHub sync settings to Supabase Storage.
  */
 export async function POST(request: Request) {
   const {
@@ -22,9 +22,9 @@ export async function POST(request: Request) {
     supabasePdfBucket,
   } = await request.json();
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isSupabaseStorageConfigured()) {
     return NextResponse.json(
-      { error: 'Vercel Blob Storage is not configured on the server.' },
+      { error: 'Supabase storage is not configured on the server.' },
       { status: 500 }
     );
   }
@@ -54,13 +54,9 @@ export async function POST(request: Request) {
       supabaseAnonKey,
       supabasePdfBucket,
     };
-    const blob = await put(blobPathname, JSON.stringify(settingsData, null, 2), {
-      access: 'public',
-      contentType: 'application/json',
-      addRandomSuffix: false,
-    });
+    await writeJsonToStorage(blobPathname, settingsData);
 
-    return NextResponse.json({ success: true, message: 'GitHub settings saved.', blob });
+    return NextResponse.json({ success: true, message: 'GitHub settings saved.' });
   } catch (error) {
     console.error(`Error in POST /api/github-settings for user ${requestedUsername}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
@@ -70,15 +66,15 @@ export async function POST(request: Request) {
 
 /**
  * GET /api/github-settings?username=<username>
- * Fetches a user's GitHub settings from Vercel Blob storage.
+ * Fetches a user's GitHub settings from Supabase Storage.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const username = searchParams.get('username');
   
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isSupabaseStorageConfigured()) {
     return NextResponse.json(
-      { error: 'Vercel Blob Storage is not configured on the server.' },
+      { error: 'Supabase storage is not configured on the server.' },
       { status: 500 }
     );
   }
@@ -99,21 +95,13 @@ export async function GET(request: Request) {
   const blobPathname = `github-settings/${requestedUsername}.json`;
 
   try {
-    const blob = await head(blobPathname);
-    
-    const response = await fetch(blob.url);
-    
-    if (!response.ok) {
-        throw new Error(`Failed to download GitHub settings from Blob storage. Status: ${response.status}`);
+    const settingsData = await readJsonFromStorage<any>(blobPathname);
+    if (!settingsData) {
+      return NextResponse.json({ settings: null, message: "No GitHub settings found for this user." }, { status: 200 });
     }
-
-    const settingsData = await response.json();
     return NextResponse.json({ settings: settingsData });
 
   } catch (error: any) {
-    if (error?.status === 404 || error?.message?.includes('404')) {
-        return NextResponse.json({ settings: null, message: "No GitHub settings found for this user." }, { status: 200 });
-    }
     console.error(`GitHub settings read error for user ${requestedUsername}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
     return NextResponse.json({ error: `Failed to read GitHub settings: ${errorMessage}` }, { status: 500 });

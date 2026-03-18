@@ -52,6 +52,8 @@ import { FocusSessionModal } from '@/components/FocusSessionModal';
 import { usePathname } from 'next/navigation';
 import { useIsMobile } from '@/hooks/use-is-mobile';
 import { trackEngagementMetric } from '@/lib/metricsClient';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { AppSidebar } from '@/components/AppSidebar';
 
 const PdfViewerPopup = dynamic(() => import('@/components/PdfViewerPopup'), {
   ssr: false,
@@ -211,6 +213,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
   const [remainingTime, setRemainingTime] = React.useState<string | null>(null);
   const pathname = usePathname();
   const isMobile = useIsMobile();
+  const isLoginRoute = pathname === '/login';
   const isWidgetSuppressedRoute = pathname === '/' || pathname === '/login';
   const isDashboardRoute = pathname === '/my-plate';
   const shouldShowAgendaWidget = !isWidgetSuppressedRoute;
@@ -520,65 +523,73 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
       <DefaultBackground />
       <MatrixBackground />
       <ClothBackground />
-      {pathname !== '/canvas' && pathname !== '/' && <Header />}
 
-      {pathname !== '/canvas' && (
-        <>
-          <ChunkRecovery />
-          <main>{children}</main>
-          <Toaster />
-          <BackgroundAudioPlayer />
-          <DesktopReadinessDialog />
-          <FloatingVideoPlayer />
-          <MindsetCategoriesCard />
-          {(shouldRenderFloatingWidgets && settings.widgetVisibility.pistons) && <PistonsHead />}
-          {(shouldRenderFloatingWidgets && settings.widgetVisibility.goals) && <GoalsWidget />}
-          {(shouldRenderFloatingWidgets && settings.widgetVisibility.topPriorities) && <TopPrioritiesCard />}
-          {(shouldRenderFloatingWidgets && settings.widgetVisibility.activityDistribution) && <ActivityDistributionCard />}
-          {(shouldRenderFloatingWidgets && settings.widgetVisibility.ruleEquations) && <RuleEquationsCard />}
-          {(shouldRenderFloatingWidgets && settings.widgetVisibility.visualizationTechniques) && <VisualizationTechniquesCard />}
-          {(shouldRenderFloatingWidgets && settings.widgetVisibility.spacedRepetition) && <SpacedRepetitionPopup />}
-          <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
-          <StopperProgressModal 
-            popupState={stopperProgressPopup}
-            onOpenChange={(isOpen) => setStopperProgressPopup(prev => ({ ...prev, isOpen }))}
-          />
-          {linkedResistancePopup && (
-            <MindsetTechniquePopup
-              popupState={linkedResistancePopup}
-              onClose={() => setLinkedResistancePopup(null)}
-            />
-          )}
-          {activeFocusSession && (
-              <FocusTimerPopup
-                activity={activeFocusSession.activity}
-                duration={activeFocusSession.duration}
-                initialSecondsLeft={activeFocusSession.secondsLeft}
-                onClose={() => setActiveFocusSession(null)}
-                onLogDuration={onLogDuration}
-                onToggleMicroSkillRepetition={authContext.handleToggleMicroSkillRepetition}
-              />
-            )}
-          <FocusSessionModal
-            isOpen={focusSessionModalOpen}
-            onOpenChange={setFocusSessionModalOpen}
-            activity={focusActivity}
-            onStartSession={handleStartFocusSession}
-            onLogDuration={onLogDuration}
-            initialDuration={focusDuration}
-          />
-          {(shouldShowAgendaWidget && !isAgendaDocked && !isMobile && settings.allWidgetsVisible && settings.widgetVisibility.agenda) && (
-            <TodaysScheduleCard
-                date={new Date()}
-                schedule={schedule}
-                activityDurations={activityDurations}
-                isAgendaDocked={isAgendaDocked}
-                onToggleDock={() => setIsAgendaDocked(prev => !prev)}
-                onOpenFocusModal={onOpenFocusModal}
-                onOpenHabitPopup={openHabitPopup}
-                currentSlot={currentSlot}
-            />
-          )}
+      <SidebarProvider defaultOpen>
+        {pathname !== '/canvas' && pathname !== '/' && !isLoginRoute && <AppSidebar />}
+        <SidebarInset>
+          {pathname !== '/canvas' && pathname !== '/' && !isLoginRoute && <Header />}
+
+          {pathname !== '/canvas' && (
+            <>
+              <ChunkRecovery />
+              <main>{children}</main>
+              <Toaster />
+              {!isLoginRoute && (
+                <>
+                  <BackgroundAudioPlayer />
+                  <DesktopReadinessDialog />
+                  <FloatingVideoPlayer />
+                  <MindsetCategoriesCard />
+                  {(shouldRenderFloatingWidgets && settings.widgetVisibility.pistons) && <PistonsHead />}
+                  {(shouldRenderFloatingWidgets && settings.widgetVisibility.goals) && <GoalsWidget />}
+                  {(shouldRenderFloatingWidgets && settings.widgetVisibility.topPriorities) && <TopPrioritiesCard />}
+                  {(shouldRenderFloatingWidgets && settings.widgetVisibility.activityDistribution) && <ActivityDistributionCard />}
+                  {(shouldRenderFloatingWidgets && settings.widgetVisibility.ruleEquations) && <RuleEquationsCard />}
+                  {(shouldRenderFloatingWidgets && settings.widgetVisibility.visualizationTechniques) && <VisualizationTechniquesCard />}
+                  {(shouldRenderFloatingWidgets && settings.widgetVisibility.spacedRepetition) && <SpacedRepetitionPopup />}
+                  <DietPlanModal isOpen={isDietPlanModalOpen} onOpenChange={setIsDietPlanModalOpen} />
+                  <StopperProgressModal 
+                    popupState={stopperProgressPopup}
+                    onOpenChange={(isOpen) => setStopperProgressPopup(prev => ({ ...prev, isOpen }))}
+                  />
+                  {linkedResistancePopup && (
+                    <MindsetTechniquePopup
+                      popupState={linkedResistancePopup}
+                      onClose={() => setLinkedResistancePopup(null)}
+                    />
+                  )}
+                  {activeFocusSession && (
+                      <FocusTimerPopup
+                        activity={activeFocusSession.activity}
+                        duration={activeFocusSession.duration}
+                        initialSecondsLeft={activeFocusSession.secondsLeft}
+                        onClose={() => setActiveFocusSession(null)}
+                        onLogDuration={onLogDuration}
+                        onToggleMicroSkillRepetition={authContext.handleToggleMicroSkillRepetition}
+                      />
+                  )}
+                  <FocusSessionModal
+                    isOpen={focusSessionModalOpen}
+                    onOpenChange={setFocusSessionModalOpen}
+                    activity={focusActivity}
+                    onStartSession={handleStartFocusSession}
+                    onLogDuration={onLogDuration}
+                    initialDuration={focusDuration}
+                  />
+                  {(shouldShowAgendaWidget && !isAgendaDocked && !isMobile && settings.allWidgetsVisible && settings.widgetVisibility.agenda) && (
+                    <TodaysScheduleCard
+                        date={new Date()}
+                        schedule={schedule}
+                        activityDurations={activityDurations}
+                        isAgendaDocked={isAgendaDocked}
+                        onToggleDock={() => setIsAgendaDocked(prev => !prev)}
+                        onOpenFocusModal={onOpenFocusModal}
+                        onOpenHabitPopup={openHabitPopup}
+                        currentSlot={currentSlot}
+                    />
+                  )}
+                </>
+              )}
         </>
       )}
 
@@ -684,6 +695,8 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
           document.getElementById('global-popup-root')!
         )
       }
+        </SidebarInset>
+      </SidebarProvider>
     </DndContext>
   );
 }

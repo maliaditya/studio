@@ -29,14 +29,14 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Separator } from './ui/separator';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Copy, Trash2, RefreshCw, Github, HardDrive, Sparkles, Mic, Square, Play, Save, RotateCcw } from 'lucide-react';
-import type { Activity, ActivityType, WorkoutSchedulingMode, WidgetVisibility, SlotName } from '@/types/workout';
+import { Copy, Trash2, RefreshCw, Github, HardDrive, Sparkles, Mic, Square, Play, Save, RotateCcw, Loader2 } from 'lucide-react';
+import type { Activity, ActivityType, WorkoutSchedulingMode, WidgetVisibility, SlotName, HolidayEntry } from '@/types/workout';
 import { initSupabasePdfStorage } from '@/lib/supabasePdfStorage';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from './ui/scroll-area';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from './ui/progress';
-import { normalizeAiSettings, DEFAULT_OPENAI_MODEL, DEFAULT_OLLAMA_MODEL, DEFAULT_PERPLEXITY_MODEL, DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai/config';
+import { normalizeAiSettings, getAiConfigFromSettings, DEFAULT_OPENAI_MODEL, DEFAULT_OLLAMA_MODEL, DEFAULT_PERPLEXITY_MODEL, DEFAULT_ANTHROPIC_MODEL } from '@/lib/ai/config';
 import type { AiProvider } from '@/types/ai';
 import { DesktopReadinessPanel } from '@/components/DesktopReadinessDialog';
 
@@ -236,6 +236,15 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
 
   // State for GitHub settings inputs
   const [localSettings, setLocalSettings] = useState(settings);
+  const [newHolidayDate, setNewHolidayDate] = useState('');
+  const [newHolidayName, setNewHolidayName] = useState('');
+  const [isHolidayAstraOpen, setIsHolidayAstraOpen] = useState(false);
+  const [holidayCountry, setHolidayCountry] = useState('India');
+  const [holidayCustomCountry, setHolidayCustomCountry] = useState('');
+  const [holidayGenError, setHolidayGenError] = useState<string | null>(null);
+  const [isGeneratingHolidays, setIsGeneratingHolidays] = useState(false);
+  const [generatedHolidays, setGeneratedHolidays] = useState<HolidayEntry[]>([]);
+  const holidayYear = new Date().getFullYear();
   const resolvedAiSettings = useMemo(
     () => normalizeAiSettings(settings.ai, isDesktopRuntime),
     [settings.ai, isDesktopRuntime]
@@ -1072,6 +1081,134 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
   const handleSettingChange = (key: keyof typeof settings, value: any) => {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
+  const handleAddHoliday = () => {
+    const dateValue = newHolidayDate.trim();
+    const nameValue = newHolidayName.trim() || 'Holiday';
+    if (!dateValue) return;
+    setSettings(prev => {
+      const entries = (prev.holidays || []).map((entry) => (
+        typeof entry === 'string'
+          ? { date: entry, name: '' }
+          : { date: entry.date, name: entry.name || '' }
+      ));
+      let updated = false;
+      const next = entries.map((entry) => {
+        if (entry.date !== dateValue) return entry;
+        updated = true;
+        return { ...entry, name: nameValue };
+      });
+      if (!updated) {
+        next.push({ date: dateValue, name: nameValue });
+      }
+      next.sort((a, b) => a.date.localeCompare(b.date));
+      return { ...prev, holidays: next };
+    });
+    setNewHolidayDate('');
+    setNewHolidayName('');
+  };
+  const handleRemoveHoliday = (dateKey: string) => {
+    setSettings(prev => ({
+      ...prev,
+      holidays: (prev.holidays || []).filter((entry) => (
+        typeof entry === 'string' ? entry !== dateKey : entry?.date !== dateKey
+      )),
+    }));
+  };
+  const holidayEntries = useMemo(() => {
+    return (settings.holidays || [])
+      .map((entry) => (
+        typeof entry === 'string'
+          ? { date: entry, name: '' }
+          : { date: entry.date, name: entry.name || '' }
+      ))
+      .filter((entry) => entry.date);
+  }, [settings.holidays]);
+
+  const extractJsonArray = (raw: string) => {
+    const text = String(raw || '').trim();
+    const start = text.indexOf('[');
+    const end = text.lastIndexOf(']');
+    if (start === -1 || end === -1 || end <= start) return null;
+    const slice = text.slice(start, end + 1);
+    try {
+      return JSON.parse(slice);
+    } catch {
+      return null;
+    }
+  };
+
+  const handleGenerateHolidays = useCallback(async () => {
+    const chosen = (holidayCustomCountry.trim() || holidayCountry).trim();
+    if (!chosen) {
+      setHolidayGenError('Pick a country or type one to continue.');
+      return;
+    }
+    setIsGeneratingHolidays(true);
+    setHolidayGenError(null);
+    setGeneratedHolidays([]);
+    try {
+      const year = holidayYear;
+      const aiConfig = getAiConfigFromSettings(settings, isDesktopRuntime);
+      const response = await fetch('/api/ai/ask-shiv', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-studio-desktop': isDesktopRuntime ? '1' : '0',
+        },
+        body: JSON.stringify({
+          question: `Generate a national public holiday list for ${chosen} for the year ${year}. Return ONLY a valid JSON array. Each item must be {"date":"YYYY-MM-DD","name":"Holiday name"}. Do not include any extra text.`,
+          history: [],
+          aiConfig,
+          openMode: true,
+          replyLanguage: String(settings?.astraReplyLanguage || 'auto').trim().toLowerCase(),
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(String(result?.details || result?.error || 'Failed to generate holidays.'));
+      }
+      const answer = typeof result?.answer === 'string' ? result.answer.trim() : '';
+      const parsed = extractJsonArray(answer);
+      if (!Array.isArray(parsed)) {
+        throw new Error('Astra response did not include a valid JSON array.');
+      }
+      const normalized = parsed
+        .map((item) => ({
+          date: String(item?.date || '').trim(),
+          name: String(item?.name || '').trim(),
+        }))
+        .filter((item) => item.date);
+      if (normalized.length === 0) {
+        throw new Error('No holidays were returned.');
+      }
+      setGeneratedHolidays(normalized);
+    } catch (error) {
+      setHolidayGenError(error instanceof Error ? error.message : 'Failed to generate holidays.');
+    } finally {
+      setIsGeneratingHolidays(false);
+    }
+  }, [holidayCountry, holidayCustomCountry, holidayYear, isDesktopRuntime, settings]);
+
+  const handleApplyGeneratedHolidays = useCallback(() => {
+    if (generatedHolidays.length === 0) return;
+    setSettings((prev) => {
+      const existing = (prev.holidays || []).map((entry) => (
+        typeof entry === 'string'
+          ? { date: entry, name: '' }
+          : { date: entry.date, name: entry.name || '' }
+      ));
+      const byDate = new Map(existing.map((entry) => [entry.date, entry]));
+      generatedHolidays.forEach((entry) => {
+        if (!entry.date) return;
+        byDate.set(entry.date, { date: entry.date, name: entry.name || byDate.get(entry.date)?.name || '' });
+      });
+      const next = Array.from(byDate.values()).sort((a, b) => a.date.localeCompare(b.date));
+      return { ...prev, holidays: next };
+    });
+    setIsHolidayAstraOpen(false);
+    setHolidayGenError(null);
+    toast({ title: 'Holidays updated', description: 'Astra holiday list merged into your settings.' });
+  }, [generatedHolidays, setSettings, toast]);
   const handleBrowseXttsSample = useCallback(async () => {
     if (!isDesktopRuntime) return;
     const bridge = (window as any)?.studioDesktop;
@@ -2047,6 +2184,55 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                                   </SelectContent>
                                 </Select>
                             </div>
+                            <Separator />
+                              <div>
+                                  <Label className="font-semibold">Holidays</Label>
+                                  <p className="text-xs text-muted-foreground mb-2">Dates to skip for intelligent routines.</p>
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      type="date"
+                                      value={newHolidayDate}
+                                      onChange={(e) => setNewHolidayDate(e.target.value)}
+                                    />
+                                    <Input
+                                      placeholder="Holiday name"
+                                      value={newHolidayName}
+                                      onChange={(e) => setNewHolidayName(e.target.value)}
+                                    />
+                                    <Button variant="secondary" onClick={handleAddHoliday}>Add</Button>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      className="gap-2"
+                                      onClick={() => {
+                                        setHolidayGenError(null);
+                                        setGeneratedHolidays([]);
+                                        setIsHolidayAstraOpen(true);
+                                      }}
+                                    >
+                                      <Sparkles className="h-4 w-4" />
+                                      Astra Generate
+                                    </Button>
+                                    <p className="text-xs text-muted-foreground">Generate a national holiday list with Astra.</p>
+                                  </div>
+                                </div>
+                                <div className="mt-2 space-y-2">
+                                  {holidayEntries.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground">No holidays added yet.</p>
+                                  ) : (
+                                    holidayEntries.map((entry) => (
+                                      <div key={`${entry.date}-${entry.name}`} className="flex items-center justify-between rounded-md border border-border/60 bg-muted/30 px-2 py-1 text-xs">
+                                        <span>{entry.date}{entry.name ? ` - ${entry.name}` : ''}</span>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveHoliday(entry.date)}>
+                                          <Trash2 className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    ))
+                                  )}
+                                </div>
+                            </div>
                         </div>
                      </AccordionContent>
                   </AccordionItem>
@@ -2355,6 +2541,85 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
         </div>
       </div>
       )}
+      <Dialog
+        open={isHolidayAstraOpen}
+        onOpenChange={(open) => {
+          setIsHolidayAstraOpen(open);
+          if (!open) {
+            setHolidayGenError(null);
+            setGeneratedHolidays([]);
+            setIsGeneratingHolidays(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Astra Holiday Generator</DialogTitle>
+            <DialogDescription>
+              Astra can generate a national holiday list for {holidayYear}. Which country should we use?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md border border-border/60 bg-muted/20 p-3 space-y-2">
+              <div className="text-xs text-muted-foreground">Astra</div>
+              <div className="text-sm">Pick a country below or type your own.</div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {['India', 'USA', 'UK', 'Japan', 'Korea'].map((country) => (
+                <Button
+                  key={country}
+                  type="button"
+                  variant={holidayCountry === country ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => {
+                    setHolidayCountry(country);
+                    setHolidayCustomCountry('');
+                  }}
+                >
+                  {country}
+                </Button>
+              ))}
+            </div>
+            <Input
+              placeholder="Or type a country (e.g., Canada)"
+              value={holidayCustomCountry}
+              onChange={(e) => setHolidayCustomCountry(e.target.value)}
+            />
+            {holidayGenError ? (
+              <p className="text-xs text-destructive">{holidayGenError}</p>
+            ) : null}
+            <div className="flex items-center gap-2">
+              <Button onClick={() => void handleGenerateHolidays()} disabled={isGeneratingHolidays}>
+                {isGeneratingHolidays ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  'Generate Holidays'
+                )}
+              </Button>
+              <Button variant="outline" onClick={() => setIsHolidayAstraOpen(false)}>Close</Button>
+            </div>
+            {generatedHolidays.length > 0 ? (
+              <div className="space-y-2">
+                <div className="text-xs font-semibold text-muted-foreground">Preview</div>
+                <div className="max-h-40 overflow-auto rounded-md border border-border/60 bg-muted/20 p-2 text-xs space-y-1">
+                  {generatedHolidays.map((entry) => (
+                    <div key={`${entry.date}-${entry.name}`} className="flex items-center justify-between gap-2">
+                      <span>{entry.date}</span>
+                      <span className="text-muted-foreground">{entry.name}</span>
+                    </div>
+                  ))}
+                </div>
+                <Button variant="secondary" onClick={handleApplyGeneratedHolidays}>
+                  Update Holiday List
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={isCopyModalOpen} onOpenChange={setIsCopyModalOpen}>
         <DialogContent>
           <DialogHeader>

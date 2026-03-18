@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer, PlusCircle, FileText, Bot, Loader2, Bug } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, MoreVertical, Brain, Wind, History, Repeat, Link as LinkIcon, CheckCircle2, Circle, Trash2, Play, Timer, PlusCircle, FileText, Bot, Loader2, Bug, CircleDollarSign } from 'lucide-react';
 import type { Activity, ActivityType, RecurrenceRule } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,6 +26,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     workout: <Dumbbell className="h-4 w-4" />,
     upskill: <BookOpenCheck className="h-4 w-4" />,
     deepwork: <Briefcase className="h-4 w-4" />,
+    finance: <CircleDollarSign className="h-4 w-4" />,
     planning: <ClipboardList className="h-4 w-4" />,
     tracking: <ClipboardCheck className="h-4 w-4" />,
     branding: <Share2 className="h-4 w-4" />,

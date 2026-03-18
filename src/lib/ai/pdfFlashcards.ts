@@ -144,6 +144,32 @@ const tryParsePayload = (value: string) => {
   }
 };
 
+const normalizeParsedPayload = (value: unknown) => {
+  if (Array.isArray(value)) {
+    return { candidates: value };
+  }
+  if (!value || typeof value !== "object") return value;
+
+  const record = value as Record<string, unknown>;
+  if (Array.isArray(record.candidates)) return value;
+
+  const candidateCollectionKeys = [
+    "flashcards",
+    "cards",
+    "items",
+    "questions",
+    "mcqs",
+  ] as const;
+
+  for (const key of candidateCollectionKeys) {
+    if (Array.isArray(record[key])) {
+      return { candidates: record[key] };
+    }
+  }
+
+  return value;
+};
+
 const exampleSchema = {
   candidates: [
     {
@@ -424,7 +450,7 @@ export const validatePdfFlashcardPayload = (input: {
     };
   }
 
-  const parsed = payloadSchema.safeParse(parsedUnknown);
+  const parsed = payloadSchema.safeParse(normalizeParsedPayload(parsedUnknown));
   if (!parsed.success) {
     return {
       ok: false,

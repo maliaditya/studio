@@ -139,6 +139,15 @@ const isObsidianUrl = (url: string | undefined): boolean => {
     } catch (e) { return false; }
 };
 
+const isInteractiveTarget = (target: EventTarget | null) => {
+    if (!(target instanceof HTMLElement)) return false;
+    return Boolean(
+        target.closest(
+            'button, a, input, textarea, select, [role="button"], [role="menuitem"], [contenteditable="true"], [data-no-select="true"]'
+        )
+    );
+};
+
 interface FolderTreeViewProps {
   folders: ResourceFolder[];
   allFolders: ResourceFolder[];
@@ -572,11 +581,13 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
 ResourceCardComponent.displayName = 'ResourceCardComponent';
 
 
-const SortableResourceCard = React.memo(({ item, children, className, linkingFromId }: { 
+const SortableResourceCard = React.memo(({ item, children, className, linkingFromId, isSelected, onSelect }: { 
     item: Resource; 
     children: React.ReactNode;
     className?: string;
     linkingFromId: string | null;
+    isSelected?: boolean;
+    onSelect?: (resourceId: string) => void;
 }) => {
     const {
         attributes,
@@ -594,8 +605,25 @@ const SortableResourceCard = React.memo(({ item, children, className, linkingFro
         cursor: linkingFromId && linkingFromId !== item.id ? 'pointer' : 'default',
     };
 
+    const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        if (!onSelect || event.button !== 0) return;
+        if (isInteractiveTarget(event.target)) return;
+        onSelect(item.id);
+    };
+
     return (
-        <div ref={setNodeRef} style={style} {...attributes} {...listeners} className={className}>
+        <div
+            ref={setNodeRef}
+            style={style}
+            onPointerDown={handlePointerDown}
+            {...attributes}
+            {...listeners}
+            className={cn(
+                className,
+                "rounded-2xl transition-shadow",
+                isSelected && "ring-2 ring-primary/60 ring-offset-2 ring-offset-background"
+            )}
+        >
             {children}
         </div>
     );
@@ -912,6 +940,7 @@ function ResourcesPageContent() {
   
   const [linkingFromId, setLinkingFromId] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null);
   
   const [searchTerm, setSearchTerm] = useState('');
   const deferredSearchTerm = useDeferredValue(searchTerm);
@@ -1431,6 +1460,13 @@ function ResourcesPageContent() {
     return [];
   }, [resources, selectedResourceFolderId, normalizedSearchTerm, searchIndex]);
 
+  useEffect(() => {
+    if (!selectedResourceId) return;
+    if (!filteredResources.some(resource => resource.id === selectedResourceId)) {
+        setSelectedResourceId(null);
+    }
+  }, [filteredResources, selectedResourceId]);
+
   return (
     <div className="h-[calc(100vh-4rem)] overflow-hidden">
     <div className="grid h-full min-h-0 grid-cols-1 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-4 gap-4 p-4">
@@ -1580,7 +1616,14 @@ function ResourcesPageContent() {
                                 <SortableContext items={filteredResources.map(r => r.id)}>
                                 <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                                     {filteredResources.map(res => (
-                                        <SortableResourceCard key={res.id} item={res} className="h-full" linkingFromId={linkingFromId}>
+                                        <SortableResourceCard
+                                            key={res.id}
+                                            item={res}
+                                            className="h-full"
+                                            linkingFromId={linkingFromId}
+                                            isSelected={selectedResourceId === res.id}
+                                            onSelect={setSelectedResourceId}
+                                        >
                                         {res.type === 'habit' ? (
                                             <HabitResourceCard resource={res} onUpdate={handleUpdateResource} onDelete={() => setDeleteConfirmation({item: res})} onLinkClick={handleLinkClick} linkingFromId={linkingFromId} onOpenNestedPopup={(resourceId, event) => openGeneralPopup(resourceId, event)} />
                                         ) : res.type === 'mechanism' ? (

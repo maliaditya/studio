@@ -4,12 +4,12 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition } from '@/types/workout';
+import { DailySchedule, Activity, ActivityType, FullSchedule, SubTask, MetaRule, SlotName, RecurrenceRule, ExerciseDefinition, Project } from '@/types/workout';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { ScrollArea } from './ui/scroll-area';
-import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Repeat } from 'lucide-react';
+import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Share2, Magnet, AlertCircle, CheckSquare, Utensils, Brain, Wind, Moon, Sunrise, Sun, CloudSun, Sunset, MoonStar, PlusCircle, Timer, Repeat, CircleDollarSign, CreditCard, AlertTriangle, PiggyBank } from 'lucide-react';
 import { isToday, format, getISODay, parseISO, differenceInDays, differenceInMonths, startOfDay, addDays } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { AgendaWidgetItem } from './AgendaWidgetItem';
@@ -22,6 +22,7 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
     workout: <Dumbbell className="h-4 w-4" />,
     upskill: <BookOpenCheck className="h-4 w-4" />,
     deepwork: <Briefcase className="h-4 w-4" />,
+    finance: <CircleDollarSign className="h-4 w-4" />,
     planning: <ClipboardList className="h-4 w-4" />,
     tracking: <ClipboardCheck className="h-4 w-4" />,
     branding: <Share2 className="h-4 w-4" />,
@@ -46,8 +47,68 @@ const AddActivityMenu = ({
     onAddRoutineToday: (routine: Activity) => void;
     selectedSlotName: string;
 }) => {
-    const { coreSkills, settings } = useAuth();
-    const specializations = coreSkills.filter(s => s.type === 'Specialization');
+    const { coreSkills, settings, projects, offerizationPlans } = useAuth();
+    const todayKey = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+    const normalizeDateKey = (value?: string | null) => {
+        if (!value) return null;
+        const trimmed = String(value).trim();
+        if (!trimmed) return null;
+        const parsed = parseISO(trimmed);
+        if (!Number.isNaN(parsed.getTime())) return format(parsed, 'yyyy-MM-dd');
+        return trimmed;
+    };
+    const specializations = useMemo(() => {
+        return coreSkills.filter((spec) => {
+            if (spec.type !== 'Specialization') return false;
+            const plan = offerizationPlans?.[spec.id];
+            if (!plan) return false;
+            const learningPlan = plan.learningPlan;
+            const learningHasItems = !!learningPlan && (
+                (learningPlan.bookWebpageResources?.length || 0) > 0 ||
+                (learningPlan.audioVideoResources?.length || 0) > 0 ||
+                (learningPlan.skillTreePaths?.length || 0) > 0
+            );
+            const learningEndDates = [
+                ...(learningPlan?.bookWebpageResources || []).map((r) => normalizeDateKey(r.completionDate)),
+                ...(learningPlan?.audioVideoResources || []).map((r) => normalizeDateKey(r.completionDate)),
+                ...(learningPlan?.skillTreePaths || []).map((r) => normalizeDateKey(r.completionDate)),
+            ].filter((date): date is string => !!date);
+            const learningEndDate = learningEndDates.reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+            const learningActive = learningHasItems && (!learningEndDate || learningEndDate >= todayKey);
+
+            const releases = plan.releases || [];
+            const projectHasItems = releases.length > 0;
+            const projectEndDates = releases
+                .map((release) => normalizeDateKey(release.launchDate))
+                .filter((date): date is string => !!date);
+            const projectEndDate = projectEndDates.reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+            const projectActive = projectHasItems && (!projectEndDate || projectEndDate >= todayKey);
+
+            return learningActive || projectActive;
+        });
+    }, [coreSkills, offerizationPlans, todayKey]);
+    const deepworkSpecializations = useMemo(() => {
+        return coreSkills.filter((spec) => {
+            if (spec.type !== 'Specialization') return false;
+            const plan = offerizationPlans?.[spec.id];
+            if (!plan) return false;
+            const releases = plan.releases || [];
+            if (releases.length === 0) return false;
+            const projectEndDates = releases
+                .map((release) => normalizeDateKey(release.launchDate))
+                .filter((date): date is string => !!date);
+            const projectEndDate = projectEndDates.reduce<string | null>((latest, date) => (!latest || date > latest ? date : latest), null);
+            return !projectEndDate || projectEndDate >= todayKey;
+        });
+    }, [coreSkills, offerizationPlans, normalizeDateKey, todayKey]);
+    const projectsBySpecialization = useMemo(() => {
+        const map = new Map<string, Project[]>();
+        specializations.forEach((spec) => {
+            const list = (projects || []).filter((project) => project.domainId === spec.domainId);
+            map.set(spec.id, list);
+        });
+        return map;
+    }, [projects, specializations]);
     const groupedRoutines = useMemo(() => {
         const bySlot = new Map<string, Activity[]>();
         (settings.routines || []).forEach((routine) => {
@@ -84,7 +145,7 @@ const AddActivityMenu = ({
     }, [selectedSlotName, settings.routines]);
 
     return (
-        <DropdownMenuContent className="w-56 p-2">
+        <DropdownMenuContent className="w-56 p-2 z-[220]">
             <p className="font-medium text-sm p-2">Select Activity</p>
             <DropdownMenuSub>
                 <DropdownMenuSubTrigger className="w-full justify-start">
@@ -154,18 +215,84 @@ const AddActivityMenu = ({
                                 <span className="ml-2 capitalize">{type.replace('-', ' ')}</span>
                             </DropdownMenuSubTrigger>
                             <DropdownMenuPortal>
-                                <DropdownMenuSubContent>
+                                <DropdownMenuSubContent className="z-[220]">
                                     <ScrollArea className="h-48">
-                                        {specializations.length > 0 ? (
-                                            specializations.map(spec => (
-                                                <DropdownMenuItem key={spec.id} onClick={() => onAddActivity(activityType, spec.name)}>
-                                                    {spec.name}
-                                                </DropdownMenuItem>
-                                            ))
+                                        {(activityType === 'deepwork' ? deepworkSpecializations : specializations).length > 0 ? (
+                                            (activityType === 'deepwork' ? deepworkSpecializations : specializations).map(spec => {
+                                                if (activityType !== 'deepwork') {
+                                                    return (
+                                                        <DropdownMenuItem key={spec.id} onClick={() => onAddActivity(activityType, spec.name)}>
+                                                            {spec.name}
+                                                        </DropdownMenuItem>
+                                                    );
+                                                }
+                                                const linkedProjects = projectsBySpecialization.get(spec.id) || [];
+                                                return (
+                                                    <DropdownMenuSub key={spec.id}>
+                                                        <DropdownMenuSubTrigger className="w-full justify-start">
+                                                            {spec.name}
+                                                        </DropdownMenuSubTrigger>
+                                                        <DropdownMenuPortal>
+                                                            <DropdownMenuSubContent>
+                                                                <ScrollArea className="h-48">
+                                                                    <DropdownMenuItem onClick={() => onAddActivity(activityType, spec.name)}>
+                                                                        General {spec.name}
+                                                                    </DropdownMenuItem>
+                                                                    {linkedProjects.length > 0 ? (
+                                                                        linkedProjects.map((project) => (
+                                                                            <DropdownMenuItem
+                                                                                key={project.id}
+                                                                                onClick={() => onAddActivity(activityType, `${spec.name}: ${project.name}`)}
+                                                                            >
+                                                                                {project.name}
+                                                                            </DropdownMenuItem>
+                                                                        ))
+                                                                    ) : (
+                                                                        <DropdownMenuItem disabled>No projects linked</DropdownMenuItem>
+                                                                    )}
+                                                                </ScrollArea>
+                                                            </DropdownMenuSubContent>
+                                                        </DropdownMenuPortal>
+                                                    </DropdownMenuSub>
+                                                );
+                                            })
                                         ) : (
-                                            <DropdownMenuItem disabled>No specializations defined</DropdownMenuItem>
+                                            <DropdownMenuItem disabled>
+                                                {activityType === 'deepwork' ? 'No active project specializations' : 'No specializations defined'}
+                                            </DropdownMenuItem>
                                         )}
                                     </ScrollArea>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuPortal>
+                        </DropdownMenuSub>
+                    );
+                }
+                if (activityType === 'finance') {
+                    const financeOptions = [
+                        { label: 'Income', icon: <CircleDollarSign className="h-4 w-4" /> },
+                        { label: 'EMI', icon: <CreditCard className="h-4 w-4" /> },
+                        { label: 'Debt', icon: <AlertTriangle className="h-4 w-4" /> },
+                        { label: 'Saving', icon: <PiggyBank className="h-4 w-4" /> },
+                        { label: 'Emergency', icon: <AlertTriangle className="h-4 w-4" /> },
+                        { label: 'UnPlanned', icon: <AlertCircle className="h-4 w-4" /> },
+                    ];
+                    return (
+                        <DropdownMenuSub key={type}>
+                            <DropdownMenuSubTrigger className="w-full justify-start">
+                                {icon}
+                                <span className="ml-2 capitalize">Finance</span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuPortal>
+                                <DropdownMenuSubContent className="z-[220]">
+                                    {financeOptions.map((option) => (
+                                        <DropdownMenuItem
+                                            key={option.label}
+                                            onClick={() => onAddActivity(activityType, option.label)}
+                                        >
+                                            {option.icon}
+                                            <span className="ml-2">{option.label}</span>
+                                        </DropdownMenuItem>
+                                    ))}
                                 </DropdownMenuSubContent>
                             </DropdownMenuPortal>
                         </DropdownMenuSub>
@@ -475,6 +602,19 @@ export function TimeSlots({
             // De-dupe across the whole day so moved routine instances do not reappear in their original slot.
             ...routineInstances.filter((ri) => !explicitActivityIdsForDay.has(ri.id))
         ];
+        const orderedActivities = mergedActivities
+            .map((activity, index) => ({
+                activity,
+                index,
+                shouldSink: activity.completed || isTaskLogged(activity),
+            }))
+            .sort((a, b) => {
+                if (a.shouldSink !== b.shouldSink) {
+                    return a.shouldSink ? 1 : -1;
+                }
+                return a.index - b.index;
+            })
+            .map(({ activity }) => activity);
         const isCurrentSlotToday = isToday(date) && currentSlot === slot.name;
         let timeLeftLabel: string | null = null;
         if (isCurrentSlotToday) {
@@ -522,8 +662,8 @@ export function TimeSlots({
                     <div ref={provided.innerRef} {...provided.droppableProps} className="flex-grow min-h-0 mb-2">
                         <ScrollArea className="h-[200px] pr-2">
                             <ul className="space-y-2">
-                                {mergedActivities && mergedActivities.length > 0 ? (
-                                mergedActivities.map((activity, index) => (
+                                {orderedActivities && orderedActivities.length > 0 ? (
+                                orderedActivities.map((activity, index) => (
                                     <Draggable key={activity.id} draggableId={activity.id} index={index}>
                                     {(provided) => (
                                       <div

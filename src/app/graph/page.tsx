@@ -300,9 +300,11 @@ const getPatternPathSummary = (pattern: any) => {
   return {
     threatSignal: pattern?.threatSignal || parts[0] || "",
     threatAction: pattern?.threatAction || parts[1] || "",
+    threatActionType: pattern?.actionType || "",
     threatOutcome: pattern?.threatOutcome || parts[2] || "",
     growthSignal: pattern?.growthSignal || parts[3] || "",
     growthAction: pattern?.growthAction || parts[4] || "",
+    growthActionType: pattern?.growthActionType || "",
     growthOutcome: pattern?.growthOutcome || parts[5] || "",
   };
 };

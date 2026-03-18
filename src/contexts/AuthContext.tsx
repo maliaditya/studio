@@ -15,7 +15,7 @@ import {
   refreshSessionHeartbeat,
   refreshSessionFromStoredToken,
 } from '@/lib/localAuth';
-import { format, addDays, parseISO, subDays, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay, getHours, startOfToday, isSameDay, getISODay, differenceInMonths } from 'date-fns';
+import { format, addDays, addMonths, parseISO, subDays, isAfter, isBefore, isValid, eachDayOfInterval, min, max, startOfWeek, differenceInDays, getDay, getHours, startOfToday, isSameDay, getISODay, differenceInMonths } from 'date-fns';
 import { DEFAULT_EXERCISE_DEFINITIONS, INITIAL_PLANS, LEAD_GEN_DEFINITIONS, DEFAULT_MINDSET_CARDS, defaultMindsetCategories, DEFAULT_MIND_PROGRAMMING_DEFINITIONS } from '@/lib/constants';
 import { getExercisesForDay } from '@/lib/workoutUtils';
 
@@ -591,11 +591,11 @@ const normalizePersistedPayload = (payload: any): { main: any; ui: any } | null 
   return { main: payload, ui: {} };
 };
 
-const KANBAN_STAGE_MIGRATION: Array<{ key: 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems'; title: string; color: string }> = [
-  { key: 'ideaItems', title: 'Idea', color: '#2563eb' },
-  { key: 'codeItems', title: 'Code', color: '#059669' },
-  { key: 'breakItems', title: 'Break', color: '#d97706' },
-  { key: 'fixItems', title: 'Fix', color: '#9333ea' },
+const KANBAN_STAGE_MIGRATION: Array<{ key: 'idea' | 'code' | 'break' | 'fix'; title: string; color: string }> = [
+  { key: 'idea', title: 'Idea', color: '#2563eb' },
+  { key: 'code', title: 'Code', color: '#059669' },
+  { key: 'break', title: 'Break', color: '#d97706' },
+  { key: 'fix', title: 'Fix', color: '#9333ea' },
 ];
 
 const DEFAULT_PROJECT_KANBAN_LIST_TEMPLATES = [
@@ -847,7 +847,12 @@ const normalizeKanbanBoards = (
           position: stageIndex,
           archived: false,
         });
-        openCards.forEach((card, cardIndex) => pushCard(listId, cardIndex, stage.key, card));
+        openCards.forEach((card, cardIndex) => {
+          const stageKey = stage.key.replace('Items', '');
+          if (stageKey === 'idea' || stageKey === 'code' || stageKey === 'break' || stageKey === 'fix') {
+            pushCard(listId, cardIndex, stageKey, card);
+          }
+        });
       });
 
       const doneListId = buildKanbanMigrationId('kanban_list', boardId, 'done');
@@ -936,6 +941,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     carryForward: true,
     autoPush: false,
     autoPushLimit: 100,
+    debtBalance: 0,
+    financeMonthKey: new Date().toISOString().slice(0, 7),
+    financeMonthlyIncome: 0,
+    financeMonthlyOutflow: 0,
+    financeNetBalance: 0,
+    holidays: [],
     carryForwardEssentials: true,
     carryForwardNutrition: false,
     smartLogging: false,
@@ -1193,7 +1204,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (activityIndex > -1) {
             const newActivities = [...activities];
             newActivities[activityIndex] = updatedActivity;
-            newSchedule[dateKey][slotName as SlotName] = newActivities;
+            const reordered = newActivities
+              .map((activity, index) => ({ activity, index }))
+              .sort((a, b) => {
+                if (a.activity.completed !== b.activity.completed) {
+                  return a.activity.completed ? 1 : -1;
+                }
+                return a.index - b.index;
+              })
+              .map(({ activity }) => activity);
+            newSchedule[dateKey][slotName as SlotName] = reordered;
             found = true;
             break;
           }
@@ -1210,16 +1230,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (routines.length === 0) return;
     const skippedRoutineIdsForDate = new Set(settings.routineSkipByDate?.[dateKey] || []);
 
-    const isDue = (routine: Activity) => {
+    const isHoliday = (target: Date) => {
+      const key = format(target, 'yyyy-MM-dd');
+      return (settings.holidays || []).some((entry) => {
+        if (typeof entry === 'string') return entry === key;
+        return entry?.date === key;
+      });
+    };
+
+    const isBlockedByRule = (target: Date, rule: RecurrenceRule) => {
+      if (rule.avoidWeekends) {
+        const dow = getISODay(target);
+        if (dow === 6 || dow === 7) return true;
+      }
+      if (rule.avoidHolidays && isHoliday(target)) return true;
+      return false;
+    };
+
+    const isDueOnDate = (routine: Activity, target: Date) => {
       if (!routine.routine) return false;
       const rule = routine.routine;
       const base = routine.baseDate || routine.createdAt;
       try {
+        if (rule.endDate) {
+          const endDate = parseISO(rule.endDate);
+          if (Number.isNaN(endDate.getTime())) return false;
+          if (isAfter(target, endDate)) return false;
+        }
         if (rule.type === 'daily') return true;
         if (rule.type === 'weekly') {
           if (!base) return false;
           const baseDow = getISODay(parseISO(base));
-          const thisDow = getISODay(date);
+          const thisDow = getISODay(target);
           return baseDow === thisDow;
         }
         if (rule.type === 'custom') {
@@ -1228,19 +1270,115 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const unit = rule.repeatUnit ?? 'day';
           const baseDate = parseISO(base);
           if (unit === 'month') {
-            if (baseDate.getDate() !== date.getDate()) return false;
-            const diffMonths = differenceInMonths(date, baseDate);
+            if (baseDate.getDate() !== target.getDate()) return false;
+            const diffMonths = differenceInMonths(target, baseDate);
             return diffMonths >= 0 && diffMonths % interval === 0;
           }
           if (unit === 'week') {
-            const diffDays = differenceInDays(date, baseDate);
+            const diffDays = differenceInDays(target, baseDate);
             return diffDays >= 0 && diffDays % (interval * 7) === 0;
           }
-          const diffDays = differenceInDays(date, baseDate);
+          const diffDays = differenceInDays(target, baseDate);
           return diffDays >= 0 && diffDays % interval === 0;
         }
       } catch (e) {
         return false;
+      }
+      return false;
+    };
+
+    const getPrevDueDate = (routine: Activity, target: Date) => {
+      if (!routine.routine) return null;
+      const rule = routine.routine;
+      const base = routine.baseDate || routine.createdAt;
+      if (!base) return null;
+      const baseDate = parseISO(base);
+      if (Number.isNaN(baseDate.getTime())) return null;
+      if (rule.type === 'daily') return addDays(target, -1);
+      if (rule.type === 'weekly') return addDays(target, -7);
+      if (rule.type === 'custom') {
+        const interval = Math.max(1, rule.repeatInterval ?? rule.days ?? 1);
+        const unit = rule.repeatUnit ?? 'day';
+        if (unit === 'month') {
+          const diffMonths = differenceInMonths(target, baseDate);
+          if (diffMonths < 0) return null;
+          const offset = Math.floor(diffMonths / interval) * interval;
+          return addMonths(baseDate, offset);
+        }
+        const stepDays = unit === 'week' ? interval * 7 : interval;
+        const diffDays = differenceInDays(target, baseDate);
+        if (diffDays < 0) return null;
+        const offset = Math.floor(diffDays / stepDays) * stepDays;
+        return addDays(baseDate, offset);
+      }
+      return null;
+    };
+
+    const getNextDueDate = (routine: Activity, target: Date) => {
+      if (!routine.routine) return null;
+      const rule = routine.routine;
+      const base = routine.baseDate || routine.createdAt;
+      if (!base) return null;
+      const baseDate = parseISO(base);
+      if (Number.isNaN(baseDate.getTime())) return null;
+      if (rule.type === 'daily') return addDays(target, 1);
+      if (rule.type === 'weekly') return addDays(target, 7);
+      if (rule.type === 'custom') {
+        const interval = Math.max(1, rule.repeatInterval ?? rule.days ?? 1);
+        const unit = rule.repeatUnit ?? 'day';
+        if (unit === 'month') {
+          const diffMonths = differenceInMonths(target, baseDate);
+          if (diffMonths < 0) return baseDate;
+          const offset = (Math.floor(diffMonths / interval) + 1) * interval;
+          return addMonths(baseDate, offset);
+        }
+        const stepDays = unit === 'week' ? interval * 7 : interval;
+        const diffDays = differenceInDays(target, baseDate);
+        if (diffDays < 0) return baseDate;
+        const offset = (Math.floor(diffDays / stepDays) + 1) * stepDays;
+        return addDays(baseDate, offset);
+      }
+      return null;
+    };
+
+    const hasAllowedBetween = (start: Date, end: Date, rule: RecurrenceRule) => {
+      let cursor = addDays(start, 1);
+      while (isBefore(cursor, end)) {
+        if (!isBlockedByRule(cursor, rule)) return true;
+        cursor = addDays(cursor, 1);
+      }
+      return false;
+    };
+
+    const shouldScheduleOnDate = (routine: Activity, target: Date) => {
+      if (!routine.routine) return false;
+      const rule = routine.routine;
+      if (rule.endDate) {
+        const endDate = parseISO(rule.endDate);
+        if (!Number.isNaN(endDate.getTime()) && isAfter(target, endDate)) return false;
+      }
+
+      const isDue = isDueOnDate(routine, target);
+      const isBlocked = isBlockedByRule(target, rule);
+      if (isDue) return !isBlocked;
+
+      if (isBlocked || (!rule.avoidWeekends && !rule.avoidHolidays) || !rule.shiftPolicy) return false;
+
+      if (rule.shiftPolicy === 'postpone') {
+        const prevDue = getPrevDueDate(routine, target);
+        if (!prevDue) return false;
+        if (!isDueOnDate(routine, prevDue)) return false;
+        if (!isBlockedByRule(prevDue, rule)) return false;
+        if (hasAllowedBetween(prevDue, target, rule)) return false;
+        return true;
+      }
+      if (rule.shiftPolicy === 'prepone') {
+        const nextDue = getNextDueDate(routine, target);
+        if (!nextDue) return false;
+        if (!isDueOnDate(routine, nextDue)) return false;
+        if (!isBlockedByRule(nextDue, rule)) return false;
+        if (hasAllowedBetween(target, nextDue, rule)) return false;
+        return true;
       }
       return false;
     };
@@ -1265,7 +1403,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       };
 
       routines.forEach(r => {
-        if (!isDue(r)) return;
+        if (!shouldScheduleOnDate(r, date)) return;
         if (skippedRoutineIdsForDate.has(r.id)) return;
         const instanceId = `${r.id}_${dateKey}`;
         if (existingIdsForDay.has(instanceId)) return;
@@ -1305,7 +1443,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     activity: Activity,
     duration: number,
     moveToSlot?: SlotName,
-    progress?: { itemsCompleted?: number; hoursCompleted?: number; pagesCompleted?: number; microSkillName?: string }
+    progress?: { itemsCompleted?: number; hoursCompleted?: number; pagesCompleted?: number; microSkillName?: string; microSkillId?: string }
   ) => {
     const todayKey = format(new Date(), 'yyyy-MM-dd');
     const taskInstanceId = activity.taskIds?.[0];
@@ -1313,6 +1451,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Find the master definition ID from the daily log instance
     let definitionId: string | undefined;
     let matchedDefinitionCategory: string | undefined;
+    let matchedDefinitionMicroSkillIds: string[] = [];
     let isUpskillLog = false;
     let taskLog;
 
@@ -1337,11 +1476,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             definitionId = taskLog.definitionId;
             const matchingDef = [...upskillDefinitions, ...deepWorkDefinitions].find(d => d.id === taskLog.definitionId);
             matchedDefinitionCategory = matchingDef?.category;
+            matchedDefinitionMicroSkillIds = matchingDef?.linkedMicroSkillIds || [];
         }
     }
 
     if (!matchedDefinitionCategory && progress?.microSkillName) {
       matchedDefinitionCategory = progress.microSkillName;
+    }
+    if (progress?.microSkillId) {
+      matchedDefinitionMicroSkillIds = [progress.microSkillId];
     }
   
     if (definitionId) {
@@ -1449,13 +1592,50 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const shouldApplyMicroSkillProgress = !!matchedDefinitionCategory && (itemsDelta > 0 || hoursDelta > 0 || pagesDelta > 0);
     const shouldRemoveFromRepetitionQueue = activity.type === 'spaced-repetition' && !!matchedDefinitionCategory;
     if (shouldApplyMicroSkillProgress || shouldRemoveFromRepetitionQueue) {
+      const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      const explicitMicroSkillIds = new Set((matchedDefinitionMicroSkillIds || []).filter(Boolean));
+      const normalizedCategory = normalizeText(matchedDefinitionCategory);
+      const scopedSpecializationIds = new Set(primarySpecialization?.id ? [primarySpecialization.id] : []);
+      const allMatchingMicroSkillIds = new Set<string>();
+
+      if (normalizedCategory) {
+        coreSkills.forEach((spec) => {
+          spec.skillAreas.forEach((area) => {
+            area.microSkills.forEach((ms) => {
+              if (normalizeText(ms.name) === normalizedCategory) {
+                allMatchingMicroSkillIds.add(ms.id);
+              }
+            });
+          });
+        });
+      }
+
+      const fallbackMicroSkillIds = new Set<string>();
+      if (explicitMicroSkillIds.size === 0 && normalizedCategory) {
+        if (allMatchingMicroSkillIds.size === 1) {
+          allMatchingMicroSkillIds.forEach((id) => fallbackMicroSkillIds.add(id));
+        } else if (scopedSpecializationIds.size > 0) {
+          coreSkills.forEach((spec) => {
+            if (!scopedSpecializationIds.has(spec.id)) return;
+            spec.skillAreas.forEach((area) => {
+              area.microSkills.forEach((ms) => {
+                if (normalizeText(ms.name) === normalizedCategory) {
+                  fallbackMicroSkillIds.add(ms.id);
+                }
+              });
+            });
+          });
+        }
+      }
+
+      const targetMicroSkillIds = explicitMicroSkillIds.size > 0 ? explicitMicroSkillIds : fallbackMicroSkillIds;
       setCoreSkills(prev =>
         prev.map(spec => ({
           ...spec,
           skillAreas: spec.skillAreas.map(area => ({
             ...area,
             microSkills: area.microSkills.map(ms => {
-              if (normalizeText(ms.name) !== normalizeText(matchedDefinitionCategory)) return ms;
+              if (targetMicroSkillIds.size === 0 || !targetMicroSkillIds.has(ms.id)) return ms;
               return {
                 ...ms,
                 completedItems: (ms.completedItems || 0) + itemsDelta,
@@ -2454,6 +2634,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         carryForward: true, autoPush: false, autoPushLimit: 100, 
         carryForwardEssentials: true, carryForwardNutrition: false,
         smartLogging: false, defaultHabitLinks: {}, routines: [],
+        debtBalance: 0,
+        financeMonthKey: new Date().toISOString().slice(0, 7),
+        financeMonthlyIncome: 0,
+        financeMonthlyOutflow: 0,
+        financeNetBalance: 0,
+        holidays: [],
         workoutScheduling: 'day-of-week',
         slotRules: {},
         widgetVisibility: { agenda: true, smartLogging: false, pistons: false, mindset: false, activityDistribution: false, favorites: false, topPriorities: false, goals: false, brainHacks: false, ruleEquations: false, visualizationTechniques: false, spacedRepetition: false },
@@ -3147,6 +3333,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const linkedTaskId = activityToUpdate.taskIds?.[0];
         let definitionId: string | undefined;
         let matchedDefinitionCategory: string | undefined;
+        let matchedDefinitionMicroSkillIds: string[] = [];
         let isUpskillLog = false;
 
         if (linkedTaskId) {
@@ -3169,6 +3356,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const setDefinitions = isUpskillLog ? setUpskillDefinitions : setDeepWorkDefinitions;
             const matchedDef = [...upskillDefinitions, ...deepWorkDefinitions].find((def) => def.id === definitionId);
             matchedDefinitionCategory = matchedDef?.category;
+            matchedDefinitionMicroSkillIds = matchedDef?.linkedMicroSkillIds || [];
             setDefinitions(prevDefs => prevDefs.map(def => {
                 if (def.id !== definitionId) return def;
                 return {
@@ -3181,19 +3369,141 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (matchedDefinitionCategory) {
             const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+            const explicitMicroSkillIds = new Set((matchedDefinitionMicroSkillIds || []).filter(Boolean));
+            const normalizedCategory = normalizeText(matchedDefinitionCategory);
+            const allMatchingMicroSkillIds = new Set<string>();
+
+            if (normalizedCategory) {
+                coreSkills.forEach((spec) => {
+                    spec.skillAreas.forEach((area) => {
+                        area.microSkills.forEach((ms) => {
+                            if (normalizeText(ms.name) === normalizedCategory) {
+                                allMatchingMicroSkillIds.add(ms.id);
+                            }
+                        });
+                    });
+                });
+            }
+
+            const targetMicroSkillIds = explicitMicroSkillIds.size > 0 ? explicitMicroSkillIds : allMatchingMicroSkillIds.size === 1 ? allMatchingMicroSkillIds : new Set<string>();
             setCoreSkills(prev =>
                 prev.map(spec => ({
                     ...spec,
                     skillAreas: spec.skillAreas.map(area => ({
                         ...area,
                         microSkills: area.microSkills.map(ms =>
-                            normalizeText(ms.name) === normalizeText(matchedDefinitionCategory)
+                            targetMicroSkillIds.size > 0 && targetMicroSkillIds.has(ms.id)
                                 ? { ...ms, isReadyForRepetition: false }
                                 : ms
                         ),
                     })),
                 }))
             );
+        }
+    }
+
+    if (shouldBeCompleted && !activityToUpdate.completed) {
+        const normalizeText = (value?: string) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        const financeLabel = normalizeText(activityToUpdate.details);
+        const incomeLabels = new Set(['income']);
+        const outflowLabels = new Set(['emi', 'debt', 'saving', 'emergency', 'unplanned']);
+        const hasCostIn = typeof activityToUpdate.costIn === 'number';
+        const hasCostOut =
+            typeof activityToUpdate.costOut === 'number' || typeof activityToUpdate.cost === 'number';
+        const isIncome = hasCostIn;
+        const isOutflow = hasCostOut;
+        const incomeAmount = isIncome
+            ? (typeof activityToUpdate.costIn === 'number' ? activityToUpdate.costIn : null)
+            : null;
+        const outflowAmount = isOutflow
+            ? (typeof activityToUpdate.costOut === 'number'
+                ? activityToUpdate.costOut
+                : typeof activityToUpdate.cost === 'number'
+                    ? activityToUpdate.cost
+                    : null)
+            : null;
+        const debtAdjustment =
+            outflowAmount !== null && financeLabel === 'debt'
+                ? outflowAmount
+                : outflowAmount !== null && financeLabel === 'emi'
+                    ? -outflowAmount
+                    : 0;
+        const netAdjustment =
+            incomeAmount !== null
+                ? incomeAmount
+                : outflowAmount !== null
+                    ? financeLabel === 'debt'
+                        ? outflowAmount
+                        : -outflowAmount
+                    : 0;
+        const monthKey = String(targetDateKey || '').slice(0, 7);
+
+        if ((isIncome && incomeAmount !== null) || (isOutflow && outflowAmount !== null)) {
+            setSettings(prev => {
+                const routines = prev.routines || [];
+                const existingIndex = routines.findIndex(r =>
+                    r.type === 'finance' && normalizeText(r.details) === financeLabel
+                );
+                const shouldResetMonth = monthKey && prev.financeMonthKey !== monthKey;
+                const baseMonthlyIncome = shouldResetMonth ? 0 : (prev.financeMonthlyIncome ?? 0);
+                const baseMonthlyOutflow = shouldResetMonth ? 0 : (prev.financeMonthlyOutflow ?? 0);
+                const nextMonthlyIncome = isIncome && incomeAmount !== null ? baseMonthlyIncome + incomeAmount : baseMonthlyIncome;
+                const shouldCountOutflow = isOutflow && outflowAmount !== null && financeLabel !== 'debt';
+                const nextMonthlyOutflow = shouldCountOutflow ? baseMonthlyOutflow + outflowAmount! : baseMonthlyOutflow;
+                const nextFinanceNet = Number.isFinite(prev.financeNetBalance ?? 0)
+                    ? Math.max(0, (prev.financeNetBalance ?? 0) + netAdjustment)
+                    : Math.max(0, netAdjustment);
+                if (existingIndex >= 0) {
+                    const updated = { ...routines[existingIndex] };
+                    if (isIncome) updated.costIn = incomeAmount;
+                    if (isOutflow) {
+                        updated.costOut = outflowAmount;
+                        updated.cost = outflowAmount;
+                    }
+                    const next = [...routines];
+                    next[existingIndex] = updated;
+                    const nextDebtBalance = Number.isFinite(prev.debtBalance ?? 0)
+                        ? Math.max(0, (prev.debtBalance ?? 0) + debtAdjustment)
+                        : Math.max(0, debtAdjustment);
+                    return {
+                        ...prev,
+                        routines: next,
+                        debtBalance: nextDebtBalance,
+                        financeMonthKey: monthKey || prev.financeMonthKey,
+                        financeMonthlyIncome: nextMonthlyIncome,
+                        financeMonthlyOutflow: nextMonthlyOutflow,
+                        financeNetBalance: nextFinanceNet,
+                    };
+                }
+
+                const routineId = `routine-finance-${financeLabel || Date.now()}`;
+                const newRoutine: Activity = {
+                    id: routineId,
+                    type: 'finance',
+                    details: activityToUpdate.details,
+                    completed: false,
+                    slot: activityToUpdate.slot || slotName,
+                    costIn: isIncome ? incomeAmount : null,
+                    costOut: isOutflow ? outflowAmount : null,
+                    cost: isOutflow ? outflowAmount : null,
+                    routine: { type: 'custom', repeatInterval: 1, repeatUnit: 'month' },
+                    isRoutine: true,
+                    baseDate: targetDateKey,
+                    taskIds: [],
+                };
+                const nextDebtBalance = Number.isFinite(prev.debtBalance ?? 0)
+                    ? Math.max(0, (prev.debtBalance ?? 0) + debtAdjustment)
+                    : Math.max(0, debtAdjustment);
+                return {
+                    ...prev,
+                    routines: [...routines, newRoutine],
+                    debtBalance: nextDebtBalance,
+                    financeMonthKey: monthKey || prev.financeMonthKey,
+                    financeMonthlyIncome: nextMonthlyIncome,
+                    financeMonthlyOutflow: nextMonthlyOutflow,
+                    financeNetBalance: nextFinanceNet,
+                };
+            });
         }
     }
     
@@ -3270,6 +3580,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUpskillDefinitions,
     setDeepWorkDefinitions,
     setCoreSkills,
+    setSettings,
   ]);
 
   const onRemoveActivity = useCallback((slotName: string, activityId: string, date: Date) => {
@@ -3989,7 +4300,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     toast({ title: 'Micro-Skill Deleted', description: 'The micro-skill and all associated tasks have been removed.' });
 };
 
-const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaId: string, microSkillId: string, isReady: boolean) => {
+  const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaId: string, microSkillId: string, isReady: boolean) => {
   let updatedMicroSkill: MicroSkill | undefined;
 
   setCoreSkills(prevSkills => {
@@ -4444,7 +4755,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
   
   const handleDeleteStopper = (habitId: string, stopperId: string) => {
     setResources(prev => prev.map(r => {
-        if (r.id === habitId) {
+        if (r.id === habitId && (r.type === 'habit' || r.type === 'mechanism')) {
             return { ...r, stoppers: (r.stoppers || []).filter(s => s.id !== stopperId) };
         }
         return r;
@@ -4753,6 +5064,8 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
       specializationId?: string | null;
     };
     routine?: {
+      activityType?: ActivityType;
+      specializationId?: string | null;
       details: string;
       slot: SlotName;
       recurrence: RecurrenceRule;
@@ -5056,6 +5369,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
         completed: false,
         slot: input.routine.slot,
         linkedEntityType: linkedSpecializationId ? 'specialization' : undefined,
+        createdAt: new Date().toISOString(),
       };
       const normalizedId = activity.id.replace(/_(\d{4}-\d{2}-\d{2})$/, '');
       routineId = normalizedId || `routine_${activity.type}_${activity.details.replace(/\s/g, '')}`;
@@ -5323,7 +5637,7 @@ const handleToggleMicroSkillRepetition = useCallback((coreSkillId: string, areaI
     };
   
     setCanvasLayout(prev => {
-        const newNode: CanvasNode = { id: newElement.id, x: x, y: y, width: 300, height: 150 };
+        const newNode = { id: newElement.id, x: x, y: y, width: 300, height: 150 };
         return {
             ...prev,
             nodes: [...prev.nodes, newNode]

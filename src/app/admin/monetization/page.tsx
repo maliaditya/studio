@@ -236,7 +236,7 @@ function AdminMonetizationPageContent() {
             <CardTitle>{summary?.storageConfigured === false ? "Not configured" : "Configured"}</CardTitle>
           </CardHeader>
           <CardContent className="text-xs text-muted-foreground">
-            Requires server `BLOB_READ_WRITE_TOKEN`.
+            Requires server `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`.
           </CardContent>
         </Card>
       </div>

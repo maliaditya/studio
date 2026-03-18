@@ -3,18 +3,19 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, Rocket, Calendar as CalendarIcon, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin, PieChart as PieChartIcon, Expand, Clock } from 'lucide-react';
+import { BarChart3, TrendingUp, Share2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Rocket, Calendar as CalendarIcon, Brain as BrainIcon, Lightbulb, Flashlight, Check, Linkedin, PieChart as PieChartIcon, Expand, Clock, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { BarChart, Bar, Cell, ResponsiveContainer, XAxis, YAxis, PieChart as RechartsPieChart, Pie, Tooltip as RechartsTooltip, CartesianGrid } from 'recharts';
-import { format, parseISO, startOfMonth } from 'date-fns';
+import { addDays, format, parseISO, startOfMonth, startOfWeek } from 'date-fns';
 import { motion } from 'framer-motion';
 import { Carousel } from './ui/carousel';
 import { useAuth } from '@/contexts/AuthContext';
@@ -286,6 +287,14 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
   const [timesheetModalTab, setTimesheetModalTab] = useState<'timesheet' | 'habit-dashboard'>('habit-dashboard');
   const [timesheetDashboardMonth, setTimesheetDashboardMonth] = useState(startOfMonth(new Date()));
   const [isTimetableModalOpen, setIsTimetableModalOpen] = useState(false);
+  const [isTimetablePortalReady, setIsTimetablePortalReady] = useState(false);
+  const [timetableWeek, setTimetableWeek] = useState<Date>(
+    startOfWeek(new Date(), { weekStartsOn: 1 })
+  );
+
+  useEffect(() => {
+    setIsTimetablePortalReady(true);
+  }, []);
   const [isWeeklyReviewModalOpen, setIsWeeklyReviewModalOpen] = useState(false);
   const [isCoreStatesModalOpen, setIsCoreStatesModalOpen] = useState(false);
 
@@ -688,28 +697,54 @@ export function ProductivitySnapshot({ stats, timeAllocationData, onOpenTimeAllo
           </div>
         </DialogContent>
       </Dialog>
-      <Dialog open={isTimetableModalOpen} onOpenChange={setIsTimetableModalOpen}>
-        <DialogContent
-          className="max-w-7xl h-[90vh] flex flex-col p-0"
-          onInteractOutside={(event) => {
-            const target = event.target as HTMLElement | null;
-            if (!target) return;
-            if (target.closest('[data-radix-dropdown-menu-content]') || target.closest('[data-radix-popper-content-wrapper]')) {
-              event.preventDefault();
-            }
-          }}
-        >
-            <DialogHeader className="p-4 border-b">
-                <DialogTitle>Weekly Timetable</DialogTitle>
-                <DialogDescription>
-                    Plan your week at a glance.
-                </DialogDescription>
-            </DialogHeader>
-            <div className="flex-grow min-h-0">
-                <TimetablePageContent isModal={true} />
-            </div>
-        </DialogContent>
-      </Dialog>
+      {isTimetableModalOpen && isTimetablePortalReady
+        ? ReactDOM.createPortal(
+            <div className="fixed left-1/2 top-1/2 z-[120] h-[95vh] w-[95vw] -translate-x-1/2 -translate-y-1/2 rounded-2xl border bg-background/95 shadow-2xl backdrop-blur">
+              <div className="flex items-start justify-between gap-4 border-b p-4">
+                <div>
+                  <div className="text-lg font-semibold">Weekly Timetable</div>
+                  <p className="text-sm text-muted-foreground">Plan your week at a glance.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => setTimetableWeek((prev) => addDays(prev, -7))}
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="h-9"
+                    onClick={() => setTimetableWeek(startOfWeek(new Date(), { weekStartsOn: 1 }))}
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => setTimetableWeek((prev) => addDays(prev, 7))}
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsTimetableModalOpen(false)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <div className="h-[calc(95vh-72px)]">
+                <TimetablePageContent
+                  isModal={true}
+                  currentWeek={timetableWeek}
+                  onWeekChange={setTimetableWeek}
+                />
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </>
   );
 }

@@ -5,7 +5,7 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy, ChevronsDown, ChevronsUp, Smartphone, Plus, Paintbrush, Library, Edit3 } from 'lucide-react';
+import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy, ChevronsDown, ChevronsUp, Smartphone, Plus, Paintbrush, Library, Edit3, Circle, Square, Play, Scissors, List, Trash2, FastForward } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +18,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { loadExcalidrawFiles, saveExcalidrawFiles, type ExcalidrawFilesMetaMap } from '@/lib/excalidrawFileStore';
 import { parseJsonWithRecovery } from '@/lib/jsonRecovery';
+import { useCanvasRecording } from '@/hooks/useCanvasRecording';
 
 // Dynamically import Excalidraw to avoid SSR issues
 const Excalidraw = dynamic(
@@ -164,6 +165,7 @@ const ExcalidrawWrapper = ({
   onKeyDown,
   onLinkOpen,
   files,
+  viewModeEnabled,
 }: {
   activeCanvas: { id: string; data?: string };
   theme: string;
@@ -176,6 +178,7 @@ const ExcalidrawWrapper = ({
   onKeyDown: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   onLinkOpen: OnLinkOpen;
   files: Record<string, any>;
+  viewModeEnabled?: boolean;
 }) => {
   const initialData = useMemo(() => {
     try {
@@ -202,6 +205,7 @@ const ExcalidrawWrapper = ({
         onPointerDown={onPointerDown}
         onKeyDown={onKeyDown}
         onLinkOpen={onLinkOpen}
+        viewModeEnabled={viewModeEnabled}
       />
     </div>
   );
@@ -415,11 +419,58 @@ function DrawingCanvasPageContent() {
 
 
     const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
+    const {
+        recording,
+        recordings,
+        activeRecordingId,
+        hasRecording,
+        isRecording,
+        isPlaying,
+        playbackFrameIndex,
+        playbackSpeed,
+        setPlaybackSpeed,
+        startRecording,
+        stopRecording,
+        renameRecording,
+        selectRecording,
+        playRecording,
+        stopPlayback,
+        handleRecordingChange,
+        cutRecording,
+        deleteFrames,
+        toggleSkippedFrames,
+        deleteRecording,
+    } = useCanvasRecording({
+        canvasId: activeCanvas?.id,
+        excalidrawAPIRef,
+        toast,
+    });
+    const [showRecordingEditor, setShowRecordingEditor] = useState(false);
+    const [showKeyframeEditor, setShowKeyframeEditor] = useState(false);
+    const [cutStartSeconds, setCutStartSeconds] = useState('0');
+    const [cutEndSeconds, setCutEndSeconds] = useState('0');
+    const [showRecordingNamePrompt, setShowRecordingNamePrompt] = useState(false);
+    const [recordingNameDraft, setRecordingNameDraft] = useState('');
+    const [pendingRenameId, setPendingRenameId] = useState<string | null>(null);
+    const [selectedKeyframes, setSelectedKeyframes] = useState<Set<number>>(new Set());
 
     useEffect(() => {
         isUserChange.current = false;
         setIsDirty(false);
     }, [drawingCanvasState?.activeCanvasId]);
+
+    useEffect(() => {
+        setShowRecordingEditor(false);
+        setShowKeyframeEditor(false);
+        setShowRecordingNamePrompt(false);
+        setSelectedKeyframes(new Set());
+    }, [activeCanvas?.id]);
+
+    useEffect(() => {
+        if (!showRecordingNamePrompt) return;
+        const nextDefault = `Recording ${recordings.length + 1}`;
+        setRecordingNameDraft(nextDefault);
+    }, [showRecordingNamePrompt, recordings.length]);
 
     useEffect(() => {
         const loadFiles = async () => {
@@ -508,11 +559,137 @@ function DrawingCanvasPageContent() {
         return () => window.removeEventListener('keydown', handleSaveShortcut);
     }, [drawingCanvasState?.activeCanvasId, handleSaveClick]);
 
-    const handleCanvasChange = useCallback(() => {
+    const handleCanvasChange = useCallback((elements: readonly ExcalidrawElement[], appState: AppState) => {
         if (isUserChange.current) {
             setIsDirty(true);
         }
-    }, []);
+        handleRecordingChange(elements, appState);
+    }, [handleRecordingChange]);
+
+    useEffect(() => {
+        if (!showRecordingEditor) return;
+        const durationSeconds = Math.max(0, Math.round(((recording?.durationMs || 0) / 1000) * 10) / 10);
+        setCutStartSeconds('0');
+        setCutEndSeconds(String(durationSeconds));
+    }, [showRecordingEditor, recording?.durationMs]);
+
+    const handleCutRecording = useCallback(() => {
+        const startSeconds = Number(cutStartSeconds);
+        const endSeconds = Number(cutEndSeconds);
+        if (!Number.isFinite(startSeconds) || !Number.isFinite(endSeconds)) {
+            toast({ title: "Enter valid times", description: "Use seconds for start/end values.", variant: "destructive" });
+            return;
+        }
+        const startMs = Math.max(0, startSeconds * 1000);
+        const endMs = Math.max(0, endSeconds * 1000);
+        stopPlayback();
+        const ok = cutRecording(startMs, endMs);
+        if (ok) {
+            toast({ title: "Recording updated", description: "Selected range removed. Audio was cleared to avoid desync." });
+            setShowRecordingEditor(false);
+        } else {
+            toast({ title: "Cut failed", description: "Range was empty or removed all frames.", variant: "destructive" });
+        }
+    }, [cutStartSeconds, cutEndSeconds, cutRecording, stopPlayback, toast]);
+
+    const skippedKeyframes = useMemo(() => new Set(recording?.skippedFrameIndices || []), [recording?.skippedFrameIndices]);
+
+    const keyframeList = useMemo(() => {
+        if (!recording?.frames?.length) return [];
+        const frames = recording.frames;
+        const maxItems = 80;
+        const minGapMs = 800;
+        const results: Array<{ index: number; t: number; count: number; skipped: boolean }> = [];
+        let lastT = -Infinity;
+        for (let i = 0; i < frames.length; i += 1) {
+            const frame = frames[i];
+            if (!frame) continue;
+            if (results.length >= maxItems) break;
+            if (frame.t - lastT < minGapMs && i !== frames.length - 1) continue;
+            results.push({ index: i, t: frame.t, count: frame.elements?.length || 0, skipped: skippedKeyframes.has(i) });
+            lastT = frame.t;
+        }
+        if (results.length === 0 && frames.length > 0) {
+            results.push({ index: 0, t: frames[0].t, count: frames[0].elements?.length || 0, skipped: skippedKeyframes.has(0) });
+        }
+        return results;
+    }, [recording?.frames, skippedKeyframes]);
+
+    const activeKeyframeIndex = useMemo(() => {
+        if (!isPlaying || playbackFrameIndex === null) return null;
+        let active: number | null = null;
+        for (const frame of keyframeList) {
+            if (frame.index <= playbackFrameIndex) active = frame.index;
+            else break;
+        }
+        return active;
+    }, [isPlaying, playbackFrameIndex, keyframeList]);
+
+    const handleDeleteKeyframes = useCallback(() => {
+        if (selectedKeyframes.size === 0) {
+            toast({ title: "Select frames", description: "Pick at least one frame to delete.", variant: "destructive" });
+            return;
+        }
+        stopPlayback();
+        const ok = deleteFrames(Array.from(selectedKeyframes));
+        if (ok) {
+            toast({ title: "Frames deleted", description: "Audio was cleared to avoid desync." });
+            setSelectedKeyframes(new Set());
+            setShowKeyframeEditor(false);
+        } else {
+            toast({ title: "Delete failed", description: "Cannot remove all frames.", variant: "destructive" });
+        }
+    }, [selectedKeyframes, deleteFrames, stopPlayback, toast]);
+
+    const handleDeleteRecording = useCallback(() => {
+        if (!activeRecordingId) return;
+        const confirmed = window.confirm("Delete this recording? This cannot be undone.");
+        if (!confirmed) return;
+        stopPlayback();
+        const ok = deleteRecording(activeRecordingId);
+        if (!ok) {
+            toast({ title: "Delete failed", description: "Unable to delete recording.", variant: "destructive" });
+        }
+    }, [activeRecordingId, deleteRecording, stopPlayback, toast]);
+
+    const handleCycleSpeed = useCallback(() => {
+        const next = playbackSpeed >= 3 ? 0 : Math.round((playbackSpeed + 0.5) * 10) / 10;
+        setPlaybackSpeed(next);
+    }, [playbackSpeed, setPlaybackSpeed]);
+
+    const handleSkipKeyframes = useCallback(() => {
+        if (selectedKeyframes.size === 0) {
+            toast({ title: "Select frames", description: "Pick at least one frame to skip.", variant: "destructive" });
+            return;
+        }
+        const ok = toggleSkippedFrames(Array.from(selectedKeyframes));
+        if (!ok) {
+            toast({ title: "Skip failed", description: "Unable to update skipped frames.", variant: "destructive" });
+        }
+    }, [selectedKeyframes, toggleSkippedFrames, toast]);
+
+    const handleConfirmStopRecording = useCallback(async () => {
+        const name = recordingNameDraft.trim();
+        if (!name) {
+            toast({ title: "Name required", description: "Please enter a recording name.", variant: "destructive" });
+            return;
+        }
+        if (pendingRenameId) {
+            renameRecording(pendingRenameId, name);
+        }
+        setShowRecordingNamePrompt(false);
+        setPendingRenameId(null);
+    }, [recordingNameDraft, pendingRenameId, renameRecording, toast]);
+
+    const handleStopRecording = useCallback(async () => {
+        const fallbackName = `Recording ${recordings.length + 1}`;
+        const saved = await stopRecording(fallbackName);
+        if (saved?.id) {
+            setPendingRenameId(saved.id);
+            setRecordingNameDraft(saved.name);
+            setShowRecordingNamePrompt(true);
+        }
+    }, [recordings.length, stopRecording]);
 
     const handlePointerDown = useCallback((activeTool: Readonly<{ type: string; }>, pointerDownState: PointerDownState) => {
         if (!isUserChange.current) {
@@ -706,18 +883,21 @@ function DrawingCanvasPageContent() {
     }, [drawingCanvasState?.openCanvases, handleUpdateResource, openDrawingCanvas, resources, toast]);
     
     if (isMobile) {
-      return (
-          <div className="flex h-screen w-screen items-center justify-center bg-background text-center text-foreground p-4">
-              <div className="space-y-4">
-                  <Smartphone className="mx-auto h-16 w-16" />
-                  <h1 className="text-2xl font-bold">Please Rotate Your Device</h1>
-                  <p className="text-muted-foreground">For the best drawing experience, please use landscape mode.</p>
-              </div>
-          </div>
-      );
+        return (
+            <div className="flex h-screen w-screen items-center justify-center bg-background p-4 text-center text-foreground">
+                <div className="space-y-4">
+                    <Smartphone className="mx-auto h-16 w-16" />
+                    <h1 className="text-2xl font-bold">Please Rotate Your Device</h1>
+                    <p className="text-muted-foreground">
+                        For the best drawing experience, please use landscape mode.
+                    </p>
+                </div>
+            </div>
+        );
     }
 
-    const subCanvasListResource = resources?.find(r => r.id === subCanvasListResourceId) || null;
+    const subCanvasListResource =
+        resources?.find((resource) => resource.id === subCanvasListResourceId) || null;
 
     return (
         <>
@@ -797,6 +977,81 @@ function DrawingCanvasPageContent() {
                         <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-4 w-4"/></Button>
                         <Button variant="ghost" size="icon" onClick={handleCopyLink}><Copy className="h-4 w-4"/></Button>
+                        {recordings.length > 0 && (
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={handleDeleteRecording}
+                              title="Delete recording"
+                              disabled={isRecording || isPlaying}
+                            >
+                              <X className="h-4 w-4 text-destructive" />
+                            </Button>
+                            <select
+                              value={activeRecordingId || ""}
+                              onChange={(event) => selectRecording(event.target.value)}
+                              className="h-7 max-w-[180px] rounded border bg-background px-2 text-xs text-muted-foreground"
+                              title="Select recording"
+                              disabled={isRecording || isPlaying}
+                            >
+                              {recordings.map((entry) => (
+                                <option key={entry.id} value={entry.id}>
+                                  {entry.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => (isRecording ? handleStopRecording() : startRecording())}
+                          title={isRecording ? "Stop recording" : "Record drawing (with voice)"}
+                          disabled={!activeCanvas || isPlaying || showRecordingNamePrompt}
+                        >
+                          {isRecording ? <Square className="h-4 w-4 text-red-500" /> : <Circle className="h-4 w-4 text-red-500" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => (isPlaying ? stopPlayback() : playRecording())}
+                          title={isPlaying ? "Stop playback" : hasRecording ? "Play recording" : "No recording yet"}
+                          disabled={!activeCanvas || isRecording || !hasRecording}
+                        >
+                          {isPlaying ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setShowRecordingEditor((prev) => !prev)}
+                          title="Cut recording range"
+                          disabled={!activeCanvas || isRecording || isPlaying || !hasRecording}
+                        >
+                          <Scissors className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setShowKeyframeEditor((prev) => !prev)}
+                          title="Delete keyframes"
+                          disabled={!activeCanvas || isRecording || isPlaying || !hasRecording}
+                        >
+                          <List className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={handleCycleSpeed}
+                          title="Playback speed"
+                          disabled={!activeCanvas || isRecording || !hasRecording}
+                        >
+                          <FastForward className="h-4 w-4" />
+                        </Button>
+                        <span className="text-xs text-muted-foreground min-w-[32px]">
+                          {playbackSpeed === 0 ? "1x" : `${playbackSpeed}x`}
+                        </span>
                         <Button variant="ghost" size="icon" onClick={handleSaveClick}>
                             <Save className={cn("h-4 w-4", isDirty ? "text-red-500" : "text-green-500")} />
                         </Button>
@@ -804,6 +1059,7 @@ function DrawingCanvasPageContent() {
                 </header>
                 <main className="flex-grow min-h-0 relative">
                     {isMounted && activeCanvas ? (
+                        <>
                         <ExcalidrawWrapper 
                             activeCanvas={activeCanvas}
                             theme={theme}
@@ -813,7 +1069,141 @@ function DrawingCanvasPageContent() {
                             onKeyDown={handleKeyDown}
                             onLinkOpen={onLinkOpen}
                             files={loadedFilesCanvasId === activeCanvas.id ? loadedFiles : {}}
+                            viewModeEnabled={isPlaying}
                         />
+                        {showRecordingEditor && hasRecording && (
+                          <div className="absolute right-4 top-4 z-20 w-[280px] rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur">
+                            <div className="text-xs font-semibold">Cut Recording Range</div>
+                            <div className="mt-2 grid grid-cols-2 gap-2">
+                              <div>
+                                <label className="mb-1 block text-[11px] text-muted-foreground">Start (sec)</label>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step={0.1}
+                                  value={cutStartSeconds}
+                                  onChange={(event) => setCutStartSeconds(event.target.value)}
+                                  className="h-7 text-xs"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-[11px] text-muted-foreground">End (sec)</label>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step={0.1}
+                                  value={cutEndSeconds}
+                                  onChange={(event) => setCutEndSeconds(event.target.value)}
+                                  className="h-7 text-xs"
+                                />
+                              </div>
+                            </div>
+                            <div className="mt-2 flex items-center gap-2">
+                              <Button size="sm" className="h-7 px-2 text-xs" onClick={handleCutRecording}>
+                                Cut Range
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => setShowRecordingEditor(false)}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                            <p className="mt-2 text-[10px] text-muted-foreground">
+                              Audio is cleared after cutting to avoid desync.
+                            </p>
+                          </div>
+                        )}
+                        {showKeyframeEditor && hasRecording && (
+                          <div className="absolute right-4 top-4 z-20 w-[300px] rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur">
+                            <div className="text-xs font-semibold">Delete Keyframes</div>
+                            <div className="mt-2 max-h-56 overflow-y-auto rounded border bg-background/60 p-2 text-[11px]">
+                              {keyframeList.length === 0 && (
+                                <div className="text-muted-foreground">No frames found.</div>
+                              )}
+                              {keyframeList.map((frame) => (
+                                <label
+                                  key={frame.index}
+                                  className={cn(
+                                    "flex items-center gap-2 py-1 rounded px-1",
+                                    activeKeyframeIndex === frame.index && "bg-primary/20"
+                                  )}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedKeyframes.has(frame.index)}
+                                    onChange={(event) => {
+                                      setSelectedKeyframes((prev) => {
+                                        const next = new Set(prev);
+                                        if (event.target.checked) next.add(frame.index);
+                                        else next.delete(frame.index);
+                                        return next;
+                                      });
+                                    }}
+                                  />
+                                  <span className="flex-1">
+                                    <span className={cn(frame.skipped && "line-through text-muted-foreground")}>
+                                      {`${(frame.t / 1000).toFixed(1)}s`} · {frame.count} elements
+                                      {frame.skipped ? " (skipped)" : ""}
+                                    </span>
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                            <div className="mt-2 flex items-center gap-2">
+                              <Button size="sm" className="h-7 px-2 text-xs" onClick={handleSkipKeyframes}>
+                                Skip
+                              </Button>
+                              <Button size="sm" className="h-7 px-2 text-xs" onClick={handleDeleteKeyframes}>
+                                <Trash2 className="mr-1 h-3 w-3" />
+                                Delete
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => setShowKeyframeEditor(false)}
+                              >
+                                Close
+                              </Button>
+                            </div>
+                            <p className="mt-2 text-[10px] text-muted-foreground">
+                              Audio is cleared after deleting frames to avoid desync.
+                            </p>
+                          </div>
+                        )}
+                        {showRecordingNamePrompt && (
+                          <div className="absolute right-4 top-4 z-30 w-[280px] rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur">
+                            <div className="text-xs font-semibold">Name This Recording</div>
+                            <div className="mt-2">
+                              <Input
+                                value={recordingNameDraft}
+                                onChange={(event) => setRecordingNameDraft(event.target.value)}
+                                className="h-7 text-xs"
+                                placeholder="Recording name"
+                              />
+                            </div>
+                            <div className="mt-2 flex items-center gap-2">
+                              <Button size="sm" className="h-7 px-2 text-xs" onClick={handleConfirmStopRecording}>
+                                Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => {
+                                  setShowRecordingNamePrompt(false);
+                                  setPendingRenameId(null);
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                        </>
                     ) : (
                         <div className="flex h-full w-full items-center justify-center text-muted-foreground">Select or open a canvas to start drawing.</div>
                     )}

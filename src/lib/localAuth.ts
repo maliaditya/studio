@@ -1,7 +1,7 @@
 
 "use client";
 
-// IMPORTANT: This service now uses Vercel Blob for user data storage.
+// IMPORTANT: This service now uses Supabase Storage for user data storage.
 // It keeps a local session token (the username) in localStorage.
 
 import type { LocalUser } from '@/types/workout';
@@ -151,10 +151,29 @@ const authRequest = async <T = unknown>(
   const base = resolveAuthBaseUrl();
   const shouldProxyViaDesktop = isDesktopRuntime() && Boolean(base) && typeof window !== "undefined" && !url.startsWith(window.location.origin);
 
+  const performBrowserFetch = async (): Promise<{ ok: boolean; status: number; data: T | AuthApiError | null }> => {
+    try {
+      const response = await fetch(url, {
+        method: init.method,
+        headers: init.headers,
+        credentials: "include",
+        body: init.body,
+      });
+      const data = (await response.json().catch(() => null)) as T | AuthApiError | null;
+      return { ok: response.ok, status: response.status, data };
+    } catch (error) {
+      return {
+        ok: false,
+        status: 0,
+        data: { error: error instanceof Error ? error.message : String(error) },
+      };
+    }
+  };
+
   if (shouldProxyViaDesktop) {
     const proxy = getDesktopAuthHttp();
     if (!proxy) {
-      return { ok: false, status: 500, data: { error: "Desktop auth bridge unavailable." } };
+      return performBrowserFetch();
     }
     const result = await proxy.request({
       url,
@@ -163,7 +182,7 @@ const authRequest = async <T = unknown>(
       body: init.body,
     });
     if (!result.success) {
-      return { ok: false, status: 500, data: { error: result.error || "Desktop auth proxy failed." } };
+      return performBrowserFetch();
     }
     return {
       ok: Boolean(result.ok),
@@ -172,14 +191,7 @@ const authRequest = async <T = unknown>(
     };
   }
 
-  const response = await fetch(url, {
-    method: init.method,
-    headers: init.headers,
-    credentials: "include",
-    body: init.body,
-  });
-  const data = (await response.json().catch(() => null)) as T | AuthApiError | null;
-  return { ok: response.ok, status: response.status, data };
+  return performBrowserFetch();
 };
 
 const setAccessToken = (username: string, accessToken?: string) => {
@@ -373,6 +385,9 @@ export async function registerUser(username: string, password: string): Promise<
     if (!response.ok) {
       if (result?.code === 'CLOUD_AUTH_UNAVAILABLE') {
         return { success: false, message: result.error || 'Cloud authentication is not configured for first-time registration.' };
+      }
+      if (result?.code === 'CLOUD_AUTH_SUSPENDED') {
+        return { success: false, message: result.error || 'Cloud registration is temporarily unavailable. Please try again later or contact support.' };
       }
       return { success: false, message: result?.error || 'Registration failed.' };
     }

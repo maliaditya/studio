@@ -1,9 +1,9 @@
 
-import { list, put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { hashPassword, verifyPassword } from '@/lib/password';
 import { attachSessionCookie } from '@/lib/serverSession';
 import { issueAuthTokens } from '@/lib/authTokens';
+import { isSupabaseStorageConfigured, readJsonFromStorage, writeJsonToStorage } from '@/lib/supabaseStorageServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
       message: 'Demo login successful.',
       user: { username: normalizedUsername },
     };
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
+    if (isSupabaseStorageConfigured()) {
       try {
         const tokens = await issueAuthTokens(normalizedUsername);
         Object.assign(responsePayload, tokens);
@@ -31,10 +31,10 @@ export async function POST(request: Request) {
     return response;
   }
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isSupabaseStorageConfigured()) {
     return NextResponse.json(
       {
-        error: 'Cloud authentication is not configured for this build. Set BLOB_READ_WRITE_TOKEN or use a deployed auth service before first login on this device.',
+        error: 'Cloud authentication is not configured for this build. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY before first login on this device.',
         code: 'CLOUD_AUTH_UNAVAILABLE',
       },
       { status: 503 }
@@ -48,21 +48,10 @@ export async function POST(request: Request) {
   const blobPathname = `auth/${normalizedUsername}.json`;
 
   try {
-    const { blobs } = await list({ prefix: blobPathname, limit: 1 });
-
-    const userBlob = blobs.find(blob => blob.pathname === blobPathname);
-
-    if (!userBlob) {
+    const userData = await readJsonFromStorage<any>(blobPathname);
+    if (!userData) {
       return NextResponse.json({ error: 'Username not found.' }, { status: 404 });
     }
-
-    const response = await fetch(userBlob.url);
-    
-    if (!response.ok) {
-        throw new Error(`Failed to download user data from Blob storage. Status: ${response.status}`);
-    }
-    
-    const userData = await response.json();
 
     const hasHashedPassword =
       typeof userData?.passwordHash === 'string' &&
@@ -86,11 +75,7 @@ export async function POST(request: Request) {
           migratedAt: new Date().toISOString(),
         };
         delete migrated.password;
-        await put(blobPathname, JSON.stringify(migrated), {
-          access: 'public',
-          contentType: 'application/json',
-          addRandomSuffix: false,
-        });
+        await writeJsonToStorage(blobPathname, migrated);
       }
     }
 
@@ -109,7 +94,7 @@ export async function POST(request: Request) {
     return responsePayload;
 
   } catch (error) {
-    console.error(`Blob storage login error for user ${normalizedUsername}:`, error);
+    console.error(`Supabase storage login error for user ${normalizedUsername}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
     return NextResponse.json({ error: `Cloud authentication request failed: ${errorMessage}` }, { status: 500 });
   }

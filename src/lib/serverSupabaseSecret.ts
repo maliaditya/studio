@@ -1,4 +1,4 @@
-import { head, put } from '@vercel/blob';
+import { readJsonFromStorage, writeJsonToStorage } from '@/lib/supabaseStorageServer';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 
 const blobPathForUser = (username: string) => `supabase-secrets/${username}.json`;
@@ -7,7 +7,6 @@ const getEncryptionKey = () => {
   const secret =
     process.env.LIFEOS_SETTINGS_ENCRYPTION_KEY ||
     process.env.LIFEOS_SESSION_SECRET ||
-    process.env.BLOB_READ_WRITE_TOKEN ||
     'lifeos-dev-settings-key';
   return createHash('sha256').update(secret).digest();
 };
@@ -31,17 +30,13 @@ export async function saveSupabaseServiceKeyForUser(username: string, serviceRol
     createdAt: new Date().toISOString(),
     encrypted: encrypt(String(serviceRoleKey)),
   };
-  await put(blobPathForUser(username), JSON.stringify(payload, null, 2), {
-    access: 'public',
-    contentType: 'application/json',
-    addRandomSuffix: false,
-  });
+  await writeJsonToStorage(blobPathForUser(username), payload);
 }
 
 export async function hasSupabaseServiceKeyForUser(username: string): Promise<boolean> {
   try {
-    await head(blobPathForUser(username));
-    return true;
+    const record = await readJsonFromStorage(blobPathForUser(username));
+    return Boolean(record);
   } catch {
     return false;
   }
@@ -49,10 +44,8 @@ export async function hasSupabaseServiceKeyForUser(username: string): Promise<bo
 
 export async function decryptSupabaseServiceKeyForUser(username: string): Promise<string | null> {
   try {
-    const blob = await head(blobPathForUser(username));
-    const response = await fetch(blob.url);
-    if (!response.ok) return null;
-    const data = await response.json();
+    const data = await readJsonFromStorage<any>(blobPathForUser(username));
+    if (!data) return null;
     const encrypted = data?.encrypted;
     if (!encrypted?.iv || !encrypted?.tag || !encrypted?.content) return null;
 
@@ -68,4 +61,3 @@ export async function decryptSupabaseServiceKeyForUser(username: string): Promis
     return null;
   }
 }
-

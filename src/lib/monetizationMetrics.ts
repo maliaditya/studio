@@ -1,4 +1,4 @@
-import { list, put } from "@vercel/blob";
+import { isSupabaseStorageConfigured, readJsonFromStorage, writeJsonToStorage } from "@/lib/supabaseStorageServer";
 
 const METRICS_BLOB_PATH = "monetization-metrics.json";
 const MONTH_KEY_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
@@ -78,7 +78,7 @@ const getNextMonthKey = (monthKey: string): string => {
   return dateToMonthKey(next);
 };
 
-const hasBlobConfig = (): boolean => Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+const hasStorageConfig = (): boolean => isSupabaseStorageConfigured();
 
 export const ensureMonthBucket = (metrics: MonetizationMetrics, monthKey: string): MonetizationMetrics => {
   if (!metrics.engagement?.monthly) {
@@ -104,22 +104,10 @@ export const ensureMonthBucket = (metrics: MonetizationMetrics, monthKey: string
 };
 
 export const readMetrics = async (): Promise<MonetizationMetrics> => {
-  if (!hasBlobConfig()) return createEmptyMetrics();
+  if (!hasStorageConfig()) return createEmptyMetrics();
 
-  const { blobs } = await list({ prefix: METRICS_BLOB_PATH, limit: 1 });
-  if (blobs.length === 0 || blobs[0]?.pathname !== METRICS_BLOB_PATH) {
-    return createEmptyMetrics();
-  }
-
-  const response = await fetch(blobs[0].url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch monetization metrics. Status: ${response.status}`);
-  }
-
-  const raw = await response.text();
-  if (!raw) return createEmptyMetrics();
-
-  const parsed = JSON.parse(raw) as MonetizationMetrics;
+  const parsed = await readJsonFromStorage<MonetizationMetrics>(METRICS_BLOB_PATH);
+  if (!parsed) return createEmptyMetrics();
   return {
     engagement: { monthly: parsed.engagement?.monthly || {} },
     support: { monthly: parsed.support?.monthly || {} },
@@ -127,20 +115,15 @@ export const readMetrics = async (): Promise<MonetizationMetrics> => {
 };
 
 export const writeMetrics = async (metrics: MonetizationMetrics): Promise<void> => {
-  if (!hasBlobConfig()) return;
-
-  await put(METRICS_BLOB_PATH, JSON.stringify(metrics), {
-    access: "public",
-    contentType: "application/json",
-    addRandomSuffix: false,
-  });
+  if (!hasStorageConfig()) return;
+  await writeJsonToStorage(METRICS_BLOB_PATH, metrics);
 };
 
 export const updateMetrics = async (
   mutator: (draft: MonetizationMetrics) => MonetizationMetrics,
   maxRetries = 2
 ): Promise<MonetizationMetrics> => {
-  if (!hasBlobConfig()) return createEmptyMetrics();
+  if (!hasStorageConfig()) return createEmptyMetrics();
 
   let lastError: unknown = null;
   for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
@@ -239,4 +222,4 @@ export const getMonetizationSummary = async (monthInput?: string): Promise<Monet
   };
 };
 
-export const isMetricsStorageConfigured = (): boolean => hasBlobConfig();
+export const isMetricsStorageConfigured = (): boolean => hasStorageConfig();

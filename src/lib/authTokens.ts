@@ -1,5 +1,5 @@
 import { createHmac, createHash, randomBytes, timingSafeEqual } from "crypto";
-import { list, put } from "@vercel/blob";
+import { isSupabaseStorageConfigured, readJsonFromStorage, writeJsonToStorage } from "@/lib/supabaseStorageServer";
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const REFRESH_TOKEN_TTL_DAYS = 45;
@@ -24,7 +24,7 @@ type RefreshRecord = {
 };
 
 const getTokenSecret = () =>
-  process.env.LIFEOS_TOKEN_SECRET || process.env.LIFEOS_SESSION_SECRET || process.env.BLOB_READ_WRITE_TOKEN || "lifeos-dev-token-secret";
+  process.env.LIFEOS_TOKEN_SECRET || process.env.LIFEOS_SESSION_SECRET || "lifeos-dev-token-secret";
 
 const toBase64Url = (value: string) => Buffer.from(value, "utf8").toString("base64url");
 const fromBase64Url = (value: string) => Buffer.from(value, "base64url").toString("utf8");
@@ -38,9 +38,9 @@ const tokenHash = (value: string) => createHash("sha256").update(value).digest("
 
 const getRefreshPath = (tokenId: string) => `${REFRESH_PREFIX}${tokenId}.json`;
 
-const assertBlobConfigured = () => {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    throw new Error("Blob storage is not configured.");
+const assertStorageConfigured = () => {
+  if (!isSupabaseStorageConfigured()) {
+    throw new Error("Supabase storage is not configured.");
   }
 };
 
@@ -77,27 +77,18 @@ export const verifyAccessToken = (token: string): AccessPayload | null => {
 };
 
 const loadRefreshRecord = async (tokenId: string): Promise<RefreshRecord | null> => {
-  assertBlobConfigured();
+  assertStorageConfigured();
   const pathname = getRefreshPath(tokenId);
-  const { blobs } = await list({ prefix: pathname, limit: 1 });
-  const blob = blobs.find((entry) => entry.pathname === pathname);
-  if (!blob) return null;
-  const response = await fetch(blob.url, { cache: "no-store" });
-  if (!response.ok) return null;
-  return (await response.json()) as RefreshRecord;
+  return await readJsonFromStorage<RefreshRecord>(pathname);
 };
 
 const saveRefreshRecord = async (record: RefreshRecord): Promise<void> => {
-  assertBlobConfigured();
-  await put(getRefreshPath(record.tokenId), JSON.stringify(record), {
-    access: "public",
-    contentType: "application/json",
-    addRandomSuffix: false,
-  });
+  assertStorageConfigured();
+  await writeJsonToStorage(getRefreshPath(record.tokenId), record);
 };
 
 export const issueRefreshToken = async (username: string) => {
-  assertBlobConfigured();
+  assertStorageConfigured();
   const normalized = normalizeUsername(username);
   const tokenId = randomBytes(12).toString("hex");
   const secret = randomBytes(32).toString("base64url");

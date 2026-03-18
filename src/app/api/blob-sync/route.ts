@@ -1,6 +1,6 @@
-import { put, head } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { getSessionUserFromRequest } from '@/lib/serverSession';
+import { isSupabaseStorageConfigured, readJsonFromStorage, writeJsonToStorage } from '@/lib/supabaseStorageServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,14 +42,8 @@ const parseBaseRevision = (value: unknown) => {
 
 const getCurrentCloudPayload = async (blobPathname: string): Promise<{ data: unknown | null; revision: number }> => {
   try {
-    const blob = await head(blobPathname);
-    const response = await fetch(blob.url);
-    if (!response.ok) {
-      throw new Error(`Failed to download data from Blob storage. Status: ${response.status} - ${response.statusText}`);
-    }
-    const textData = await response.text();
-    if (!textData) return { data: null, revision: 0 };
-    const parsed = JSON.parse(textData);
+    const parsed = await readJsonFromStorage<any>(blobPathname);
+    if (!parsed) return { data: null, revision: 0 };
     return normalizeStoredPayload(parsed);
   } catch (error: any) {
     if (error?.status === 404 || error?.message?.includes('404')) {
@@ -61,12 +55,12 @@ const getCurrentCloudPayload = async (blobPathname: string): Promise<{ data: unk
 
 /**
  * POST /api/blob-sync
- * Uploads a user's entire data object to Vercel Blob storage with optimistic revision guards.
+ * Uploads a user's entire data object to Supabase Storage with optimistic revision guards.
  */
 export async function POST(request: Request) {
   const { username, data, demo_override_token, baseRevision } = await request.json();
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isSupabaseStorageConfigured()) {
     const requestedUsername = normalizeUsername(String(username || ''));
     if (!requestedUsername || data === undefined) {
       return NextResponse.json({ error: 'Username and data payload are required.' }, { status: 400 });
@@ -133,16 +127,11 @@ export async function POST(request: Request) {
       data,
     };
 
-    const blob = await put(blobPathname, JSON.stringify(envelope, null, 2), {
-      access: 'public', // 'public' is required on Vercel's Hobby plan.
-      contentType: 'application/json',
-      addRandomSuffix: false,
-    });
+    await writeJsonToStorage(blobPathname, envelope);
 
     return NextResponse.json({
       success: true,
       message: 'Data synced to cloud.',
-      blob,
       revision: envelope.revision,
     });
   } catch (error) {
@@ -154,13 +143,13 @@ export async function POST(request: Request) {
 
 /**
  * GET /api/blob-sync?username=<username>
- * Fetches a user's data file from Vercel Blob storage.
+ * Fetches a user's data file from Supabase Storage.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const username = searchParams.get('username');
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isSupabaseStorageConfigured()) {
     return NextResponse.json({
       data: null,
       revision: 0,
@@ -195,8 +184,8 @@ export async function GET(request: Request) {
     if (error?.status === 404 || error?.message?.includes('404')) {
       return NextResponse.json({ data: null, revision: 0, message: 'No cloud data found for this user.' }, { status: 200 });
     }
-    console.error(`Blob storage read error for user ${requestedUsername}:`, error);
+    console.error(`Supabase storage read error for user ${requestedUsername}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-    return NextResponse.json({ error: `Failed to read data from Blob storage: ${errorMessage}` }, { status: 500 });
+    return NextResponse.json({ error: `Failed to read data from storage: ${errorMessage}` }, { status: 500 });
   }
 }

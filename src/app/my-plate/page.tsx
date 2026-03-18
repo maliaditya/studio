@@ -44,6 +44,8 @@ const slotEndHours: Record<string, number> = {
   'Late Night': 4, 'Dawn': 8, 'Morning': 12, 'Afternoon': 16, 'Evening': 20, 'Night': 24,
 };
 
+const normalizeBoardLookupText = (value?: string | null) => (value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
 function MyPlatePageContent() {
     const {
         settings,
@@ -210,14 +212,38 @@ function MyPlatePageContent() {
         const specializationBoards = specialization
             ? projectBoards.filter((board) => board.specializationId === specialization.id)
             : projectBoards;
+        const releaseNames = new Set(
+            ((specialization?.id ? offerizationPlans?.[specialization.id]?.releases || [] : []) as any[])
+                .map((release) => normalizeBoardLookupText(release?.name))
+                .filter(Boolean)
+        );
+
+        const rankedBoards = [...specializationBoards].sort((a, b) => {
+            const scoreBoard = (board: typeof specializationBoards[number]) => {
+                const linkedProject = board.projectId ? projects.find((project) => project.id === board.projectId) || null : null;
+                let score = 0;
+                if (targetProjectId && board.projectId === targetProjectId) score += 1000;
+                if (linkedProject) score += 200;
+                if (linkedProject && releaseNames.has(normalizeBoardLookupText(linkedProject.name))) score += 120;
+                if (releaseNames.has(normalizeBoardLookupText(board.name))) score += 80;
+                if ((board.cards || []).some((card) => !card.archived)) score += 20;
+                return {
+                    score,
+                    updatedAt: Date.parse(board.updatedAt || '') || 0,
+                };
+            };
+            const aRank = scoreBoard(a);
+            const bRank = scoreBoard(b);
+            if (bRank.score !== aRank.score) return bRank.score - aRank.score;
+            return bRank.updatedAt - aRank.updatedAt;
+        });
 
         const board =
-            (targetProjectId ? specializationBoards.find((entry) => entry.projectId === targetProjectId) : null) ||
-            specializationBoards[0] ||
+            rankedBoards[0] ||
             null;
 
         return { board, rootTask, existingCardId };
-    }, [coreSkills, findRootTask, findSpecializationForTask, kanbanBoards, kanbanCardIds]);
+    }, [coreSkills, findRootTask, findSpecializationForTask, kanbanBoards, kanbanCardIds, offerizationPlans, projects]);
 
     const openFocusSessionForActivity = useCallback((activity: Activity) => {
         const estDurationStr = activity.duration?.toString();

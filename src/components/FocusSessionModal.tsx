@@ -16,10 +16,12 @@ import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { Label } from './ui/label';
 import { Play, SkipForward, ChevronUp, ChevronDown, Workflow, Link as LinkIcon, Eye, PlusCircle, ArrowRight, Minus, Save, ChevronRight as ChevronRightIcon } from 'lucide-react';
+import { addDays, addMonths, format, parseISO } from 'date-fns';
 import type { Activity, HabitEquation, Resource, ActivityType, CoreSkill, SkillArea, MicroSkill, ExerciseDefinition, WorkoutExercise, SlotName } from '@/types/workout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
 
 interface FocusSessionModalProps {
   isOpen: boolean;
@@ -47,6 +49,7 @@ export function FocusSessionModal({
 }: FocusSessionModalProps) {
   const { 
     updateActivity, 
+    toggleRoutine,
     skillDomains, 
     coreSkills,
     settings,
@@ -66,11 +69,18 @@ export function FocusSessionModal({
     getUpskillNodeType,
     handleToggleMicroSkillRepetition,
   } = useAuth();
+  const { toast } = useToast();
   const [duration, setDuration] = useState(30);
   const [skipBreaks, setSkipBreaks] = useState(false);
   const [itemsCompletedInput, setItemsCompletedInput] = useState('');
   const [hoursCompletedInput, setHoursCompletedInput] = useState('');
   const [pagesCompletedInput, setPagesCompletedInput] = useState('');
+  const [costInInput, setCostInInput] = useState('');
+  const [costOutInput, setCostOutInput] = useState('');
+  const [emiAmountInput, setEmiAmountInput] = useState('');
+  const [emiTotalMonthsInput, setEmiTotalMonthsInput] = useState('12');
+  const [emiPaidMonthsInput, setEmiPaidMonthsInput] = useState('0');
+  const [emiDueDateInput, setEmiDueDateInput] = useState('');
   
   const [linkedActivityType, setLinkedActivityType] = useState<ActivityType | ''>(activity?.linkedActivityType || '');
 
@@ -117,6 +127,123 @@ export function FocusSessionModal({
     }
     return [];
   }, [selectedMicroSkillId, linkedActivityType, microSkills, deepWorkDefinitions, upskillDefinitions, getDeepWorkNodeType, getUpskillNodeType]);
+
+  useEffect(() => {
+    if (!activity) {
+      setCostInInput('');
+      setCostOutInput('');
+      return;
+    }
+    setCostInInput(activity.costIn != null ? String(activity.costIn) : '');
+    setCostOutInput(
+      activity.costOut != null
+        ? String(activity.costOut)
+        : activity.cost != null
+          ? String(activity.cost)
+          : ''
+    );
+  }, [activity?.id]);
+
+  const isCostOutOnlyTask = useMemo(() => {
+    const raw = (activity?.details || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const label = raw.split(':')[0]?.trim() || raw;
+    return ['emi', 'debt', 'emergency', 'emergency funds', 'unplanned'].some(
+      (key) => label === key || label.startsWith(`${key} `)
+    );
+  }, [activity?.details]);
+
+  const isDebtTask = useMemo(() => {
+    const raw = (activity?.details || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const label = raw.split(':')[0]?.trim() || raw;
+    return label === 'debt' || label.startsWith('debt ');
+  }, [activity?.details]);
+
+  const debtName = useMemo(() => {
+    const raw = (activity?.details || '').trim();
+    const parts = raw.split(':');
+    if (parts.length < 2) return raw;
+    return parts.slice(1).join(':').trim() || raw;
+  }, [activity?.details]);
+
+  const computeEmiEndDate = (startDateKey: string, remainingMonths: number) => {
+    try {
+      const startDate = parseISO(startDateKey);
+      if (Number.isNaN(startDate.getTime())) return null;
+      const end = addDays(addMonths(startDate, Math.max(0, remainingMonths)), -1);
+      return format(end, 'yyyy-MM-dd');
+    } catch {
+      return null;
+    }
+  };
+
+  const handleCreateEmiRoutine = () => {
+    if (!activity) return;
+    const amount = Number(emiAmountInput);
+    const totalMonths = Math.max(1, Math.floor(Number(emiTotalMonthsInput) || 0));
+    const paidMonths = Math.max(0, Math.floor(Number(emiPaidMonthsInput) || 0));
+    const remainingMonths = Math.max(0, totalMonths - paidMonths);
+    const dueDateKey = emiDueDateInput || format(new Date(), 'yyyy-MM-dd');
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast({ title: 'Enter EMI Amount', description: 'Add a valid EMI cost-out amount.', variant: 'destructive' });
+      return;
+    }
+    if (remainingMonths <= 0) {
+      toast({ title: 'EMIs Already Paid', description: 'Remaining months is zero.', variant: 'destructive' });
+      return;
+    }
+
+    const endDateKey = computeEmiEndDate(dueDateKey, remainingMonths);
+    if (!endDateKey) {
+      toast({ title: 'Invalid Due Date', description: 'Set a valid EMI due date.', variant: 'destructive' });
+      return;
+    }
+
+    const emiActivity: Activity = {
+      ...activity,
+      type: 'finance',
+      details: `EMI: ${debtName}`,
+      costOut: amount,
+      cost: amount,
+      costIn: null,
+      slot: activity.slot,
+      completed: false,
+    };
+
+    toggleRoutine(emiActivity, { type: 'custom', repeatInterval: 1, repeatUnit: 'month', endDate: endDateKey }, dueDateKey);
+    toast({ title: 'EMI Routine Created', description: `EMI set for ${remainingMonths} month(s).` });
+  };
+
+  const normalizeCostInput = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    const value = Number(trimmed);
+    if (!Number.isFinite(value)) return null;
+    return Math.max(0, value);
+  };
+
+  const getCostPatch = () => {
+    const normalizedCostIn = normalizeCostInput(costInInput);
+    const normalizedCostOut = normalizeCostInput(costOutInput);
+    return {
+      costIn: normalizedCostIn,
+      costOut: normalizedCostOut,
+      cost: normalizedCostOut,
+    };
+  };
+
+  const persistCostInputs = () => {
+    if (!activity) return;
+    const patch = getCostPatch();
+    if (
+      activity.costIn === patch.costIn &&
+      activity.costOut === patch.costOut &&
+      activity.cost === patch.cost
+    ) {
+      return;
+    }
+    updateActivity({ ...activity, ...patch });
+  };
 
   const learningContext = useMemo(() => {
     if (!activity || (activity.type !== 'upskill' && activity.type !== 'deepwork')) {
@@ -660,6 +787,7 @@ export function FocusSessionModal({
     if (activity) {
       persistDeepWorkKanbanChecklistSelections();
       const now = Date.now();
+      const costPatch = getCostPatch();
       const updatedActivity: Activity = {
         ...activity,
         focusSessionInitialStartTime: now,
@@ -667,6 +795,7 @@ export function FocusSessionModal({
         focusSessionEndTime: undefined,
         focusSessionPauses: [],
         focusSessionInitialDuration: duration,
+        ...costPatch,
         linkedActivityType: activity.type === 'pomodoro' ? (linkedActivityType as ActivityType) : undefined,
       };
       updateActivity(updatedActivity); 
@@ -705,6 +834,7 @@ export function FocusSessionModal({
       }
       const activityToLog: Activity = {
         ...activity,
+        ...getCostPatch(),
         linkedActivityType: activity.type === 'pomodoro' ? (linkedActivityType as ActivityType) : undefined,
       };
       onLogDuration(activityToLog, duration, undefined, {
@@ -726,6 +856,7 @@ export function FocusSessionModal({
       persistDeepWorkKanbanChecklistSelections();
       const activityToLog: Activity = {
         ...activity,
+        ...getCostPatch(),
         linkedActivityType: activity.type === 'pomodoro' ? (linkedActivityType as ActivityType) : undefined,
       };
       onLogDuration(activityToLog, duration, currentSlot as SlotName, {
@@ -757,6 +888,105 @@ export function FocusSessionModal({
                 <Button variant="outline" size="icon" className="h-10 w-10 rounded-full" onClick={() => handleDurationChange(5)}><PlusCircle /></Button>
             </div>
             <p className="text-center text-sm text-muted-foreground -mt-2">minutes</p>
+            {isDebtTask && (
+              <div className="space-y-3 rounded-md border border-border/60 bg-muted/20 p-3">
+                <p className="text-xs font-medium text-muted-foreground">
+                  EMI setup for <span className="text-foreground">{debtName}</span>
+                </p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="emi-amount">EMI Amount (Cost Out)</Label>
+                    <Input
+                      id="emi-amount"
+                      type="number"
+                      min={0}
+                      step={0.01}
+                      placeholder="e.g., 12000"
+                      value={emiAmountInput}
+                      onChange={(e) => setEmiAmountInput(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="emi-due-date">EMI Due Date</Label>
+                    <Input
+                      id="emi-due-date"
+                      type="date"
+                      value={emiDueDateInput}
+                      onChange={(e) => setEmiDueDateInput(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="emi-total-months">Total Months</Label>
+                    <Input
+                      id="emi-total-months"
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={emiTotalMonthsInput}
+                      onChange={(e) => setEmiTotalMonthsInput(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="emi-paid-months">EMIs Already Paid</Label>
+                    <Input
+                      id="emi-paid-months"
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={emiPaidMonthsInput}
+                      onChange={(e) => setEmiPaidMonthsInput(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <Button variant="secondary" className="w-full" onClick={handleCreateEmiRoutine}>
+                  Create EMI Routine
+                </Button>
+              </div>
+            )}
+            {isCostOutOnlyTask ? (
+              <div className="space-y-1">
+                <Label htmlFor="focus-cost-out">Cost Out</Label>
+                <Input
+                  id="focus-cost-out"
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  placeholder="e.g., 200"
+                  value={costOutInput}
+                  onChange={(e) => setCostOutInput(e.target.value)}
+                  onBlur={persistCostInputs}
+                />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="focus-cost-in">Cost In</Label>
+                  <Input
+                    id="focus-cost-in"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    placeholder="e.g., 500"
+                    value={costInInput}
+                    onChange={(e) => setCostInInput(e.target.value)}
+                    onBlur={persistCostInputs}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="focus-cost-out">Cost Out</Label>
+                  <Input
+                    id="focus-cost-out"
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    placeholder="e.g., 200"
+                    value={costOutInput}
+                    onChange={(e) => setCostOutInput(e.target.value)}
+                    onBlur={persistCostInputs}
+                  />
+                </div>
+              </div>
+            )}
             {activity.type === 'pomodoro' && (
                 <div className="space-y-3">
                     <div>

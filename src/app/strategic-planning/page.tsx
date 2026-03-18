@@ -5,7 +5,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { AuthGuard } from '@/components/AuthGuard';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Check, Magnet, Package, MessageCircle, ArrowRight, Book, Target, Calendar as CalendarIcon, Banknote, Clock, PlusCircle, Briefcase, DraftingCompass, Copy, Download, Edit, Trash2, Github, Globe, Link as LinkIcon, Search } from 'lucide-react';
+import { Check, Magnet, Package, MessageCircle, ArrowRight, Book, Target, Calendar as CalendarIcon, Banknote, Clock, PlusCircle, Briefcase, DraftingCompass, Copy, Download, Edit, Trash2, Github, Globe, Link as LinkIcon, Search, Sparkles, Loader2, X, Activity } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import type { SkillAcquisitionPlan, HabitEquation, Project, ProjectPlan, GapAnalysis, Release, Offer, ExerciseCategory, ExerciseDefinition, MicroSkill, CoreSkill, SkillArea, LearningPlan, LearningResourceAudio, LearningResourceBook, SkillTreePathPlan, KanbanCard } from '@/types/workout';
+import type { SkillAcquisitionPlan, HabitEquation, Project, ProjectPlan, GapAnalysis, Release, Offer, ExerciseCategory, ExerciseDefinition, MicroSkill, CoreSkill, SkillArea, LearningPlan, LearningResourceAudio, LearningResourceBook, SkillTreePathPlan, KanbanCard, ProjectTechnicalSection } from '@/types/workout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { offerTypes, GAP_TYPES, productTypes } from '@/lib/constants';
@@ -30,6 +30,80 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { DialogTitle as DialogTitleComponent, DialogDescription as DialogDescriptionComponent } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuLabel, DropdownMenuGroup, DropdownMenuItem } from '@/components/ui/dropdown-menu';
+import { getAiConfigFromSettings } from '@/lib/ai/config';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+
+type OfferFieldKey = 'name' | 'outcome' | 'audience' | 'deliverables' | 'valueStack' | 'timeline' | 'price' | 'format';
+type OfferDraft = Partial<Offer> & { offerTypeLabel?: string; generatedByAi?: boolean };
+type EditingOffersState = { specializationId: string; offers: OfferDraft[]; selectedOfferId: string | null };
+type ProjectDraft = Partial<Release>;
+type EditingProjectsState = { specializationId: string; releases: ProjectDraft[]; selectedReleaseId: string | null };
+const PROJECT_TECHNICAL_SECTION_TITLES: ProjectTechnicalSection['title'][] = [
+  'Problem / Goal',
+  'System Architecture',
+  'Core Implementation',
+  'Technologies Used',
+  'Optimization / Challenges',
+  'Result / Output',
+];
+
+const createEmptyProjectTechnicalDetails = (): ProjectTechnicalSection[] =>
+  PROJECT_TECHNICAL_SECTION_TITLES.map((title) => ({
+    title,
+    content: [],
+  }));
+
+const normalizeProjectTechnicalDetails = (sections?: ProjectTechnicalSection[] | null): ProjectTechnicalSection[] =>
+  PROJECT_TECHNICAL_SECTION_TITLES.map((title) => {
+    const match = (sections || []).find((section) => section.title === title);
+    return {
+      title,
+      content: Array.isArray(match?.content)
+        ? match.content.filter((item): item is string => typeof item === 'string' && item.trim()).map((item) => item.trim())
+        : [],
+    };
+  });
+
+const normalizeTechnicalDetailLineForComparison = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const createEmptyOfferDraft = (): OfferDraft => ({
+  id: `offer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+  name: '',
+  outcome: '',
+  audience: '',
+  deliverables: '',
+  valueStack: '',
+  timeline: '',
+  price: '',
+  format: '',
+});
+
+const createEmptyProjectDraft = (): ProjectDraft => ({
+  id: `release_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+  name: '',
+  description: '',
+  launchDate: format(new Date(), 'yyyy-MM-dd'),
+  focusAreaIds: [],
+  addToPortfolio: true,
+});
+
+function OfferPreviewMarkdown({ content, fallback }: { content?: string; fallback: string }) {
+  if (!(content || '').trim()) {
+    return <p>{fallback}</p>;
+  }
+
+  return (
+    <div className="prose prose-sm max-w-none text-muted-foreground prose-headings:text-foreground prose-p:my-0 prose-p:leading-7 prose-strong:text-foreground prose-ul:my-0 prose-ul:pl-5 prose-li:my-1 prose-li:leading-7 prose-ol:my-0 prose-ol:pl-5 dark:prose-invert">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    </div>
+  );
+}
 
 
 function PlanningContent() {
@@ -883,7 +957,7 @@ function ProductizationContent() {
         ) : (
           <Card>
             <CardContent className="py-10 text-center text-muted-foreground">
-              No productization items found. Add a product plan in `Planning -> Product Plans` and it will appear here.
+              No productization items found. Add a product plan in `Planning to Product Plans` and it will appear here.
             </CardContent>
           </Card>
         )}
@@ -894,16 +968,19 @@ function ProductizationContent() {
 // OfferizationContent component and others remain unchanged
 // ... Rest of the file
 function OfferizationContent() {
-  const { coreSkills, setCoreSkills, offerizationPlans, setOfferizationPlans, copyOffer, skillAcquisitionPlans, projects, microSkillMap, resources, openPdfViewer } = useAuth();
+  const { coreSkills, setCoreSkills, offerizationPlans, setOfferizationPlans, copyOffer, skillAcquisitionPlans, projects, microSkillMap, resources, openPdfViewer, settings, upskillDefinitions } = useAuth();
   const { toast } = useToast();
+  const isDesktopRuntime = typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop);
+  const aiConfig = useMemo(() => getAiConfigFromSettings(settings, isDesktopRuntime), [settings, isDesktopRuntime]);
   
   const [newMicroSkillNames, setNewMicroSkillNames] = useState<Record<string, string>>({});
   
-  const [editingRelease, setEditingRelease] = useState<{ specializationId: string; release: Partial<Release> } | null>(null);
+  const [editingProject, setEditingProject] = useState<EditingProjectsState | null>(null);
+  const [editingLearningPlanSpecId, setEditingLearningPlanSpecId] = useState<string | null>(null);
   
   const [editingSpecialization, setEditingSpecialization] = useState<CoreSkill | null>(null);
 
-  const [editingOffer, setEditingOffer] = useState<{ specializationId: string; offer: Partial<Offer> } | null>(null);
+  const [editingOffer, setEditingOffer] = useState<EditingOffersState | null>(null);
   const [pdfLinkPicker, setPdfLinkPicker] = useState<{
     isOpen: boolean;
     specializationId: string | null;
@@ -920,8 +997,8 @@ function OfferizationContent() {
   const [pdfSearchTerm, setPdfSearchTerm] = useState('');
   
   // New state for hierarchical selection in the modal
-  const [selectedSpecForMicro, setSelectedSpecForMicro] = useState<CoreSkill | null>(null);
-  const [selectedSkillAreaForMicro, setSelectedSkillAreaForMicro] = useState<SkillArea | null>(null);
+  const [offerAiLoadingField, setOfferAiLoadingField] = useState<OfferFieldKey | null>(null);
+  const [isGeneratingOffersBatch, setIsGeneratingOffersBatch] = useState(false);
 
   const pdfResources = useMemo(
     () => (resources || []).filter((resource) => resource.type === 'pdf'),
@@ -936,6 +1013,68 @@ function OfferizationContent() {
       return name.includes(query) || description.includes(query);
     });
   }, [pdfResources, pdfSearchTerm]);
+
+  const buildOfferAiContext = useCallback((specializationId: string) => {
+    const specialization = coreSkills.find((skill) => skill.id === specializationId && skill.type === 'Specialization');
+    const plan = offerizationPlans[specializationId] || {};
+    if (!specialization) return null;
+
+    const microSkillNames = specialization.skillAreas.flatMap((area) => area.microSkills.map((microSkill) => microSkill.name));
+    const microSkillNameSet = new Set(microSkillNames.map((name) => name.trim().toLowerCase()).filter(Boolean));
+    const curiosities = upskillDefinitions
+      .filter((definition) => microSkillNameSet.has((definition.category || '').trim().toLowerCase()))
+      .map((definition) => definition.name)
+      .filter(Boolean)
+      .slice(0, 40);
+
+    return {
+      name: specialization.name,
+      skillAreas: specialization.skillAreas.map((area) => ({
+        name: area.name,
+        microSkills: area.microSkills.map((microSkill) => microSkill.name),
+      })),
+      microSkills: microSkillNames,
+      curiosities,
+      selectedOfferTypes: plan.offerTypes || [],
+      gapAnalysis: plan.gapAnalysis || null,
+      releases: (plan.releases || []).map((release) => ({
+        name: release.name,
+        description: release.description,
+        launchDate: release.launchDate,
+      })),
+      relatedProjects: projects
+        .filter((project) => project.name === specialization.name || (project.features || []).some((feature) => microSkillNameSet.has((feature.name || '').trim().toLowerCase())))
+        .map((project) => project.name)
+        .slice(0, 20),
+    };
+  }, [coreSkills, offerizationPlans, projects, upskillDefinitions]);
+
+  const activeDraftOffer = useMemo(() => {
+    if (!editingOffer) return null;
+    return (
+      editingOffer.offers.find((offer) => offer.id === editingOffer.selectedOfferId) ||
+      editingOffer.offers[0] ||
+      null
+    );
+  }, [editingOffer]);
+
+  const activeDraftProject = useMemo(() => {
+    if (!editingProject) return null;
+    return (
+      editingProject.releases.find((release) => release.id === editingProject.selectedReleaseId) ||
+      editingProject.releases[0] ||
+      null
+    );
+  }, [editingProject]);
+
+  const activeLearningSpec = useMemo(
+    () => coreSkills.find((skill) => skill.id === editingLearningPlanSpecId && skill.type === 'Specialization') || null,
+    [coreSkills, editingLearningPlanSpecId]
+  );
+  const activeLearningPlan = useMemo(
+    () => (editingLearningPlanSpecId ? (offerizationPlans[editingLearningPlanSpecId]?.learningPlan || {}) : {}),
+    [editingLearningPlanSpecId, offerizationPlans]
+  );
 
   const openPdfLinkPicker = useCallback((
     specializationId: string,
@@ -1090,84 +1229,118 @@ function OfferizationContent() {
   };
 
   const handleStartEditingRelease = (specializationId: string, release?: Release) => {
-    const spec = coreSkills.find(s => s.id === specializationId);
-    setEditingRelease({
-        specializationId,
-        release: release
-          ? { ...release, workflowStages: { ...defaultWorkflowStages(), ...(release.workflowStages || {}) } }
-          : {
-              id: `release_${Date.now()}_${Math.random()}`,
-              name: '',
-              description: '',
-              launchDate: format(new Date(), 'yyyy-MM-dd'),
-              focusAreaIds: [],
-              addToPortfolio: true,
-              workflowStages: defaultWorkflowStages(),
-            }
+    const currentReleases = (offerizationPlans[specializationId]?.releases || []).map((item) => ({
+      ...item,
+      workflowStages: { ...defaultWorkflowStages(), ...(item.workflowStages || {}) },
+    }));
+    const releases = currentReleases.length > 0 ? currentReleases : [{ ...createEmptyProjectDraft(), workflowStages: defaultWorkflowStages() }];
+    const selectedReleaseId = release?.id || releases[0]?.id || null;
+    setEditingProject({
+      specializationId,
+      releases,
+      selectedReleaseId,
     });
-    setSelectedSpecForMicro(spec || null);
-    setSelectedSkillAreaForMicro(null);
   };
 
   const handleUpdateEditingRelease = (field: keyof Release, value: any) => {
-    setEditingRelease(current => {
+    setEditingProject(current => {
       if (!current) return null;
-      let newRelease = { ...current.release };
-      if (field === 'name') {
-          const selectedProject = projects.find(p => p.name === value);
-          newRelease = {
-              ...newRelease,
+      const selectedReleaseId = current.selectedReleaseId || current.releases[0]?.id || null;
+      return {
+        ...current,
+        selectedReleaseId,
+        releases: current.releases.map((release) => {
+          if (release.id !== selectedReleaseId) return release;
+          if (field === 'name') {
+            const selectedProject = projects.find(p => p.name === value);
+            return {
+              ...release,
               name: value,
-              focusAreaIds: selectedProject ? selectedProject.features.flatMap(f => f.linkedSkills.map(l => l.microSkillId)) : []
-          };
-      } else {
-          newRelease = { ...newRelease, [field]: value };
-      }
-      return { ...current, release: newRelease };
+              focusAreaIds: selectedProject ? selectedProject.features.flatMap(f => f.linkedSkills.map(l => l.microSkillId)) : [],
+            };
+          }
+          return { ...release, [field]: value };
+        }),
+      };
     });
   };
 
-  const handleToggleFocusAreaInRelease = (microSkillId: string) => {
-     setEditingRelease(current => {
-        if (!current) return null;
-        const currentIds = current.release.focusAreaIds || [];
-        const newIds = currentIds.includes(microSkillId)
-            ? currentIds.filter(id => id !== microSkillId)
-            : [...currentIds, microSkillId];
-        return {
-            ...current,
-            release: { ...current.release, focusAreaIds: newIds }
-        }
-     });
-  };
+  const handleSelectEditingProject = useCallback((releaseId: string) => {
+    setEditingProject((current) => (current ? { ...current, selectedReleaseId: releaseId } : null));
+  }, []);
 
-  const handleSaveRelease = () => {
-    if (!editingRelease) return;
-    const { specializationId, release } = editingRelease;
-    if (!release.name?.trim()) {
-      toast({ title: "Error", description: "Project name cannot be empty.", variant: "destructive" });
+  const handleAddBlankProjectDraft = useCallback(() => {
+    setEditingProject((current) => {
+      if (!current) return current;
+      const blankProject = { ...createEmptyProjectDraft(), workflowStages: defaultWorkflowStages() };
+      return {
+        ...current,
+        releases: [...current.releases, blankProject],
+        selectedReleaseId: blankProject.id || null,
+      };
+    });
+  }, [defaultWorkflowStages]);
+
+  const handleDeleteSelectedProjectDraft = useCallback(() => {
+    setEditingProject((current) => {
+      if (!current) return current;
+      const selectedReleaseId = current.selectedReleaseId || current.releases[0]?.id || null;
+      const remainingReleases = current.releases.filter((release) => release.id !== selectedReleaseId);
+      if (remainingReleases.length === 0) {
+        const blankProject = { ...createEmptyProjectDraft(), workflowStages: defaultWorkflowStages() };
+        return {
+          ...current,
+          releases: [blankProject],
+          selectedReleaseId: blankProject.id || null,
+        };
+      }
+      return {
+        ...current,
+        releases: remainingReleases,
+        selectedReleaseId: remainingReleases[0]?.id || null,
+      };
+    });
+  }, [defaultWorkflowStages]);
+
+  const handleSaveProjects = () => {
+    if (!editingProject) return;
+    const { specializationId, releases } = editingProject;
+    const normalizedReleases = releases
+      .map((release) => ({
+        ...release,
+        name: String(release.name || '').trim(),
+        description: String(release.description || '').trim(),
+        launchDate: String(release.launchDate || '').trim(),
+        githubLink: String(release.githubLink || '').trim(),
+        demoLink: String(release.demoLink || '').trim(),
+        focusAreaIds: Array.isArray(release.focusAreaIds) ? release.focusAreaIds : [],
+        workflowStages: { ...defaultWorkflowStages(), ...(release.workflowStages || {}) },
+      }))
+      .filter((release) => release.name || release.description || release.focusAreaIds.length > 0 || release.githubLink || release.demoLink);
+
+    if (normalizedReleases.length === 0) {
+      toast({ title: "Error", description: "Add at least one project before saving.", variant: "destructive" });
+      return;
+    }
+    if (normalizedReleases.some((release) => !release.name)) {
+      toast({ title: "Error", description: "Each project must have a name.", variant: "destructive" });
       return;
     }
 
     setOfferizationPlans(prev => {
         const newPlans = { ...prev };
         const currentPlan = newPlans[specializationId] || {};
-        const existingReleases = currentPlan.releases || [];
-        
-        const releaseIndex = existingReleases.findIndex(r => r.id === release.id);
-
-        if (releaseIndex > -1) {
-            existingReleases[releaseIndex] = release as Release;
-        } else {
-            existingReleases.push(release as Release);
-        }
-
-        newPlans[specializationId] = { ...currentPlan, releases: existingReleases.sort((a,b) => new Date(a.launchDate).getTime() - new Date(b.launchDate).getTime()) };
+        newPlans[specializationId] = {
+          ...currentPlan,
+          releases: normalizedReleases
+            .map((release) => release as Release)
+            .sort((a,b) => new Date(a.launchDate).getTime() - new Date(b.launchDate).getTime()),
+        };
         return newPlans;
     });
 
-    toast({ title: "Project Saved", description: `"${release.name}" has been saved.`});
-    setEditingRelease(null);
+    toast({ title: "Projects Saved", description: `${normalizedReleases.length} project${normalizedReleases.length === 1 ? '' : 's'} saved.`});
+    setEditingProject(null);
   };
 
   const handleDeleteRelease = (specializationId: string, releaseId: string) => {
@@ -1185,61 +1358,267 @@ function OfferizationContent() {
   };
   
   const handleStartEditingOffer = (specializationId: string, offer?: Offer) => {
+    const currentOffers = (offerizationPlans[specializationId]?.offers || []).map((item) => ({ ...item }));
+    const offers = currentOffers.length > 0 ? currentOffers : [createEmptyOfferDraft()];
+    const selectedOfferId = offer?.id || offers[0]?.id || null;
     setEditingOffer({
-        specializationId,
-        offer: offer ? { ...offer } : { 
-            id: `offer_${Date.now()}_${Math.random()}`, 
-            name: '', 
-            outcome: '',
-            audience: '',
-            deliverables: '',
-            valueStack: '',
-            timeline: '',
-            price: '',
-            format: '',
-        }
+      specializationId,
+      offers,
+      selectedOfferId,
     });
   };
 
-  const handleUpdateEditingOffer = (field: keyof Offer, value: string) => {
+  const handleUpdateEditingOffer = useCallback((field: keyof Offer, value: string) => {
     setEditingOffer(current => {
       if (!current) return null;
+      const selectedOfferId = current.selectedOfferId || current.offers[0]?.id || null;
       return {
         ...current,
-        offer: {
-          ...current.offer,
-          [field]: value,
-        }
-      }
+        selectedOfferId,
+        offers: current.offers.map((offer) =>
+          offer.id === selectedOfferId
+            ? {
+                ...offer,
+                [field]: value,
+              }
+            : offer
+        ),
+      };
     });
-  };
+  }, []);
+
+  const handleSelectEditingOffer = useCallback((offerId: string) => {
+    setEditingOffer((current) => (current ? { ...current, selectedOfferId: offerId } : null));
+  }, []);
+
+  const handleAddBlankOfferDraft = useCallback(() => {
+    const blankOffer = createEmptyOfferDraft();
+    setEditingOffer((current) =>
+      current
+        ? {
+            ...current,
+            offers: [...current.offers, blankOffer],
+            selectedOfferId: blankOffer.id || null,
+          }
+        : null
+    );
+  }, []);
+
+  const handleDeleteSelectedDraftOffer = useCallback(() => {
+    setEditingOffer((current) => {
+      if (!current) return null;
+      const selectedOfferId = current.selectedOfferId || current.offers[0]?.id || null;
+      const remainingOffers = current.offers.filter((offer) => offer.id !== selectedOfferId);
+      if (remainingOffers.length === 0) {
+        const blankOffer = createEmptyOfferDraft();
+        return {
+          ...current,
+          offers: [blankOffer],
+          selectedOfferId: blankOffer.id || null,
+        };
+      }
+      return {
+        ...current,
+        offers: remainingOffers,
+        selectedOfferId: remainingOffers[0]?.id || null,
+      };
+    });
+  }, []);
+
+  const handleGenerateOfferField = useCallback(async (field: OfferFieldKey) => {
+    if (!editingOffer || !activeDraftOffer) return;
+    if (aiConfig.provider === 'none') {
+      toast({
+        title: 'AI is not configured',
+        description: 'Choose an AI provider in Settings > AI Settings first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const specialization = buildOfferAiContext(editingOffer.specializationId);
+    if (!specialization) {
+      toast({
+        title: 'Missing specialization',
+        description: 'Could not find the specialization context for this offer.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setOfferAiLoadingField(field);
+    try {
+      const response = await fetch('/api/ai/offer-field', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+        },
+        body: JSON.stringify({
+          field,
+          specialization,
+          currentOffer: activeDraftOffer,
+          aiConfig,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to generate offer field.');
+      }
+      if (typeof data?.value !== 'string' || !data.value.trim()) {
+        throw new Error('AI returned an empty value.');
+      }
+
+      handleUpdateEditingOffer(field, data.value.trim());
+      toast({
+        title: 'AI field generated',
+        description: `Updated ${field === 'valueStack' ? 'value stack' : field}.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'AI generation failed',
+        description: error instanceof Error ? error.message : 'Unknown AI error.',
+        variant: 'destructive',
+      });
+    } finally {
+      setOfferAiLoadingField(null);
+    }
+  }, [activeDraftOffer, aiConfig, buildOfferAiContext, editingOffer, handleUpdateEditingOffer, isDesktopRuntime, toast]);
+
+  const renderOfferFieldAction = useCallback((field: OfferFieldKey) => (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-7 px-2 text-xs"
+      onClick={() => void handleGenerateOfferField(field)}
+      disabled={offerAiLoadingField !== null || aiConfig.provider === 'none'}
+      title={aiConfig.provider === 'none' ? 'Configure AI in Settings to enable this.' : `Generate ${field} with AI`}
+    >
+      {offerAiLoadingField === field ? (
+        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+      ) : (
+        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+      )}
+      AI
+    </Button>
+  ), [aiConfig.provider, handleGenerateOfferField, offerAiLoadingField]);
+
+  const handleGenerateOffersFromTypes = useCallback(async () => {
+    if (!editingOffer) return;
+    if (aiConfig.provider === 'none') {
+      toast({
+        title: 'AI is not configured',
+        description: 'Choose an AI provider in Settings > AI Settings first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const specialization = buildOfferAiContext(editingOffer.specializationId);
+    const selectedTypes = specialization?.selectedOfferTypes || [];
+    if (!specialization || selectedTypes.length === 0) {
+      toast({
+        title: 'No offer types selected',
+        description: 'Add one or more offer types to this specialization first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsGeneratingOffersBatch(true);
+    try {
+      const response = await fetch('/api/ai/offers-from-types', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+        },
+        body: JSON.stringify({
+          specialization,
+          offerTypes: selectedTypes,
+          currentOffers: editingOffer.offers,
+          aiConfig,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to generate offers.');
+      }
+      const generatedOffers = Array.isArray(data?.offers) ? data.offers : [];
+      if (generatedOffers.length === 0) {
+        throw new Error('AI returned no offers.');
+      }
+
+      const nextOffers: OfferDraft[] = generatedOffers.map((entry: any) => ({
+        ...createEmptyOfferDraft(),
+        ...(entry?.offer || {}),
+        offerTypeLabel: typeof entry?.offerType === 'string' ? entry.offerType : '',
+        generatedByAi: true,
+      }));
+
+      setEditingOffer((current) =>
+        current
+          ? {
+              ...current,
+              offers: nextOffers,
+              selectedOfferId: nextOffers[0]?.id || null,
+            }
+          : null
+      );
+      toast({
+        title: 'Offers generated',
+        description: `Created ${nextOffers.length} AI offer${nextOffers.length === 1 ? '' : 's'} from selected types.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Offer generation failed',
+        description: error instanceof Error ? error.message : 'Unknown AI error.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingOffersBatch(false);
+    }
+  }, [aiConfig, buildOfferAiContext, editingOffer, isDesktopRuntime, toast]);
 
   const handleSaveOffer = () => {
     if (!editingOffer) return;
-    const { specializationId, offer } = editingOffer;
-    if (!offer.name?.trim()) {
-      toast({ title: "Error", description: "Offer name cannot be empty.", variant: "destructive" });
+    const { specializationId, offers } = editingOffer;
+    const normalizedOffers = offers
+      .filter((offer) => {
+        const fields = [offer.name, offer.outcome, offer.audience, offer.deliverables, offer.valueStack, offer.timeline, offer.price, offer.format];
+        return fields.some((value) => String(value || '').trim().length > 0);
+      })
+      .map((offer) => ({
+        id: String(offer.id || createEmptyOfferDraft().id),
+        name: String(offer.name || '').trim(),
+        outcome: String(offer.outcome || '').trim(),
+        audience: String(offer.audience || '').trim(),
+        deliverables: String(offer.deliverables || '').trim(),
+        valueStack: String(offer.valueStack || '').trim(),
+        timeline: String(offer.timeline || '').trim(),
+        price: String(offer.price || '').trim(),
+        format: String(offer.format || '').trim(),
+      })) as Offer[];
+
+    if (normalizedOffers.length === 0) {
+      toast({ title: "Error", description: "Add at least one offer before saving.", variant: "destructive" });
+      return;
+    }
+    if (normalizedOffers.some((offer) => !offer.name.trim())) {
+      toast({ title: "Error", description: "Each saved offer needs a name.", variant: "destructive" });
       return;
     }
 
     setOfferizationPlans(prev => {
         const newPlans = { ...prev };
         const currentPlan = newPlans[specializationId] || {};
-        const existingOffers = currentPlan.offers || [];
-        
-        const offerIndex = existingOffers.findIndex(o => o.id === offer.id);
-
-        if (offerIndex > -1) {
-            existingOffers[offerIndex] = offer as Offer;
-        } else {
-            existingOffers.push(offer as Offer);
-        }
-
-        newPlans[specializationId] = { ...currentPlan, offers: existingOffers };
+        newPlans[specializationId] = { ...currentPlan, offers: normalizedOffers };
         return newPlans;
     });
 
-    toast({ title: "Offer Saved", description: `"${offer.name}" has been saved.`});
+    toast({ title: "Offers Saved", description: `${normalizedOffers.length} offer${normalizedOffers.length === 1 ? '' : 's'} saved.`});
     setEditingOffer(null);
   };
 
@@ -1395,9 +1774,6 @@ function OfferizationContent() {
           const plan = offerizationPlans[spec.id] || {};
           const selectedOfferTypes = plan.offerTypes || [];
           const gapAnalysis = plan.gapAnalysis;
-          const releases = plan.releases || [];
-          const offers = plan.offers || [];
-          const learningPlan = plan.learningPlan || {};
           
           return (
               <Card key={spec.id} className="flex flex-col">
@@ -1411,6 +1787,35 @@ function OfferizationContent() {
               </CardHeader>
               <CardContent className="flex-grow space-y-4">
                 <Accordion type="multiple" className="w-full">
+                   <AccordionItem value="item-0">
+                     <AccordionTrigger>Skills</AccordionTrigger>
+                     <AccordionContent>
+                        <div className="space-y-3">
+                            <div className="rounded-md border border-white/10 bg-muted/20 p-3 text-xs text-muted-foreground">
+                                {spec.skillAreas.length} skill area{spec.skillAreas.length === 1 ? '' : 's'} · {spec.skillAreas.reduce((sum, area) => sum + area.microSkills.length, 0)} micro-skill{spec.skillAreas.reduce((sum, area) => sum + area.microSkills.length, 0) === 1 ? '' : 's'}
+                            </div>
+                            {spec.skillAreas.map((area) => (
+                                <div key={area.id} className="rounded-md border border-white/10 bg-muted/20 p-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <h4 className="font-semibold text-sm">{area.name}</h4>
+                                        <span className="text-xs text-muted-foreground">
+                                            {area.microSkills.length} micro-skill{area.microSkills.length === 1 ? '' : 's'}
+                                        </span>
+                                    </div>
+                                    {area.microSkills.length > 0 ? (
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {area.microSkills.map((ms) => (
+                                                <Badge key={ms.id} variant="secondary">{ms.name}</Badge>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="mt-2 text-xs text-muted-foreground">No micro-skills added yet.</p>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                     </AccordionContent>
+                  </AccordionItem>
                    <AccordionItem value="item-1">
                      <AccordionTrigger>Micro-Skills</AccordionTrigger>
                      <AccordionContent>
@@ -1524,352 +1929,25 @@ function OfferizationContent() {
                       </AccordionItem>
                       <AccordionItem value="item-learning">
                           <AccordionTrigger>Learning Planner</AccordionTrigger>
-                          <AccordionContent className="space-y-4">
-                              <div className="space-y-3">
-                                  <h4 className="font-medium text-sm flex items-center gap-2">
-                                      <PlusCircle className="h-4 w-4 cursor-pointer hover:text-primary" onClick={() => handleAddSkillTreePathPlan(spec.id, spec)} />
-                                      Skill Tree Path Plan
-                                  </h4>
-                                  {(learningPlan.skillTreePaths || []).length === 0 && (
-                                      <div className="rounded-md border border-white/10 bg-muted/20 p-3 text-xs text-muted-foreground">
-                                          No custom paths yet. Click + to create a path from skill areas.
-                                      </div>
-                                  )}
-                                  {(learningPlan.skillTreePaths || []).map((path, index) => {
-                                      const selectedAreas = spec.skillAreas.filter((area) => (path.skillAreaIds || []).includes(area.id));
-                                      const totalMicroSkills = selectedAreas.reduce((sum, area) => sum + area.microSkills.length, 0);
-                                      const completedMicroSkills = selectedAreas.reduce(
-                                          (sum, area) =>
-                                              sum +
-                                              area.microSkills.filter((micro) =>
-                                                  !!micro.isReadyForRepetition ||
-                                                  (micro.completedItems || 0) > 0 ||
-                                                  (micro.completedHours || 0) > 0 ||
-                                                  (micro.completedPages || 0) > 0
-                                              ).length,
-                                          0
-                                      );
-                                      const targetCount = path.targetMicroSkills ?? totalMicroSkills;
-                                      const remainingCount = Math.max(0, (targetCount || 0) - Math.min(completedMicroSkills, targetCount || completedMicroSkills));
-                                      const today = startOfDay(new Date());
-                                      const daysLeft = path.completionDate
-                                          ? Math.max(0, differenceInDays(startOfDay(parseISO(path.completionDate)), today))
-                                          : null;
-                                      const dailyTarget = remainingCount > 0 && daysLeft != null
-                                          ? (daysLeft > 0 ? Math.max(1, Math.ceil(remainingCount / daysLeft)) : remainingCount)
-                                          : null;
-                                      return (
-                                          <div key={path.id} className="space-y-2 rounded-md border p-3">
-                                              <div className="flex items-center gap-2">
-                                                  <Input
-                                                      value={path.name}
-                                                      onChange={(e) =>
-                                                          handleUpdateSkillTreePathPlan(spec.id, path.id, { name: e.target.value })
-                                                      }
-                                                      placeholder={`Path ${index + 1}`}
-                                                      className="font-semibold"
-                                                  />
-                                                  <Button
-                                                      variant="ghost"
-                                                      size="icon"
-                                                      className="h-8 w-8 text-destructive"
-                                                      onClick={() => handleDeleteSkillTreePathPlan(spec.id, path.id)}
-                                                  >
-                                                      <Trash2 className="h-4 w-4" />
-                                                  </Button>
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                  <Button
-                                                      variant="outline"
-                                                      size="sm"
-                                                      className="h-8"
-                                                      onClick={() => openPdfLinkPicker(spec.id, 'path', undefined, path.id)}
-                                                  >
-                                                      <Search className="mr-2 h-3.5 w-3.5" />
-                                                      Link PDF Card
-                                                  </Button>
-                                                  {path.linkedPdfResourceId && (
-                                                      <>
-                                                          <Button
-                                                              variant="ghost"
-                                                              size="sm"
-                                                              className="h-8 px-2"
-                                                              onClick={() => {
-                                                                  const linked = pdfResources.find((resource) => resource.id === path.linkedPdfResourceId);
-                                                                  if (linked) openPdfViewer(linked);
-                                                              }}
-                                                          >
-                                                              <LinkIcon className="mr-1.5 h-3.5 w-3.5" />
-                                                              {(pdfResources.find((resource) => resource.id === path.linkedPdfResourceId)?.name || 'Open linked PDF')}
-                                                          </Button>
-                                                          <Button
-                                                              variant="ghost"
-                                                              size="icon"
-                                                              className="h-8 w-8 text-destructive"
-                                                              onClick={() => handleUnlinkPdfResource(spec.id, 'path', undefined, path.id)}
-                                                          >
-                                                              <Trash2 className="h-3.5 w-3.5" />
-                                                          </Button>
-                                                      </>
-                                                  )}
-                                              </div>
-                                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                  <Input
-                                                      type="number"
-                                                      value={path.targetMicroSkills ?? ''}
-                                                      onChange={(e) =>
-                                                          handleUpdateSkillTreePathPlan(spec.id, path.id, {
-                                                              targetMicroSkills: e.target.value === '' ? null : Number(e.target.value),
-                                                          })
-                                                      }
-                                                      placeholder="Target micro-skills to complete"
-                                                  />
-                                                  <div className="rounded-md border border-white/10 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                                                      Progress: {Math.min(completedMicroSkills, targetCount || completedMicroSkills)}/{targetCount || 0} completed
-                                                  </div>
-                                              </div>
-                                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                  <Input
-                                                      type="date"
-                                                      value={path.completionDate || ''}
-                                                      onChange={(e) =>
-                                                          handleUpdateSkillTreePathPlan(spec.id, path.id, {
-                                                              completionDate: e.target.value || null,
-                                                          })
-                                                      }
-                                                      placeholder="Path end date"
-                                                  />
-                                                  <div className="rounded-md border border-white/10 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                                                      End: {path.completionDate ? format(parseISO(path.completionDate), 'PPP') : 'Not set'} | Days left: {daysLeft != null ? daysLeft : 'N/A'}
-                                                  </div>
-                                              </div>
-                                              <div className="rounded-md border border-white/10 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                                                  Remaining: {remainingCount} | Daily target: {dailyTarget != null ? `${dailyTarget} micro-skills/day` : (remainingCount === 0 ? 'Done' : 'N/A')}
-                                              </div>
-                                              <div className="space-y-2 rounded-md border border-white/10 bg-muted/20 p-2">
-                                                  <div className="text-xs font-medium text-muted-foreground">Skill Areas in this path</div>
-                                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                      {spec.skillAreas.map((area) => (
-                                                          <label key={area.id} className="flex items-center gap-2 text-xs">
-                                                              <Checkbox
-                                                                  checked={(path.skillAreaIds || []).includes(area.id)}
-                                                                  onCheckedChange={() => handleToggleSkillAreaInPath(spec.id, path.id, area.id)}
-                                                              />
-                                                              <span className="truncate">{area.name}</span>
-                                                              <span className="text-muted-foreground">({area.microSkills.length})</span>
-                                                          </label>
-                                                      ))}
-                                                  </div>
-                                              </div>
-                                          </div>
-                                      );
-                                  })}
-                              </div>
-                              {(() => {
-                                  const completedPages = spec.skillAreas.reduce(
-                                      (sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedPages || 0), 0),
-                                      0
-                                  );
-                                  const completedHours = spec.skillAreas.reduce(
-                                      (sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedHours || 0), 0),
-                                      0
-                                  );
-                                  const totalPages = (learningPlan.bookWebpageResources || []).reduce((sum, resource) => sum + (resource.totalPages || 0), 0);
-                                  const totalHours = (learningPlan.audioVideoResources || []).reduce((sum, resource) => sum + (resource.totalHours || 0), 0);
-                                  const hasBooks = (learningPlan.bookWebpageResources || []).length > 0;
-                                  const hasAudio = (learningPlan.audioVideoResources || []).length > 0;
-                                  return (
-                                      <div className="rounded-md border border-white/10 bg-muted/20 p-3 text-xs">
-                                          <div className="font-medium mb-2">Progress Reflected From Skill Tree</div>
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-muted-foreground">
-                                              {hasBooks && (
-                                                  <span>Books/Webpages: {completedPages}/{totalPages} pages completed</span>
-                                              )}
-                                              {hasAudio && (
-                                                  <span>Audio/Video: {completedHours}/{totalHours} hours completed</span>
-                                              )}
-                                              {!hasBooks && !hasAudio && (
-                                                  <span>No learning resources added yet.</span>
-                                              )}
-                                          </div>
-                                      </div>
-                                  );
-                              })()}
-                              <div className="space-y-3">
-                                  <h4 className="font-medium text-sm flex items-center gap-2">
-                                      <PlusCircle className="h-4 w-4 cursor-pointer hover:text-primary" onClick={() => handleAddLearningResource(spec.id, 'audio')} />
-                                      Audio/Video Resources
-                                  </h4>
-                                  {(learningPlan.audioVideoResources || []).map((resource, index) => (
-                                      <div key={resource.id} className="grid grid-cols-1 gap-2 p-2 border rounded-md">
-                                          <div className="flex justify-between items-center">
-                                            <Input value={resource.name} onChange={e => handleLearningPlanFieldChange(spec.id, 'audio', index, 'name', e.target.value)} placeholder="Name" className="font-semibold"/>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLearningResource(spec.id, 'audio', index)}><Trash2 className="h-4 w-4"/></Button>
-                                          </div>
-                                          <Input value={resource.tutor} onChange={e => handleLearningPlanFieldChange(spec.id, 'audio', index, 'tutor', e.target.value)} placeholder="Tutor"/>
-                                          <div className="grid grid-cols-2 gap-2">
-                                              <Input type="number" value={resource.totalItems || ''} onChange={e => handleLearningPlanFieldChange(spec.id, 'audio', index, 'totalItems', e.target.value === '' ? null : Number(e.target.value))} placeholder="Total Items"/>
-                                              <Input type="number" value={resource.totalHours || ''} onChange={e => handleLearningPlanFieldChange(spec.id, 'audio', index, 'totalHours', e.target.value === '' ? null : Number(e.target.value))} placeholder="Total Hours"/>
-                                          </div>
-                                           <div className="grid grid-cols-2 gap-2">
-                                               <Popover><PopoverTrigger asChild><Button variant="outline" className="justify-start font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{resource.startDate ? format(parseISO(resource.startDate), 'PPP') : 'Start Date'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={resource.startDate ? parseISO(resource.startDate) : undefined} onSelect={(d) => handleLearningPlanFieldChange(spec.id, 'audio', index, 'startDate', d ? format(d, 'yyyy-MM-dd') : null)} /></PopoverContent></Popover>
-                                               <Popover><PopoverTrigger asChild><Button variant="outline" className="justify-start font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{resource.completionDate ? format(parseISO(resource.completionDate), 'PPP') : 'End Date'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={resource.completionDate ? parseISO(resource.completionDate) : undefined} onSelect={(d) => handleLearningPlanFieldChange(spec.id, 'audio', index, 'completionDate', d ? format(d, 'yyyy-MM-dd') : null)} /></PopoverContent></Popover>
-                                           </div>
-                                      </div>
-                                  ))}
-                              </div>
-                              <div className="space-y-3">
-                                  <h4 className="font-medium text-sm flex items-center gap-2">
-                                      <PlusCircle className="h-4 w-4 cursor-pointer hover:text-primary" onClick={() => handleAddLearningResource(spec.id, 'book')} />
-                                      Books/Webpages Resources
-                                  </h4>
-                                  {(learningPlan.bookWebpageResources || []).map((resource, index) => (
-                                      <div key={resource.id} className="grid grid-cols-1 gap-2 p-2 border rounded-md">
-                                          <div className="flex justify-between items-center">
-                                            <Input value={resource.name} onChange={e => handleLearningPlanFieldChange(spec.id, 'book', index, 'name', e.target.value)} placeholder="Name" className="font-semibold"/>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteLearningResource(spec.id, 'book', index)}><Trash2 className="h-4 w-4"/></Button>
-                                          </div>
-                                          <div className="flex items-center gap-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-8"
-                                                onClick={() => openPdfLinkPicker(spec.id, 'book', index)}
-                                            >
-                                                <Search className="mr-2 h-3.5 w-3.5" />
-                                                Link PDF Card
-                                            </Button>
-                                            {resource.linkedPdfResourceId && (
-                                                <>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="h-8 px-2"
-                                                        onClick={() => {
-                                                            const linked = pdfResources.find((item) => item.id === resource.linkedPdfResourceId);
-                                                            if (linked) openPdfViewer(linked);
-                                                        }}
-                                                    >
-                                                        <LinkIcon className="mr-1.5 h-3.5 w-3.5" />
-                                                        {(pdfResources.find((item) => item.id === resource.linkedPdfResourceId)?.name || 'Open linked PDF')}
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="h-8 w-8 text-destructive"
-                                                        onClick={() => handleUnlinkPdfResource(spec.id, 'book', index)}
-                                                    >
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                </>
-                                            )}
-                                          </div>
-                                          <Input value={resource.author} onChange={e => handleLearningPlanFieldChange(spec.id, 'book', index, 'author', e.target.value)} placeholder="Author" />
-                                          <Input type="number" value={resource.totalPages || ''} onChange={e => handleLearningPlanFieldChange(spec.id, 'book', index, 'totalPages', e.target.value === '' ? null : Number(e.target.value))} placeholder="Total Pages" />
-                                          <div className="grid grid-cols-2 gap-2">
-                                            <Popover><PopoverTrigger asChild><Button variant="outline" className="justify-start font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{resource.startDate ? format(parseISO(resource.startDate), 'PPP') : 'Start Date'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={resource.startDate ? parseISO(resource.startDate) : undefined} onSelect={(d) => handleLearningPlanFieldChange(spec.id, 'book', index, 'startDate', d ? format(d, 'yyyy-MM-dd') : null)} /></PopoverContent></Popover>
-                                            <Popover><PopoverTrigger asChild><Button variant="outline" className="justify-start font-normal"><CalendarIcon className="mr-2 h-4 w-4" />{resource.completionDate ? format(parseISO(resource.completionDate), 'PPP') : 'End Date'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={resource.completionDate ? parseISO(resource.completionDate) : undefined} onSelect={(d) => handleLearningPlanFieldChange(spec.id, 'book', index, 'completionDate', d ? format(d, 'yyyy-MM-dd') : null)} /></PopoverContent></Popover>
-                                          </div>
-                                      </div>
-                                  ))}
-                              </div>
+                          <AccordionContent>
+                              <Button className="mt-2 w-full" variant="outline" onClick={() => setEditingLearningPlanSpecId(spec.id)}>
+                                  <Book className="mr-2 h-4 w-4" /> Create / Edit Learning Plan
+                              </Button>
                           </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="item-4">
                          <AccordionTrigger>Project Planner</AccordionTrigger>
                          <AccordionContent>
-                              {releases.map(release => (
-                              <Card key={release.id} className="mb-3">
-                              <CardHeader className="p-3">
-                                  <div className="flex justify-between items-start">
-                                  <div>
-                                      <CardTitle className="text-base">{release.name}</CardTitle>
-                                      <CardDescription>{format(parseISO(release.launchDate), 'PPP')}</CardDescription>
-                                  </div>
-                                  <div className="flex items-center">
-                                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEditingRelease(spec.id, release)}><Edit className="h-4 w-4"/></Button>
-                                      <AlertDialog>
-                                      <AlertDialogTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4"/></Button>
-                                      </AlertDialogTrigger>
-                                      <AlertDialogContent>
-                                          <AlertDialogHeader>
-                                          <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
-                                          <AlertDialogDescriptionComponent>This will permanently delete the project "{release.name}". This action cannot be undone.</AlertDialogDescriptionComponent>
-                                          </AlertDialogHeader>
-                                          <AlertDialogFooter>
-                                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                          <AlertDialogAction onClick={() => handleDeleteRelease(spec.id, release.id)}>Delete</AlertDialogAction>
-                                          </AlertDialogFooter>
-                                      </AlertDialogContent>
-                                      </AlertDialog>
-                                  </div>
-                                  </div>
-                              </CardHeader>
-                              <CardContent className="p-3 text-sm">
-                                  {release.description && <p className="mb-2 text-muted-foreground">{release.description}</p>}
-                                  <p className="font-medium text-foreground">Micro-Skills:</p>
-                                  <ul className="list-disc list-inside text-muted-foreground">
-                                    {(release.focusAreaIds || []).map((id, index) => (
-                                        <li key={`${id}-${index}`}>{microSkillMap.get(id)?.microSkillName || 'Unknown Micro-Skill'}</li>
-                                    ))}
-                                  </ul>
-                              </CardContent>
-                              </Card>
-                          ))}
-
-                          {editingRelease?.specializationId === spec.id ? (
-                            <ProjectForm 
-                                specialization={spec} 
-                                editingRelease={editingRelease} 
-                                handleUpdateEditingRelease={handleUpdateEditingRelease} 
-                                handleToggleFocusAreaInRelease={handleToggleFocusAreaInRelease} 
-                                handleSaveRelease={handleSaveRelease}
-                                setEditingRelease={setEditingRelease}
-                            />
-                          ) : (
-                              <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingRelease(spec.id)}>
-                                  <PlusCircle className="mr-2 h-4 w-4" /> Add Project
+                              <Button className="mt-2 w-full" variant="outline" onClick={() => handleStartEditingRelease(spec.id)}>
+                                  <Briefcase className="mr-2 h-4 w-4" /> Create / Edit Projects
                               </Button>
-                          )}
                          </AccordionContent>
                       </AccordionItem>
                       <AccordionItem value="item-5">
                           <AccordionTrigger>Offers</AccordionTrigger>
-                          <AccordionContent className="space-y-3">
-                              {offers.map(offer => (
-                                  <Card key={offer.id}>
-                                      <CardHeader className="p-3">
-                                          <div className="flex justify-between items-start">
-                                              <CardTitle className="text-base">{offer.name}</CardTitle>
-                                              <div className="flex items-center">
-                                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => copyOffer(spec.id, offer.id)}>
-                                                      <Copy className="h-4 w-4" />
-                                                  </Button>
-                                                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleStartEditingOffer(spec.id, offer)}><Edit className="h-4 w-4" /></Button>
-                                                  <AlertDialog>
-                                                      <AlertDialogTrigger asChild>
-                                                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive"><Trash2 className="h-4 w-4" /></Button>
-                                                      </AlertDialogTrigger>
-                                                      <AlertDialogContent>
-                                                          <AlertDialogHeader>
-                                                              <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
-                                                              <AlertDialogDescriptionComponent>This will permanently delete the offer "{offer.name}".</AlertDialogDescriptionComponent>
-                                                          </AlertDialogHeader>
-                                                          <AlertDialogFooter>
-                                                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                                              <AlertDialogAction onClick={() => handleDeleteOffer(spec.id, offer.id)}>Delete</AlertDialogAction>
-                                                          </AlertDialogFooter>
-                                                      </AlertDialogContent>
-                                                  </AlertDialog>
-                                              </div>
-                                          </div>
-                                          <CardDescription className="text-xs">{offer.outcome}</CardDescription>
-                                      </CardHeader>
-                                  </Card>
-                              ))}
-                              <Button className="w-full mt-2" variant="outline" onClick={() => handleStartEditingOffer(spec.id)}>
-                                  <PlusCircle className="mr-2 h-4 w-4" /> Add New Offer
+                          <AccordionContent>
+                              <Button className="mt-2 w-full" variant="outline" onClick={() => handleStartEditingOffer(spec.id)}>
+                                  <Sparkles className="mr-2 h-4 w-4" /> Create / Edit Offers
                               </Button>
                           </AccordionContent>
                       </AccordionItem>
@@ -1882,59 +1960,353 @@ function OfferizationContent() {
         })}
       </div>
       
-      {editingOffer && (
-        <Dialog open={!!editingOffer} onOpenChange={(isOpen) => !isOpen && setEditingOffer(null)}>
-            <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col">
-                <DialogHeader>
-                    <DialogTitleComponent>{editingOffer.offer.name ? 'Edit Offer' : 'Create New Offer'}</DialogTitleComponent>
-                    <DialogDescriptionComponent>
-                        Use this template to turn your service topic into a concrete offer.
-                    </DialogDescriptionComponent>
-                </DialogHeader>
-                <div className="flex-grow min-h-0">
-                    <ScrollArea className="h-full pr-6">
-                        <div className="space-y-4 py-4">
-                            <div>
-                                <Label htmlFor="offer-name">1. Offer Name</Label>
-                                <Input id="offer-name" value={editingOffer.offer.name || ''} onChange={(e) => handleUpdateEditingOffer('name', e.target.value)} placeholder="e.g., Launch Starter, GPU Boost Sprint" />
+      {editingProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+            <div className="relative max-h-[calc(100vh-2rem)] w-[min(98vw,1680px)] overflow-y-auto rounded-2xl border border-border/70 bg-background shadow-2xl">
+                <div className="pr-20 pl-6 pt-6">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                        <div>
+                            <h2 className="text-lg font-semibold leading-none tracking-tight">Manage Projects</h2>
+                            <p className="text-sm text-muted-foreground">
+                                Create and manage multiple projects for the same specialization from one workspace.
+                            </p>
+                        </div>
+                        <div className="flex flex-col gap-3 xl:items-end">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="min-w-[300px] max-w-[420px] flex-1">
+                                    <Select
+                                        value={String(activeDraftProject?.id || '')}
+                                        onValueChange={handleSelectEditingProject}
+                                    >
+                                        <SelectTrigger className="h-10 rounded-xl border-border/60 bg-muted/20">
+                                            <SelectValue placeholder="Select a project" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectGroup>
+                                                <SelectLabel>Project Set</SelectLabel>
+                                                {editingProject.releases.map((release, index) => (
+                                                    <SelectItem key={release.id || index} value={String(release.id || '')}>
+                                                        {release.name?.trim() || `Project ${index + 1}`}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectGroup>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <Badge variant="outline">
+                                    {editingProject.releases.length} draft project{editingProject.releases.length === 1 ? '' : 's'}
+                                </Badge>
                             </div>
-                            <div>
-                                <Label htmlFor="offer-outcome">2. Outcome / Promise</Label>
-                                <Textarea id="offer-outcome" value={editingOffer.offer.outcome || ''} onChange={(e) => handleUpdateEditingOffer('outcome', e.target.value)} placeholder="Get [X result] in [Y time] using [Z method]" />
-                            </div>
-                            <div>
-                                <Label htmlFor="offer-audience">3. Who It's For (Audience)</Label>
-                                <Textarea id="offer-audience" value={editingOffer.offer.audience || ''} onChange={(e) => handleUpdateEditingOffer('audience', e.target.value)} placeholder="Describe the ideal client segment" />
-                            </div>
-                            <div>
-                                <Label htmlFor="offer-deliverables">4. Core Deliverables</Label>
-                                <Textarea id="offer-deliverables" value={editingOffer.offer.deliverables || ''} onChange={(e) => handleUpdateEditingOffer('deliverables', e.target.value)} placeholder="List tangible items the client will receive, one per line." />
-                            </div>
-                            <div>
-                                <Label htmlFor="offer-valueStack">5. Value Stack</Label>
-                                <Textarea id="offer-valueStack" value={editingOffer.offer.valueStack || ''} onChange={(e) => handleUpdateEditingOffer('valueStack', e.target.value)} placeholder="List all included items, one per line. Include core work, support, and bonuses." />
-                            </div>
-                            <div>
-                                <Label htmlFor="offer-timeline">6. Timeline</Label>
-                                <Input id="offer-timeline" value={editingOffer.offer.timeline || ''} onChange={(e) => handleUpdateEditingOffer('timeline', e.target.value)} placeholder="e.g., Delivered in 3 working days" />
-                            </div>
-                            <div>
-                                <Label htmlFor="offer-price">7. Price</Label>
-                                <Input id="offer-price" value={editingOffer.offer.price || ''} onChange={(e) => handleUpdateEditingOffer('price', e.target.value)} placeholder="e.g., $500 flat (50% upfront)" />
-                            </div>
-                             <div>
-                                <Label htmlFor="offer-format">8. Format / Delivery</Label>
-                                <Textarea id="offer-format" value={editingOffer.offer.format || ''} onChange={(e) => handleUpdateEditingOffer('format', e.target.value)} placeholder="How is the service delivered? (e.g., GitHub, Loom, Notion)" />
+                            <div className="flex flex-wrap gap-2">
+                                <Button type="button" onClick={handleSaveProjects}>
+                                    Save Projects
+                                </Button>
+                                <Button type="button" variant="outline" onClick={handleAddBlankProjectDraft}>
+                                    <PlusCircle className="mr-2 h-4 w-4" />
+                                    Add Blank Project
+                                </Button>
+                                <Button type="button" variant="outline" onClick={handleDeleteSelectedProjectDraft} disabled={(editingProject.releases || []).length === 0}>
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete Selected
+                                </Button>
                             </div>
                         </div>
-                    </ScrollArea>
+                    </div>
                 </div>
-                <DialogFooter>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-4 top-4 h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
+                    onClick={handleSaveProjects}
+                >
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Close project manager</span>
+                </Button>
+                <div className="px-6 pb-6">
+                    {activeDraftProject && coreSkills.find((skill) => skill.id === editingProject.specializationId) ? (
+                      <ProjectForm
+                        specialization={coreSkills.find((skill) => skill.id === editingProject.specializationId) as CoreSkill}
+                        release={activeDraftProject}
+                        handleUpdateEditingRelease={handleUpdateEditingRelease}
+                      />
+                    ) : null}
+                </div>
+            </div>
+        </div>
+      )}
+
+      {activeLearningSpec && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+            <div className="relative max-h-[calc(100vh-2rem)] w-[min(98vw,1680px)] overflow-y-auto rounded-2xl border border-border/70 bg-background shadow-2xl">
+                <div className="pr-20 pl-6 pt-6">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                        <div>
+                            <h2 className="text-lg font-semibold leading-none tracking-tight">Manage Learning Plan</h2>
+                            <p className="text-sm text-muted-foreground">
+                                Organize skill-tree paths and learning resources for {activeLearningSpec.name} in one workspace.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline">
+                                {(activeLearningPlan.skillTreePaths || []).length} path{(activeLearningPlan.skillTreePaths || []).length === 1 ? '' : 's'}
+                            </Badge>
+                            <Badge variant="outline">
+                                {((activeLearningPlan.audioVideoResources || []).length + (activeLearningPlan.bookWebpageResources || []).length)} resource{((activeLearningPlan.audioVideoResources || []).length + (activeLearningPlan.bookWebpageResources || []).length) === 1 ? '' : 's'}
+                            </Badge>
+                            <Button type="button" onClick={() => setEditingLearningPlanSpecId(null)}>
+                                Done
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-4 top-4 h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
+                    onClick={() => setEditingLearningPlanSpecId(null)}
+                >
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Close learning plan manager</span>
+                </Button>
+                <div className="px-6 pb-6">
+                    <LearningPlannerForm
+                        spec={activeLearningSpec}
+                        learningPlan={activeLearningPlan}
+                        pdfResources={pdfResources}
+                        openPdfViewer={openPdfViewer}
+                        onOpenPdfLinkPicker={openPdfLinkPicker}
+                        onUnlinkPdfResource={handleUnlinkPdfResource}
+                        onAddSkillTreePathPlan={handleAddSkillTreePathPlan}
+                        onUpdateSkillTreePathPlan={handleUpdateSkillTreePathPlan}
+                        onToggleSkillAreaInPath={handleToggleSkillAreaInPath}
+                        onDeleteSkillTreePathPlan={handleDeleteSkillTreePathPlan}
+                        onAddLearningResource={handleAddLearningResource}
+                        onLearningPlanFieldChange={handleLearningPlanFieldChange}
+                        onDeleteLearningResource={handleDeleteLearningResource}
+                    />
+                </div>
+            </div>
+        </div>
+      )}
+
+      {editingOffer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
+            <div className="relative max-h-[calc(100vh-2rem)] w-[min(98vw,1680px)] overflow-y-auto rounded-2xl border border-border/70 bg-background shadow-2xl">
+                <div className="pr-20 pl-6 pt-6">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                        <div>
+                            <h2 className="text-lg font-semibold leading-none tracking-tight">Manage Offers</h2>
+                            <p className="text-sm text-muted-foreground">
+                                Generate and manage multiple offers for the same specialization from one workspace.
+                            </p>
+                        </div>
+                        <div className="flex flex-col gap-3 xl:items-end">
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="min-w-[300px] max-w-[420px] flex-1">
+                                    <Select
+                                        value={String(activeDraftOffer?.id || '')}
+                                        onValueChange={handleSelectEditingOffer}
+                                    >
+                                        <SelectTrigger className="h-10 rounded-xl border-border/60 bg-muted/20">
+                                            <SelectValue placeholder="Select an offer" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectGroup>
+                                                <SelectLabel>Offer Set</SelectLabel>
+                                                {editingOffer.offers.map((offer, index) => (
+                                                    <SelectItem key={offer.id || index} value={String(offer.id || '')}>
+                                                        {offer.name?.trim() || `Offer ${index + 1}`}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectGroup>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <Badge variant="outline">
+                                    {editingOffer.offers.length} draft offer{editingOffer.offers.length === 1 ? '' : 's'}
+                                </Badge>
+                                <Badge variant="outline">
+                                    {(offerizationPlans[editingOffer.specializationId]?.offerTypes || []).length} type{(offerizationPlans[editingOffer.specializationId]?.offerTypes || []).length === 1 ? '' : 's'}
+                                </Badge>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                            <Button type="button" variant="outline" onClick={() => void handleGenerateOffersFromTypes()} disabled={isGeneratingOffersBatch}>
+                                {isGeneratingOffersBatch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
+                                Generate From Offer Types
+                            </Button>
+                            <Button type="button" variant="outline" onClick={handleAddBlankOfferDraft}>
+                                <PlusCircle className="mr-2 h-4 w-4" />
+                                Add Blank Offer
+                            </Button>
+                            <Button type="button" variant="outline" onClick={handleDeleteSelectedDraftOffer} disabled={(editingOffer.offers || []).length === 0}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete Selected
+                            </Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-4 top-4 h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
+                    onClick={() => setEditingOffer(null)}
+                >
+                    <X className="h-4 w-4" />
+                    <span className="sr-only">Close offer manager</span>
+                </Button>
+                <div className="px-6 pb-6">
+                        <div className="grid gap-4 py-3 xl:grid-cols-2">
+                            <div className="space-y-4">
+                                {activeDraftOffer ? (
+                                  <div className="rounded-2xl border border-border/60 bg-muted/15 p-6">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="min-w-0">
+                                            <h3 className="text-[1.7rem] font-bold leading-tight tracking-tight text-foreground">
+                                                {activeDraftOffer.name?.trim() || 'Selected Offer Preview'}
+                                            </h3>
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                {activeDraftOffer.format?.trim() || activeDraftOffer.offerTypeLabel || 'Offer preview'}
+                                            </p>
+                                        </div>
+                                        <Badge variant="secondary" className="shrink-0">
+                                            {activeDraftOffer.offerTypeLabel || 'Concept'}
+                                        </Badge>
+                                    </div>
+
+                                    <div className="mt-6 space-y-5">
+                                        <div>
+                                            <p className="text-base font-semibold text-foreground">Outcome</p>
+                                            <div className="mt-2 text-sm leading-7 text-muted-foreground">
+                                                <OfferPreviewMarkdown content={activeDraftOffer.outcome} fallback="No outcome yet" />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-base font-semibold text-foreground">Audience</p>
+                                            <div className="mt-2 text-sm leading-7 text-muted-foreground">
+                                                <OfferPreviewMarkdown content={activeDraftOffer.audience} fallback="No audience yet" />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid gap-3 md:grid-cols-2">
+                                            <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                                                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Timeline</p>
+                                                <p className="mt-2 text-sm leading-7 text-foreground">{activeDraftOffer.timeline || 'Not set'}</p>
+                                            </div>
+                                            <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                                                <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Price</p>
+                                                <p className="mt-2 text-sm leading-7 text-foreground">{activeDraftOffer.price || 'Not set'}</p>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-base font-semibold text-foreground">Deliverables</p>
+                                            <div className="mt-2 text-sm leading-7 text-muted-foreground">
+                                                <OfferPreviewMarkdown content={activeDraftOffer.deliverables} fallback="No deliverables yet" />
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <p className="text-base font-semibold text-foreground">Value Stack</p>
+                                            <div className="mt-2 text-sm leading-7 text-muted-foreground">
+                                                <OfferPreviewMarkdown content={activeDraftOffer.valueStack} fallback="No value stack yet" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                  </div>
+                                ) : null}
+                            </div>
+
+                            <div className="space-y-3">
+                            {activeDraftOffer ? (
+                              <div className="grid gap-3 lg:grid-cols-2">
+                            <div className="space-y-1.5 rounded-xl border border-border/60 bg-muted/15 p-3">
+                                <div className="mb-1 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        {renderOfferFieldAction('name')}
+                                        <Label htmlFor="offer-name">1. Offer Name</Label>
+                                    </div>
+                                </div>
+                                <Input id="offer-name" value={activeDraftOffer.name || ''} onChange={(e) => handleUpdateEditingOffer('name', e.target.value)} placeholder="e.g., Launch Starter, GPU Boost Sprint" />
+                            </div>
+                            <div className="space-y-1.5 rounded-xl border border-border/60 bg-muted/15 p-3">
+                                <div className="mb-1 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        {renderOfferFieldAction('timeline')}
+                                        <Label htmlFor="offer-timeline">6. Timeline</Label>
+                                    </div>
+                                </div>
+                                <Input id="offer-timeline" value={activeDraftOffer.timeline || ''} onChange={(e) => handleUpdateEditingOffer('timeline', e.target.value)} placeholder="e.g., Delivered in 3 working days" />
+                            </div>
+                            <div className="space-y-1.5 rounded-xl border border-border/60 bg-muted/15 p-3">
+                                <div className="mb-1 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        {renderOfferFieldAction('outcome')}
+                                        <Label htmlFor="offer-outcome">2. Outcome / Promise</Label>
+                                    </div>
+                                </div>
+                                <Textarea className="min-h-[92px] resize-y" id="offer-outcome" value={activeDraftOffer.outcome || ''} onChange={(e) => handleUpdateEditingOffer('outcome', e.target.value)} placeholder="Get [X result] in [Y time] using [Z method]" />
+                            </div>
+                            <div className="space-y-1.5 rounded-xl border border-border/60 bg-muted/15 p-3">
+                                <div className="mb-1 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        {renderOfferFieldAction('audience')}
+                                        <Label htmlFor="offer-audience">3. Who It's For (Audience)</Label>
+                                    </div>
+                                </div>
+                                <Textarea className="min-h-[92px] resize-y" id="offer-audience" value={activeDraftOffer.audience || ''} onChange={(e) => handleUpdateEditingOffer('audience', e.target.value)} placeholder="Describe the ideal client segment" />
+                            </div>
+                            <div className="space-y-1.5 rounded-xl border border-border/60 bg-muted/15 p-3">
+                                <div className="mb-1 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        {renderOfferFieldAction('deliverables')}
+                                        <Label htmlFor="offer-deliverables">4. Core Deliverables</Label>
+                                    </div>
+                                </div>
+                                <Textarea className="min-h-[110px] resize-y" id="offer-deliverables" value={activeDraftOffer.deliverables || ''} onChange={(e) => handleUpdateEditingOffer('deliverables', e.target.value)} placeholder="List tangible items the client will receive, one per line." />
+                            </div>
+                            <div className="space-y-1.5 rounded-xl border border-border/60 bg-muted/15 p-3">
+                                <div className="mb-1 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        {renderOfferFieldAction('valueStack')}
+                                        <Label htmlFor="offer-valueStack">5. Value Stack</Label>
+                                    </div>
+                                </div>
+                                <Textarea className="min-h-[110px] resize-y" id="offer-valueStack" value={activeDraftOffer.valueStack || ''} onChange={(e) => handleUpdateEditingOffer('valueStack', e.target.value)} placeholder="List all included items, one per line. Include core work, support, and bonuses." />
+                            </div>
+                            <div className="space-y-1.5 rounded-xl border border-border/60 bg-muted/15 p-3">
+                                <div className="mb-1 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        {renderOfferFieldAction('price')}
+                                        <Label htmlFor="offer-price">7. Price</Label>
+                                    </div>
+                                </div>
+                                <Input id="offer-price" value={activeDraftOffer.price || ''} onChange={(e) => handleUpdateEditingOffer('price', e.target.value)} placeholder="e.g., $500 flat (50% upfront)" />
+                            </div>
+                             <div className="space-y-1.5 rounded-xl border border-border/60 bg-muted/15 p-3">
+                                <div className="mb-1 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        {renderOfferFieldAction('format')}
+                                        <Label htmlFor="offer-format">8. Format / Delivery</Label>
+                                    </div>
+                                </div>
+                                <Textarea className="min-h-[92px] resize-y" id="offer-format" value={activeDraftOffer.format || ''} onChange={(e) => handleUpdateEditingOffer('format', e.target.value)} placeholder="How is the service delivered? (e.g., GitHub, Loom, Notion)" />
+                            </div>
+                              </div>
+                            ) : null}
+                            </div>
+                        </div>
+                </div>
+                <div className="flex items-center justify-end gap-2 border-t border-border/60 px-6 pb-6 pt-4">
                     <Button variant="outline" onClick={() => setEditingOffer(null)}>Cancel</Button>
-                    <Button onClick={handleSaveOffer}>Save Offer</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                    <Button onClick={handleSaveOffer}>Save Offers</Button>
+                </div>
+            </div>
+        </div>
       )}
       <Dialog open={pdfLinkPicker.isOpen} onOpenChange={(open) => !open && closePdfLinkPicker()}>
         <DialogContent className="sm:max-w-xl">
@@ -1981,19 +2353,20 @@ function OfferizationContent() {
   );
 }
 
-const ProjectForm = ({ specialization, editingRelease, handleUpdateEditingRelease, handleToggleFocusAreaInRelease, handleSaveRelease, setEditingRelease }: {
+const ProjectForm = ({ specialization, release, handleUpdateEditingRelease }: {
     specialization: CoreSkill,
-    editingRelease: { specializationId: string; release: Partial<Release> },
+    release: Partial<Release>,
     handleUpdateEditingRelease: (field: keyof Release, value: any) => void,
-    handleToggleFocusAreaInRelease: (microSkillId: string) => void,
-    handleSaveRelease: () => void,
-    setEditingRelease: React.Dispatch<React.SetStateAction<{ specializationId: string; release: Partial<Release> } | null>>,
 }) => {
-    const { projects, coreSkills, mindsetCards, kanbanBoards } = useAuth();
-    const [selectedSpecForMicro, setSelectedSpecForMicro] = useState<CoreSkill | null>(specialization);
-    const [selectedSkillAreaForMicro, setSelectedSkillAreaForMicro] = useState<SkillArea | null>(null);
-
-    const { release } = editingRelease;
+    const { projects, coreSkills, mindsetCards, kanbanBoards, deepWorkDefinitions, settings } = useAuth();
+    const { toast } = useToast();
+    const isDesktopRuntime = typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop);
+    const aiConfig = useMemo(() => getAiConfigFromSettings(settings, isDesktopRuntime), [settings, isDesktopRuntime]);
+    const [technicalDetails, setTechnicalDetails] = useState<ProjectTechnicalSection[]>(
+        () => normalizeProjectTechnicalDetails(release.technicalDetails)
+    );
+    const [isGeneratingTechnicalDetails, setIsGeneratingTechnicalDetails] = useState(false);
+    const [rephrasingTechnicalLineKey, setRephrasingTechnicalLineKey] = useState<string | null>(null);
     const workflowStages = useMemo(() => ({
         botheringPointId: release.workflowStages?.botheringPointId || null,
         botheringText: release.workflowStages?.botheringText || '',
@@ -2019,12 +2392,24 @@ const ProjectForm = ({ specialization, editingRelease, handleUpdateEditingReleas
                 type: card.id.replace('mindset_botherings_', ''),
             })));
     }, [mindsetCards]);
-    const allMicroSkills = useMemo(() => selectedSkillAreaForMicro?.microSkills || [], [selectedSkillAreaForMicro]);
     const projectsInDomain = useMemo(() => projects.filter(p => p.domainId === specialization.domainId), [specialization.domainId, projects]);
-    const linkedKanbanBoard = useMemo(
-        () => kanbanBoards.find((board) => board.releaseId === release.id) || null,
-        [kanbanBoards, release.id]
+    const matchedProject = useMemo(
+        () =>
+            projectsInDomain.find((project) => project.name === release.name) ||
+            projects.find((project) => project.name === release.name) ||
+            null,
+        [projects, projectsInDomain, release.name]
     );
+    const linkedKanbanBoard = useMemo(() => {
+        const projectBoards = kanbanBoards.filter((board) => (board.boardType || 'project') === 'project');
+        return (
+            projectBoards.find((board) => board.releaseId === release.id && board.specializationId === specialization.id) ||
+            projectBoards.find((board) => matchedProject?.id && board.projectId === matchedProject.id) ||
+            projectBoards.find((board) => board.name === release.name && board.specializationId === specialization.id) ||
+            projectBoards.find((board) => board.releaseId === release.id) ||
+            null
+        );
+    }, [kanbanBoards, matchedProject?.id, release.id, release.name, specialization.id]);
     const stageCardsByKey = useMemo(() => {
         if (!linkedKanbanBoard) {
             return {
@@ -2032,203 +2417,1017 @@ const ProjectForm = ({ specialization, editingRelease, handleUpdateEditingReleas
                 codeItems: [] as KanbanCard[],
                 breakItems: [] as KanbanCard[],
                 fixItems: [] as KanbanCard[],
+                doneItems: [] as KanbanCard[],
             };
         }
-        const cardsByListId = new Map<string, KanbanCard[]>();
-        linkedKanbanBoard.cards.forEach((card) => {
-            const bucket = cardsByListId.get(card.listId) || [];
-            bucket.push(card);
-            cardsByListId.set(card.listId, bucket);
+        const listIdsByStage = new Map<string, string[]>();
+        linkedKanbanBoard.lists.forEach((list) => {
+            const normalizedTitle = (list.title || '').trim().toLowerCase();
+            if (!normalizedTitle) return;
+            const existing = listIdsByStage.get(normalizedTitle) || [];
+            existing.push(list.id);
+            listIdsByStage.set(normalizedTitle, existing);
         });
+
+        const cardsForStage = (stage: 'idea' | 'code' | 'break' | 'fix' | 'done') => {
+            const stageListIds = new Set<string>([
+                ...(listIdsByStage.get(stage) || []),
+                `${linkedKanbanBoard.id}_${stage}`,
+                `${linkedKanbanBoard.id}_list_${stage}`,
+            ]);
+
+            return linkedKanbanBoard.cards
+                .filter((card) => {
+                    if (card.archived) return false;
+                    if (stageListIds.has(card.listId)) return true;
+                    if (stage !== 'done' && card.workflowStageKey === stage) return true;
+                    return false;
+                })
+                .sort((a, b) => a.position - b.position);
+        };
+
         return {
-            ideaItems: (cardsByListId.get(`${linkedKanbanBoard.id}_list_idea`) || []).sort((a, b) => a.position - b.position),
-            codeItems: (cardsByListId.get(`${linkedKanbanBoard.id}_list_code`) || []).sort((a, b) => a.position - b.position),
-            breakItems: (cardsByListId.get(`${linkedKanbanBoard.id}_list_break`) || []).sort((a, b) => a.position - b.position),
-            fixItems: (cardsByListId.get(`${linkedKanbanBoard.id}_list_fix`) || []).sort((a, b) => a.position - b.position),
+            ideaItems: cardsForStage('idea'),
+            codeItems: cardsForStage('code'),
+            breakItems: cardsForStage('break'),
+            fixItems: cardsForStage('fix'),
+            doneItems: cardsForStage('done'),
         };
     }, [linkedKanbanBoard]);
+
+    const doneIntentionMap = useMemo(() => {
+        const intentionIds = new Set<string>();
+        stageCardsByKey.doneItems.forEach((card) => {
+            (card.linkedIntentionIds || []).forEach((id) => {
+                if (id) intentionIds.add(id);
+            });
+            (card.checklist || []).forEach((item) => {
+                if (item.linkedIntentionId) intentionIds.add(item.linkedIntentionId);
+            });
+        });
+
+        const microSkillIntentions = new Map<string, { id: string; name: string }[]>();
+        Array.from(intentionIds).forEach((intentionId) => {
+            const definition = deepWorkDefinitions.find((entry) => entry.id === intentionId);
+            if (!definition) return;
+
+            const linkedIds = new Set<string>(definition.linkedMicroSkillIds || []);
+            coreSkills
+                .filter((skill) => skill.type === 'Specialization')
+                .forEach((skill) => {
+                    skill.skillAreas.forEach((area) => {
+                        area.microSkills.forEach((microSkill) => {
+                            if (
+                                (definition.category || '').trim().toLowerCase() === microSkill.name.trim().toLowerCase() ||
+                                linkedIds.has(microSkill.id)
+                            ) {
+                                const existing = microSkillIntentions.get(microSkill.id) || [];
+                                if (!existing.some((item) => item.id === definition.id)) {
+                                    existing.push({ id: definition.id, name: definition.name });
+                                    microSkillIntentions.set(microSkill.id, existing);
+                                }
+                            }
+                        });
+                    });
+                });
+        });
+
+        return microSkillIntentions;
+    }, [coreSkills, deepWorkDefinitions, stageCardsByKey.doneItems]);
+
+    const doneChecklistFallbackIntentions = useMemo(() => {
+        const items: { id: string; name: string }[] = [];
+        stageCardsByKey.doneItems.forEach((card) => {
+            (card.checklist || []).forEach((item) => {
+                if (!item.completed) return;
+                if (item.linkedIntentionId) return;
+                const name = (item.text || '').trim();
+                if (!name) return;
+                const id = `done-check-${card.id}-${item.id}`;
+                if (!items.some((entry) => entry.id === id)) {
+                    items.push({ id, name });
+                }
+            });
+        });
+        return items;
+    }, [stageCardsByKey.doneItems]);
+
+    const skillsUsedRows = useMemo(() => {
+        const rowsMap = new Map<string, {
+            microSkillId: string;
+            specializationName: string;
+            skillAreaName: string;
+            skillAreaPurpose: string;
+            microSkillName: string;
+            intentions: { id: string; name: string }[];
+        }>();
+
+        const upsertRow = (
+            microSkillId: string,
+            specializationName: string,
+            skillAreaName: string,
+            skillAreaPurpose: string,
+            microSkillName: string,
+            intentions: { id: string; name: string }[] = []
+        ) => {
+            const existing = rowsMap.get(microSkillId);
+            if (!existing) {
+                rowsMap.set(microSkillId, {
+                    microSkillId,
+                    specializationName,
+                    skillAreaName,
+                    skillAreaPurpose,
+                    microSkillName,
+                    intentions: [...intentions],
+                });
+                return;
+            }
+            const mergedIntentions = [...existing.intentions];
+            intentions.forEach((intention) => {
+                if (!mergedIntentions.some((item) => item.id === intention.id)) {
+                    mergedIntentions.push(intention);
+                }
+            });
+            rowsMap.set(microSkillId, {
+                ...existing,
+                skillAreaPurpose: existing.skillAreaPurpose || skillAreaPurpose,
+                intentions: mergedIntentions,
+            });
+        };
+
+        coreSkills
+            .filter((skill) => skill.type === 'Specialization')
+            .forEach((skill) => {
+                skill.skillAreas.forEach((area) => {
+                    area.microSkills.forEach((microSkill) => {
+                        const intentions = doneIntentionMap.get(microSkill.id) || [];
+                        if (intentions.length > 0) {
+                            upsertRow(microSkill.id, skill.name, area.name, area.purpose || '', microSkill.name, intentions);
+                        }
+                    });
+                });
+            });
+
+        (matchedProject?.features || []).forEach((feature) => {
+            (feature.linkedSkills || []).forEach((link) => {
+                coreSkills
+                    .filter((skill) => skill.type === 'Specialization')
+                    .forEach((skill) => {
+                        skill.skillAreas.forEach((area) => {
+                            const microSkill = area.microSkills.find((item) => item.id === link.microSkillId);
+                            if (!microSkill) return;
+                            upsertRow(
+                                microSkill.id,
+                                skill.name,
+                                area.name,
+                                area.purpose || '',
+                                microSkill.name,
+                                (() => {
+                                    const directIntentions = doneIntentionMap.get(microSkill.id) || [];
+                                    return directIntentions.length > 0 ? directIntentions : doneChecklistFallbackIntentions;
+                                })()
+                            );
+                        });
+                    });
+            });
+        });
+
+        return Array.from(rowsMap.values()).sort((a, b) =>
+            `${a.skillAreaName} ${a.microSkillName}`.localeCompare(`${b.skillAreaName} ${b.microSkillName}`)
+        );
+    }, [coreSkills, doneChecklistFallbackIntentions, doneIntentionMap, matchedProject?.features]);
+
+    useEffect(() => {
+        setTechnicalDetails(normalizeProjectTechnicalDetails(release.technicalDetails));
+    }, [release.id, release.technicalDetails]);
+
+    const syncTechnicalDetailsToRelease = useCallback((next: ProjectTechnicalSection[]) => {
+        const normalized = normalizeProjectTechnicalDetails(next);
+        setTechnicalDetails(normalized);
+        handleUpdateEditingRelease('technicalDetails' as keyof Release, normalized);
+    }, [handleUpdateEditingRelease]);
+
+    const handleTechnicalDetailLineChange = useCallback((title: ProjectTechnicalSection['title'], lineIndex: number, value: string) => {
+        const next = normalizeProjectTechnicalDetails(technicalDetails).map((section) => (
+            section.title === title
+                ? {
+                    ...section,
+                    content: section.content.map((line, index) => index === lineIndex ? value : line),
+                  }
+                : section
+        ));
+        syncTechnicalDetailsToRelease(next);
+    }, [syncTechnicalDetailsToRelease, technicalDetails]);
+
+    const handleAddTechnicalDetailLine = useCallback((title: ProjectTechnicalSection['title']) => {
+        const next = normalizeProjectTechnicalDetails(technicalDetails).map((section) => (
+            section.title === title
+                ? { ...section, content: [...section.content, 'New point'] }
+                : section
+        ));
+        syncTechnicalDetailsToRelease(next);
+    }, [syncTechnicalDetailsToRelease, technicalDetails]);
+
+    const handleRephraseTechnicalDetailLine = useCallback(async (title: ProjectTechnicalSection['title'], lineIndex: number, line: string) => {
+        if (aiConfig.provider === 'none') {
+            toast({
+                title: 'AI is not configured',
+                description: 'Choose an AI provider in Settings > AI Settings first.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        const trimmedLine = line.trim();
+        if (!trimmedLine) return;
+
+        const lineKey = `${title}-${lineIndex}`;
+        setRephrasingTechnicalLineKey(lineKey);
+        try {
+            const response = await fetch('/api/ai/project-technical-line', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+                },
+                body: JSON.stringify({
+                    sectionTitle: title,
+                    projectName: release.name || '',
+                    line: trimmedLine,
+                    aiConfig,
+                }),
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to rephrase technical detail.');
+            }
+
+            const nextValue = typeof data?.value === 'string' ? data.value.trim() : '';
+            if (!nextValue) {
+                throw new Error('AI returned an empty rephrased line.');
+            }
+
+            const next = normalizeProjectTechnicalDetails(technicalDetails).map((section) => (
+                section.title === title
+                    ? {
+                        ...section,
+                        content: section.content.map((entry, index) => index === lineIndex ? nextValue : entry),
+                      }
+                    : section
+            ));
+            syncTechnicalDetailsToRelease(next);
+        } catch (error) {
+            toast({
+                title: 'AI rephrase failed',
+                description: error instanceof Error ? error.message : 'Unknown AI error.',
+                variant: 'destructive',
+            });
+        } finally {
+            setRephrasingTechnicalLineKey((current) => current === lineKey ? null : current);
+        }
+    }, [aiConfig, isDesktopRuntime, release.name, syncTechnicalDetailsToRelease, technicalDetails, toast]);
+
+    const normalizedTechnicalDetails = normalizeProjectTechnicalDetails(technicalDetails);
+
+    const handleGenerateTechnicalDetails = useCallback(async () => {
+        if (aiConfig.provider === 'none') {
+            toast({
+                title: 'AI is not configured',
+                description: 'Choose an AI provider in Settings > AI Settings first.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        setIsGeneratingTechnicalDetails(true);
+        try {
+            const response = await fetch('/api/ai/project-technical-details', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+                },
+                body: JSON.stringify({
+                    project: {
+                        name: release.name || '',
+                        description: release.description || '',
+                        githubLink: release.githubLink || '',
+                        demoLink: release.demoLink || '',
+                    },
+                    existingSections: normalizedTechnicalDetails,
+                    skillsUsed: skillsUsedRows.map((row) => ({
+                        specialization: row.specializationName,
+                        skillArea: row.skillAreaName,
+                        skillAreaPurpose: row.skillAreaPurpose,
+                        microSkill: row.microSkillName,
+                        intentions: row.intentions.map((item) => item.name),
+                    })),
+                    doneCards: stageCardsByKey.doneItems.map((card) => ({
+                        title: card.title,
+                        description: card.description,
+                        checklist: (card.checklist || [])
+                            .filter((item) => item.completed)
+                            .map((item) => item.text)
+                            .filter(Boolean),
+                    })),
+                    aiConfig,
+                }),
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to generate technical details.');
+            }
+            if (!Array.isArray(data?.sections)) {
+                throw new Error('AI returned invalid technical details.');
+            }
+
+            const generatedSections = normalizeProjectTechnicalDetails(data.sections as ProjectTechnicalSection[]);
+            const mergedSections = normalizeProjectTechnicalDetails(normalizedTechnicalDetails).map((section) => {
+                const generated = generatedSections.find((item) => item.title === section.title);
+                const existingNormalized = new Set(section.content.map((item) => normalizeTechnicalDetailLineForComparison(item)));
+                const additionalContent = (generated?.content || []).filter((item) => {
+                    const normalized = normalizeTechnicalDetailLineForComparison(item);
+                    return normalized && !existingNormalized.has(normalized);
+                });
+                return {
+                    ...section,
+                    content: [...section.content, ...additionalContent],
+                };
+            });
+
+            syncTechnicalDetailsToRelease(mergedSections);
+        } catch (error) {
+            toast({
+                title: 'AI generation failed',
+                description: error instanceof Error ? error.message : 'Unknown AI error.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsGeneratingTechnicalDetails(false);
+        }
+    }, [aiConfig, isDesktopRuntime, normalizedTechnicalDetails, release.demoLink, release.description, release.githubLink, release.name, skillsUsedRows, stageCardsByKey.doneItems, syncTechnicalDetailsToRelease, toast]);
 
     const updateWorkflowStages = (next: typeof workflowStages) => {
         handleUpdateEditingRelease('workflowStages' as keyof Release, next);
     };
     
     return (
-        <Card className="mt-4 bg-muted/50">
-            <CardHeader>
-                <CardTitle className="text-lg">{release.id?.startsWith('release_') ? 'Add New Project' : 'Edit Project'}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div>
-                    <Label htmlFor="release-name">Project Name</Label>
-                    <Select value={release.name || ''} onValueChange={(value) => handleUpdateEditingRelease('name', value)}>
-                        <SelectTrigger id="release-name">
-                            <SelectValue placeholder="Select a project..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {projectsInDomain.map(proj => (
-                                <SelectItem key={proj.id} value={proj.name}>{proj.name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div>
-                    <Label htmlFor="release-date">EST completion date</Label>
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button id="release-date" variant="outline" className="w-full justify-start text-left font-normal">
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {release.launchDate ? format(parseISO(release.launchDate), 'PPP') : 'Select a date'}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                            <Calendar mode="single" selected={release.launchDate ? parseISO(release.launchDate) : new Date()} onSelect={(date) => handleUpdateEditingRelease('launchDate', format(date as Date, 'yyyy-MM-dd'))} />
-                        </PopoverContent>
-                    </Popover>
-                </div>
-                <div>
-                    <Label htmlFor="release-desc">Description</Label>
-                    <Textarea id="release-desc" value={release.description || ''} onChange={(e) => handleUpdateEditingRelease('description', e.target.value)} placeholder="What is the goal of this project?" />
-                </div>
-                <div className="space-y-3 rounded-md border p-3">
-                    <div className="font-medium">Project Stages</div>
-                    <div className="space-y-2">
-                        <Label>Bothering -&gt; define pain</Label>
-                        <Select
-                            value={workflowStages.botheringPointId || ''}
-                            onValueChange={(pointId) => {
-                                const selected = allBotherings.find(b => b.id === pointId);
-                                updateWorkflowStages({
-                                    ...workflowStages,
-                                    botheringPointId: pointId,
-                                    botheringText: selected?.text || '',
-                                });
-                            }}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select from botherings list..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {allBotherings.map(b => (
-                                    <SelectItem key={b.id} value={b.id}>
-                                        [{b.type}] {b.text}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        {workflowStages.botheringText && (
-                            <p className="text-xs text-muted-foreground">{workflowStages.botheringText}</p>
-                        )}
+        <div className="mt-4 space-y-4">
+            <div className="rounded-2xl border border-border/60 bg-muted/15 p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                        <h3 className="text-2xl font-bold tracking-tight text-foreground">
+                            {release.name?.trim() || 'Project Details'}
+                        </h3>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Shape the project scope, timeline, delivery links, and execution stages in one place.
+                        </p>
                     </div>
-                    {[
-                        { key: 'ideaItems', labelKey: 'idea' },
-                        { key: 'codeItems', labelKey: 'code' },
-                        { key: 'breakItems', labelKey: 'break' },
-                        { key: 'fixItems', labelKey: 'fix' },
-                    ].map(stage => (
-                        <div key={stage.key} className="space-y-2">
-                            <Input
-                                value={workflowStages.stageLabels[stage.labelKey as 'idea' | 'code' | 'break' | 'fix']}
-                                onChange={(e) =>
+                    <div className="grid min-w-[260px] grid-cols-2 gap-3">
+                        <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Target Date</p>
+                            <p className="mt-2 text-sm font-medium text-foreground">
+                                {release.launchDate ? format(parseISO(release.launchDate), 'PPP') : 'Not set'}
+                            </p>
+                        </div>
+                        <div className="rounded-xl border border-border/60 bg-background/40 p-4">
+                            <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Portfolio</p>
+                            <p className="mt-2 text-sm font-medium text-foreground">
+                                {release.addToPortfolio ? 'Included' : 'Private'}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-3 xl:items-start">
+                <div className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-1.5 rounded-2xl border border-border/60 bg-muted/15 p-4 md:col-span-2">
+                            <Label htmlFor="release-name">Project Name</Label>
+                            <Select value={release.name || ''} onValueChange={(value) => handleUpdateEditingRelease('name', value)}>
+                                <SelectTrigger id="release-name" className="h-11 rounded-xl">
+                                    <SelectValue placeholder="Select a project..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {projectsInDomain.map(proj => (
+                                        <SelectItem key={proj.id} value={proj.name}>{proj.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-1.5 rounded-2xl border border-border/60 bg-muted/15 p-4 md:col-span-2">
+                            <Label>Bothering -&gt; define pain</Label>
+                            <Select
+                                value={workflowStages.botheringPointId || ''}
+                                onValueChange={(pointId) => {
+                                    const selected = allBotherings.find(b => b.id === pointId);
                                     updateWorkflowStages({
                                         ...workflowStages,
-                                        stageLabels: {
-                                            ...workflowStages.stageLabels,
-                                            [stage.labelKey]: e.target.value,
-                                        },
-                                    })
-                                }
-                                placeholder="Stage title"
+                                        botheringPointId: pointId,
+                                        botheringText: selected?.text || '',
+                                    });
+                                }}
+                            >
+                                <SelectTrigger className="rounded-xl">
+                                    <SelectValue placeholder="Select from botherings list..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {allBotherings.map(b => (
+                                        <SelectItem key={b.id} value={b.id}>
+                                            [{b.type}] {b.text}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {workflowStages.botheringText && (
+                                <div className="rounded-lg border border-border/50 bg-background/30 px-3 py-2 text-xs text-muted-foreground">
+                                    {workflowStages.botheringText}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="space-y-1.5 rounded-2xl border border-border/60 bg-muted/15 p-4">
+                            <Label htmlFor="release-date">Est. Completion Date</Label>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button id="release-date" variant="outline" className="h-11 w-full justify-start rounded-xl text-left font-normal">
+                                        <CalendarIcon className="mr-2 h-4 w-4" />
+                                        {release.launchDate ? format(parseISO(release.launchDate), 'PPP') : 'Select a date'}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                    <Calendar mode="single" selected={release.launchDate ? parseISO(release.launchDate) : new Date()} onSelect={(date) => handleUpdateEditingRelease('launchDate', format(date as Date, 'yyyy-MM-dd'))} />
+                                </PopoverContent>
+                            </Popover>
+                        </div>
+
+                        <div className="space-y-1.5 rounded-2xl border border-border/60 bg-muted/15 p-4">
+                            <Label htmlFor="add-to-portfolio">Visibility</Label>
+                            <div className="flex h-11 items-center justify-between rounded-xl border border-border/60 bg-background/40 px-3">
+                                <div>
+                                    <p className="text-sm font-medium text-foreground">Add to Portfolio</p>
+                                    <p className="text-xs text-muted-foreground">Show this project on the Portfolio page</p>
+                                </div>
+                                <Checkbox
+                                    id="add-to-portfolio"
+                                    checked={release.addToPortfolio}
+                                    onCheckedChange={(checked) => handleUpdateEditingRelease('addToPortfolio', !!checked)}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5 rounded-2xl border border-border/60 bg-muted/15 p-4 md:col-span-2">
+                            <Label htmlFor="release-desc">Description</Label>
+                            <Textarea
+                                id="release-desc"
+                                className="min-h-[110px] rounded-xl"
+                                value={release.description || ''}
+                                onChange={(e) => handleUpdateEditingRelease('description', e.target.value)}
+                                placeholder="What is the goal of this project?"
                             />
-                            <div className="space-y-2 rounded-md border border-dashed p-3">
-                                {stageCardsByKey[stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems'].length > 0 ? (
-                                    stageCardsByKey[stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems'].map((card) => (
-                                        <div key={card.id} className="rounded-md border bg-background/60 px-3 py-2">
-                                            <div className="text-sm font-medium">{card.title}</div>
-                                            {card.description && (
-                                                <div className="mt-1 text-xs text-muted-foreground line-clamp-2">{card.description}</div>
+                        </div>
+
+                        <div className="rounded-2xl border border-border/60 bg-muted/15 p-4 md:col-span-2">
+                            <div className="mb-3">
+                                <h4 className="text-base font-semibold text-foreground">Links</h4>
+                                <p className="text-sm text-muted-foreground">Attach the project repo and live demo if available.</p>
+                            </div>
+                            <div className="space-y-3">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="github-link">GitHub Link</Label>
+                                    <Input id="github-link" className="rounded-xl" value={release.githubLink || ''} onChange={(e) => handleUpdateEditingRelease('githubLink', e.target.value)} placeholder="https://github.com/user/repo"/>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="demo-link">Demo Link</Label>
+                                    <Input id="demo-link" className="rounded-xl" value={release.demoLink || ''} onChange={(e) => handleUpdateEditingRelease('demoLink', e.target.value)} placeholder="https://my-app.vercel.app"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-border/60 bg-muted/15 p-4">
+                        <div className="mb-3">
+                            <h4 className="text-base font-semibold text-foreground">Execution Stages</h4>
+                            <p className="text-sm text-muted-foreground">Keep the project flow aligned with the linked Kanban board.</p>
+                        </div>
+
+                        <div className="space-y-3">
+                            <div className="grid gap-3 xl:grid-cols-2">
+                                {[
+                                    { key: 'ideaItems', labelKey: 'idea', tone: 'Idea' },
+                                    { key: 'codeItems', labelKey: 'code', tone: 'Code' },
+                                    { key: 'breakItems', labelKey: 'break', tone: 'Break' },
+                                    { key: 'fixItems', labelKey: 'fix', tone: 'Fix' },
+                                ].map(stage => (
+                                    <div key={stage.key} className="space-y-2 rounded-xl border border-border/60 bg-background/30 p-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">{stage.tone}</span>
+                                            <span className="text-xs text-muted-foreground">
+                                                {stageCardsByKey[stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems'].length} cards
+                                            </span>
+                                        </div>
+                                        <div className="space-y-2 rounded-xl border border-dashed border-border/60 bg-muted/10 p-3">
+                                            {stageCardsByKey[stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems'].length > 0 ? (
+                                                stageCardsByKey[stage.key as 'ideaItems' | 'codeItems' | 'breakItems' | 'fixItems'].map((card) => (
+                                                    <div key={card.id} className="rounded-lg border border-border/50 bg-background/60 px-3 py-2">
+                                                        <div className="text-sm font-medium">{card.title}</div>
+                                                        {card.description && (
+                                                            <div className="mt-1 text-xs text-muted-foreground line-clamp-2">{card.description}</div>
+                                                        )}
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-xs text-muted-foreground">
+                                                    No Kanban cards in this stage yet. Add cards from the Kanban board.
+                                                </div>
                                             )}
                                         </div>
-                                    ))
+                                    </div>
+                                ))}
+
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-4 xl:min-w-0">
+                    <div className="rounded-2xl border border-border/60 bg-muted/15 p-4">
+                        <div className="mb-3 flex items-start justify-between gap-3">
+                            <div>
+                                <h4 className="text-base font-semibold text-foreground">Technical Details</h4>
+                                <p className="text-sm text-muted-foreground">Generate concise technical notes from the inferred skills used in this project.</p>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleGenerateTechnicalDetails()}
+                                disabled={isGeneratingTechnicalDetails || aiConfig.provider === 'none'}
+                            >
+                                {isGeneratingTechnicalDetails ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 ) : (
-                                    <div className="text-xs text-muted-foreground">
-                                        No Kanban cards in this stage yet. Add cards from the Kanban board.
-                                    </div>
+                                    <Sparkles className="mr-2 h-4 w-4" />
                                 )}
-                            </div>
+                                Generate
+                            </Button>
                         </div>
-                    ))}
-                    <div className="rounded-md border border-dashed p-2 text-xs text-muted-foreground">
-                        Done -&gt; stop & ship. Kanban keeps this final column separate from the editable project-plan stages.
-                    </div>
-                </div>
-                 <div>
-                    <Label htmlFor="github-link">GitHub Link</Label>
-                    <Input id="github-link" value={release.githubLink || ''} onChange={(e) => handleUpdateEditingRelease('githubLink', e.target.value)} placeholder="https://github.com/user/repo"/>
-                </div>
-                <div>
-                    <Label htmlFor="demo-link">Demo Link</Label>
-                    <Input id="demo-link" value={release.demoLink || ''} onChange={(e) => handleUpdateEditingRelease('demoLink', e.target.value)} placeholder="https://my-app.vercel.app"/>
-                </div>
-                <div>
-                    <Label>Included Micro-Skills</Label>
-                    <div className="space-y-2 mt-2 p-3 border rounded-md">
-                        <div className='grid grid-cols-2 gap-2 mb-2'>
-                            <Select value={selectedSpecForMicro?.id || ''} onValueChange={specId => {
-                                setSelectedSpecForMicro(coreSkills.find(s => s.id === specId) || null);
-                                setSelectedSkillAreaForMicro(null);
-                            }}>
-                                <SelectTrigger><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
-                                <SelectContent>
-                                    {coreSkills.filter(s => s.type === 'Specialization').map(spec => (
-                                        <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <Select value={selectedSkillAreaForMicro?.id || ''} onValueChange={areaId => {
-                                const area = selectedSpecForMicro?.skillAreas.find(a => a.id === areaId) || null;
-                                setSelectedSkillAreaForMicro(area);
-                            }} disabled={!selectedSpecForMicro}>
-                                <SelectTrigger><SelectValue placeholder="Select Skill Area..." /></SelectTrigger>
-                                <SelectContent>
-                                    {(selectedSpecForMicro?.skillAreas || []).map(area => (
-                                        <SelectItem key={area.id} value={area.id}>{area.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <ScrollArea className="max-h-36">
-                            <div className="space-y-2">
-                                {allMicroSkills.length > 0 ? allMicroSkills.map(ms => (
-                                    <div key={ms.id} className="flex items-center space-x-2">
-                                        <Checkbox
-                                            id={`ms-${ms.id}`}
-                                            checked={(release.focusAreaIds || []).includes(ms.id)}
-                                            onCheckedChange={() => handleToggleFocusAreaInRelease(ms.id)}
-                                        />
-                                        <Label htmlFor={`ms-${ms.id}`} className="font-normal">{ms.name}</Label>
+                        <div className="rounded-xl border border-border/60 bg-background/30 p-3">
+                            <div className="space-y-5">
+                                {normalizedTechnicalDetails.map((section, index) => (
+                                    <div key={`${section.title}-${index}`} className={index > 0 ? "border-t border-border/30 pt-4" : ""}>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                                                {index + 1}. {section.title}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7"
+                                                    aria-label={`Add point to ${section.title}`}
+                                                    onClick={() => handleAddTechnicalDetailLine(section.title)}
+                                                >
+                                                    <PlusCircle className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 space-y-2">
+                                            {section.content.length > 0 ? section.content.map((line, lineIndex) => (
+                                                <div
+                                                    key={`${section.title}-${lineIndex}`}
+                                                    className="group flex items-start gap-2 rounded-md px-1 py-1 transition-colors hover:bg-background/20"
+                                                >
+                                                    <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/70" />
+                                                    <div
+                                                        contentEditable
+                                                        suppressContentEditableWarning
+                                                        className="min-h-[24px] flex-1 whitespace-pre-wrap break-words rounded-sm text-sm leading-6 text-foreground outline-none"
+                                                        role="textbox"
+                                                        aria-label={`${section.title} point ${lineIndex + 1}`}
+                                                        onBlur={(e) => handleTechnicalDetailLineChange(section.title, lineIndex, e.currentTarget.textContent || '')}
+                                                    >
+                                                        {line}
+                                                    </div>
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 text-muted-foreground hover:text-foreground focus-visible:opacity-100"
+                                                        onClick={() => void handleRephraseTechnicalDetailLine(section.title, lineIndex, line)}
+                                                        disabled={rephrasingTechnicalLineKey === `${section.title}-${lineIndex}` || aiConfig.provider === 'none'}
+                                                        aria-label={`Rephrase ${section.title} point ${lineIndex + 1}`}
+                                                    >
+                                                        {rephrasingTechnicalLineKey === `${section.title}-${lineIndex}` ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                        ) : (
+                                                            <Sparkles className="h-4 w-4" />
+                                                        )}
+                                                    </Button>
+                                                </div>
+                                            )) : (
+                                                <div className="px-1 py-2 text-sm text-muted-foreground">
+                                                    No points yet. Generate from AI or add your own notes here.
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                )) : <p className="text-xs text-muted-foreground text-center">Select a skill area to see micro-skills.</p>}
+                                ))}
                             </div>
-                        </ScrollArea>
+                        </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-border/60 bg-muted/15 p-4">
+                        <div className="mb-3">
+                            <h4 className="text-base font-semibold text-foreground">Skills Used</h4>
+                            <p className="text-sm text-muted-foreground">Automatically inferred from this project&apos;s linked skills and Kanban Done cards with linked intentions.</p>
+                        </div>
+                        <div className="rounded-xl border border-border/60 bg-background/30 p-3">
+                            <ScrollArea className="max-h-64">
+                                <div className="space-y-2 pr-1">
+                                    {skillsUsedRows.length > 0 ? skillsUsedRows.map((row) => (
+                                        <div key={row.microSkillId} className="rounded-lg border border-border/40 bg-background/40 px-3 py-3">
+                                            <p className="text-sm font-semibold text-foreground">
+                                                {row.skillAreaName} &gt; {row.microSkillName}
+                                            </p>
+                                            <p className="mt-1 text-xs text-muted-foreground">{row.specializationName}</p>
+                                            {row.skillAreaPurpose ? (
+                                                <p className="mt-1 text-xs text-muted-foreground/90">{row.skillAreaPurpose}</p>
+                                            ) : null}
+                                            <div className="mt-2 space-y-1">
+                                                {row.intentions.map((intention) => (
+                                                    <div key={intention.id} className="text-xs text-muted-foreground">
+                                                        {intention.name}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )) : (
+                                        <p className="py-6 text-center text-xs text-muted-foreground">
+                                            No skills could be inferred yet. Add linked skills to the project or move intention-linked cards into Done on this project&apos;s Kanban board.
+                                        </p>
+                                    )}
+                                </div>
+                            </ScrollArea>
+                        </div>
                     </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                    <Checkbox
-                        id="add-to-portfolio"
-                        checked={release.addToPortfolio}
-                        onCheckedChange={(checked) => handleUpdateEditingRelease('addToPortfolio', !!checked)}
-                    />
-                    <Label htmlFor="add-to-portfolio">Add to Portfolio</Label>
+
+                <div className="space-y-4 xl:min-w-0">
+                    <div className="rounded-2xl border border-border/60 bg-muted/15 p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                            <div>
+                                <h4 className="text-base font-semibold text-foreground">Done</h4>
+                                <p className="text-sm text-muted-foreground">Completed Kanban cards for this project.</p>
+                            </div>
+                            <Badge variant="outline">
+                                {stageCardsByKey.doneItems.length} card{stageCardsByKey.doneItems.length === 1 ? '' : 's'}
+                            </Badge>
+                        </div>
+                        <div className="rounded-xl border border-border/60 bg-background/30 p-3">
+                            <ScrollArea className="max-h-72">
+                                <div className="space-y-2 pr-1">
+                                    {stageCardsByKey.doneItems.length > 0 ? (
+                                        stageCardsByKey.doneItems.map((card) => (
+                                            <div key={card.id} className="rounded-2xl border border-border/40 bg-background/40 p-4">
+                                                <div className="mb-3 flex items-start justify-between gap-3">
+                                                    <Badge className="bg-emerald-700/80 text-white hover:bg-emerald-700/80">Done</Badge>
+                                                    <div className="rounded-md border border-border/50 bg-background/50 px-2 py-1 text-[11px] text-muted-foreground">
+                                                        {linkedKanbanBoard?.name || 'Kanban Board'}
+                                                    </div>
+                                                </div>
+                                                <div className="text-lg font-semibold leading-tight text-foreground">{card.title}</div>
+                                                {card.labelIds.length > 0 && linkedKanbanBoard ? (
+                                                    <div className="mt-3 flex flex-wrap gap-2">
+                                                        {card.labelIds.map((labelId) => {
+                                                            const label = linkedKanbanBoard.labels.find((item) => item.id === labelId);
+                                                            if (!label) return null;
+                                                            return (
+                                                                <span
+                                                                    key={label.id}
+                                                                    className="rounded-full border border-emerald-700/40 bg-emerald-950/30 px-2.5 py-1 text-[11px] text-emerald-200"
+                                                                >
+                                                                    {label.title}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ) : null}
+                                                {card.description ? (
+                                                    <div className="mt-3 text-xs leading-6 text-muted-foreground line-clamp-5 whitespace-pre-wrap">
+                                                        {card.description}
+                                                    </div>
+                                                ) : null}
+                                                <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <span className="rounded-md border border-border/50 bg-background/50 px-2 py-1">
+                                                        {card.checklist.filter((item) => item.completed).length}/{card.checklist.length} checklist
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="py-6 text-center text-xs text-muted-foreground">
+                                            No completed Kanban cards in this project yet.
+                                        </p>
+                                    )}
+                                </div>
+                            </ScrollArea>
+                        </div>
+                    </div>
                 </div>
-                <div className="flex justify-end gap-2">
-                    <Button variant="ghost" onClick={() => setEditingRelease(null)}>Cancel</Button>
-                    <Button onClick={handleSaveRelease}>Save Project</Button>
-                </div>
-            </CardContent>
-        </Card>
+            </div>
+        </div>
     );
 };
 
+const LearningPlannerForm = ({
+    spec,
+    learningPlan,
+    pdfResources,
+    openPdfViewer,
+    onOpenPdfLinkPicker,
+    onUnlinkPdfResource,
+    onAddSkillTreePathPlan,
+    onUpdateSkillTreePathPlan,
+    onToggleSkillAreaInPath,
+    onDeleteSkillTreePathPlan,
+    onAddLearningResource,
+    onLearningPlanFieldChange,
+    onDeleteLearningResource,
+}: {
+    spec: CoreSkill,
+    learningPlan: LearningPlan,
+    pdfResources: any[],
+    openPdfViewer: (resource: any) => void,
+    onOpenPdfLinkPicker: (specializationId: string, target: 'book' | 'path', resourceIndex?: number, pathId?: string) => void,
+    onUnlinkPdfResource: (specializationId: string, target: 'book' | 'path', resourceIndex?: number, pathId?: string) => void,
+    onAddSkillTreePathPlan: (specId: string, spec: CoreSkill) => void,
+    onUpdateSkillTreePathPlan: (specId: string, pathId: string, updates: Partial<SkillTreePathPlan>) => void,
+    onToggleSkillAreaInPath: (specId: string, pathId: string, areaId: string) => void,
+    onDeleteSkillTreePathPlan: (specId: string, pathId: string) => void,
+    onAddLearningResource: (specId: string, type: 'audio' | 'book') => void,
+    onLearningPlanFieldChange: (specializationId: string, type: 'audio' | 'book', index: number, field: string, value: any) => void,
+    onDeleteLearningResource: (specId: string, type: 'audio' | 'book', index: number) => void,
+}) => {
+    const completedPages = spec.skillAreas.reduce(
+        (sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedPages || 0), 0),
+        0
+    );
+    const completedHours = spec.skillAreas.reduce(
+        (sum, area) => sum + area.microSkills.reduce((inner, micro) => inner + (micro.completedHours || 0), 0),
+        0
+    );
+
+    return (
+        <div className="mt-4 grid gap-4 xl:grid-cols-3">
+            <div className="rounded-2xl border border-border/60 bg-muted/15 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                        <h4 className="text-base font-semibold text-foreground">Books</h4>
+                        <p className="text-sm text-muted-foreground">Track reading material and linked PDF cards.</p>
+                    </div>
+                    <Button type="button" variant="outline" onClick={() => onAddLearningResource(spec.id, 'book')}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add
+                    </Button>
+                </div>
+                <div className="space-y-3">
+                    {(learningPlan.bookWebpageResources || []).length > 0 ? (
+                        (learningPlan.bookWebpageResources || []).map((resource, index) => {
+                            const progressPages = resource.totalPages ? Math.min(completedPages, resource.totalPages) : completedPages;
+                            const progressPercent = resource.totalPages ? Math.min(100, Math.round((progressPages / resource.totalPages) * 100)) : 0;
+                            const linkedPdf = pdfResources.find((item) => item.id === resource.linkedPdfResourceId);
+
+                            return (
+                                <div key={resource.id} className="rounded-2xl border border-border/60 bg-background/30 p-4">
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            value={resource.name}
+                                            onChange={(e) => onLearningPlanFieldChange(spec.id, 'book', index, 'name', e.target.value)}
+                                            placeholder="Book or webpage name"
+                                            className="font-semibold"
+                                        />
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-9 w-9 text-destructive"
+                                            onClick={() => onDeleteLearningResource(spec.id, 'book', index)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                                        <div className="flex items-center justify-between">
+                                            <span>Progress</span>
+                                            <span>{progressPages}/{resource.totalPages || 0} pages</span>
+                                        </div>
+                                        <div className="mt-2 h-2 rounded-full bg-muted">
+                                            <div className="h-2 rounded-full bg-primary" style={{ width: `${progressPercent}%` }} />
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        <Button variant="outline" size="sm" className="h-8" onClick={() => onOpenPdfLinkPicker(spec.id, 'book', index)}>
+                                            <Search className="mr-2 h-3.5 w-3.5" />
+                                            Link PDF
+                                        </Button>
+                                        {linkedPdf ? (
+                                            <>
+                                                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => openPdfViewer(linkedPdf)}>
+                                                    <LinkIcon className="mr-1.5 h-3.5 w-3.5" />
+                                                    {linkedPdf.name}
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-destructive"
+                                                    onClick={() => onUnlinkPdfResource(spec.id, 'book', index)}
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </>
+                                        ) : null}
+                                    </div>
+                                    <Input className="mt-3" value={resource.author} onChange={(e) => onLearningPlanFieldChange(spec.id, 'book', index, 'author', e.target.value)} placeholder="Author" />
+                                    <Input
+                                        className="mt-3"
+                                        type="number"
+                                        value={resource.totalPages || ''}
+                                        onChange={(e) => onLearningPlanFieldChange(spec.id, 'book', index, 'totalPages', e.target.value === '' ? null : Number(e.target.value))}
+                                        placeholder="Total pages"
+                                    />
+                                    <div className="mt-3 grid grid-cols-2 gap-3">
+                                        <Input type="date" value={resource.startDate || ''} onChange={(e) => onLearningPlanFieldChange(spec.id, 'book', index, 'startDate', e.target.value || null)} />
+                                        <Input type="date" value={resource.completionDate || ''} onChange={(e) => onLearningPlanFieldChange(spec.id, 'book', index, 'completionDate', e.target.value || null)} />
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <div className="rounded-xl border border-dashed border-border/50 bg-background/20 px-4 py-6 text-sm text-muted-foreground">
+                            No books or webpages added yet.
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="rounded-2xl border border-border/60 bg-muted/15 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                        <h4 className="text-base font-semibold text-foreground">Audio Video</h4>
+                        <p className="text-sm text-muted-foreground">Track courses, playlists, and guided material.</p>
+                    </div>
+                    <Button type="button" variant="outline" onClick={() => onAddLearningResource(spec.id, 'audio')}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add
+                    </Button>
+                </div>
+                <div className="space-y-3">
+                    {(learningPlan.audioVideoResources || []).length > 0 ? (
+                        (learningPlan.audioVideoResources || []).map((resource, index) => {
+                            const progressHours = resource.totalHours ? Math.min(completedHours, resource.totalHours) : completedHours;
+                            const progressPercent = resource.totalHours ? Math.min(100, Math.round((progressHours / resource.totalHours) * 100)) : 0;
+
+                            return (
+                                <div key={resource.id} className="rounded-2xl border border-border/60 bg-background/30 p-4">
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            value={resource.name}
+                                            onChange={(e) => onLearningPlanFieldChange(spec.id, 'audio', index, 'name', e.target.value)}
+                                            placeholder="Course or playlist name"
+                                            className="font-semibold"
+                                        />
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-9 w-9 text-destructive"
+                                            onClick={() => onDeleteLearningResource(spec.id, 'audio', index)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                                        <div className="flex items-center justify-between">
+                                            <span>Progress</span>
+                                            <span>{progressHours}/{resource.totalHours || 0} hours</span>
+                                        </div>
+                                        <div className="mt-2 h-2 rounded-full bg-muted">
+                                            <div className="h-2 rounded-full bg-primary" style={{ width: `${progressPercent}%` }} />
+                                        </div>
+                                    </div>
+                                    <Input className="mt-3" value={resource.tutor} onChange={(e) => onLearningPlanFieldChange(spec.id, 'audio', index, 'tutor', e.target.value)} placeholder="Tutor / creator" />
+                                    <div className="mt-3 grid grid-cols-2 gap-3">
+                                        <Input type="number" value={resource.totalItems || ''} onChange={(e) => onLearningPlanFieldChange(spec.id, 'audio', index, 'totalItems', e.target.value === '' ? null : Number(e.target.value))} placeholder="Total items" />
+                                        <Input type="number" value={resource.totalHours || ''} onChange={(e) => onLearningPlanFieldChange(spec.id, 'audio', index, 'totalHours', e.target.value === '' ? null : Number(e.target.value))} placeholder="Total hours" />
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-2 gap-3">
+                                        <Input type="date" value={resource.startDate || ''} onChange={(e) => onLearningPlanFieldChange(spec.id, 'audio', index, 'startDate', e.target.value || null)} />
+                                        <Input type="date" value={resource.completionDate || ''} onChange={(e) => onLearningPlanFieldChange(spec.id, 'audio', index, 'completionDate', e.target.value || null)} />
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <div className="rounded-xl border border-dashed border-border/50 bg-background/20 px-4 py-6 text-sm text-muted-foreground">
+                            No audio/video resources yet.
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="rounded-2xl border border-border/60 bg-muted/15 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                        <h4 className="text-base font-semibold text-foreground">Skill Tree Path</h4>
+                        <p className="text-sm text-muted-foreground">Create custom paths from skill areas and track completion velocity.</p>
+                    </div>
+                    <Button type="button" variant="outline" onClick={() => onAddSkillTreePathPlan(spec.id, spec)}>
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Add Path
+                    </Button>
+                </div>
+                <div className="space-y-3">
+                    {(learningPlan.skillTreePaths || []).length > 0 ? (
+                        (learningPlan.skillTreePaths || []).map((path) => {
+                            const selectedAreas = spec.skillAreas.filter((area) => (path.skillAreaIds || []).includes(area.id));
+                            const totalMicroSkills = selectedAreas.reduce((sum, area) => sum + area.microSkills.length, 0);
+                            const completedMicroSkills = selectedAreas.reduce(
+                                (sum, area) => sum + area.microSkills.filter((micro) => !!micro.isReadyForRepetition || (micro.completedItems || 0) > 0 || (micro.completedHours || 0) > 0 || (micro.completedPages || 0) > 0).length,
+                                0
+                            );
+                            const targetCount = path.targetMicroSkills ?? totalMicroSkills;
+                            const remainingCount = Math.max(0, (targetCount || 0) - Math.min(completedMicroSkills, targetCount || completedMicroSkills));
+                            const pathPercent = targetCount && targetCount > 0 ? Math.min(100, Math.round((Math.min(completedMicroSkills, targetCount) / targetCount) * 100)) : 0;
+                            const linkedPdf = pdfResources.find((item) => item.id === path.linkedPdfResourceId);
+
+                            return (
+                                <div key={path.id} className="rounded-2xl border border-border/60 bg-background/30 p-4">
+                                    <div className="flex items-center gap-2">
+                                        <Input value={path.name} onChange={(e) => onUpdateSkillTreePathPlan(spec.id, path.id, { name: e.target.value })} placeholder="Path name" className="font-semibold" />
+                                        <Button variant="ghost" size="icon" className="h-9 w-9 text-destructive" onClick={() => onDeleteSkillTreePathPlan(spec.id, path.id)}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                    <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                                        <div className="flex items-center justify-between">
+                                            <span>Progress</span>
+                                            <span>{Math.min(completedMicroSkills, targetCount || completedMicroSkills)}/{targetCount || 0} completed</span>
+                                        </div>
+                                        <div className="mt-2 h-2 rounded-full bg-muted">
+                                            <div className="h-2 rounded-full bg-primary" style={{ width: `${pathPercent}%` }} />
+                                        </div>
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        <Button variant="outline" size="sm" className="h-8" onClick={() => onOpenPdfLinkPicker(spec.id, 'path', undefined, path.id)}>
+                                            <Search className="mr-2 h-3.5 w-3.5" />
+                                            Link PDF
+                                        </Button>
+                                        {linkedPdf ? (
+                                            <>
+                                                <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => openPdfViewer(linkedPdf)}>
+                                                    <LinkIcon className="mr-1.5 h-3.5 w-3.5" />
+                                                    {linkedPdf.name}
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => onUnlinkPdfResource(spec.id, 'path', undefined, path.id)}>
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </>
+                                        ) : null}
+                                    </div>
+                                    <Input className="mt-3" type="number" value={path.targetMicroSkills ?? ''} onChange={(e) => onUpdateSkillTreePathPlan(spec.id, path.id, { targetMicroSkills: e.target.value === '' ? null : Number(e.target.value) })} placeholder="Target micro-skills" />
+                                    <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                                        Remaining: {remainingCount}
+                                    </div>
+                                    <Input className="mt-3" type="date" value={path.completionDate || ''} onChange={(e) => onUpdateSkillTreePathPlan(spec.id, path.id, { completionDate: e.target.value || null })} />
+                                    <div className="mt-3 rounded-xl border border-border/50 bg-muted/20 p-3">
+                                        <div className="mb-2 text-xs font-medium text-muted-foreground">Skill Areas In This Path</div>
+                                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                            {spec.skillAreas.map((area) => (
+                                                <label key={area.id} className="flex items-center gap-2 text-xs">
+                                                    <Checkbox checked={(path.skillAreaIds || []).includes(area.id)} onCheckedChange={() => onToggleSkillAreaInPath(spec.id, path.id, area.id)} />
+                                                    <span className="truncate">{area.name}</span>
+                                                    <span className="text-muted-foreground">({area.microSkills.length})</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <div className="rounded-xl border border-dashed border-border/50 bg-background/20 px-4 py-6 text-sm text-muted-foreground">
+                            No custom paths yet. Create a path from skill areas to start planning progression.
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 function StrategicPlanningPageContent() {
   const router = useRouter();
@@ -2241,10 +3440,11 @@ function StrategicPlanningPageContent() {
     { value: 'productization', label: 'Productization' },
     { value: 'offerization', label: 'Offerization' },
     { value: 'offers', label: 'Offers' },
+    { value: 'progress', label: 'Visualize Progress' },
     { value: 'matrix', label: 'Matrix' },
   ];
   const tabs = simpleMode
-    ? allTabs.filter((tab) => tab.value === 'planning' || tab.value === 'offerization')
+    ? allTabs.filter((tab) => tab.value === 'planning' || tab.value === 'offerization' || tab.value === 'progress')
     : allTabs;
   
   useEffect(() => {
@@ -2271,7 +3471,7 @@ function StrategicPlanningPageContent() {
       </div>
 
        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className={cn("grid w-full", simpleMode ? "grid-cols-2" : "grid-cols-2 md:grid-cols-5")}>
+        <TabsList className={cn("grid w-full", simpleMode ? "grid-cols-3" : "grid-cols-2 md:grid-cols-6")}>
             {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
         </TabsList>
         <TabsContent value="planning" className="mt-6">
@@ -2287,6 +3487,9 @@ function StrategicPlanningPageContent() {
             </TabsContent>
             <TabsContent value="offers" className="mt-6">
               <OffersContent />
+            </TabsContent>
+            <TabsContent value="progress" className="mt-6">
+              <VisualizeProgressContent />
             </TabsContent>
             <TabsContent value="matrix" className="mt-6">
               <MatrixContent />
@@ -2413,6 +3616,185 @@ function OffersContent() {
   );
 }
 
+function VisualizeProgressContent() {
+  const { coreSkills, offerizationPlans } = useAuth();
+
+  const specializations = useMemo(() => {
+    return coreSkills.filter((skill) => skill.type === 'Specialization');
+  }, [coreSkills]);
+
+  const progressRows = useMemo(() => {
+    return specializations.map((spec) => {
+      const plan = offerizationPlans[spec.id] || {};
+      const offerTypes = plan.offerTypes || [];
+      const offers = plan.offers || [];
+      const releases = plan.releases || [];
+      const learningPlan = plan.learningPlan || {};
+      const totalMicroSkills = spec.skillAreas.reduce((sum, area) => sum + area.microSkills.length, 0);
+      const completedMicroSkills = spec.skillAreas.reduce(
+        (sum, area) => sum + area.microSkills.filter((micro) => micro.completed).length,
+        0
+      );
+      const learningResourceCount =
+        (learningPlan.audioVideoResources || []).length +
+        (learningPlan.bookWebpageResources || []).length +
+        (learningPlan.skillTreePaths || []).length;
+      const portfolioProjects = releases.filter((release) => release.addToPortfolio).length;
+
+      const checkpoints = [
+        offerTypes.length > 0,
+        !!plan.gapAnalysis,
+        learningResourceCount > 0,
+        releases.length > 0,
+        offers.length > 0,
+      ];
+      const completionPercent = Math.round((checkpoints.filter(Boolean).length / checkpoints.length) * 100);
+      const microSkillPercent = totalMicroSkills > 0 ? Math.round((completedMicroSkills / totalMicroSkills) * 100) : 0;
+
+      return {
+        spec,
+        offerTypes: offerTypes.length,
+        offers: offers.length,
+        releases: releases.length,
+        learningResourceCount,
+        portfolioProjects,
+        totalMicroSkills,
+        completedMicroSkills,
+        completionPercent,
+        microSkillPercent,
+      };
+    });
+  }, [specializations, offerizationPlans]);
+
+  const totals = useMemo(() => {
+    return progressRows.reduce(
+      (acc, row) => {
+        acc.specializations += 1;
+        acc.offers += row.offers;
+        acc.projects += row.releases;
+        acc.portfolioProjects += row.portfolioProjects;
+        acc.completedMicroSkills += row.completedMicroSkills;
+        acc.totalMicroSkills += row.totalMicroSkills;
+        return acc;
+      },
+      {
+        specializations: 0,
+        offers: 0,
+        projects: 0,
+        portfolioProjects: 0,
+        completedMicroSkills: 0,
+        totalMicroSkills: 0,
+      }
+    );
+  }, [progressRows]);
+
+  return (
+    <div className="space-y-6">
+      <Card className="border-primary/20 bg-card/70">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-3 text-xl">
+            <Activity className="h-6 w-6 text-primary" />
+            Visualize Progress
+          </CardTitle>
+          <CardDescription>
+            Track strategy progress across skill development, offers, projects, and portfolio readiness.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Specializations</div>
+            <div className="mt-2 text-3xl font-semibold">{totals.specializations}</div>
+          </div>
+          <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Offers</div>
+            <div className="mt-2 text-3xl font-semibold">{totals.offers}</div>
+          </div>
+          <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Projects</div>
+            <div className="mt-2 text-3xl font-semibold">{totals.projects}</div>
+          </div>
+          <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Portfolio Ready</div>
+            <div className="mt-2 text-3xl font-semibold">{totals.portfolioProjects}</div>
+          </div>
+          <div className="rounded-2xl border border-border/50 bg-background/50 p-4">
+            <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Micro-Skills Done</div>
+            <div className="mt-2 text-3xl font-semibold">
+              {totals.completedMicroSkills}/{totals.totalMicroSkills}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {progressRows.length > 0 ? (
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          {progressRows.map((row) => (
+            <Card key={row.spec.id} className="rounded-2xl border-border/60 bg-card/75">
+              <CardHeader className="space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>{row.spec.name}</CardTitle>
+                    <CardDescription>
+                      {row.offerTypes} offer type{row.offerTypes === 1 ? '' : 's'} · {row.learningResourceCount} learning item{row.learningResourceCount === 1 ? '' : 's'}
+                    </CardDescription>
+                  </div>
+                  <Badge variant="secondary">{row.completionPercent}% complete</Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-foreground">Strategy Completion</span>
+                    <span className="text-muted-foreground">{row.completionPercent}%</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted">
+                    <div className="h-2 rounded-full bg-primary" style={{ width: `${row.completionPercent}%` }} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-foreground">Micro-Skill Completion</span>
+                    <span className="text-muted-foreground">{row.completedMicroSkills}/{row.totalMicroSkills}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted">
+                    <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${row.microSkillPercent}%` }} />
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-xl border border-border/50 bg-background/40 p-3">
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Offers</div>
+                    <div className="mt-1 text-sm font-medium">{row.offers}</div>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-background/40 p-3">
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Projects</div>
+                    <div className="mt-1 text-sm font-medium">{row.releases}</div>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-background/40 p-3">
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Portfolio</div>
+                    <div className="mt-1 text-sm font-medium">{row.portfolioProjects}</div>
+                  </div>
+                  <div className="rounded-xl border border-border/50 bg-background/40 p-3">
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Learning</div>
+                    <div className="mt-1 text-sm font-medium">{row.learningResourceCount}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            No specialization progress found yet. Start building plans in `Offerization` to visualize progress here.
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+}
+
 function MatrixContent() {
   const { coreSkills, offerizationPlans, projects } = useAuth();
 
@@ -2530,6 +3912,7 @@ function MatrixContent() {
     </div>
   );
 }
+
 
 
 

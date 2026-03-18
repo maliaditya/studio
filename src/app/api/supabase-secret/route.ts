@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getSessionUserFromRequest } from '@/lib/serverSession';
 import { hasSupabaseServiceKeyForUser, saveSupabaseServiceKeyForUser } from '@/lib/serverSupabaseSecret';
+import { isSupabaseStorageConfigured } from '@/lib/supabaseStorageServer';
 
 export const dynamic = 'force-dynamic';
 
 const normalizeUsername = (username: string) => username.trim().toLowerCase();
 
 export async function POST(request: Request) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json({ error: 'Vercel Blob Storage is not configured on the server.' }, { status: 500 });
+  if (!isSupabaseStorageConfigured()) {
+    return NextResponse.json({ error: 'Supabase storage is not configured on the server.' }, { status: 500 });
   }
 
   const { username, supabaseServiceRoleKey } = await request.json();
@@ -31,8 +32,8 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json({ error: 'Vercel Blob Storage is not configured on the server.' }, { status: 500 });
+  if (!isSupabaseStorageConfigured()) {
+    return NextResponse.json({ error: 'Supabase storage is not configured on the server.' }, { status: 500 });
   }
   const { searchParams } = new URL(request.url);
   const username = searchParams.get('username');
