@@ -1751,31 +1751,28 @@ export function Header() {
                   <span className="sr-only">Support</span>
                 </Link>
               </Button>
-              {!simpleMode && (
               <>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => {
-                  setUpcomingTasksInitialTab('routine');
-                  setIsUpcomingTasksModalOpen(true);
-                }}
-              >
-                <Workflow className="h-4 w-4" />
-                <span className="sr-only">Routine Tasks</span>
-              </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    setUpcomingTasksInitialTab('routine');
+                    setIsUpcomingTasksModalOpen(true);
+                  }}
+                >
+                  <Workflow className="h-4 w-4" />
+                  <span className="sr-only">Routine Tasks</span>
+                </Button>
 
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsHabitDashboardOpen(true)}>
-                <ListChecks className="h-4 w-4" />
-                <span className="sr-only">Habit Dashboard</span>
-              </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsHabitDashboardOpen(true)}>
+                  <ListChecks className="h-4 w-4" />
+                  <span className="sr-only">Habit Dashboard</span>
+                </Button>
               </>
-              )}
               
               <GlobalSearch open={isSearchOpen} setOpen={setIsSearchOpen} />
 
-              {(!simpleMode || keepCanvasAndBotheringsInSimpleMode) && (
               <>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={openMindsetWidget}>
                     <Brain className="h-4 w-4" />
@@ -1787,7 +1784,6 @@ export function Header() {
                     <span className="sr-only">Drawing Canvas</span>
                 </Button>
               </>
-              )}
 
               {!simpleMode && (
               <>

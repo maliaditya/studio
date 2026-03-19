@@ -5,7 +5,7 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Save, X, GripVertical, Eraser, Download, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush, Plus, Library, ArrowUpRight, Copy, Edit3, Sparkles, Loader2, Volume2, VolumeX, RefreshCw, Circle, Square, Play, Scissors, List, Trash2, FastForward } from 'lucide-react';
+import { Save, X, GripVertical, Eraser, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush, Plus, Library, ArrowUpRight, Copy, Edit3, Sparkles, Loader2, Volume2, VolumeX, RefreshCw, Circle, Square, Play, List, Trash2, FastForward } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ExcalidrawElement, NonDeleted, AppState, PointerDownState, OnLinkOpen } from "@excalidraw/excalidraw";
 import { useAuth } from '@/contexts/AuthContext';
@@ -652,7 +652,7 @@ const ExcalidrawWrapper = ({
 ExcalidrawWrapper.displayName = "ExcalidrawWrapper";
 
 export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: () => void; }) {
-  const { 
+  const {
     drawingCanvasState, 
     setDrawingCanvasState, 
     updateDrawingData, 
@@ -698,6 +698,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [loadedFiles, setLoadedFiles] = useState<Record<string, any>>({});
   const [loadedFilesCanvasId, setLoadedFilesCanvasId] = useState<string | null>(null);
+  const [activeFilesMeta, setActiveFilesMeta] = useState<ExcalidrawFilesMetaMap | null>(null);
   const [showDiagramExplainPanel, setShowDiagramExplainPanel] = useState(false);
   const [isExplainingDiagram, setIsExplainingDiagram] = useState(false);
   const [diagramExplanation, setDiagramExplanation] = useState('');
@@ -1220,8 +1221,10 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
       if (!filesMeta || Object.keys(filesMeta).length === 0) {
         setLoadedFiles({});
         setLoadedFilesCanvasId(activeCanvas.id);
+        setActiveFilesMeta(null);
         return;
       }
+      setActiveFilesMeta(filesMeta);
 
       try {
         const files = await loadExcalidrawFiles(activeCanvas.id, filesMeta);
@@ -1249,7 +1252,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
       api.updateScene({ files: loadedFiles });
     }
   }, [loadedFiles, loadedFilesCanvasId, activeCanvas?.id]);
-  
+
   useEffect(() => {
     if (!isOpen) return;
     if (!isDirty) return;
@@ -1986,35 +1989,29 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       variant="ghost"
                       size="icon"
                       className="h-5 w-5"
-                      onClick={() => setShowRecordingEditor((prev) => !prev)}
-                      title="Cut recording range"
-                      disabled={!activeCanvas || isRecording || isPlaying || !hasRecording}
-                    >
-                      <Scissors className="h-2.5 w-2.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
                       onClick={() => setShowKeyframeEditor((prev) => !prev)}
                       title="Delete keyframes"
                       disabled={!activeCanvas || isRecording || isPlaying || !hasRecording}
                     >
                       <List className="h-2.5 w-2.5" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-5 w-5"
-                      onClick={handleCycleSpeed}
-                      title="Playback speed"
-                      disabled={!activeCanvas || isRecording || !hasRecording}
-                    >
-                      <FastForward className="h-2.5 w-2.5" />
-                    </Button>
-                    <span className="text-[10px] text-muted-foreground min-w-[28px]">
-                      {playbackSpeed === 0 ? "1x" : `${playbackSpeed}x`}
-                    </span>
+                    {isPlaying && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5"
+                          onClick={handleCycleSpeed}
+                          title="Playback speed"
+                          disabled={!activeCanvas || isRecording || !hasRecording}
+                        >
+                          <FastForward className="h-2.5 w-2.5" />
+                        </Button>
+                        <span className="text-[10px] text-muted-foreground min-w-[28px]">
+                          {playbackSpeed === 0 ? "1x" : `${playbackSpeed}x`}
+                        </span>
+                      </>
+                    )}
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleSaveClick}>
                         <Save className={cn("h-2.5 w-2.5", isDirty ? "text-red-500" : "text-green-500")} />
                     </Button>

@@ -5,6 +5,32 @@ const net = require("net");
 const { spawn, spawnSync } = require("child_process");
 const fs = require("fs");
 
+const loadBundledEnv = () => {
+  const candidates = [
+    path.join(__dirname, "env.json"),
+    path.join(process.resourcesPath, "electron", "env.json"),
+    path.join(process.resourcesPath, "app.asar.unpacked", "electron", "env.json"),
+  ];
+  for (const candidate of candidates) {
+    if (!fs.existsSync(candidate)) continue;
+    try {
+      const raw = fs.readFileSync(candidate, "utf8");
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") continue;
+      Object.entries(parsed).forEach(([key, value]) => {
+        if (!process.env[key] && typeof value === "string" && value.trim().length > 0) {
+          process.env[key] = value.trim();
+        }
+      });
+      return;
+    } catch (error) {
+      console.warn("Failed to load bundled desktop env:", error?.message || error);
+    }
+  }
+};
+
+loadBundledEnv();
+
 const isDev = !app.isPackaged;
 const DEV_URL = process.env.ELECTRON_DEV_URL || "http://localhost:9002";
 const PROD_URL = process.env.ELECTRON_START_URL || null;

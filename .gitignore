@@ -26,6 +26,7 @@
 /build
 /dist-electron
 /electron/node-runtime/
+/electron/env.json
 
 # misc
 .DS_Store

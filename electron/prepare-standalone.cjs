@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const dotenv = require("dotenv");
 
 const root = path.resolve(__dirname, "..");
 const distDirArg = process.argv[2] || ".next-local";
@@ -15,6 +16,27 @@ const nodeRuntimeBinary = path.join(
   nodeRuntimeDir,
   process.platform === "win32" ? "node.exe" : "node"
 );
+
+const envPath = path.join(root, ".env.local");
+const envPayload = {};
+if (fs.existsSync(envPath)) {
+  try {
+    const parsed = dotenv.parse(fs.readFileSync(envPath));
+    const getValue = (key) => process.env[key] || parsed[key];
+    ["ELECTRON_START_URL", "ELECTRON_FORCE_REMOTE", "ELECTRON_AUTH_BASE_URL"].forEach((key) => {
+      const value = getValue(key);
+      if (value) envPayload[key] = String(value);
+    });
+  } catch (error) {
+    console.warn("Failed to parse .env.local for desktop env binding:", error?.message || error);
+  }
+}
+if (Object.keys(envPayload).length > 0) {
+  const targetEnvPath = path.join(root, "electron", "env.json");
+  fs.mkdirSync(path.dirname(targetEnvPath), { recursive: true });
+  fs.writeFileSync(targetEnvPath, JSON.stringify(envPayload, null, 2));
+  console.log(`Wrote desktop env binding: ${targetEnvPath}`);
+}
 
 if (!fs.existsSync(path.join(standaloneDir, "server.js"))) {
   throw new Error(`Standalone build is missing in ${distDirArg}. Run the desktop build first.`);

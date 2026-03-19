@@ -979,6 +979,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
         githubOwner: localSettings.githubOwner,
         githubRepo: localSettings.githubRepo,
         githubPath: localSettings.githubPath,
+        githubFetchMissingOnly: localSettings.githubFetchMissingOnly ?? true,
         supabaseUrl: localSettings.supabaseUrl,
         supabaseAnonKey: localSettings.supabaseAnonKey,
         supabasePdfBucket: localSettings.supabasePdfBucket,
@@ -1001,6 +1002,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                 githubOwner: localSettings.githubOwner,
                 githubRepo: localSettings.githubRepo,
                 githubPath: localSettings.githubPath,
+                githubFetchMissingOnly: localSettings.githubFetchMissingOnly ?? true,
                 supabaseUrl: localSettings.supabaseUrl,
                 supabaseAnonKey: localSettings.supabaseAnonKey,
                 supabasePdfBucket: localSettings.supabasePdfBucket,
@@ -1628,6 +1630,21 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                             <Label htmlFor="github-path">File Path in Repo</Label>
                             <Input id="github-path" placeholder="e.g., backup.json" value={localSettings.githubPath || ''} onChange={(e) => handleLocalSettingChange('githubPath', e.target.value)} />
                           </div>
+                          <div className="flex items-center justify-between rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+                            <div className="space-y-0.5">
+                              <Label htmlFor="github-fetch-missing-only" className="font-normal">
+                                Fetch missing images only
+                              </Label>
+                              <p className="text-xs text-muted-foreground">
+                                Fewer GitHub calls. Turn off to force download all images.
+                              </p>
+                            </div>
+                            <Switch
+                              id="github-fetch-missing-only"
+                              checked={localSettings.githubFetchMissingOnly ?? true}
+                              onCheckedChange={(checked) => handleLocalSettingChange('githubFetchMissingOnly', checked)}
+                            />
+                          </div>
                           <Separator />
                           <div className="space-y-1">
                             <Label htmlFor="supabase-url">Supabase URL</Label>
@@ -1657,7 +1674,12 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                             <Button variant="secondary" onClick={handleSaveSupabaseServiceKey}>Save Service Key</Button>
                             <Button variant="outline" onClick={handleInitSupabaseStorage} disabled={isInitializingSupabase}>{isInitializingSupabase ? 'Initializing...' : 'Init Supabase Storage'}</Button>
                             <Button variant="secondary" onClick={syncCanvasImagesToGitHub}>Upload Canvas Images</Button>
-                            <Button variant="outline" onClick={fetchCanvasImagesFromGitHub}>Fetch Canvas Images</Button>
+                            <Button
+                              variant="outline"
+                              onClick={() => fetchCanvasImagesFromGitHub({ missingOnly: settings.githubFetchMissingOnly ?? true })}
+                            >
+                              Fetch Canvas Images
+                            </Button>
                             <Button variant="secondary" onClick={syncAudioFilesToGitHub}>Upload Audio</Button>
                             <Button variant="outline" onClick={fetchAudioFilesFromGitHub}>Fetch Audio</Button>
                             <Button variant="secondary" onClick={syncPdfFilesToGitHub}>Upload PDFs</Button>

@@ -169,7 +169,7 @@ const PropertyItemRow = ({ prop, handlePropertyChange, handleDeleteProperty }: {
     );
 };
 
-const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose, onSave, onOpenDrawingCanvas }: { 
+const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose, onSave, onOpenDrawingCanvas, onAddOperation }: { 
     item: FormalizationItem | null; 
     type: 'elements' | 'operations' | 'components';
     formalizationData?: FormalizationData;
@@ -177,12 +177,14 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
     onClose: () => void; 
     onSave: (itemToSave: FormalizationItem) => void;
     onOpenDrawingCanvas: (resourceId: string, pointId: string) => void;
+    onAddOperation: (text: string) => FormalizationItem | null;
 }) => {
     const [text, setText] = useState('');
     const [properties, setProperties] = useState<PropertyItem[]>([]);
     const [linkedElementIds, setLinkedElementIds] = useState<string[]>([]);
     const [linkedComponentIds, setLinkedComponentIds] = useState<string[]>([]);
     const [linkedOperationIds, setLinkedOperationIds] = useState<string[]>([]);
+    const [newOperationText, setNewOperationText] = useState('');
     const { resources } = useAuth();
 
     const allCanvases = useMemo(() => {
@@ -227,8 +229,44 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
         setProperties(prev => [...prev, { id: `prop_${Date.now()}_${Math.random()}`, key: '', value: '' }]);
     };
 
+    const handleAddPropertyTemplate = () => {
+        const template: Array<{ key: string; value: string }> = [
+            { key: 'nature.type', value: 'physical | abstract | process | system' },
+            { key: 'nature.behavior', value: 'static | dynamic | reactive' },
+            { key: 'stability.state', value: 'stable | changing | chaotic | cyclic' },
+            { key: 'stability.timescale', value: 'instant | short-term | long-term' },
+            { key: 'purpose.primary', value: 'why it exists' },
+            { key: 'purpose.secondary', value: 'optional' },
+            { key: 'dependency.type', value: 'independent | dependent | interdependent' },
+            { key: 'dependency.on', value: 'list of elements' },
+            { key: 'impact.scope', value: 'self | local | global | system' },
+            { key: 'impact.effect', value: 'positive | negative | neutral' },
+        ];
+
+        setProperties(prev => {
+            const existingKeys = new Set(prev.map(p => p.key));
+            const next = [...prev];
+            template.forEach(({ key, value }) => {
+                if (!existingKeys.has(key)) {
+                    next.push({ id: `prop_${Date.now()}_${Math.random()}`, key, value });
+                }
+            });
+            return next;
+        });
+    };
+
     const handleDeleteProperty = (idToDelete: string) => {
         setProperties(prev => prev.filter(p => p.id !== idToDelete));
+    };
+
+    const handleAddOperation = () => {
+        const text = newOperationText.trim();
+        if (!text) return;
+        const created = onAddOperation(text);
+        if (created?.id) {
+            setLinkedOperationIds(prev => prev.includes(created.id) ? prev : [...prev, created.id]);
+            setNewOperationText('');
+        }
     };
     
     const handleLinkToggle = (id: string, linkType: 'element' | 'component' | 'operation') => {
@@ -288,8 +326,9 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
                                           />
                                       ))}
                                   </div>
-                                  <div className="flex gap-2">
+                                  <div className="flex flex-wrap gap-2">
                                     <Button variant="outline" size="sm" onClick={handleAddProperty}>Add Property</Button>
+                                    <Button variant="outline" size="sm" onClick={handleAddPropertyTemplate}>Add Template</Button>
                                     <Popover>
                                         <PopoverTrigger asChild>
                                             <Button variant="outline" size="sm"><Paintbrush className="mr-2 h-4 w-4"/>Link Canvas</Button>
@@ -315,6 +354,14 @@ const ItemEditorModal = ({ item, type, formalizationData, globalContext, onClose
                               </div>
                                <div className="space-y-2">
                                     <Label>Link Operations</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Input
+                                            value={newOperationText}
+                                            onChange={(e) => setNewOperationText(e.target.value)}
+                                            placeholder="Create new operation..."
+                                        />
+                                        <Button type="button" variant="outline" onClick={handleAddOperation}>Add</Button>
+                                    </div>
                                     <ScrollArea className="h-40 border rounded-md p-2">
                                         <div className="space-y-1">
                                             {(formalizationData?.operations || []).map(op => (
@@ -464,33 +511,33 @@ const ComponentDetailPopup = ({ popupState, allComponentsForSpec, allElementsFor
                           <div className="space-y-2">
                             <h4 className="text-sm font-semibold">Linked Components</h4>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {linkedComponents.map(subComponent => {
-                                const subComponentElements = allElementsForSpec.filter(el => subComponent.linkedElementIds?.includes(el.id)) || [];
-                                return (
-                                    <Card key={subComponent.id} className="relative group/subcomponent cursor-pointer hover:bg-muted/50" onClick={(e) => onOpenSubComponent(subComponent.id, e)}>
-                                        <div className="absolute top-1 right-1 opacity-0 group-hover/subcomponent:opacity-100 transition-opacity">
-                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEditItem(subComponent, 'components'); }}>
-                                                <Edit className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                        <CardHeader className="p-4 pb-2">
-                                            <CardTitle className="text-base flex items-center gap-2">
-                                                <Blocks className="h-4 w-4 text-primary" />
-                                                {subComponent.text}
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="p-4 pt-2">
-                                            {subComponentElements.length > 0 ? (
-                                                <ul className="text-xs text-muted-foreground list-disc list-inside">
-                                                    {subComponentElements.map(el => <li key={el.id}>{el.text}</li>)}
-                                                </ul>
-                                            ) : (
-                                                <p className="text-xs text-muted-foreground">No elements linked.</p>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                );
-                              })}
+                               {linkedComponents.map(subComponent => {
+                                 const subComponentElements = allElementsForSpec.filter(el => subComponent.linkedElementIds?.includes(el.id)) || [];
+                                 return (
+                                     <Card key={subComponent.id} className="relative group/subcomponent cursor-pointer hover:bg-muted/50" onClick={(e) => onOpenSubComponent(subComponent.id, e)}>
+                                         <div className="absolute top-1 right-1 opacity-0 group-hover/subcomponent:opacity-100 transition-opacity">
+                                             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); onEditItem(subComponent, 'components'); }}>
+                                                 <Edit className="h-4 w-4" />
+                                             </Button>
+                                         </div>
+                                         <CardHeader className="p-4 pb-2">
+                                             <CardTitle className="text-base flex items-center gap-2">
+                                                 <Blocks className="h-4 w-4 text-primary" />
+                                                 {subComponent.text}
+                                             </CardTitle>
+                                         </CardHeader>
+                                         <CardContent className="p-4 pt-2">
+                                             {subComponentElements.length > 0 ? (
+                                                 <ul className="text-xs text-muted-foreground list-disc list-inside">
+                                                     {subComponentElements.map(el => <li key={el.id}>{el.text}</li>)}
+                                                 </ul>
+                                             ) : (
+                                                 <p className="text-xs text-muted-foreground">No elements linked.</p>
+                                             )}
+                                         </CardContent>
+                                     </Card>
+                                 );
+                               })}
                             </div>
                           </div>
                         )}
@@ -583,7 +630,6 @@ interface FormalizationPageContentProps {
 const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => {
     const { 
         resources, 
-        setResources, 
         coreSkills, 
         upskillDefinitions, 
         openGeneralPopup, 
@@ -592,6 +638,8 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
         setSelectedFormalizationSpecId,
         offerizationPlans,
         openDrawingCanvas,
+        settings,
+        setSettings,
     } = useAuth();
     const { toast } = useToast();
     
@@ -760,44 +808,94 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
         }
     };
     
-    const updateResourceFormalization = (resourceId: string, updatedFormalization: FormalizationData) => {
-      setResources(prevResources =>
-        prevResources.map(res =>
-          res.id === resourceId
-            ? { ...res, formalization: updatedFormalization }
-            : res
-        )
-      );
-    };
+    const emptyFormalization = useMemo<FormalizationData>(() => ({
+        elements: [],
+        operations: [],
+        components: [],
+    }), []);
+
+    const specFormalization = useMemo<FormalizationData>(() => {
+        if (!selectedFormalizationSpecId) return emptyFormalization;
+        return settings.formalizationBySpec?.[selectedFormalizationSpecId] || emptyFormalization;
+    }, [settings.formalizationBySpec, selectedFormalizationSpecId, emptyFormalization]);
+
+    const updateSpecFormalization = useCallback((nextFormalization: FormalizationData) => {
+        if (!selectedFormalizationSpecId) return;
+        setSettings(prev => ({
+            ...prev,
+            formalizationBySpec: {
+                ...(prev.formalizationBySpec || {}),
+                [selectedFormalizationSpecId]: nextFormalization,
+            },
+        }));
+    }, [selectedFormalizationSpecId, setSettings]);
+
+    useEffect(() => {
+        if (!selectedFormalizationSpecId) return;
+        if (settings.formalizationBySpec?.[selectedFormalizationSpecId]) return;
+
+        const specResources = getSpecResources(selectedFormalizationSpecId);
+        const seeded = specResources.reduce((acc, res) => {
+            if (res.formalization) {
+                acc.elements.push(...res.formalization.elements);
+                acc.operations.push(...res.formalization.operations);
+                acc.components.push(...res.formalization.components);
+            }
+            return acc;
+        }, { elements: [] as FormalizationItem[], operations: [] as FormalizationItem[], components: [] as FormalizationItem[] });
+
+        const uniqueItems = (items: FormalizationItem[]) => Array.from(new Map(items.map(item => [item.id, item])).values());
+        const nextFormalization: FormalizationData = {
+            elements: uniqueItems(seeded.elements),
+            operations: uniqueItems(seeded.operations),
+            components: uniqueItems(seeded.components),
+        };
+
+        if (nextFormalization.elements.length || nextFormalization.operations.length || nextFormalization.components.length) {
+            updateSpecFormalization(nextFormalization);
+        }
+    }, [selectedFormalizationSpecId, settings.formalizationBySpec, getSpecResources, updateSpecFormalization]);
 
     const handleAddItem = (type: 'elements' | 'operations' | 'components') => {
-        if (!selectedResource || !isResource(selectedResource)) return;
+        if (!selectedFormalizationSpecId) {
+            toast({ title: "Select a specialization", description: "Pick a specialization to add formalization items.", variant: "destructive" });
+            return;
+        }
         const newItem: FormalizationItem = { id: `item_${Date.now()}`, text: `New ${type.slice(0, -1)}` };
         
-        const currentFormalization = selectedResource.formalization || { elements: [], operations: [], components: [] };
+        const currentFormalization = specFormalization || emptyFormalization;
         const updatedItems = [...(currentFormalization[type] || []), newItem];
         
-        updateResourceFormalization(selectedResource.id, { ...currentFormalization, [type]: updatedItems });
+        updateSpecFormalization({ ...currentFormalization, [type]: updatedItems });
         setEditingItem({ item: newItem, type });
     };
     
     const handleUpdateItem = (itemToSave: FormalizationItem) => {
-        if (!selectedResource || !isResource(selectedResource) || !editingItem) return;
+        if (!selectedFormalizationSpecId || !editingItem) return;
         
         const type = editingItem!.type;
-        const currentFormalization = selectedResource.formalization || { elements: [], operations: [], components: [] };
+        const currentFormalization = specFormalization || emptyFormalization;
         
         const updatedItems = (currentFormalization[type] || []).map(item =>
             item.id === itemToSave.id ? itemToSave : item
         );
         
-        updateResourceFormalization(selectedResource.id, { ...currentFormalization, [type]: updatedItems });
+        updateSpecFormalization({ ...currentFormalization, [type]: updatedItems });
         setEditingItem(null);
     };
 
+    const handleAddOperationFromModal = useCallback((text: string): FormalizationItem | null => {
+        if (!selectedFormalizationSpecId) return null;
+        const newItem: FormalizationItem = { id: `op_${Date.now()}`, text };
+        const currentFormalization = specFormalization || emptyFormalization;
+        const updatedItems = [...(currentFormalization.operations || []), newItem];
+        updateSpecFormalization({ ...currentFormalization, operations: updatedItems });
+        return newItem;
+    }, [selectedFormalizationSpecId, specFormalization, emptyFormalization, updateSpecFormalization]);
+
     const handleDeleteItem = (type: 'elements' | 'operations' | 'components', id: string) => {
-        if (!selectedResource || !isResource(selectedResource)) return;
-        const currentFormalization = selectedResource.formalization || { elements: [], operations: [], components: [] };
+        if (!selectedFormalizationSpecId) return;
+        const currentFormalization = specFormalization || emptyFormalization;
         const updatedItems = (currentFormalization[type] || []).filter(item => item.id !== id);
         
         let finalFormalization: FormalizationData = { ...currentFormalization, [type]: updatedItems };
@@ -830,7 +928,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
             }));
         }
         
-        updateResourceFormalization(selectedResource.id, finalFormalization);
+        updateSpecFormalization(finalFormalization);
     };
     
     const openMindMapForElement = (elementId: string) => {
@@ -839,49 +937,27 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
     };
 
     const handleToggleGlobal = (elementId: string) => {
+        if (!selectedFormalizationSpecId) return;
         let isNowGlobal = false;
-        const allResourcesToUpdate = resources.map(res => {
-            if (res.formalization && res.formalization.elements) {
-                let elementFound = false;
-                const updatedElements = res.formalization.elements.map(el => {
-                    if (el.id === elementId) {
-                        elementFound = true;
-                        isNowGlobal = !el.isGlobal;
-                        return { ...el, isGlobal: isNowGlobal };
-                    }
-                    return el;
-                });
-                if (elementFound) {
-                    return { ...res, formalization: { ...res.formalization, elements: updatedElements }};
-                }
+        const currentFormalization = specFormalization || emptyFormalization;
+        const updatedElements = (currentFormalization.elements || []).map(el => {
+            if (el.id === elementId) {
+                isNowGlobal = !el.isGlobal;
+                return { ...el, isGlobal: isNowGlobal };
             }
-            return res;
+            return el;
         });
-        setResources(allResourcesToUpdate);
+        const nextFormalization = { ...currentFormalization, elements: updatedElements };
+        updateSpecFormalization(nextFormalization);
 
         if (isNowGlobal) {
-            const element = allResourcesToUpdate.flatMap(r => r.formalization?.elements || []).find(el => el.id === elementId);
+            const element = updatedElements.find(el => el.id === elementId);
             if (element) {
                 openComponentHierarchyFromElement(element);
             }
         }
     };
     
-    const allComponentsForSpec = useMemo(() => {
-        const specResources = getSpecResources(selectedFormalizationSpecId);
-        return specResources.flatMap(r => r.formalization?.components || []);
-    }, [selectedFormalizationSpecId, getSpecResources]);
-
-    const allElementsForSpec = useMemo(() => {
-        const specResources = getSpecResources(selectedFormalizationSpecId);
-        return specResources.flatMap(r => r.formalization?.elements || []);
-    }, [selectedFormalizationSpecId, getSpecResources]);
-
-    const allOpsForSpec = useMemo(() => {
-        const specResources = getSpecResources(selectedFormalizationSpecId);
-        return specResources.flatMap(r => r.formalization?.operations || []);
-    }, [selectedFormalizationSpecId, getSpecResources]);
-
     const openComponentHierarchyFromElement = (element: FormalizationItem) => {
         if (!element.properties) return;
         let xOffset = 0;
@@ -916,53 +992,39 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
     };
       
     const fullFormalizationData = useMemo(() => {
-      const specResources = getSpecResources(selectedFormalizationSpecId);
-  
-      const allSpecFormalization = specResources.reduce((acc, res) => {
-        if (res.formalization) {
-          acc.elements.push(...res.formalization.elements);
-          acc.operations.push(...res.formalization.operations);
-          acc.components.push(...res.formalization.components);
-        }
-        return acc;
-      }, { elements: [] as FormalizationItem[], operations: [] as FormalizationItem[], components: [] as FormalizationItem[] });
-      
-      const uniqueItems = (items: FormalizationItem[]) => Array.from(new Map(items.map(item => [item.id, item])).values());
-  
-      return {
-        elements: uniqueItems(allSpecFormalization.elements),
-        operations: uniqueItems(allSpecFormalization.operations),
-        components: uniqueItems(allSpecFormalization.components),
-      };
-    }, [selectedFormalizationSpecId, getSpecResources]);
+        return specFormalization || emptyFormalization;
+    }, [specFormalization, emptyFormalization]);
+
+    const allComponentsForSpec = useMemo(() => {
+        return fullFormalizationData.components || [];
+    }, [fullFormalizationData]);
+
+    const allElementsForSpec = useMemo(() => {
+        return fullFormalizationData.elements || [];
+    }, [fullFormalizationData]);
+
+    const allOpsForSpec = useMemo(() => {
+        return fullFormalizationData.operations || [];
+    }, [fullFormalizationData]);
     
     const globalElements = useMemo(() => {
         return fullFormalizationData.elements.filter(el => el.isGlobal);
     }, [fullFormalizationData]);
     
     const itemsToDisplay = useMemo(() => {
-        const localData = (isResource(selectedResource) && selectedResource?.formalization)
-            ? selectedResource.formalization
-            : { elements: [], operations: [], components: [] };
+        const localData = specFormalization || emptyFormalization;
     
         const allLinkedOpIds = new Set(fullFormalizationData.elements.flatMap(el => el.linkedOperationIds || []));
         const allLinkedElementIds = new Set(fullFormalizationData.components.flatMap(c => c.linkedElementIds || []));
         const allLinkedComponentIdsInProps = new Set(fullFormalizationData.elements.flatMap(el => Object.values(el.properties || {})));
         const allLinkedComponentIdsInComps = new Set(fullFormalizationData.components.flatMap(c => c.linkedComponentIds || []));
 
-        const globalElementIds = new Set(globalElements.map(el => el.id));
-        const localElementIds = new Set((localData.elements || []).map(el => el.id));
-        const combinedElements = [
-            ...(localData.elements || []),
-            ...globalElements.filter(ge => !localElementIds.has(ge.id))
-        ];
-
         return {
-            elements: combinedElements.filter(el => !allLinkedElementIds.has(el.id)),
+            elements: (localData.elements || []).filter(el => !allLinkedElementIds.has(el.id)),
             operations: (localData.operations || []).filter(op => !allLinkedOpIds.has(op.id)),
             components: (localData.components || []).filter(c => !allLinkedComponentIdsInProps.has(c.id) && !allLinkedComponentIdsInComps.has(c.id)),
         };
-    }, [selectedResource, fullFormalizationData, globalElements]);
+    }, [specFormalization, emptyFormalization, fullFormalizationData]);
 
 
     const handleToggleCollapseAll = () => {
@@ -989,11 +1051,11 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
     };
 
     const handleUpdateElementProperty = (elementId: string, propertyKey: string, propertyValue: string) => {
-        if (!selectedResource || !isResource(selectedResource)) return;
-
+        if (!selectedFormalizationSpecId) return;
+        const currentFormalization = specFormalization || emptyFormalization;
         const updatedFormalization = {
-            ...(selectedResource.formalization || { elements: [], operations: [], components: [] }),
-            elements: (selectedResource.formalization?.elements || []).map(el => {
+            ...currentFormalization,
+            elements: (currentFormalization.elements || []).map(el => {
                 if (el.id === elementId) {
                     return {
                         ...el,
@@ -1006,7 +1068,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                 return el;
             }),
         };
-        updateResourceFormalization(selectedResource.id, updatedFormalization);
+        updateSpecFormalization(updatedFormalization);
     };
     
     const renderSelectedResource = () => {
@@ -1157,7 +1219,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                                     <GitMerge className="h-4 w-4 text-purple-500" />
                                 </Button>
                             )}
-                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddItem(type)} disabled={!isResource(selectedResource)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAddItem(type)} disabled={!selectedFormalizationSpecId}>
                                 <PlusCircle className="h-4 w-4 text-green-500"/>
                             </Button>
                         </div>
@@ -1171,10 +1233,43 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                                     const linkedComponents = (item.linkedComponentIds || []).map(id => fullFormalizationData?.components?.find(c => c.id === id)?.text).filter(Boolean);
                                     
                                     return (
-                                    <Card key={item.id} className="group relative">
+                                    <Card key={item.id} className="group relative border-border/60 bg-gradient-to-br from-background/60 via-background/40 to-muted/40 shadow-sm">
                                         <CardContent className="p-3 text-sm">
-                                            <div className="flex items-center justify-between">
-                                                <button className="font-semibold text-left w-full" onClick={(e) => type === 'components' && openComponentPopup(item.id, e)}>{item.text}</button>
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="flex items-start gap-2">
+                                                    <div className={cn(
+                                                        "mt-0.5 h-8 w-1.5 rounded-full",
+                                                        type === 'elements' && "bg-emerald-500/70",
+                                                        type === 'operations' && "bg-sky-500/70",
+                                                        type === 'components' && "bg-violet-500/70"
+                                                    )} />
+                                                    <div className="min-w-0">
+                                                        <button className="font-semibold text-left w-full truncate" onClick={(e) => type === 'components' && openComponentPopup(item.id, e)} title={item.text}>
+                                                            {item.text}
+                                                        </button>
+                                                        <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                                                            {type === 'elements' && (
+                                                                <>
+                                                                    <Badge variant="outline" className="text-[10px]">Element</Badge>
+                                                                    {linkedOperations.length > 0 && <Badge variant="secondary" className="text-[10px]">Ops: {linkedOperations.length}</Badge>}
+                                                                    {Object.keys(item.properties || {}).length > 0 && <Badge variant="secondary" className="text-[10px]">Props: {Object.keys(item.properties || {}).length}</Badge>}
+                                                                </>
+                                                            )}
+                                                            {type === 'operations' && (
+                                                                <>
+                                                                    <Badge variant="outline" className="text-[10px]">Operation</Badge>
+                                                                </>
+                                                            )}
+                                                            {type === 'components' && (
+                                                                <>
+                                                                    <Badge variant="outline" className="text-[10px]">Component</Badge>
+                                                                    {linkedElements.length > 0 && <Badge variant="secondary" className="text-[10px]">Els: {linkedElements.length}</Badge>}
+                                                                    {linkedComponents.length > 0 && <Badge variant="secondary" className="text-[10px]">Comps: {linkedComponents.length}</Badge>}
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                 {item.isGlobal && <Globe className="h-4 w-4 text-blue-500"/>}
                                             </div>
                                             {type === 'elements' && item.properties && (
@@ -1228,28 +1323,37 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                                                     })}
                                                 </div>
                                             )}
-                                            {type === 'elements' && linkedOperations.length > 0 && (
-                                                <div className="mt-2 pt-2 border-t">
-                                                    <h5 className="font-medium text-xs text-muted-foreground">Operations:</h5>
-                                                    <div className="flex flex-wrap gap-1 mt-1">
-                                                        {linkedOperations.map((op, i) => <Badge key={i} variant="secondary">{op}</Badge>)}
+                                            {(type === 'elements' && linkedOperations.length > 0) && (
+                                                <div className="mt-2 pt-2 border-t border-border/60">
+                                                    <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                                                        <span className="font-medium">Flows →</span>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {linkedOperations.slice(0, 3).map((op, i) => <Badge key={i} variant="secondary">{op}</Badge>)}
+                                                            {linkedOperations.length > 3 && <Badge variant="outline">+{linkedOperations.length - 3}</Badge>}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             )}
-                                            {type === 'components' && linkedElements.length > 0 && (
-                                                <div className="mt-2 pt-2 border-t">
-                                                    <h5 className="font-medium text-xs text-muted-foreground">Elements:</h5>
-                                                    <div className="flex flex-wrap gap-1 mt-1">
-                                                        {linkedElements.map((el, i) => <Badge key={i} variant="secondary">{el}</Badge>)}
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {type === 'components' && linkedComponents.length > 0 && (
-                                                <div className="mt-2 pt-2 border-t">
-                                                    <h5 className="font-medium text-xs text-muted-foreground">Components:</h5>
-                                                    <div className="flex flex-wrap gap-1 mt-1">
-                                                        {linkedComponents.map((comp, i) => <Badge key={i} variant="outline">{comp}</Badge>)}
-                                                    </div>
+                                            {(type === 'components' && (linkedElements.length > 0 || linkedComponents.length > 0)) && (
+                                                <div className="mt-2 pt-2 border-t border-border/60 space-y-1">
+                                                    {linkedElements.length > 0 && (
+                                                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                                                            <span className="font-medium">Uses ●</span>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {linkedElements.slice(0, 3).map((el, i) => <Badge key={i} variant="secondary">{el}</Badge>)}
+                                                                {linkedElements.length > 3 && <Badge variant="outline">+{linkedElements.length - 3}</Badge>}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    {linkedComponents.length > 0 && (
+                                                        <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                                                            <span className="font-medium">Builds ▸</span>
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {linkedComponents.slice(0, 3).map((comp, i) => <Badge key={i} variant="outline">{comp}</Badge>)}
+                                                                {linkedComponents.length > 3 && <Badge variant="outline">+{linkedComponents.length - 3}</Badge>}
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </CardContent>
@@ -1325,58 +1429,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
         <DndContext onDragEnd={handleDragEnd}>
             <audio ref={audioRef} onEnded={() => setPlayingAudio(false)} className="hidden" />
             <div className="h-[calc(100vh-4rem-1px)] p-4 flex flex-col">
-                <div className="flex-grow grid grid-cols-5 gap-4 min-h-0">
-                    <div className="col-span-1 h-full min-h-0">
-                        <Card className="flex flex-col h-full">
-                            <CardHeader>
-                                <div className="flex justify-between items-center">
-                                    <CardTitle className="flex items-center gap-2"><BookCopy/> Curiosities</CardTitle>
-                                    <div className="flex">
-                                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleToggleCollapseAll}>
-                                            <ChevronsDown className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                                <Select value={selectedFormalizationSpecId || ''} onValueChange={setSelectedFormalizationSpecId}>
-                                    <SelectTrigger className="w-full"><SelectValue placeholder="Select Specialization..." /></SelectTrigger>
-                                    <SelectContent>
-                                        {specializations.map(spec => (
-                                            <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </CardHeader>
-                            <CardContent className="flex-grow min-h-0">
-                                <ScrollArea className="h-full">
-                                    <div className="space-y-1">
-                                        {curiositiesForSpecialization.map(curiosity => (
-                                            <CuriosityNode 
-                                                key={curiosity.id}
-                                                item={curiosity}
-                                                onSelect={setSelectedResource}
-                                                selectedId={selectedResource?.id || null}
-                                                allUpskillDefinitions={upskillDefinitions}
-                                                allResources={resources}
-                                                collapsedIds={collapsedCuriosities}
-                                                onToggleCollapse={(id) => setCollapsedCuriosities(prev => {
-                                                    const newSet = new Set(prev);
-                                                    if (newSet.has(id)) {
-                                                        newSet.delete(id);
-                                                    } else {
-                                                        newSet.add(id);
-                                                    }
-                                                    return newSet;
-                                                })}
-                                            />
-                                        ))}
-                                    </div>
-                                </ScrollArea>
-                            </CardContent>
-                        </Card>
-                    </div>
-                    <div className="col-span-1 h-full min-h-0">
-                        {renderSelectedResource()}
-                    </div>
+                <div className="flex-grow grid grid-cols-3 gap-4 min-h-0">
                     <div className="col-span-1 h-full min-h-0">
                         {renderFormalizationSection('elements', 'Elements', 'Atomic concepts, formulas, code snippets.')}
                     </div>
@@ -1397,6 +1450,7 @@ const FormalizationPageContent: React.FC<FormalizationPageContentProps> = () => 
                     onClose={() => setEditingItem(null)}
                     onSave={handleUpdateItem}
                     onOpenDrawingCanvas={openDrawingCanvas}
+                    onAddOperation={handleAddOperationFromModal}
                 />
             )}
              {Array.from(componentPopups.values()).map(popupState => (

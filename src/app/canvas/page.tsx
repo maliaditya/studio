@@ -5,7 +5,7 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy, ChevronsDown, ChevronsUp, Smartphone, Plus, Paintbrush, Library, Edit3, Circle, Square, Play, Scissors, List, Trash2, FastForward } from 'lucide-react';
+import { Save, X, Pin, PinOff, Search, Link as LinkIcon, LayoutDashboard, Copy, ChevronsDown, ChevronsUp, Smartphone, Plus, Paintbrush, Library, Edit3, Circle, Square, Play, List, Trash2, FastForward } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -250,6 +250,7 @@ function DrawingCanvasPageContent() {
     const isUserChange = useRef(false);
     const [loadedFiles, setLoadedFiles] = useState<Record<string, any>>({});
     const [loadedFilesCanvasId, setLoadedFilesCanvasId] = useState<string | null>(null);
+    const [activeFilesMeta, setActiveFilesMeta] = useState<ExcalidrawFilesMetaMap | null>(null);
 
     useEffect(() => {
         if (!tabContextMenu) return;
@@ -493,8 +494,10 @@ function DrawingCanvasPageContent() {
             if (!filesMeta || Object.keys(filesMeta).length === 0) {
                 setLoadedFiles({});
                 setLoadedFilesCanvasId(activeCanvas.id);
+                setActiveFilesMeta(null);
                 return;
             }
+            setActiveFilesMeta(filesMeta);
 
             try {
                 const files = await loadExcalidrawFiles(activeCanvas.id, filesMeta);
@@ -902,97 +905,92 @@ function DrawingCanvasPageContent() {
     return (
         <>
             <div className="h-screen w-screen flex flex-col bg-background">
-                <header className="p-2 flex items-center justify-between border-b gap-4 flex-shrink-0">
+                <header className="px-2 py-0.5 flex items-center justify-between border-b gap-2 flex-shrink-0">
                     <div className="flex-grow min-w-0 flex items-center gap-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => setIsHeaderCollapsed(p => !p)}>
-                            {isHeaderCollapsed ? <ChevronsDown className="h-4 w-4" /> : <ChevronsUp className="h-4 w-4" />}
-                        </Button>
-                        {!isHeaderCollapsed && (
-                            <div className="overflow-x-auto">
-                                <div className="flex items-center gap-2">
-                                    {(drawingCanvasState?.openCanvases || []).map(canvas => (
-                                        <Button
-                                            key={canvas.id}
-                                            variant={drawingCanvasState?.activeCanvasId === canvas.id ? "secondary" : "ghost"}
-                                            size="sm"
-                                            className="h-8 pl-2 pr-1 flex items-center gap-1 flex-shrink-0"
-                                            onClick={() => handleTabClick(canvas.id)}
-                                            onContextMenu={(event) => {
-                                                event.preventDefault();
-                                                setTabContextMenu({
-                                                    x: event.clientX,
-                                                    y: event.clientY,
-                                                    canvasId: canvas.id,
-                                                });
-                                            }}
-                                        >
-                                            {editingCanvasId === canvas.id ? (
-                                                <Input
-                                                    ref={editingInputRef}
-                                                    value={editingCanvasName}
-                                                    onChange={(event) => setEditingCanvasName(event.target.value)}
-                                                    onClick={(event) => event.stopPropagation()}
-                                                    onPointerDown={(event) => event.stopPropagation()}
-                                                    onKeyDown={(event) => {
-                                                        if (event.key === 'Enter') {
-                                                            event.preventDefault();
-                                                            handleRenameCanvas(canvas.id, editingCanvasName);
-                                                        }
-                                                        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
-                                                            event.preventDefault();
-                                                            handleRenameCanvas(canvas.id, editingCanvasName);
-                                                        }
-                                                        if (event.key === 'Escape') {
-                                                            event.preventDefault();
-                                                            setEditingCanvasId(null);
-                                                        }
-                                                    }}
-                                                    onBlur={() => handleRenameCanvas(canvas.id, editingCanvasName)}
-                                                    className="h-6 text-sm px-1 py-0.5"
-                                                />
-                                            ) : (
-                                                <span className="truncate max-w-[120px]">{canvas.name}</span>
-                                            )}
-                                            <button onClick={(e) => handleTogglePin(e, canvas.id)} className="p-1 rounded hover:bg-muted">
-                                                <Pin className={cn("h-3 w-3", (settings.pinnedCanvasIds || []).includes(canvas.id) ? "text-primary fill-current" : "text-muted-foreground")}/>
-                                            </button>
-                                            {!(settings.pinnedCanvasIds || []).includes(canvas.id) && (
-                                                <button onClick={(e) => handleCloseTab(e, canvas.id)} className="p-1 rounded hover:bg-destructive/20">
-                                                    <X className="h-3 w-3 text-destructive"/>
-                                                </button>
-                                            )}
-                                        </Button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button variant="ghost" size="icon" asChild>
+                        <Button variant="ghost" size="icon" className="h-5 w-5 flex-shrink-0" asChild>
                             <Link href="/my-plate">
-                                <LayoutDashboard className="h-4 w-4" />
+                                <LayoutDashboard className="h-3 w-3" />
                             </Link>
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={openCanvasResourceCard}><Plus className="h-4 w-4"/></Button>
-                        <Button variant="ghost" size="icon" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-4 w-4"/></Button>
-                        <Button variant="ghost" size="icon" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-4 w-4"/></Button>
-                        <Button variant="ghost" size="icon" onClick={handleCopyLink}><Copy className="h-4 w-4"/></Button>
+                        <div className="overflow-x-auto">
+                            <div className="flex items-center gap-2">
+                                {(drawingCanvasState?.openCanvases || []).map(canvas => (
+                                    <Button
+                                        key={canvas.id}
+                                        variant={drawingCanvasState?.activeCanvasId === canvas.id ? "secondary" : "ghost"}
+                                        size="sm"
+                                        className="h-5 pl-2 pr-1 flex items-center gap-1 flex-shrink-0 text-[10px]"
+                                        onClick={() => handleTabClick(canvas.id)}
+                                        onContextMenu={(event) => {
+                                            event.preventDefault();
+                                            setTabContextMenu({
+                                                x: event.clientX,
+                                                y: event.clientY,
+                                                canvasId: canvas.id,
+                                            });
+                                        }}
+                                    >
+                                        {editingCanvasId === canvas.id ? (
+                                            <Input
+                                                ref={editingInputRef}
+                                                value={editingCanvasName}
+                                                onChange={(event) => setEditingCanvasName(event.target.value)}
+                                                onClick={(event) => event.stopPropagation()}
+                                                onPointerDown={(event) => event.stopPropagation()}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === 'Enter') {
+                                                        event.preventDefault();
+                                                        handleRenameCanvas(canvas.id, editingCanvasName);
+                                                    }
+                                                    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+                                                        event.preventDefault();
+                                                        handleRenameCanvas(canvas.id, editingCanvasName);
+                                                    }
+                                                    if (event.key === 'Escape') {
+                                                        event.preventDefault();
+                                                        setEditingCanvasId(null);
+                                                    }
+                                                }}
+                                                onBlur={() => handleRenameCanvas(canvas.id, editingCanvasName)}
+                                                className="h-4 text-[10px] px-1 py-0.5"
+                                            />
+                                        ) : (
+                                            <span className="truncate max-w-[120px] text-[10px]">{canvas.name}</span>
+                                        )}
+                                        <button onClick={(e) => handleTogglePin(e, canvas.id)} className="p-1 rounded hover:bg-muted">
+                                            <Pin className={cn("h-3 w-3", (settings.pinnedCanvasIds || []).includes(canvas.id) ? "text-primary fill-current" : "text-muted-foreground")}/>
+                                        </button>
+                                        {!(settings.pinnedCanvasIds || []).includes(canvas.id) && (
+                                            <button onClick={(e) => handleCloseTab(e, canvas.id)} className="p-1 rounded hover:bg-destructive/20">
+                                                <X className="h-3 w-3 text-destructive"/>
+                                            </button>
+                                        )}
+                                    </Button>
+                                ))}
+                                </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={openCanvasResourceCard}><Plus className="h-3 w-3"/></Button>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-3 w-3"/></Button>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-3 w-3"/></Button>
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleCopyLink}><Copy className="h-3 w-3"/></Button>
                         {recordings.length > 0 && (
                           <div className="flex items-center gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7"
+                              className="h-5 w-5"
                               onClick={handleDeleteRecording}
                               title="Delete recording"
                               disabled={isRecording || isPlaying}
                             >
-                              <X className="h-4 w-4 text-destructive" />
+                              <X className="h-3 w-3 text-destructive" />
                             </Button>
                             <select
                               value={activeRecordingId || ""}
                               onChange={(event) => selectRecording(event.target.value)}
-                              className="h-7 max-w-[180px] rounded border bg-background px-2 text-xs text-muted-foreground"
+                              className="h-6 max-w-[180px] rounded border bg-background px-2 text-[10px] text-muted-foreground"
                               title="Select recording"
                               disabled={isRecording || isPlaying}
                             >
@@ -1007,53 +1005,52 @@ function DrawingCanvasPageContent() {
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-5 w-5"
                           onClick={() => (isRecording ? handleStopRecording() : startRecording())}
                           title={isRecording ? "Stop recording" : "Record drawing (with voice)"}
                           disabled={!activeCanvas || isPlaying || showRecordingNamePrompt}
                         >
-                          {isRecording ? <Square className="h-4 w-4 text-red-500" /> : <Circle className="h-4 w-4 text-red-500" />}
+                          {isRecording ? <Square className="h-3 w-3 text-red-500" /> : <Circle className="h-3 w-3 text-red-500" />}
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
+                          className="h-5 w-5"
                           onClick={() => (isPlaying ? stopPlayback() : playRecording())}
                           title={isPlaying ? "Stop playback" : hasRecording ? "Play recording" : "No recording yet"}
                           disabled={!activeCanvas || isRecording || !hasRecording}
                         >
-                          {isPlaying ? <Square className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                          {isPlaying ? <Square className="h-3 w-3" /> : <Play className="h-3 w-3" />}
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => setShowRecordingEditor((prev) => !prev)}
-                          title="Cut recording range"
-                          disabled={!activeCanvas || isRecording || isPlaying || !hasRecording}
-                        >
-                          <Scissors className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
+                          className="h-5 w-5"
                           onClick={() => setShowKeyframeEditor((prev) => !prev)}
                           title="Delete keyframes"
                           disabled={!activeCanvas || isRecording || isPlaying || !hasRecording}
                         >
-                          <List className="h-4 w-4" />
+                          <List className="h-3 w-3" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={handleCycleSpeed}
-                          title="Playback speed"
-                          disabled={!activeCanvas || isRecording || !hasRecording}
-                        >
-                          <FastForward className="h-4 w-4" />
-                        </Button>
-                        <span className="text-xs text-muted-foreground min-w-[32px]">
-                          {playbackSpeed === 0 ? "1x" : `${playbackSpeed}x`}
-                        </span>
-                        <Button variant="ghost" size="icon" onClick={handleSaveClick}>
-                            <Save className={cn("h-4 w-4", isDirty ? "text-red-500" : "text-green-500")} />
+                        {isPlaying && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-5 w-5"
+                              onClick={handleCycleSpeed}
+                              title="Playback speed"
+                              disabled={!activeCanvas || isRecording || !hasRecording}
+                            >
+                              <FastForward className="h-3 w-3" />
+                            </Button>
+                            <span className="text-[10px] text-muted-foreground min-w-[28px]">
+                              {playbackSpeed === 0 ? "1x" : `${playbackSpeed}x`}
+                            </span>
+                          </>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleSaveClick}>
+                            <Save className={cn("h-3 w-3", isDirty ? "text-red-500" : "text-green-500")} />
                         </Button>
                     </div>
                 </header>

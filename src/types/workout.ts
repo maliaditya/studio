@@ -1240,10 +1240,12 @@ export interface UserSettings {
   githubOwner?: string;
   githubRepo?: string;
   githubPath?: string;
+  githubFetchMissingOnly?: boolean;
   supabaseUrl?: string;
   supabaseAnonKey?: string;
   supabasePdfBucket?: string;
   supabaseServiceRoleKey?: string;
+  formalizationBySpec?: Record<string, FormalizationData>;
   lastSync?: { sha: string, timestamp: number };
   githubModuleHashes?: Record<string, string>;
   githubPulledHashes?: Record<string, string>;

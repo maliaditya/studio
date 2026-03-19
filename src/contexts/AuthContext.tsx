@@ -2650,6 +2650,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           coreStateManualOverrides: {},
           githubModuleHashes: {},
           githubPulledHashes: {},
+          githubFetchMissingOnly: true,
           routineRebalanceLearning: {
             history: [],
           },
@@ -2842,6 +2843,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             if (!didLoadData) {
               setIsLoadingState(false);
             }
+            
+            await hydrateGitHubSettings(user.username);
           
             router.push('/my-plate');
             toast({ title: "Success", description: message });
@@ -3052,6 +3055,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         toast({ title: "Export Failed", description: "Could not export your data.", variant: "destructive" });
     }
   };
+
+  const mergeGitHubSettings = useCallback((incoming?: Partial<UserSettings>) => {
+    if (!incoming) return;
+    setSettings(prev => ({
+      ...prev,
+      githubToken: prev.githubToken || incoming.githubToken,
+      githubOwner: prev.githubOwner || incoming.githubOwner,
+      githubRepo: prev.githubRepo || incoming.githubRepo,
+      githubPath: prev.githubPath || incoming.githubPath,
+      githubFetchMissingOnly:
+        prev.githubFetchMissingOnly ?? (incoming.githubFetchMissingOnly ?? prev.githubFetchMissingOnly ?? true),
+    }));
+  }, [setSettings]);
+
+  const hydrateGitHubSettings = useCallback(async (username: string) => {
+    try {
+      const response = await fetch(`/api/github-settings?username=${username.toLowerCase()}`, {
+        credentials: 'include',
+      });
+      if (!response.ok) return;
+      const result = await response.json();
+      if (result?.settings) {
+        mergeGitHubSettings(result.settings);
+      }
+    } catch (error) {
+      console.debug("Failed to hydrate GitHub settings:", error);
+    }
+  }, [mergeGitHubSettings]);
 
   const importData = () => {
     if (!currentUser?.username) {
@@ -5943,7 +5974,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const canvasFilesIndex = {
         version: 1,
         updatedAt,
-        folder: `images_${currentUser?.username?.toLowerCase() || 'unknown'}`,
+        folder: getGitHubImagesFolder(currentUser?.username),
         canvases: uniqueCanvasIds,
       };
       moduleEntries.push({
@@ -6264,7 +6295,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }
 
   async function getGitHubFileSha(token: string, owner: string, repo: string, path: string): Promise<string | undefined> {
-    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+    const response = await fetchWithTimeout(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
         headers: { 'Authorization': `token ${token}` }
     });
     if (response.ok) {
@@ -6286,9 +6317,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return new TextDecoder().decode(bytes);
   };
 
+  async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 20000, retries = 2): Promise<Response> {
+    let lastError: unknown;
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const response = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(timeoutId);
+        return response;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        lastError = error;
+        if (attempt < retries) {
+          const backoffMs = 500 * Math.pow(2, attempt);
+          await new Promise((resolve) => setTimeout(resolve, backoffMs));
+          continue;
+        }
+      }
+    }
+    throw lastError;
+  }
+
   async function getGitHubJson<T>(token: string, owner: string, repo: string, path?: string): Promise<T | null> {
     if (!path) return null;
-    const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+    const response = await fetchWithTimeout(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
         headers: { 'Authorization': `token ${token}` }
     });
     if (response.status === 404) return null;
@@ -6303,7 +6356,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       return JSON.parse(content) as T;
     }
     if (data?.download_url) {
-      const fileResponse = await fetch(data.download_url);
+      const fileResponse = await fetchWithTimeout(data.download_url, {});
       if (fileResponse.ok) {
         const text = await fileResponse.text();
         return JSON.parse(text) as T;
@@ -6311,7 +6364,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     // Mobile/network-safe fallback: fetch blob content directly by SHA.
     if (data?.sha) {
-      const blobResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/blobs/${data.sha}`, {
+      const blobResponse = await fetchWithTimeout(`https://api.github.com/repos/${owner}/${repo}/git/blobs/${data.sha}`, {
         headers: { 'Authorization': `token ${token}` }
       });
       if (blobResponse.ok) {
@@ -6349,6 +6402,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return Array.isArray(data) ? data : null;
   }
 
+  async function listGitHubDirectoryPaged(
+    token: string,
+    owner: string,
+    repo: string,
+    dir: string
+  ): Promise<Array<{ name: string; type: string; path: string; sha?: string }> | null> {
+    const perPage = 100;
+    let page = 1;
+    const entries: Array<{ name: string; type: string; path: string; sha?: string }> = [];
+    while (page <= 50) {
+      const endpoint = dir
+        ? `https://api.github.com/repos/${owner}/${repo}/contents/${dir}?per_page=${perPage}&page=${page}`
+        : `https://api.github.com/repos/${owner}/${repo}/contents?per_page=${perPage}&page=${page}`;
+      const response = await fetchWithTimeout(endpoint, {
+        headers: { 'Authorization': `token ${token}` }
+      });
+      if (response.status === 404) {
+        return entries.length > 0 ? entries : null;
+      }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error((errorData as any).message || `Failed to list GitHub directory: ${dir || '/'}`);
+      }
+      const data = await response.json();
+      const pageEntries = Array.isArray(data) ? data : [];
+      entries.push(...pageEntries);
+      if (pageEntries.length < perPage) break;
+      page += 1;
+    }
+    return entries;
+  }
+
   function pickLatestDatedBackupPath(
     entries: Array<{ name: string; type: string; path: string }>,
     username: string
@@ -6372,6 +6457,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
     if (username) return username.toLowerCase();
     return null;
+  }
+
+  function getGitHubImagesFolder(username?: string | null): string {
+    const namespace = resolveGitHubNamespace(username) || username?.toLowerCase() || 'unknown';
+    return `images_${namespace}`;
   }
 
   function withUserGitHubPrefix(path: string, username?: string | null): string {
@@ -6522,7 +6612,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const canvasFilesIndex = {
       version: 1,
       updatedAt,
-      folder: `images_${username}`,
+      folder: getGitHubImagesFolder(username),
       canvases: importedCanvasIds,
     };
     moduleEntries.push({
@@ -7001,7 +7091,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
       }
 
-      const folderPath = withUserGitHubPrefix(`images_${username}`, username);
+      const folderPath = withUserGitHubPrefix(getGitHubImagesFolder(username), username);
       let toastHandle: ReturnType<typeof toast> | null = null;
       if (!silent) {
         toastHandle = toast({
@@ -7022,19 +7112,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const existingFilesMap = new Map<string, string>();
             const uploadedFileNames = new Set<string>();
             try {
-            const listResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${folderPath}`, {
-              headers: { 'Authorization': `token ${githubToken}` }
-            });
-            if (listResponse.ok) {
-              const listData = await listResponse.json();
+            const listData = await listGitHubDirectoryPaged(githubToken, githubOwner, githubRepo, folderPath);
+            if (listData) {
               for (const item of listData || []) {
-              if (item && item.type === 'file' && item.name && item.sha) {
-                existingFilesMap.set(item.name, item.sha);
+                if (item && item.type === 'file' && item.name && item.sha) {
+                  existingFilesMap.set(item.name, item.sha);
+                }
               }
-              }
-            } else if (listResponse.status !== 404) {
-              const err = await listResponse.json();
-              throw new Error(err.message || 'Failed to list images on GitHub');
             }
             } catch (e) {
             console.debug('Could not list existing GitHub image folder, continuing with per-file upload', e);
@@ -7592,7 +7676,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-  const fetchCanvasImagesFromGitHub = async () => {
+  const fetchCanvasImagesFromGitHub = async (options?: { missingOnly?: boolean }) => {
       const username = currentUser?.username?.toLowerCase();
       const { githubToken, githubOwner, githubRepo } = settings;
 
@@ -7607,7 +7691,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       const localCanvasFilesById = getCanvasFilesMetaByCanvasId();
-      const folderPath = withUserGitHubPrefix(`images_${username}`, username);
       const prefixedPath = withUserGitHubPrefix(settings.githubPath || 'backup.json', username);
       const { dir } = getGitHubBaseDir(prefixedPath);
       const modulesBase = dir ? `${dir}/modules` : 'modules';
@@ -7615,12 +7698,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       toast({ title: "Fetching images...", description: "Downloading images from GitHub to this browser." });
 
       try {
-          const remoteCanvasIndex = await getGitHubJson<{ canvases?: string[] }>(
-              githubToken,
-              githubOwner,
-              githubRepo,
-              `${canvasFilesBase}/index.json`
-          );
+      const remoteCanvasIndex = await getGitHubJson<{ canvases?: string[]; folder?: string }>(
+          githubToken,
+          githubOwner,
+          githubRepo,
+          `${canvasFilesBase}/index.json`
+      );
+      const resolvedFolder = typeof remoteCanvasIndex?.folder === 'string' && remoteCanvasIndex.folder.trim().length > 0
+        ? remoteCanvasIndex.folder.trim()
+        : getGitHubImagesFolder(username);
+      const folderPath = withUserGitHubPrefix(resolvedFolder, username);
           const remoteCanvasIds = new Set(
               Array.isArray(remoteCanvasIndex?.canvases)
                   ? remoteCanvasIndex!.canvases!.filter((canvasId): canvasId is string => typeof canvasId === 'string' && canvasId.length > 0)
@@ -7633,17 +7720,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           let remoteCanvasMetaPathById = new Map<string, string>();
           try {
-              const canvasFilesListResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${canvasFilesBase}`, {
-                  headers: { 'Authorization': `token ${githubToken}` }
-              });
-              if (canvasFilesListResponse.ok) {
-                  const canvasFilesListData = await canvasFilesListResponse.json();
-                  remoteCanvasMetaPathById = new Map(
-                      (Array.isArray(canvasFilesListData) ? canvasFilesListData : [])
-                          .filter((item: any) => item?.type === 'file' && typeof item?.name === 'string' && item.name.endsWith('.json') && item.name !== 'index.json')
-                          .map((item: any) => [item.name.slice(0, -5), item.path] as const)
-                  );
-              }
+          const canvasFilesListData = await listGitHubDirectoryPaged(githubToken, githubOwner, githubRepo, canvasFilesBase);
+          if (canvasFilesListData) {
+              remoteCanvasMetaPathById = new Map(
+                  (Array.isArray(canvasFilesListData) ? canvasFilesListData : [])
+                      .filter((item: any) => item?.type === 'file' && typeof item?.name === 'string' && item.name.endsWith('.json') && item.name !== 'index.json')
+                      .map((item: any) => [item.name.slice(0, -5), item.path] as const)
+              );
+          }
           } catch {
               // Optional optimization; fallback logic below still works without this list.
           }
@@ -7653,21 +7737,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               return;
           }
 
-          const listResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${folderPath}`, {
-              headers: { 'Authorization': `token ${githubToken}` }
-          });
-
-            if (!listResponse.ok) {
-              if (listResponse.status === 404) {
-                console.info(`GitHub image folder ${folderPath} not found; nothing to fetch.`);
-                toast({ title: 'No image folder', description: `No folder "${folderPath}" found on GitHub. Nothing to fetch.` });
-                return;
-              }
-              const errorData = await listResponse.json().catch(() => ({ message: 'Could not list image folder on GitHub.' }));
-              throw new Error(errorData.message || 'Could not list image folder on GitHub.');
-            }
-
-          const listData = await listResponse.json();
+          const listData = await listGitHubDirectoryPaged(githubToken, githubOwner, githubRepo, folderPath);
+          if (!listData) {
+            console.info(`GitHub image folder ${folderPath} not found; nothing to fetch.`);
+            toast({ title: 'No image folder', description: `No folder "${folderPath}" found on GitHub. Nothing to fetch.` });
+            return;
+          }
           const fileMap = new Map<string, { name: string; sha?: string; path: string }>();
           (listData || []).forEach((item: any) => {
               if (item.type !== 'file' || !item.name) return;
@@ -7675,8 +7750,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               fileMap.set(fileId, { name: item.name, sha: item.sha, path: `${folderPath}/${item.name}` });
           });
 
-          let downloaded = 0;
-          let missing = 0;
+      const missingOnly = !!options?.missingOnly;
+      let downloaded = 0;
+      let missing = 0;
+          const missingIds: string[] = [];
           let skippedUnchanged = 0;
           const nextPulledHashes: Record<string, string> = { ...(settings.githubPulledHashes || {}) };
 
@@ -7712,26 +7789,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   const entry = fileMap.get(fileId);
                   if (!entry?.name) {
                       missing += 1;
+                      if (missingIds.length < 10) missingIds.push(fileId);
                       continue;
                   }
 
                   try {
                       const filePath = entry.path;
-                      if (entry.sha && settings.githubPulledHashes?.[filePath] === entry.sha) {
+                      if (missingOnly && entry.sha && settings.githubPulledHashes?.[filePath] === entry.sha) {
                           skippedUnchanged += 1;
                           continue;
                       }
-                      const fileResponse = await fetch(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${filePath}`, {
+                      const fileResponse = await fetchWithTimeout(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${filePath}`, {
                           headers: { 'Authorization': `token ${githubToken}` }
                       });
                       if (!fileResponse.ok) {
                           missing += 1;
+                          if (missingIds.length < 10) missingIds.push(fileId);
                           continue;
                       }
                       const fileData = await fileResponse.json();
                       const mimeType = filesMeta[fileId]?.mimeType || 'application/octet-stream';
                       if (!fileData?.content) {
                           missing += 1;
+                          if (missingIds.length < 10) missingIds.push(fileId);
                           continue;
                       }
                       const blob = base64ToBlob(fileData.content, mimeType);
@@ -7750,7 +7830,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           toast({
               title: "Images Fetched",
-              description: `Downloaded ${downloaded} images. ${skippedUnchanged > 0 ? `${skippedUnchanged} unchanged skipped. ` : ''}${missing > 0 ? `${missing} missing.` : ''}`,
+              description: `Folder: ${folderPath}. Downloaded ${downloaded} images. ${skippedUnchanged > 0 ? `${skippedUnchanged} unchanged skipped. ` : ''}${missing > 0 ? `${missing} missing (${missingIds.join(', ')}).` : ''}`,
           });
       } catch (error) {
           console.error("GitHub image fetch failed:", error);

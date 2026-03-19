@@ -313,35 +313,6 @@ function FinancePageContent() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-xl">Finance Structure</CardTitle>
-          <CardDescription>How the money system is organized across your stack.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Input</p>
-            <p className="mt-2 text-sm text-foreground">Income sources</p>
-          </div>
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Allocation</p>
-            <p className="mt-2 text-sm text-foreground">Spending</p>
-          </div>
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Saving</p>
-            <p className="mt-2 text-sm text-foreground">Reserved capital</p>
-          </div>
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Debt</p>
-            <p className="mt-2 text-sm text-foreground">Obligations &amp; liabilities</p>
-          </div>
-          <div className="rounded-lg border border-border/60 bg-muted/20 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Balance</p>
-            <p className="mt-2 text-sm text-foreground">Net position</p>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-3">
