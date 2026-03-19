@@ -39,10 +39,11 @@ import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
 import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { HabitDetailPopup } from '@/components/HabitDetailPopup';
-import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, storeExcalidrawFile, type ExcalidrawFileRecord, storeAudio, getAudioForResource, storePdf, getPdfForResource, getAllPdfKeys } from '@/lib/audioDB';
+import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, getExcalidrawFile, storeExcalidrawFile, type ExcalidrawFileRecord, storeAudio, getAudioForResource, storePdf, getPdfForResource, getAllPdfKeys } from '@/lib/audioDB';
 import { uploadPdfToSupabase, downloadPdfFromSupabase } from '@/lib/supabasePdfStorage';
 import { normalizeAiSettings } from '@/lib/ai/config';
 import { buildDefaultPointsForResourceType, createDefaultTextPoint } from '@/lib/resourceDefaults';
+import { fetchAppConfig } from '@/lib/appConfigClient';
 
 // Helper: convert ArrayBuffer to base64 in safe chunks to avoid "call stack size exceeded"
 const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
@@ -123,7 +124,7 @@ interface AuthContextType {
   gitHubSyncNotification: GitHubSyncNotification | null;
   dismissGitHubSyncNotification: () => void;
   syncCanvasImagesToGitHub: () => Promise<void>;
-  fetchCanvasImagesFromGitHub: () => Promise<void>;
+  fetchCanvasImagesFromGitHub: (options?: { missingOnly?: boolean }) => Promise<void>;
   syncAudioFilesToGitHub: () => Promise<void>;
   fetchAudioFilesFromGitHub: () => Promise<void>;
   syncPdfFilesToGitHub: () => Promise<void>;
@@ -6386,7 +6387,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { dir, base };
   }
 
-  async function listGitHubDirectory(token: string, owner: string, repo: string, dir: string): Promise<Array<{ name: string; type: string; path: string; sha?: string }> | null> {
+  async function listGitHubDirectory(token: string, owner: string, repo: string, dir: string): Promise<Array<{ name: string; type: string; path: string; sha?: string; download_url?: string }> | null> {
     const endpoint = dir
       ? `https://api.github.com/repos/${owner}/${repo}/contents/${dir}`
       : `https://api.github.com/repos/${owner}/${repo}/contents`;
@@ -6407,10 +6408,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     owner: string,
     repo: string,
     dir: string
-  ): Promise<Array<{ name: string; type: string; path: string; sha?: string }> | null> {
+  ): Promise<Array<{ name: string; type: string; path: string; sha?: string; download_url?: string }> | null> {
     const perPage = 100;
     let page = 1;
-    const entries: Array<{ name: string; type: string; path: string; sha?: string }> = [];
+    const entries: Array<{ name: string; type: string; path: string; sha?: string; download_url?: string }> = [];
     while (page <= 50) {
       const endpoint = dir
         ? `https://api.github.com/repos/${owner}/${repo}/contents/${dir}?per_page=${perPage}&page=${page}`
@@ -7019,6 +7020,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const getCanvasFilesMetaByCanvasId = useCallback(() => {
       const canvasFilesById = new Map<string, Record<string, any>>();
+      const sanitizeJson = (input: string) =>
+        input.replace(/[\u0000-\u001F]/g, ' ').trim();
+      const tryParseDrawing = (raw: string): any | null => {
+        try {
+          return JSON.parse(raw);
+        } catch {
+          try {
+            return JSON.parse(sanitizeJson(raw));
+          } catch {
+            return null;
+          }
+        }
+      };
 
       (resources || []).forEach(resource => {
           (resource.points || []).forEach(point => {
@@ -7030,7 +7044,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                   // If drawing is a JSON string (starts with { or [), attempt to parse it.
                   // Otherwise it's likely a data URL or other inline content and there are no external files to fetch.
                   if (typeof drawing === 'string' && (drawing.trim().startsWith('{') || drawing.trim().startsWith('['))) {
-                    const parsed = JSON.parse(drawing);
+                    const parsed = tryParseDrawing(drawing);
+                    if (!parsed) {
+                      console.debug("Skipping invalid canvas drawing while collecting file metadata: could not parse JSON.");
+                      return;
+                    }
 
                     if (parsed && parsed.files && typeof parsed.files === 'object' && Object.keys(parsed.files).length > 0) {
                       canvasFilesById.set(canvasId, parsed.files);
@@ -7737,39 +7755,100 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               return;
           }
 
-          const listData = await listGitHubDirectoryPaged(githubToken, githubOwner, githubRepo, folderPath);
-          if (!listData) {
-            console.info(`GitHub image folder ${folderPath} not found; nothing to fetch.`);
-            toast({ title: 'No image folder', description: `No folder "${folderPath}" found on GitHub. Nothing to fetch.` });
-            return;
+      const namespace = resolveGitHubNamespace(username);
+      const folderCandidates = [folderPath];
+      if (resolvedFolder && resolvedFolder !== folderPath) {
+        folderCandidates.push(resolvedFolder);
+      }
+      if (namespace) {
+        const prefix = `${namespace}/`;
+        if (resolvedFolder.startsWith(prefix)) {
+          const withoutPrefix = resolvedFolder.slice(prefix.length);
+          if (withoutPrefix && !folderCandidates.includes(withoutPrefix)) {
+            folderCandidates.push(withoutPrefix);
           }
-          const fileMap = new Map<string, { name: string; sha?: string; path: string }>();
-          (listData || []).forEach((item: any) => {
-              if (item.type !== 'file' || !item.name) return;
-              const fileId = item.name.split('.').slice(0, -1).join('.') || item.name;
-              fileMap.set(fileId, { name: item.name, sha: item.sha, path: `${folderPath}/${item.name}` });
-          });
+        }
+        if (folderPath.startsWith(prefix)) {
+          const withoutPrefix = folderPath.slice(prefix.length);
+          if (withoutPrefix && !folderCandidates.includes(withoutPrefix)) {
+            folderCandidates.push(withoutPrefix);
+          }
+        }
+      }
 
-      const missingOnly = !!options?.missingOnly;
+      const folderListings: Array<{ folder: string; items: Array<{ name: string; type: string; path: string; sha?: string; download_url?: string }> }> = [];
+      for (const candidate of folderCandidates) {
+        const data = await listGitHubDirectoryPaged(githubToken, githubOwner, githubRepo, candidate);
+        if (data && data.length > 0) {
+          folderListings.push({ folder: candidate, items: data });
+        }
+      }
+
+      if (folderListings.length === 0) {
+        console.info(`GitHub image folder(s) not found or empty: ${folderCandidates.join(', ')}`);
+        toast({
+          title: 'No image folder',
+          description: `No images found in: ${folderCandidates.join(', ')}.`,
+        });
+        return;
+      }
+      const effectiveFolderPath = folderListings[0]?.folder || folderPath;
+      const fileMap = new Map<string, { name: string; sha?: string; path: string; download_url?: string }>();
+      const fileMapLower = new Map<string, { name: string; sha?: string; path: string; download_url?: string }>();
+      folderListings.forEach(({ folder, items }) => {
+        (items || []).forEach((item: any) => {
+            if (item.type !== 'file' || !item.name) return;
+            const fileId = item.name.split('.').slice(0, -1).join('.') || item.name;
+            if (fileMap.has(fileId)) return;
+            const path = item.path || `${folder}/${item.name}`;
+            const entry = { name: item.name, sha: item.sha, path, download_url: item.download_url };
+            fileMap.set(fileId, entry);
+            fileMapLower.set(fileId.toLowerCase(), entry);
+        });
+      });
+
+      const missingOnly = options?.missingOnly ?? settings.githubFetchMissingOnly ?? true;
       let downloaded = 0;
       let missing = 0;
           const missingIds: string[] = [];
           let skippedUnchanged = 0;
           const nextPulledHashes: Record<string, string> = { ...(settings.githubPulledHashes || {}) };
 
-          const base64ToBlob = (base64: string, mimeType: string) => {
-              const cleaned = base64.replace(/\n/g, '');
-              const binary = atob(cleaned);
-              const bytes = new Uint8Array(binary.length);
-              for (let i = 0; i < binary.length; i++) {
-                  bytes[i] = binary.charCodeAt(i);
-              }
-              return new Blob([bytes], { type: mimeType });
-          };
+      const base64ToBlob = (base64: string, mimeType: string) => {
+          const cleaned = base64.replace(/\n/g, '');
+          const binary = atob(cleaned);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) {
+              bytes[i] = binary.charCodeAt(i);
+          }
+          return new Blob([bytes], { type: mimeType });
+      };
+      const fetchBlobBySha = async (sha: string, mimeType: string): Promise<Blob | null> => {
+        try {
+          const blobResponse = await fetchWithTimeout(`https://api.github.com/repos/${githubOwner}/${githubRepo}/git/blobs/${sha}`, {
+            headers: { 'Authorization': `token ${githubToken}` }
+          });
+          if (!blobResponse.ok) return null;
+          const blobData = await blobResponse.json();
+          if (!blobData?.content) return null;
+          return base64ToBlob(String(blobData.content), mimeType);
+        } catch {
+          return null;
+        }
+      };
+      const getExtForMime = (mimeType?: string) => {
+        const lower = String(mimeType || '').toLowerCase();
+        if (lower.includes('png')) return 'png';
+        if (lower.includes('jpeg')) return 'jpg';
+        if (lower.includes('jpg')) return 'jpg';
+        if (lower.includes('webp')) return 'webp';
+        if (lower.includes('gif')) return 'gif';
+        return '';
+      };
 
-          for (const canvasId of candidateCanvasIds) {
-              let filesMeta = localCanvasFilesById.get(canvasId) || {};
-              const remoteCanvasMetaPath = remoteCanvasMetaPathById.get(canvasId);
+      for (const canvasId of candidateCanvasIds) {
+          let filesMeta = localCanvasFilesById.get(canvasId) || {};
+          const remoteCanvasMetaPath = remoteCanvasMetaPathById.get(canvasId);
               if (remoteCanvasMetaPath) {
                   try {
                       const canvasMeta = await getGitHubJson<any>(githubToken, githubOwner, githubRepo, remoteCanvasMetaPath);
@@ -7783,23 +7862,67 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
               if (!filesMeta || Object.keys(filesMeta).length === 0) {
                   continue;
+          }
+
+          for (const fileId of Object.keys(filesMeta || {})) {
+              const entry = fileMap.get(fileId) || fileMapLower.get(fileId.toLowerCase());
+              if (!entry?.name) {
+                  // Fallback: try direct fetch by inferred filename (for cases where list is incomplete).
+                  const mimeType = filesMeta[fileId]?.mimeType || 'application/octet-stream';
+                  const ext = getExtForMime(mimeType);
+                  const candidateNames = [];
+                  if (ext) candidateNames.push(`${fileId}.${ext}`);
+                  candidateNames.push(`${fileId}.png`, `${fileId}.jpg`, `${fileId}.webp`, `${fileId}.gif`, `${fileId}.bin`);
+                   let fetched = false;
+                   const fallbackFolders = folderListings.map(listing => listing.folder);
+                   for (const candidate of candidateNames) {
+                     if (fetched) break;
+                     const candidatesToTry = fallbackFolders.length > 0 ? fallbackFolders : [effectiveFolderPath];
+                     for (const folder of candidatesToTry) {
+                     try {
+                      const filePath = `${folder}/${candidate}`;
+                      const fileResponse = await fetchWithTimeout(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${filePath}`, {
+                        headers: { 'Authorization': `token ${githubToken}` }
+                      });
+                      if (!fileResponse.ok) continue;
+                      const fileData = await fileResponse.json();
+                      let blob: Blob | null = null;
+                      if (fileData?.content) {
+                        blob = base64ToBlob(fileData.content, mimeType);
+                      } else if (fileData?.sha) {
+                        blob = await fetchBlobBySha(String(fileData.sha), mimeType);
+                      }
+                      if (!blob) continue;
+                      const record: ExcalidrawFileRecord = { blob, mimeType };
+                      await storeExcalidrawFile(`${canvasId}:${fileId}`, record);
+                      downloaded += 1;
+                      if (fileData?.sha) {
+                        nextPulledHashes[filePath] = fileData.sha;
+                      }
+                      fetched = true;
+                      break;
+                    } catch {
+                      // try next candidate
+                    }
+                     }
+                   }
+                  if (!fetched) {
+                    missing += 1;
+                    if (missingIds.length < 10) missingIds.push(fileId);
+                  }
+                  continue;
               }
 
-              for (const fileId of Object.keys(filesMeta || {})) {
-                  const entry = fileMap.get(fileId);
-                  if (!entry?.name) {
-                      missing += 1;
-                      if (missingIds.length < 10) missingIds.push(fileId);
-                      continue;
-                  }
-
-                  try {
-                      const filePath = entry.path;
-                      if (missingOnly && entry.sha && settings.githubPulledHashes?.[filePath] === entry.sha) {
-                          skippedUnchanged += 1;
-                          continue;
+              try {
+                  const filePath = entry.path;
+                  if (missingOnly && entry.sha && settings.githubPulledHashes?.[filePath] === entry.sha) {
+                          const localRecord = await getExcalidrawFile(`${canvasId}:${fileId}`);
+                          if (localRecord) {
+                            skippedUnchanged += 1;
+                            continue;
+                          }
                       }
-                      const fileResponse = await fetchWithTimeout(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${filePath}`, {
+                  const fileResponse = await fetchWithTimeout(`https://api.github.com/repos/${githubOwner}/${githubRepo}/contents/${filePath}`, {
                           headers: { 'Authorization': `token ${githubToken}` }
                       });
                       if (!fileResponse.ok) {
@@ -7809,17 +7932,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                       }
                       const fileData = await fileResponse.json();
                       const mimeType = filesMeta[fileId]?.mimeType || 'application/octet-stream';
-                      if (!fileData?.content) {
+                      let blob: Blob | null = null;
+                      if (fileData?.content) {
+                        blob = base64ToBlob(fileData.content, mimeType);
+                      } else if (entry.sha) {
+                        blob = await fetchBlobBySha(entry.sha, mimeType);
+                      } else if (entry.download_url) {
+                        try {
+                          const rawResp = await fetchWithTimeout(entry.download_url);
+                          if (rawResp.ok) blob = await rawResp.blob();
+                        } catch {
+                          // ignore
+                        }
+                      }
+                      if (!blob) {
                           missing += 1;
                           if (missingIds.length < 10) missingIds.push(fileId);
                           continue;
                       }
-                      const blob = base64ToBlob(fileData.content, mimeType);
                       const record: ExcalidrawFileRecord = { blob, mimeType };
                       await storeExcalidrawFile(`${canvasId}:${fileId}`, record);
                       downloaded += 1;
                       if (entry.sha) {
-                          nextPulledHashes[filePath] = entry.sha;
+                        nextPulledHashes[filePath] = entry.sha;
                       }
                   } catch (e) {
                       missing += 1;
@@ -7830,7 +7965,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           toast({
               title: "Images Fetched",
-              description: `Folder: ${folderPath}. Downloaded ${downloaded} images. ${skippedUnchanged > 0 ? `${skippedUnchanged} unchanged skipped. ` : ''}${missing > 0 ? `${missing} missing (${missingIds.join(', ')}).` : ''}`,
+              description: `Folder: ${effectiveFolderPath}. Downloaded ${downloaded} images. ${skippedUnchanged > 0 ? `${skippedUnchanged} unchanged skipped. ` : ''}${missing > 0 ? `${missing} missing (${missingIds.join(', ')}).` : ''}`,
           });
       } catch (error) {
           console.error("GitHub image fetch failed:", error);
@@ -7910,6 +8045,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [loadState]);
 
+  const appConfigLoadedRef = useRef(false);
+
   useEffect(() => {
     if (!currentUser?.username) return;
     refreshSessionHeartbeat(currentUser.username);
@@ -7918,6 +8055,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }, 15000);
     return () => clearInterval(interval);
   }, [currentUser?.username]);
+
+  useEffect(() => {
+    if (!currentUser?.username) return;
+    if (appConfigLoadedRef.current) return;
+    appConfigLoadedRef.current = true;
+
+    const loadAppConfig = async () => {
+      try {
+        const config = await fetchAppConfig();
+        const nextSettings: Partial<UserSettings> = {};
+        if (config.supabaseUrl) nextSettings.supabaseUrl = config.supabaseUrl;
+        if (config.supabaseAnonKey) nextSettings.supabaseAnonKey = config.supabaseAnonKey;
+        if (config.supabaseStorageBucket) nextSettings.supabasePdfBucket = config.supabaseStorageBucket;
+
+        if (Object.keys(nextSettings).length > 0) {
+          setSettings((prev) => ({ ...prev, ...nextSettings }));
+        }
+      } catch (error) {
+        console.warn("Failed to load app config:", error);
+      }
+    };
+
+    void loadAppConfig();
+  }, [currentUser?.username, setSettings]);
 
   useEffect(() => {
     if (!currentUser?.username) return;

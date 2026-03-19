@@ -1676,7 +1676,7 @@ export function SettingsModal({ isOpen, onOpenChange }: SettingsModalProps) {
                             <Button variant="secondary" onClick={syncCanvasImagesToGitHub}>Upload Canvas Images</Button>
                             <Button
                               variant="outline"
-                              onClick={() => fetchCanvasImagesFromGitHub({ missingOnly: settings.githubFetchMissingOnly ?? true })}
+                              onClick={() => fetchCanvasImagesFromGitHub({ missingOnly: localSettings.githubFetchMissingOnly ?? true })}
                             >
                               Fetch Canvas Images
                             </Button>

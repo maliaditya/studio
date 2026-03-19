@@ -186,7 +186,12 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
         { href: '/strategic-planning', label: 'Strategy' },
         { href: '/truth', label: 'Truth' },
         { href: '/support', label: 'Support' },
-        ...(isAdminUser ? [{ href: '/admin/monetization', label: 'Admin' }] : []),
+        ...(isAdminUser
+          ? [
+              { href: '/admin/monetization', label: 'Monetization' },
+              { href: '/admin/config', label: 'Config' },
+            ]
+          : []),
       ]
     : [
         { href: '/my-plate', label: 'Dashboard' },
@@ -198,7 +203,12 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
         { href: '/strategic-planning', label: 'Strategy' },
         { href: '/truth', label: 'Truth' },
         { href: '/graph', label: 'Graph', icon: Workflow },
-        ...(isAdminUser ? [{ href: '/admin/monetization', label: 'Admin' }] : []),
+        ...(isAdminUser
+          ? [
+              { href: '/admin/monetization', label: 'Monetization' },
+              { href: '/admin/config', label: 'Config' },
+            ]
+          : []),
       ];
 
   if (!isClient) {
@@ -1786,17 +1796,19 @@ export function Header() {
               </>
 
               {!simpleMode && (
-              <>
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsStateDiagramOpen(true)}>
-                  <GitBranch className="h-4 w-4" />
-                  <span className="sr-only">State Diagram</span>
-              </Button>
+                <>
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsStateDiagramOpen(true)}>
+                    <GitBranch className="h-4 w-4" />
+                    <span className="sr-only">State Diagram</span>
+                  </Button>
 
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsLearningPerformanceOpen(true)}>
-                  <ActivityIcon className="h-4 w-4" />
-                  <span className="sr-only">Learning Performance</span>
-              </Button>
-              
+                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsLearningPerformanceOpen(true)}>
+                    <ActivityIcon className="h-4 w-4" />
+                    <span className="sr-only">Learning Performance</span>
+                  </Button>
+                </>
+              )}
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8 relative">
@@ -1833,8 +1845,6 @@ export function Header() {
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
-              </>
-              )}
 
               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsSettingsModalOpen(true)}>
                   <Settings className="h-4 w-4" />

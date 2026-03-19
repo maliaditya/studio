@@ -9,10 +9,37 @@ const BACKUP_STORE_NAME = 'backupStore';
 const EXCALIDRAW_STORE_NAME = 'excalidrawFileStore';
 const DB_VERSION = 4; // Incremented version
 const DB_NAME_STORAGE_KEY = 'lifeos.indexeddb.name';
+const EXCALIDRAW_CACHE_NAME = 'lifeos-excalidraw-cache-v1';
+const EXCALIDRAW_CACHE_PREFIX = 'https://lifeos.local/excalidraw/';
+
+export type ExcalidrawFileRecord = {
+  blob: Blob;
+  mimeType: string;
+  created?: number;
+  lastRetrieved?: number;
+};
+
+const excalidrawMemoryStore = new Map<string, ExcalidrawFileRecord>();
+let excalidrawDisableIndexedDb = false;
+let excalidrawDisableCache = false;
+let excalidrawFallbackLogged = false;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 let dbInstance: IDBDatabase | null = null;
 let activeDbName: string | null = null;
+let disableIndexedDb = false;
+let persistentFallbackLogged = false;
+
+const memoryStoreByName = new Map<string, Map<string, Blob>>();
+
+function getMemoryStore(storeName: string): Map<string, Blob> {
+  let store = memoryStoreByName.get(storeName);
+  if (!store) {
+    store = new Map<string, Blob>();
+    memoryStoreByName.set(storeName, store);
+  }
+  return store;
+}
 
 function getDbName(): string {
   if (activeDbName) return activeDbName;
@@ -66,6 +93,73 @@ function isRecoverableIndexedDbError(error: unknown): boolean {
     name.includes("quotaexceedederror") ||
     message.includes("quota")
   );
+}
+
+function describeIndexedDbError(error: unknown): string {
+  const name = (error as any)?.name ? String((error as any).name) : "UnknownError";
+  const message = (error as any)?.message ? String((error as any).message) : String(error || "");
+  return `${name}${message ? `: ${message}` : ""}`;
+}
+
+function shouldDisablePersistentStorage(error: unknown): boolean {
+  const normalized = describeIndexedDbError(error).toLowerCase();
+  return normalized.includes('internal error') || normalized.includes('unknownerror');
+}
+
+function disablePersistentStorage(reason?: unknown) {
+  disableIndexedDb = true;
+  excalidrawDisableIndexedDb = true;
+  if (!persistentFallbackLogged) {
+    console.warn('[audioDB] Persistent storage unavailable; using in-memory store for this session.', reason);
+    persistentFallbackLogged = true;
+  }
+}
+
+function buildExcalidrawCacheRequest(key: string): Request {
+  return new Request(`${EXCALIDRAW_CACHE_PREFIX}${encodeURIComponent(key)}`);
+}
+
+async function storeExcalidrawInCache(key: string, record: ExcalidrawFileRecord): Promise<boolean> {
+  if (typeof window === 'undefined' || !('caches' in window)) return false;
+  try {
+    const cache = await caches.open(EXCALIDRAW_CACHE_NAME);
+    const headers = new Headers();
+    const mimeType = record.mimeType || record.blob.type || 'application/octet-stream';
+    headers.set('Content-Type', mimeType);
+    if (record.created) headers.set('x-created', String(record.created));
+    if (record.lastRetrieved) headers.set('x-last-retrieved', String(record.lastRetrieved));
+    const response = new Response(record.blob, { headers });
+    await cache.put(buildExcalidrawCacheRequest(key), response);
+    return true;
+  } catch (error) {
+    console.warn('[audioDB] Failed to store Excalidraw file in CacheStorage:', describeIndexedDbError(error));
+    if (shouldDisablePersistentStorage(error)) {
+      excalidrawDisableCache = true;
+    }
+    return false;
+  }
+}
+
+async function getExcalidrawFromCache(key: string): Promise<ExcalidrawFileRecord | null> {
+  if (typeof window === 'undefined' || !('caches' in window)) return null;
+  try {
+    const cache = await caches.open(EXCALIDRAW_CACHE_NAME);
+    const response = await cache.match(buildExcalidrawCacheRequest(key));
+    if (!response) return null;
+    const blob = await response.blob();
+    const mimeType = response.headers.get('content-type') || 'application/octet-stream';
+    const createdRaw = response.headers.get('x-created');
+    const lastRetrievedRaw = response.headers.get('x-last-retrieved');
+    const created = createdRaw ? Number(createdRaw) : undefined;
+    const lastRetrieved = lastRetrievedRaw ? Number(lastRetrievedRaw) : undefined;
+    return { blob, mimeType, created, lastRetrieved };
+  } catch (error) {
+    console.warn('[audioDB] Failed to read Excalidraw file from CacheStorage:', describeIndexedDbError(error));
+    if (shouldDisablePersistentStorage(error)) {
+      excalidrawDisableCache = true;
+    }
+    return null;
+  }
 }
 
 async function rebuildDatabase(): Promise<void> {
@@ -167,7 +261,7 @@ function getDB(): Promise<IDBDatabase> {
 
     request.onerror = (event) => {
       const error = (event.target as IDBOpenDBRequest).error;
-      console.error('IndexedDB error:', error);
+      console.error('IndexedDB error:', error, describeIndexedDbError(error));
       reject(error || new Error('IndexedDB error'));
       dbPromise = null;
     };
@@ -183,126 +277,187 @@ function getDB(): Promise<IDBDatabase> {
 }
 
 async function storeItem(storeName: string, key: string, blob: Blob): Promise<void> {
-    return withIndexedDbRecovery(`store ${storeName}/${key}`, async () => {
-      const db = await getDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readwrite');
-        const store = transaction.objectStore(storeName);
-        const request = store.put(blob, key);
-
-        request.onsuccess = () => resolve();
-        request.onerror = (event) => {
-            const error = (event.target as IDBRequest).error;
-            console.error(`Error storing item in ${storeName}:`, error);
-            reject(error || new Error(`Failed to store item in ${storeName}.`));
-        };
-        transaction.onerror = (event) => {
-          const error = (event.target as IDBTransaction).error;
-          reject(error || new Error(`Transaction failed in ${storeName}.`));
-        };
-      });
-    });
-}
-
-async function getItem(storeName: string, key: string): Promise<Blob | null> {
-    return withIndexedDbRecovery(`get ${storeName}/${key}`, async () => {
-      const db = await getDB();
-      return new Promise((resolve, reject) => {
-        const transaction = db.transaction(storeName, 'readonly');
-        const store = transaction.objectStore(storeName);
-        const request = store.get(key);
-
-        request.onsuccess = () => {
-          resolve(request.result || null);
-        };
-        request.onerror = (event) => {
-          const error = (event.target as IDBRequest).error;
-          console.error(`Error fetching item from ${storeName}:`, error);
-          reject(error || new Error(`Failed to retrieve item from ${storeName}.`));
-        };
-        transaction.onerror = (event) => {
-          const error = (event.target as IDBTransaction).error;
-          reject(error || new Error(`Transaction failed in ${storeName}.`));
-        };
-      });
-    });
-}
-
-async function deleteItem(storeName: string, key: string): Promise<void> {
-    return withIndexedDbRecovery(`delete ${storeName}/${key}`, async () => {
-      const db = await getDB();
-      return new Promise((resolve, reject) => {
+    if (disableIndexedDb) {
+      getMemoryStore(storeName).set(key, blob);
+      return;
+    }
+    try {
+      return await withIndexedDbRecovery(`store ${storeName}/${key}`, async () => {
+        const db = await getDB();
+        return new Promise((resolve, reject) => {
           const transaction = db.transaction(storeName, 'readwrite');
           const store = transaction.objectStore(storeName);
-          const request = store.delete(key);
+          const request = store.put(blob, key);
 
           request.onsuccess = () => resolve();
           request.onerror = (event) => {
               const error = (event.target as IDBRequest).error;
-              console.error(`Error deleting item from ${storeName}:`, error);
-              reject(error || new Error(`Failed to delete item from ${storeName}.`));
+              console.error(`Error storing item in ${storeName}:`, error);
+              reject(error || new Error(`Failed to store item in ${storeName}.`));
           };
           transaction.onerror = (event) => {
             const error = (event.target as IDBTransaction).error;
             reject(error || new Error(`Transaction failed in ${storeName}.`));
           };
+        });
       });
-    });
+    } catch (error) {
+      if (shouldDisablePersistentStorage(error)) {
+        disablePersistentStorage(error);
+        getMemoryStore(storeName).set(key, blob);
+        return;
+      }
+      throw error;
+    }
+}
+
+async function getItem(storeName: string, key: string): Promise<Blob | null> {
+    if (disableIndexedDb) {
+      return getMemoryStore(storeName).get(key) || null;
+    }
+    try {
+      return await withIndexedDbRecovery(`get ${storeName}/${key}`, async () => {
+        const db = await getDB();
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction(storeName, 'readonly');
+          const store = transaction.objectStore(storeName);
+          const request = store.get(key);
+
+          request.onsuccess = () => {
+            resolve(request.result || null);
+          };
+          request.onerror = (event) => {
+            const error = (event.target as IDBRequest).error;
+            console.error(`Error fetching item from ${storeName}:`, error);
+            reject(error || new Error(`Failed to retrieve item from ${storeName}.`));
+          };
+          transaction.onerror = (event) => {
+            const error = (event.target as IDBTransaction).error;
+            reject(error || new Error(`Transaction failed in ${storeName}.`));
+          };
+        });
+      });
+    } catch (error) {
+      if (shouldDisablePersistentStorage(error)) {
+        disablePersistentStorage(error);
+        return getMemoryStore(storeName).get(key) || null;
+      }
+      throw error;
+    }
+}
+
+async function deleteItem(storeName: string, key: string): Promise<void> {
+    if (disableIndexedDb) {
+      getMemoryStore(storeName).delete(key);
+      return;
+    }
+    try {
+      return await withIndexedDbRecovery(`delete ${storeName}/${key}`, async () => {
+        const db = await getDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(storeName, 'readwrite');
+            const store = transaction.objectStore(storeName);
+            const request = store.delete(key);
+
+            request.onsuccess = () => resolve();
+            request.onerror = (event) => {
+                const error = (event.target as IDBRequest).error;
+                console.error(`Error deleting item from ${storeName}:`, error);
+                reject(error || new Error(`Failed to delete item from ${storeName}.`));
+            };
+            transaction.onerror = (event) => {
+              const error = (event.target as IDBTransaction).error;
+              reject(error || new Error(`Transaction failed in ${storeName}.`));
+            };
+        });
+      });
+    } catch (error) {
+      if (shouldDisablePersistentStorage(error)) {
+        disablePersistentStorage(error);
+        getMemoryStore(storeName).delete(key);
+        return;
+      }
+      throw error;
+    }
 }
 
 async function getAllKeys(storeName: string): Promise<string[]> {
-  return withIndexedDbRecovery(`getAllKeys ${storeName}`, async () => {
-    const db = await getDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction(storeName, 'readonly');
-      const store = transaction.objectStore(storeName);
-      const request = store.getAllKeys();
-      request.onsuccess = () => resolve((request.result || []) as string[]);
-      request.onerror = (event) => {
-        const error = (event.target as IDBRequest).error;
-        console.error(`Error fetching keys from ${storeName}:`, error);
-        reject(error || new Error(`Failed to retrieve keys from ${storeName}.`));
-      };
-      transaction.onerror = (event) => {
-        const error = (event.target as IDBTransaction).error;
-        reject(error || new Error(`Transaction failed in ${storeName}.`));
-      };
+  if (disableIndexedDb) {
+    return Array.from(getMemoryStore(storeName).keys());
+  }
+  try {
+    return await withIndexedDbRecovery(`getAllKeys ${storeName}`, async () => {
+      const db = await getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(storeName, 'readonly');
+        const store = transaction.objectStore(storeName);
+        const request = store.getAllKeys();
+        request.onsuccess = () => resolve((request.result || []) as string[]);
+        request.onerror = (event) => {
+          const error = (event.target as IDBRequest).error;
+          console.error(`Error fetching keys from ${storeName}:`, error);
+          reject(error || new Error(`Failed to retrieve keys from ${storeName}.`));
+        };
+        transaction.onerror = (event) => {
+          const error = (event.target as IDBTransaction).error;
+          reject(error || new Error(`Transaction failed in ${storeName}.`));
+        };
+      });
     });
-  });
+  } catch (error) {
+    if (shouldDisablePersistentStorage(error)) {
+      disablePersistentStorage(error);
+      return Array.from(getMemoryStore(storeName).keys());
+    }
+    throw error;
+  }
 }
 
 export async function clearAllData(): Promise<void> {
-    return withIndexedDbRecovery("clearAllData", async () => {
-      const db = await getDB();
-      return new Promise((resolve, reject) => {
-        const storesToClear = [AUDIO_STORE_NAME, PDF_STORE_NAME, BACKUP_STORE_NAME, EXCALIDRAW_STORE_NAME];
-        if (storesToClear.every(store => !db.objectStoreNames.contains(store))) {
-          console.log('No object stores found to clear.');
-          resolve();
-          return;
-        }
-
-        const transaction = db.transaction(storesToClear, 'readwrite');
-
-        transaction.oncomplete = () => {
-          console.log('All IndexedDB object stores have been cleared.');
-          resolve();
-        };
-
-        transaction.onerror = (event) => {
-          const error = (event.target as IDBTransaction).error;
-          console.error('Error clearing IndexedDB:', error);
-          reject(error || new Error('Failed to clear IndexedDB.'));
-        };
-
-        storesToClear.forEach(storeName => {
-          if (db.objectStoreNames.contains(storeName)) {
-              const store = transaction.objectStore(storeName);
-              store.clear();
+    if (disableIndexedDb) {
+      memoryStoreByName.forEach(store => store.clear());
+      return;
+    }
+    try {
+      return await withIndexedDbRecovery("clearAllData", async () => {
+        const db = await getDB();
+        return new Promise((resolve, reject) => {
+          const storesToClear = [AUDIO_STORE_NAME, PDF_STORE_NAME, BACKUP_STORE_NAME, EXCALIDRAW_STORE_NAME];
+          if (storesToClear.every(store => !db.objectStoreNames.contains(store))) {
+            console.log('No object stores found to clear.');
+            resolve();
+            return;
           }
+
+          const transaction = db.transaction(storesToClear, 'readwrite');
+
+          transaction.oncomplete = () => {
+            console.log('All IndexedDB object stores have been cleared.');
+            resolve();
+          };
+
+          transaction.onerror = (event) => {
+            const error = (event.target as IDBTransaction).error;
+            console.error('Error clearing IndexedDB:', error);
+            reject(error || new Error('Failed to clear IndexedDB.'));
+          };
+
+          storesToClear.forEach(storeName => {
+            if (db.objectStoreNames.contains(storeName)) {
+                const store = transaction.objectStore(storeName);
+                store.clear();
+            }
+          });
         });
       });
-    });
+    } catch (error) {
+      if (shouldDisablePersistentStorage(error)) {
+        disablePersistentStorage(error);
+        memoryStoreByName.forEach(store => store.clear());
+        return;
+      }
+      throw error;
+    }
 }
 
 
@@ -560,87 +715,162 @@ export const getBackup = (key: string) => getItem(BACKUP_STORE_NAME, key);
 export const deleteBackup = (key: string) => deleteItem(BACKUP_STORE_NAME, key);
 
 // Excalidraw file functions
-export type ExcalidrawFileRecord = {
-  blob: Blob;
-  mimeType: string;
-  created?: number;
-  lastRetrieved?: number;
-};
-
 export async function storeExcalidrawFile(key: string, record: ExcalidrawFileRecord): Promise<void> {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(EXCALIDRAW_STORE_NAME, 'readwrite');
-    const store = transaction.objectStore(EXCALIDRAW_STORE_NAME);
-    const request = store.put(record, key);
+  if (excalidrawDisableIndexedDb && excalidrawDisableCache) {
+    excalidrawMemoryStore.set(key, record);
+    if (!excalidrawFallbackLogged) {
+      console.warn('[audioDB] Falling back to in-memory store for Excalidraw files (persistent storage unavailable).');
+      excalidrawFallbackLogged = true;
+    }
+    return;
+  }
+  if (excalidrawDisableIndexedDb) {
+    const cached = excalidrawDisableCache ? false : await storeExcalidrawInCache(key, record);
+    if (cached) {
+      console.warn(`[audioDB] IndexedDB unavailable; stored Excalidraw file in CacheStorage for ${key}.`);
+      return;
+    }
+    excalidrawMemoryStore.set(key, record);
+    if (!excalidrawFallbackLogged) {
+      console.warn('[audioDB] Falling back to in-memory store for Excalidraw files (persistent storage unavailable).');
+      excalidrawFallbackLogged = true;
+    }
+    return;
+  }
+  try {
+    await withIndexedDbRecovery(`store excalidraw/${key}`, async () => {
+      const db = await getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(EXCALIDRAW_STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(EXCALIDRAW_STORE_NAME);
+        const request = store.put(record, key);
 
-    request.onsuccess = () => resolve();
-    request.onerror = (event) => {
-      console.error(`Error storing Excalidraw file:`, (event.target as IDBRequest).error);
-      reject(new Error(`Failed to store Excalidraw file.`));
-    };
-  });
+        request.onsuccess = () => resolve();
+        request.onerror = (event) => {
+          console.error(`Error storing Excalidraw file:`, (event.target as IDBRequest).error);
+          reject(new Error(`Failed to store Excalidraw file.`));
+        };
+        transaction.onerror = (event) => {
+          const error = (event.target as IDBTransaction).error;
+          reject(error || new Error(`Failed to store Excalidraw file.`));
+        };
+        transaction.onabort = (event) => {
+          const error = (event.target as IDBTransaction).error;
+          reject(error || new Error(`Failed to store Excalidraw file (aborted).`));
+        };
+      });
+    });
+    return;
+  } catch (error) {
+    if (shouldDisablePersistentStorage(error)) {
+      excalidrawDisableIndexedDb = true;
+    }
+    const cached = excalidrawDisableCache ? false : await storeExcalidrawInCache(key, record);
+    if (cached) {
+      console.warn(`[audioDB] IndexedDB unavailable; stored Excalidraw file in CacheStorage for ${key}.`);
+      return;
+    }
+    excalidrawMemoryStore.set(key, record);
+    if (!excalidrawFallbackLogged) {
+      console.warn('[audioDB] Falling back to in-memory store for Excalidraw files (persistent storage unavailable).');
+      excalidrawFallbackLogged = true;
+    }
+    return;
+  }
 }
 
 export async function getExcalidrawFile(key: string): Promise<ExcalidrawFileRecord | null> {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(EXCALIDRAW_STORE_NAME, 'readonly');
-    const store = transaction.objectStore(EXCALIDRAW_STORE_NAME);
-    const request = store.get(key);
+  const memoryRecord = excalidrawMemoryStore.get(key);
+  if (memoryRecord) return memoryRecord;
+  try {
+    if (!excalidrawDisableIndexedDb) {
+      const record = await withIndexedDbRecovery(`get excalidraw/${key}`, async () => {
+        const db = await getDB();
+        return new Promise((resolve, reject) => {
+          const transaction = db.transaction(EXCALIDRAW_STORE_NAME, 'readonly');
+          const store = transaction.objectStore(EXCALIDRAW_STORE_NAME);
+          const request = store.get(key);
 
-    request.onsuccess = () => resolve(request.result || null);
-    request.onerror = (event) => {
-      console.error(`Error fetching Excalidraw file:`, (event.target as IDBRequest).error);
-      reject(new Error(`Failed to retrieve Excalidraw file.`));
-    };
-  });
+          request.onsuccess = () => resolve(request.result || null);
+          request.onerror = (event) => {
+            console.error(`Error fetching Excalidraw file:`, (event.target as IDBRequest).error);
+            reject(new Error(`Failed to retrieve Excalidraw file.`));
+          };
+          transaction.onerror = (event) => {
+            const error = (event.target as IDBTransaction).error;
+            reject(error || new Error(`Failed to retrieve Excalidraw file.`));
+          };
+        });
+      });
+      if (record) return record as ExcalidrawFileRecord;
+    }
+  } catch (error) {
+    if (shouldDisablePersistentStorage(error)) {
+      excalidrawDisableIndexedDb = true;
+    }
+    console.warn(`[audioDB] IndexedDB failed for get excalidraw/${key}:`, describeIndexedDbError(error));
+  }
+  if (excalidrawDisableCache) return excalidrawMemoryStore.get(key) || null;
+  return await getExcalidrawFromCache(key);
 }
 
-export const deleteExcalidrawFile = (key: string) => deleteItem(EXCALIDRAW_STORE_NAME, key);
+export const deleteExcalidrawFile = (key: string) => {
+  excalidrawMemoryStore.delete(key);
+  if (excalidrawDisableIndexedDb) return Promise.resolve();
+  return withIndexedDbRecovery(`delete excalidraw/${key}`, () => deleteItem(EXCALIDRAW_STORE_NAME, key));
+};
 
 export async function getAllExcalidrawFiles(): Promise<{ key: string; record: ExcalidrawFileRecord }[]> {
-  const db = await getDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction(EXCALIDRAW_STORE_NAME, 'readonly');
-    const store = transaction.objectStore(EXCALIDRAW_STORE_NAME);
-    const getAllKeysRequest = store.getAllKeys();
-    const getAllRequest = store.getAll();
+  if (excalidrawDisableIndexedDb) {
+    return Array.from(excalidrawMemoryStore.entries()).map(([key, record]) => ({ key, record }));
+  }
+  return withIndexedDbRecovery(`list excalidraw`, async () => {
+    const db = await getDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(EXCALIDRAW_STORE_NAME, 'readonly');
+      const store = transaction.objectStore(EXCALIDRAW_STORE_NAME);
+      const getAllKeysRequest = store.getAllKeys();
+      const getAllRequest = store.getAll();
 
-    let keys: IDBValidKey[] = [];
-    let records: ExcalidrawFileRecord[] = [];
+      let keys: IDBValidKey[] = [];
+      let records: ExcalidrawFileRecord[] = [];
 
-    const maybeResolve = () => {
-      if (keys.length === 0 && records.length === 0) return;
-      if (keys.length && records.length && keys.length === records.length) {
-        resolve(keys.map((key, index) => ({ key: String(key), record: records[index] })));
-      }
-    };
+      const maybeResolve = () => {
+        if (keys.length === 0 && records.length === 0) return;
+        if (keys.length && records.length && keys.length === records.length) {
+          resolve(keys.map((key, index) => ({ key: String(key), record: records[index] })));
+        }
+      };
 
-    getAllKeysRequest.onsuccess = () => {
-      keys = (getAllKeysRequest.result || []) as IDBValidKey[];
-      if (keys.length === 0) {
-        resolve([]);
-        return;
-      }
-      maybeResolve();
-    };
-    getAllKeysRequest.onerror = (event) => {
-      console.error(`Error fetching Excalidraw file keys:`, (event.target as IDBRequest).error);
-      reject(new Error(`Failed to retrieve Excalidraw file keys.`));
-    };
+      getAllKeysRequest.onsuccess = () => {
+        keys = (getAllKeysRequest.result || []) as IDBValidKey[];
+        if (keys.length === 0) {
+          resolve([]);
+          return;
+        }
+        maybeResolve();
+      };
+      getAllKeysRequest.onerror = (event) => {
+        console.error(`Error fetching Excalidraw file keys:`, (event.target as IDBRequest).error);
+        reject(new Error(`Failed to retrieve Excalidraw file keys.`));
+      };
 
-    getAllRequest.onsuccess = () => {
-      records = (getAllRequest.result || []) as ExcalidrawFileRecord[];
-      if (records.length === 0) {
-        resolve([]);
-        return;
-      }
-      maybeResolve();
-    };
-    getAllRequest.onerror = (event) => {
-      console.error(`Error fetching Excalidraw files:`, (event.target as IDBRequest).error);
-      reject(new Error(`Failed to retrieve Excalidraw files.`));
-    };
+      getAllRequest.onsuccess = () => {
+        records = (getAllRequest.result || []) as ExcalidrawFileRecord[];
+        if (records.length === 0) {
+          resolve([]);
+          return;
+        }
+        maybeResolve();
+      };
+      getAllRequest.onerror = (event) => {
+        console.error(`Error fetching Excalidraw files:`, (event.target as IDBRequest).error);
+        reject(new Error(`Failed to retrieve Excalidraw files.`));
+      };
+      transaction.onerror = (event) => {
+        const error = (event.target as IDBTransaction).error;
+        reject(error || new Error(`Failed to retrieve Excalidraw files.`));
+      };
+    });
   });
 }

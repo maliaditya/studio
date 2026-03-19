@@ -21,6 +21,7 @@ import {
   PenTool,
   PieChart,
   Route,
+  Settings,
   Sparkles,
   Target,
   Trello,
@@ -158,7 +159,13 @@ export function AppSidebar() {
   const navSections = isAdminUser
     ? [
         ...baseSections,
-        { label: "Admin", links: [{ href: "/admin/monetization", label: "Admin", icon: Wallet }] },
+        {
+          label: "Admin",
+          links: [
+            { href: "/admin/monetization", label: "Monetization", icon: Wallet },
+            { href: "/admin/config", label: "Config", icon: Settings },
+          ],
+        },
       ]
     : baseSections;
   const showMore = !simpleMode;
