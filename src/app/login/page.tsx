@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, type FormEvent } from 'react';
+import React, { Suspense, useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 const REMEMBER_LOGIN_KEY = 'dock_remember_login_v1';
 type RememberLoginPayload = { username?: string; password?: string; remember?: boolean };
 
-export default function LoginPage() {
+function LoginPageContent() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
@@ -265,5 +265,27 @@ export default function LoginPage() {
         </CardFooter>
       </Card>
     </div>
+  );
+}
+
+function LoginPageFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-screen p-4">
+      <Card className="w-full max-w-md shadow-2xl">
+        <CardHeader className="text-center">
+          <BrainCircuit className="mx-auto h-14 w-14 text-primary mb-2" />
+          <CardTitle className="text-2xl lg:text-3xl font-bold text-primary">Dock</CardTitle>
+          <CardDescription className="text-muted-foreground">Loading sign-in…</CardDescription>
+        </CardHeader>
+      </Card>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageFallback />}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

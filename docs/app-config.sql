@@ -17,3 +17,5 @@ alter table public.app_config
 insert into public.app_config (id, supabase_url, supabase_anon_key, supabase_storage_bucket, desktop_price_inr)
 values ('default', '', '', '', 799)
 on conflict (id) do nothing;
+
+

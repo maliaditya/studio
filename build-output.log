@@ -1,0 +1,131 @@
+
+> nextn@0.1.0 build
+> next build
+
+  ▲ Next.js 14.2.35
+  - Environments: .env.local
+
+   Creating an optimized production build ...
+ ✓ Compiled successfully
+   Skipping validation of types
+   Skipping linting
+   Collecting page data ...
+   Generating static pages (0/50) ...
+   Generating static pages (12/50) 
+   Generating static pages (24/50) 
+   Generating static pages (37/50) 
+ ✓ Generating static pages (50/50)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                              Size     First Load JS
+┌ ○ /                                    9.74 kB         660 kB
+├ ○ /_not-found                          880 B            89 kB
+├ ○ /admin/config                        3.61 kB         608 kB
+├ ○ /admin/donors                        5 kB            610 kB
+├ ○ /admin/monetization                  4.42 kB         609 kB
+├ ○ /admin/users                         6.24 kB         611 kB
+├ ƒ /api/account/profile                 0 B                0 B
+├ ƒ /api/admin/desktop-users             0 B                0 B
+├ ƒ /api/admin/donors                    0 B                0 B
+├ ƒ /api/ai/ask-shiv                     0 B                0 B
+├ ƒ /api/ai/astra-create-resource        0 B                0 B
+├ ƒ /api/ai/astra-detect-gap             0 B                0 B
+├ ƒ /api/ai/bothering-validate           0 B                0 B
+├ ƒ /api/ai/botherings-report            0 B                0 B
+├ ƒ /api/ai/diagram-from-explanation     0 B                0 B
+├ ƒ /api/ai/excalidraw-from-console      0 B                0 B
+├ ƒ /api/ai/explain                      0 B                0 B
+├ ƒ /api/ai/graph-insights               0 B                0 B
+├ ƒ /api/ai/models                       0 B                0 B
+├ ƒ /api/ai/offer-field                  0 B                0 B
+├ ƒ /api/ai/offers-from-types            0 B                0 B
+├ ƒ /api/ai/pdf-flashcards               0 B                0 B
+├ ƒ /api/ai/project-technical-details    0 B                0 B
+├ ƒ /api/ai/project-technical-line       0 B                0 B
+├ ƒ /api/ai/routine-rebalance            0 B                0 B
+├ ƒ /api/ai/shiv-observability           0 B                0 B
+├ ƒ /api/ai/shiv-refresh-aliases         0 B                0 B
+├ ƒ /api/ai/skill-from-pdf-index         0 B                0 B
+├ ƒ /api/ai/stt                          0 B                0 B
+├ ƒ /api/ai/task-bci                     0 B                0 B
+├ ƒ /api/ai/task-convincer-script        0 B                0 B
+├ ƒ /api/ai/tts                          0 B                0 B
+├ ƒ /api/app-config                      0 B                0 B
+├ ƒ /api/auth/login                      0 B                0 B
+├ ƒ /api/auth/logout                     0 B                0 B
+├ ƒ /api/auth/refresh                    0 B                0 B
+├ ƒ /api/auth/register                   0 B                0 B
+├ ƒ /api/blob-sync                       0 B                0 B
+├ ƒ /api/desktop-access                  0 B                0 B
+├ ƒ /api/desktop-access/confirm          0 B                0 B
+├ ƒ /api/desktop-access/start            0 B                0 B
+├ ƒ /api/download-count                  0 B                0 B
+├ ƒ /api/get-link-metadata               0 B                0 B
+├ ƒ /api/github-settings                 0 B                0 B
+├ ƒ /api/knowledge-tree/graph            0 B                0 B
+├ ƒ /api/knowledge-tree/merge            0 B                0 B
+├ ƒ /api/knowledge-tree/project          0 B                0 B
+├ ƒ /api/latest-windows-release          0 B                0 B
+├ ƒ /api/metrics/engagement              0 B                0 B
+├ ƒ /api/metrics/monetization-summary    0 B                0 B
+├ ƒ /api/metrics/support-event           0 B                0 B
+├ ƒ /api/pdf-storage                     0 B                0 B
+├ ƒ /api/publish-releases                0 B                0 B
+├ ƒ /api/share/folder                    0 B                0 B
+├ ƒ /api/storage-health                  0 B                0 B
+├ ƒ /api/supabase-secret                 0 B                0 B
+├ ƒ /api/support-count                   0 B                0 B
+├ ƒ /api/support-payment/confirm         0 B                0 B
+├ ƒ /api/support-payment/start           0 B                0 B
+├ ƒ /api/workout-data                    0 B                0 B
+├ ○ /canvas                              9.71 kB         623 kB
+├ ○ /changelog                           154 B          88.3 kB
+├ ○ /charts                              830 B           726 kB
+├ ○ /code-of-conduct                     2.82 kB         608 kB
+├ ○ /code-viz                            4.39 kB         755 kB
+├ ○ /cube                                3.23 kB         754 kB
+├ ○ /deep-work                           1.45 kB         905 kB
+├ ○ /finance                             5.07 kB         619 kB
+├ ○ /formalization                       9.46 kB         620 kB
+├ ○ /gamified-skills                     5.48 kB         647 kB
+├ ○ /goals                               6.86 kB         615 kB
+├ ○ /graph                               17.1 kB         622 kB
+├ ○ /installer-handling                  154 B          88.3 kB
+├ ○ /kanban                              2.56 kB         626 kB
+├ ○ /lead-generation                     7.18 kB         664 kB
+├ ○ /login                               2.77 kB         616 kB
+├ ○ /means                               6.54 kB         611 kB
+├ ○ /mind-map                            1.79 kB         607 kB
+├ ○ /mind-programming                    5.09 kB         775 kB
+├ ○ /mindset                             6.26 kB         647 kB
+├ ○ /my-plate                            28.4 kB        1.07 MB
+├ ƒ /p/[folderId]                        7.58 kB         779 kB
+├ ○ /path                                3.03 kB         608 kB
+├ ○ /patterns                            16.7 kB         622 kB
+├ ○ /personal-branding                   4.74 kB         610 kB
+├ ○ /portfolio                           3.6 kB          608 kB
+├ ○ /privacy                             154 B          88.3 kB
+├ ○ /purpose                             10.5 kB         615 kB
+├ ○ /resources                           18.8 kB         790 kB
+├ ○ /robots.txt                          0 B                0 B
+├ ƒ /shared/p/[folderId]                 7.18 kB         779 kB
+├ ○ /shiv-observability                  1.55 kB        89.7 kB
+├ ○ /sitemap.xml                         0 B                0 B
+├ ○ /skill                               18.2 kB         921 kB
+├ ○ /spaced-repetition                   154 B          88.3 kB
+├ ○ /strategic-planning                  24.9 kB         640 kB
+├ ○ /support                             4.75 kB         610 kB
+├ ○ /timesheet                           1.44 kB         857 kB
+├ ○ /timetable                           2.02 kB         645 kB
+├ ○ /truth                               12 kB           617 kB
+└ ○ /workout-tracker                     13.3 kB         794 kB
++ First Load JS shared by all            88.2 kB
+  ├ chunks/2117-ecf3e45748e391c2.js      31.9 kB
+  ├ chunks/fd9d1056-9d922979003c5474.js  53.6 kB
+  └ other shared chunks (total)          2.62 kB
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+
