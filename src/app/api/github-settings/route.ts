@@ -1,14 +1,14 @@
 
 import { NextResponse } from 'next/server';
 import { getSessionUserFromRequest } from '@/lib/serverSession';
-import { isSupabaseStorageConfigured, readJsonFromStorage, writeJsonToStorage } from '@/lib/supabaseStorageServer';
+import { isGitHubSettingsDbConfigured, readGitHubSettings, upsertGitHubSettings } from '@/lib/githubSettingsServer';
 
 export const dynamic = 'force-dynamic';
 const normalizeUsername = (username: string) => username.trim().toLowerCase();
 
 /**
  * POST /api/github-settings
- * Uploads a user's GitHub sync settings to Supabase Storage.
+ * Saves a user's GitHub sync settings to the database.
  */
 export async function POST(request: Request) {
   const {
@@ -23,9 +23,9 @@ export async function POST(request: Request) {
     supabasePdfBucket,
   } = await request.json();
 
-  if (!isSupabaseStorageConfigured()) {
+  if (!isGitHubSettingsDbConfigured()) {
     return NextResponse.json(
-      { error: 'Supabase storage is not configured on the server.' },
+      { error: 'GitHub settings database is not configured on the server. Run docs/auth-users.sql after setting Supabase server credentials.' },
       { status: 500 }
     );
   }
@@ -42,11 +42,9 @@ export async function POST(request: Request) {
   if (sessionUser !== requestedUsername) {
     return NextResponse.json({ error: 'Forbidden. You can only access your own settings.' }, { status: 403 });
   }
-
-  const blobPathname = `github-settings/${requestedUsername}.json`;
-
   try {
-    const settingsData = {
+    await upsertGitHubSettings({
+      username: requestedUsername,
       githubToken,
       githubOwner,
       githubRepo,
@@ -55,8 +53,7 @@ export async function POST(request: Request) {
       supabaseUrl,
       supabaseAnonKey,
       supabasePdfBucket,
-    };
-    await writeJsonToStorage(blobPathname, settingsData);
+    });
 
     return NextResponse.json({ success: true, message: 'GitHub settings saved.' });
   } catch (error) {
@@ -68,15 +65,15 @@ export async function POST(request: Request) {
 
 /**
  * GET /api/github-settings?username=<username>
- * Fetches a user's GitHub settings from Supabase Storage.
+ * Fetches a user's GitHub settings from the database.
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const username = searchParams.get('username');
   
-  if (!isSupabaseStorageConfigured()) {
+  if (!isGitHubSettingsDbConfigured()) {
     return NextResponse.json(
-      { error: 'Supabase storage is not configured on the server.' },
+      { error: 'GitHub settings database is not configured on the server. Run docs/auth-users.sql after setting Supabase server credentials.' },
       { status: 500 }
     );
   }
@@ -93,11 +90,8 @@ export async function GET(request: Request) {
   if (sessionUser !== requestedUsername) {
     return NextResponse.json({ error: 'Forbidden. You can only access your own settings.' }, { status: 403 });
   }
-
-  const blobPathname = `github-settings/${requestedUsername}.json`;
-
   try {
-    const settingsData = await readJsonFromStorage<any>(blobPathname);
+    const settingsData = await readGitHubSettings(requestedUsername);
     if (!settingsData) {
       return NextResponse.json({ settings: null, message: "No GitHub settings found for this user." }, { status: 200 });
     }

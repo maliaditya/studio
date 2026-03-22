@@ -1,9 +1,11 @@
+import { DESKTOP_PLAN_DISPLAY_PRICE } from '@/lib/desktopAccess';
+
 export default function Head() {
   const site = "https://vdock.vercel.app";
   const url = `${site}/support`;
-  const title = "Support Dock | Donations";
+  const title = "Dock Pricing & Support";
   const description =
-    "Support Dock with fixed supporter options or custom amount to help fund faster releases.";
+    `Dock web is free. Desktop access is ${DESKTOP_PLAN_DISPLAY_PRICE} yearly, with optional direct support for continued development.`;
 
   return (
     <>

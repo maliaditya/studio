@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -20,11 +20,14 @@ type RememberLoginPayload = { username?: string; password?: string; remember?: b
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [sessionBlockedMessage, setSessionBlockedMessage] = useState('');
   const [isDesktopRuntime, setIsDesktopRuntime] = useState(false);
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const router = useRouter();
+  const searchParams = useSearchParams();
   
   const { signIn, register, loading, currentUser } = useAuth();
 
@@ -53,6 +56,11 @@ export default function LoginPage() {
     if (typeof window === 'undefined') return;
     setIsDesktopRuntime(Boolean((window as any)?.studioDesktop?.isDesktop));
   }, []);
+
+  useEffect(() => {
+    const requestedMode = searchParams.get('mode');
+    setActiveTab(requestedMode === 'register' ? 'register' : 'login');
+  }, [searchParams]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -86,7 +94,7 @@ export default function LoginPage() {
       alert("Passwords do not match.");
       return;
     }
-    await register(username, password);
+    await register(username, password, registerEmail);
     setSessionBlockedMessage('');
   };
 
@@ -120,7 +128,7 @@ export default function LoginPage() {
               .
             </p>
           </div>
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'login' | 'register')} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="register">Register</TabsTrigger>
@@ -204,6 +212,19 @@ export default function LoginPage() {
                     placeholder="Choose a username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
+                    required
+                    className="h-10"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="register-email">Email</Label>
+                  <Input
+                    id="register-email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={registerEmail}
+                    onChange={(e) => setRegisterEmail(e.target.value)}
+                    autoComplete="email"
                     required
                     className="h-10"
                   />

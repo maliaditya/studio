@@ -25,7 +25,6 @@ import type { SkillAcquisitionPlan, HabitEquation, Project, ProjectPlan, GapAnal
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { offerTypes, GAP_TYPES, productTypes } from '@/lib/constants';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDescriptionComponent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle as AlertDialogTitleComponent, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { DialogTitle as DialogTitleComponent, DialogDescription as DialogDescriptionComponent } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +38,7 @@ type OfferDraft = Partial<Offer> & { offerTypeLabel?: string; generatedByAi?: bo
 type EditingOffersState = { specializationId: string; offers: OfferDraft[]; selectedOfferId: string | null };
 type ProjectDraft = Partial<Release>;
 type EditingProjectsState = { specializationId: string; releases: ProjectDraft[]; selectedReleaseId: string | null };
+type SpecializationModalState = { specializationId: string; mode: 'offer-types' | 'gap-analysis' } | null;
 const PROJECT_TECHNICAL_SECTION_TITLES: ProjectTechnicalSection['title'][] = [
   'Problem / Goal',
   'System Architecture',
@@ -92,6 +92,70 @@ const createEmptyProjectDraft = (): ProjectDraft => ({
   focusAreaIds: [],
   addToPortfolio: true,
 });
+
+const normalizeProjectName = (value?: string | null) => String(value || '').trim().toLowerCase();
+
+const reconcileProjectsForDrafts = ({
+  existingProjects,
+  releases,
+  priorReleases,
+  domainId,
+}: {
+  existingProjects: Project[];
+  releases: Release[];
+  priorReleases: Release[];
+  domainId: string;
+}) => {
+  const nextProjects = [...existingProjects];
+  const projectIdByReleaseId = new Map<string, string>();
+
+  releases.forEach((release) => {
+    const releaseId = String(release.id || '').trim();
+    const nextName = String(release.name || '').trim();
+    if (!releaseId || !nextName) return;
+
+    const priorName = String(priorReleases.find((item) => item.id === releaseId)?.name || '').trim();
+    const nextIndex = nextProjects.findIndex(
+      (project) => project.domainId === domainId && normalizeProjectName(project.name) === normalizeProjectName(nextName)
+    );
+    const priorIndex = priorName
+      ? nextProjects.findIndex(
+          (project) => project.domainId === domainId && normalizeProjectName(project.name) === normalizeProjectName(priorName)
+        )
+      : -1;
+
+    if (priorIndex >= 0) {
+      if (nextIndex >= 0 && nextIndex !== priorIndex) {
+        projectIdByReleaseId.set(releaseId, nextProjects[nextIndex].id);
+        return;
+      }
+
+      const priorProject = nextProjects[priorIndex];
+      nextProjects[priorIndex] = {
+        ...priorProject,
+        name: nextName,
+      };
+      projectIdByReleaseId.set(releaseId, priorProject.id);
+      return;
+    }
+
+    if (nextIndex >= 0) {
+      projectIdByReleaseId.set(releaseId, nextProjects[nextIndex].id);
+      return;
+    }
+
+    const newProjectId = `proj_${releaseId}`;
+    nextProjects.push({
+      id: newProjectId,
+      name: nextName,
+      domainId,
+      features: [],
+    });
+    projectIdByReleaseId.set(releaseId, newProjectId);
+  });
+
+  return { nextProjects, projectIdByReleaseId };
+};
 
 function OfferPreviewMarkdown({ content, fallback }: { content?: string; fallback: string }) {
   if (!(content || '').trim()) {
@@ -968,17 +1032,14 @@ function ProductizationContent() {
 // OfferizationContent component and others remain unchanged
 // ... Rest of the file
 function OfferizationContent() {
-  const { coreSkills, setCoreSkills, offerizationPlans, setOfferizationPlans, copyOffer, skillAcquisitionPlans, projects, microSkillMap, resources, openPdfViewer, settings, upskillDefinitions } = useAuth();
+  const { coreSkills, offerizationPlans, setOfferizationPlans, copyOffer, skillAcquisitionPlans, projects, setProjects, setKanbanBoards, microSkillMap, resources, openPdfViewer, settings, upskillDefinitions } = useAuth();
   const { toast } = useToast();
   const isDesktopRuntime = typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop);
   const aiConfig = useMemo(() => getAiConfigFromSettings(settings, isDesktopRuntime), [settings, isDesktopRuntime]);
   
-  const [newMicroSkillNames, setNewMicroSkillNames] = useState<Record<string, string>>({});
-  
   const [editingProject, setEditingProject] = useState<EditingProjectsState | null>(null);
   const [editingLearningPlanSpecId, setEditingLearningPlanSpecId] = useState<string | null>(null);
-  
-  const [editingSpecialization, setEditingSpecialization] = useState<CoreSkill | null>(null);
+  const [specializationModal, setSpecializationModal] = useState<SpecializationModalState>(null);
 
   const [editingOffer, setEditingOffer] = useState<EditingOffersState | null>(null);
   const [pdfLinkPicker, setPdfLinkPicker] = useState<{
@@ -1075,6 +1136,14 @@ function OfferizationContent() {
     () => (editingLearningPlanSpecId ? (offerizationPlans[editingLearningPlanSpecId]?.learningPlan || {}) : {}),
     [editingLearningPlanSpecId, offerizationPlans]
   );
+  const activeSpecializationModalSpec = useMemo(
+    () => (specializationModal ? coreSkills.find((skill) => skill.id === specializationModal.specializationId && skill.type === 'Specialization') || null : null),
+    [coreSkills, specializationModal]
+  );
+  const activeSpecializationModalPlan = useMemo(
+    () => (specializationModal ? (offerizationPlans[specializationModal.specializationId] || {}) : {}),
+    [offerizationPlans, specializationModal]
+  );
 
   const openPdfLinkPicker = useCallback((
     specializationId: string,
@@ -1161,37 +1230,6 @@ function OfferizationContent() {
         return newPlans;
     });
   };
-  
-  const handleMicroSkillChange = (areaId: string, value: string) => {
-    setNewMicroSkillNames(prev => ({ ...prev, [areaId]: value }));
-  };
-
-  const handleAddMicroSkill = (e: React.FormEvent, specializationId: string, areaId: string) => {
-    e.preventDefault();
-    const name = newMicroSkillNames[areaId]?.trim();
-    if (!name) {
-        toast({ title: 'Error', description: 'Micro-skill name cannot be empty.', variant: "destructive" });
-        return;
-    }
-
-    setCoreSkills(prev => prev.map(s => {
-        if (s.id === specializationId) {
-            return {
-                ...s,
-                skillAreas: s.skillAreas.map(area => {
-                    if (area.id === areaId) {
-                        return { ...area, microSkills: [...area.microSkills, { id: `ms_${Date.now()}`, name }] };
-                    }
-                    return area;
-                })
-            };
-        }
-        return s;
-    }));
-
-    setNewMicroSkillNames(prev => ({ ...prev, [areaId]: '' }));
-    toast({ title: 'Micro-Skill Added', description: `"${name}" has been added.` });
-  };
 
   const handleGapAnalysisChange = (specializationId: string, field: keyof Omit<GapAnalysis, 'gapTypes'>, value: string) => {
     setOfferizationPlans(prev => ({
@@ -1246,17 +1284,23 @@ function OfferizationContent() {
     setEditingProject(current => {
       if (!current) return null;
       const selectedReleaseId = current.selectedReleaseId || current.releases[0]?.id || null;
+      const specialization = coreSkills.find((skill) => skill.id === current.specializationId);
       return {
         ...current,
         selectedReleaseId,
         releases: current.releases.map((release) => {
           if (release.id !== selectedReleaseId) return release;
           if (field === 'name') {
-            const selectedProject = projects.find(p => p.name === value);
+            const selectedProject = projects.find((project) => {
+              if (specialization?.domainId && project.domainId !== specialization.domainId) return false;
+              return normalizeProjectName(project.name) === normalizeProjectName(String(value || ''));
+            });
             return {
               ...release,
               name: value,
-              focusAreaIds: selectedProject ? selectedProject.features.flatMap(f => f.linkedSkills.map(l => l.microSkillId)) : [],
+              focusAreaIds: selectedProject
+                ? selectedProject.features.flatMap((feature) => feature.linkedSkills.map((link) => link.microSkillId))
+                : (release.focusAreaIds || []),
             };
           }
           return { ...release, [field]: value };
@@ -1305,6 +1349,8 @@ function OfferizationContent() {
   const handleSaveProjects = () => {
     if (!editingProject) return;
     const { specializationId, releases } = editingProject;
+    const priorReleases = offerizationPlans[specializationId]?.releases || [];
+    const specialization = coreSkills.find((skill) => skill.id === specializationId);
     const normalizedReleases = releases
       .map((release) => ({
         ...release,
@@ -1325,6 +1371,56 @@ function OfferizationContent() {
     if (normalizedReleases.some((release) => !release.name)) {
       toast({ title: "Error", description: "Each project must have a name.", variant: "destructive" });
       return;
+    }
+
+    const duplicateNameCount = normalizedReleases.reduce<Record<string, number>>((acc, release) => {
+      const key = normalizeProjectName(release.name);
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    if (Object.values(duplicateNameCount).some((count) => count > 1)) {
+      toast({ title: "Error", description: "Project names must be unique within this specialization.", variant: "destructive" });
+      return;
+    }
+
+    if (specialization?.domainId) {
+      const { nextProjects, projectIdByReleaseId } = reconcileProjectsForDrafts({
+        existingProjects: projects,
+        releases: normalizedReleases as Release[],
+        priorReleases,
+        domainId: specialization.domainId,
+      });
+
+      setProjects(nextProjects);
+      setKanbanBoards((prevBoards) => prevBoards.map((board) => {
+        const matchingRelease = (normalizedReleases as Release[]).find((release) => release.id === board.releaseId);
+        if (!matchingRelease) return board;
+
+        const nextProjectId = projectIdByReleaseId.get(matchingRelease.id) || board.projectId || null;
+        const nextName = matchingRelease.name;
+        const nextDescription = matchingRelease.description || '';
+        const nextCards = board.cards.map((card) => (
+          card.linkedProjectId === nextProjectId ? card : { ...card, linkedProjectId: nextProjectId }
+        ));
+
+        if (
+          board.name === nextName &&
+          (board.description || '') === nextDescription &&
+          (board.projectId || null) === nextProjectId &&
+          nextCards.every((card, index) => card === board.cards[index])
+        ) {
+          return board;
+        }
+
+        return {
+          ...board,
+          name: nextName,
+          description: nextDescription,
+          projectId: nextProjectId,
+          cards: nextCards,
+          updatedAt: new Date().toISOString(),
+        };
+      }));
     }
 
     setOfferizationPlans(prev => {
@@ -1386,6 +1482,38 @@ function OfferizationContent() {
       };
     });
   }, []);
+
+  const openSpecializationModal = useCallback((
+    specializationId: string,
+    mode: 'offer-types' | 'gap-analysis',
+    hasOfferTypes: boolean
+  ) => {
+    setSpecializationModal({
+      specializationId,
+      mode: mode === 'gap-analysis' && !hasOfferTypes ? 'offer-types' : mode,
+    });
+  }, []);
+
+  const handleSummaryCardClick = useCallback((
+    specializationId: string,
+    target: 'offer-types' | 'gap-analysis' | 'learning' | 'projects' | 'offers',
+    hasOfferTypes: boolean
+  ) => {
+    if (target === 'learning') {
+      setEditingLearningPlanSpecId(specializationId);
+      return;
+    }
+    if (target === 'projects') {
+      handleStartEditingRelease(specializationId);
+      return;
+    }
+    if (target === 'offers') {
+      handleStartEditingOffer(specializationId);
+      return;
+    }
+
+    openSpecializationModal(specializationId, target, hasOfferTypes);
+  }, [handleStartEditingOffer, handleStartEditingRelease, openSpecializationModal]);
 
   const handleSelectEditingOffer = useCallback((offerId: string) => {
     setEditingOffer((current) => (current ? { ...current, selectedOfferId: offerId } : null));
@@ -1774,191 +1902,234 @@ function OfferizationContent() {
           const plan = offerizationPlans[spec.id] || {};
           const selectedOfferTypes = plan.offerTypes || [];
           const gapAnalysis = plan.gapAnalysis;
+          const releaseCount = (plan.releases || []).length;
+          const offerCount = (plan.offers || []).length;
+          const learningPlan = plan.learningPlan || {};
+          const learningResourceCount =
+          (learningPlan.audioVideoResources || []).length +
+          (learningPlan.bookWebpageResources || []).length +
+          (learningPlan.skillTreePaths || []).length;
+          const hasGapContent = Boolean(
+          (gapAnalysis?.gapTypes || []).length ||
+          gapAnalysis?.strainReduction ||
+          gapAnalysis?.whatYouCanFill ||
+          gapAnalysis?.coreSolution ||
+          gapAnalysis?.outcomeGoal
+          );
           
           return (
-              <Card key={spec.id} className="flex flex-col">
-              <CardHeader>
-                  <div className="flex justify-between items-start">
-                      <CardTitle className="flex items-center gap-3">
-                          <Briefcase className="h-5 w-5 text-primary"/>
-                          {spec.name}
-                      </CardTitle>
+            <Card
+            key={spec.id}
+            className="flex flex-col overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-b from-background to-muted/10 shadow-[0_12px_28px_rgba(0,0,0,0.16)] transition-colors hover:border-primary/30"
+            >
+            <CardHeader className="space-y-3 border-b border-border/50 bg-gradient-to-br from-muted/25 via-background to-background px-5 pb-4 pt-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 space-y-2">
+                  <div className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary">
+                    <Briefcase className="h-4 w-4"/>
                   </div>
+                  <div className="space-y-1">
+                    <CardTitle className="text-xl font-bold leading-tight tracking-tight text-foreground">
+                      {spec.name}
+                    </CardTitle>
+                  </div>
+                </div>
+                <Badge
+                variant="outline"
+                className={cn(
+                  'shrink-0 rounded-full px-2.5 py-0.5 text-[11px] font-medium',
+                  selectedOfferTypes.length > 0
+                  ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                  : 'border-border/70 bg-muted/30 text-muted-foreground'
+                )}
+                >
+                {selectedOfferTypes.length > 0 ? 'Configured' : 'Needs setup'}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                <button
+                  type="button"
+                  className="rounded-xl border border-border/60 bg-background/60 px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-background/80"
+                  onClick={() => handleSummaryCardClick(spec.id, 'offer-types', selectedOfferTypes.length > 0)}
+                >
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Offer Types</p>
+                  <p className="mt-1.5 text-base font-semibold text-foreground">{selectedOfferTypes.length}</p>
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-border/60 bg-background/60 px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-background/80"
+                  onClick={() => handleSummaryCardClick(spec.id, 'gap-analysis', selectedOfferTypes.length > 0)}
+                >
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Gap Analysis</p>
+                  <p className="mt-1.5 text-base font-semibold text-foreground">{hasGapContent ? 'Ready' : 'Blank'}</p>
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-border/60 bg-background/60 px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-background/80"
+                  onClick={() => handleSummaryCardClick(spec.id, 'learning', selectedOfferTypes.length > 0)}
+                >
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Learning</p>
+                  <p className="mt-1.5 text-base font-semibold text-foreground">{learningResourceCount}</p>
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-border/60 bg-background/60 px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-background/80"
+                  onClick={() => handleSummaryCardClick(spec.id, 'projects', selectedOfferTypes.length > 0)}
+                >
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Projects</p>
+                  <p className="mt-1.5 text-base font-semibold text-foreground">{releaseCount}</p>
+                </button>
+                <button
+                  type="button"
+                  className="rounded-xl border border-border/60 bg-background/60 px-3 py-2.5 text-left transition-colors hover:border-primary/40 hover:bg-background/80"
+                  onClick={() => handleSummaryCardClick(spec.id, 'offers', selectedOfferTypes.length > 0)}
+                >
+                  <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Offers</p>
+                  <p className="mt-1.5 text-base font-semibold text-foreground">{offerCount}</p>
+                </button>
+              </div>
               </CardHeader>
-              <CardContent className="flex-grow space-y-4">
-                <Accordion type="multiple" className="w-full">
-                   <AccordionItem value="item-0">
-                     <AccordionTrigger>Skills</AccordionTrigger>
-                     <AccordionContent>
-                        <div className="space-y-3">
-                            <div className="rounded-md border border-white/10 bg-muted/20 p-3 text-xs text-muted-foreground">
-                                {spec.skillAreas.length} skill area{spec.skillAreas.length === 1 ? '' : 's'} · {spec.skillAreas.reduce((sum, area) => sum + area.microSkills.length, 0)} micro-skill{spec.skillAreas.reduce((sum, area) => sum + area.microSkills.length, 0) === 1 ? '' : 's'}
-                            </div>
-                            {spec.skillAreas.map((area) => (
-                                <div key={area.id} className="rounded-md border border-white/10 bg-muted/20 p-3">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <h4 className="font-semibold text-sm">{area.name}</h4>
-                                        <span className="text-xs text-muted-foreground">
-                                            {area.microSkills.length} micro-skill{area.microSkills.length === 1 ? '' : 's'}
-                                        </span>
-                                    </div>
-                                    {area.microSkills.length > 0 ? (
-                                        <div className="mt-2 flex flex-wrap gap-2">
-                                            {area.microSkills.map((ms) => (
-                                                <Badge key={ms.id} variant="secondary">{ms.name}</Badge>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="mt-2 text-xs text-muted-foreground">No micro-skills added yet.</p>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                     </AccordionContent>
-                  </AccordionItem>
-                   <AccordionItem value="item-1">
-                     <AccordionTrigger>Micro-Skills</AccordionTrigger>
-                     <AccordionContent>
-                        {spec.skillAreas.map(area => (
-                            <div key={area.id} className="mb-2">
-                                <h4 className="font-semibold text-sm text-muted-foreground">{area.name}</h4>
-                                <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground pl-2">
-                                    {area.microSkills.map(ms => <li key={ms.id}>{ms.name}</li>)}
-                                </ul>
-                                <form onSubmit={(e) => handleAddMicroSkill(e, spec.id, area.id)} className="flex items-center gap-2 mt-2">
-                                    <Input value={newMicroSkillNames[area.id] || ''} onChange={(e) => handleMicroSkillChange(area.id, e.target.value)} placeholder="Add new micro-skill..." className="h-8"/>
-                                    <Button size="sm" className="h-8">Add</Button>
-                                </form>
-                            </div>
-                        ))}
-                     </AccordionContent>
-                  </AccordionItem>
-                  <AccordionItem value="item-2">
-                     <AccordionTrigger>Offer Type</AccordionTrigger>
-                     <AccordionContent>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                    {selectedOfferTypes.length > 0 ? `${selectedOfferTypes.length} selected` : "Select offer types..."}
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-[--radix-select-trigger-width] max-h-60 overflow-y-auto">
-                                {offerTypes.map((group) => (
-                                    <React.Fragment key={group.group}>
-                                        <DropdownMenuLabel>{group.group}</DropdownMenuLabel>
-                                        {group.items.map(item => (
-                                            <DropdownMenuCheckboxItem
-                                                key={item.name}
-                                                checked={selectedOfferTypes.includes(item.name)}
-                                                onCheckedChange={() => handleOfferTypeChange(spec.id, item.name)}
-                                            >
-                                                {item.name}
-                                            </DropdownMenuCheckboxItem>
-                                        ))}
-                                    </React.Fragment>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-
-                        {selectedOfferTypes.length > 0 && (
-                            <div className="mt-2 space-y-2">
-                                {selectedOfferTypes.map(offerName => {
-                                    const offer = offerTypes.flatMap(g => g.items).find(i => i.name === offerName);
-                                    return offer ? (
-                                        <div key={offer.name} className="text-xs p-2 bg-muted/50 rounded-md">
-                                            <p className="font-semibold">{offer.name}</p>
-                                            <p className="text-muted-foreground">{offer.description}</p>
-                                        </div>
-                                    ) : null;
-                                })}
-                            </div>
-                        )}
-                     </AccordionContent>
-                  </AccordionItem>
-                   {selectedOfferTypes.length > 0 && (
-                    <>
-                      <AccordionItem value="item-3">
-                         <AccordionTrigger>Gap Analysis</AccordionTrigger>
-                         <AccordionContent className="space-y-4">
-                            <p className="text-xs text-muted-foreground">Answer these questions to define your offer strategy.</p>
-                            <div>
-                                <Label htmlFor={`gapType-${spec.id}`} className="text-sm">Gap Type</Label>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" className="w-full justify-start text-left font-normal">
-                                            {(gapAnalysis?.gapTypes && gapAnalysis.gapTypes.length > 0)
-                                                ? `${gapAnalysis.gapTypes.length} selected`
-                                                : "Select gap types..."}
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-[--radix-select-trigger-width] max-h-60 overflow-y-auto">
-                                        {GAP_TYPES.map(group => (
-                                            <React.Fragment key={group.group}>
-                                                <DropdownMenuLabel>{group.group}</DropdownMenuLabel>
-                                                {group.items.map(item => (
-                                                    <DropdownMenuCheckboxItem
-                                                        key={item.name}
-                                                        checked={(gapAnalysis?.gapTypes || []).includes(item.name)}
-                                                        onCheckedChange={() => handleGapTypeChange(spec.id, item.name)}
-                                                    >
-                                                        {item.name}
-                                                    </DropdownMenuCheckboxItem>
-                                                ))}
-                                            </React.Fragment>
-                                        ))}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-                            <div>
-                                <Label htmlFor={`strain-${spec.id}`} className="text-sm">How will this reduce strain on the human body or mind?</Label>
-                                <Textarea id={`strain-${spec.id}`} value={gapAnalysis?.strainReduction || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'strainReduction', e.target.value)} placeholder="Assist or automate daily manual work..." />
-                            </div>
-                            <div>
-                                <Label htmlFor={`fill-${spec.id}`} className="text-sm">What You Can Fill</Label>
-                                <Textarea id={`fill-${spec.id}`} value={gapAnalysis?.whatYouCanFill || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'whatYouCanFill', e.target.value)} placeholder="How can you specifically address this gap?" />
-                            </div>
-                            <div>
-                                <Label htmlFor={`solution-${spec.id}`} className="text-sm">Core Solution / Offer</Label>
-                                <Textarea id={`solution-${spec.id}`} value={gapAnalysis?.coreSolution || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'coreSolution', e.target.value)} placeholder="What is the core service or offer?" />
-                            </div>
-                            <div>
-                                <Label htmlFor={`goal-${spec.id}`} className="text-sm">Outcome Goal</Label>
-                                <Textarea id={`goal-${spec.id}`} value={gapAnalysis?.outcomeGoal || ''} onChange={(e) => handleGapAnalysisChange(spec.id, 'outcomeGoal', e.target.value)} placeholder="What is the desired result?" />
-                            </div>
-                         </AccordionContent>
-                      </AccordionItem>
-                      <AccordionItem value="item-learning">
-                          <AccordionTrigger>Learning Planner</AccordionTrigger>
-                          <AccordionContent>
-                              <Button className="mt-2 w-full" variant="outline" onClick={() => setEditingLearningPlanSpecId(spec.id)}>
-                                  <Book className="mr-2 h-4 w-4" /> Create / Edit Learning Plan
-                              </Button>
-                          </AccordionContent>
-                      </AccordionItem>
-                      <AccordionItem value="item-4">
-                         <AccordionTrigger>Project Planner</AccordionTrigger>
-                         <AccordionContent>
-                              <Button className="mt-2 w-full" variant="outline" onClick={() => handleStartEditingRelease(spec.id)}>
-                                  <Briefcase className="mr-2 h-4 w-4" /> Create / Edit Projects
-                              </Button>
-                         </AccordionContent>
-                      </AccordionItem>
-                      <AccordionItem value="item-5">
-                          <AccordionTrigger>Offers</AccordionTrigger>
-                          <AccordionContent>
-                              <Button className="mt-2 w-full" variant="outline" onClick={() => handleStartEditingOffer(spec.id)}>
-                                  <Sparkles className="mr-2 h-4 w-4" /> Create / Edit Offers
-                              </Button>
-                          </AccordionContent>
-                      </AccordionItem>
-                    </>
-                   )}
-                </Accordion>
-              </CardContent>
               </Card>
           )
         })}
       </div>
+
+      <Dialog open={!!specializationModal} onOpenChange={(open) => !open && setSpecializationModal(null)}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {specializationModal?.mode === 'gap-analysis' ? 'Gap Analysis' : 'Offer Type'}
+              {activeSpecializationModalSpec ? ` • ${activeSpecializationModalSpec.name}` : ''}
+            </DialogTitle>
+            <DialogDescription>
+              {specializationModal?.mode === 'gap-analysis'
+                ? 'Define the market gap, positioning, and outcome for this specialization.'
+                : 'Choose the offer types you want to build for this specialization.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {activeSpecializationModalSpec && specializationModal?.mode === 'offer-types' && (
+            <div className="space-y-4">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="h-11 w-full justify-start rounded-xl border-border/60 bg-background/40 text-left font-normal">
+                    {(activeSpecializationModalPlan.offerTypes || []).length > 0
+                      ? `${(activeSpecializationModalPlan.offerTypes || []).length} selected`
+                      : 'Select offer types...'}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-[--radix-select-trigger-width] max-h-60 overflow-y-auto">
+                  {offerTypes.map((group) => (
+                    <React.Fragment key={group.group}>
+                      <DropdownMenuLabel>{group.group}</DropdownMenuLabel>
+                      {group.items.map((item) => (
+                        <DropdownMenuCheckboxItem
+                          key={item.name}
+                          checked={(activeSpecializationModalPlan.offerTypes || []).includes(item.name)}
+                          onCheckedChange={() => handleOfferTypeChange(activeSpecializationModalSpec.id, item.name)}
+                        >
+                          {item.name}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              {(activeSpecializationModalPlan.offerTypes || []).length > 0 && (
+                <div className="space-y-2">
+                  {(activeSpecializationModalPlan.offerTypes || []).map((offerName) => {
+                    const offer = offerTypes.flatMap((group) => group.items).find((item) => item.name === offerName);
+                    return offer ? (
+                      <div key={offer.name} className="rounded-xl border border-border/60 bg-muted/10 p-3">
+                        <p className="text-sm font-semibold text-foreground">{offer.name}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{offer.description}</p>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeSpecializationModalSpec && specializationModal?.mode === 'gap-analysis' && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor={`modal-gapType-${activeSpecializationModalSpec.id}`} className="text-sm">Gap Type</Label>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="mt-2 h-11 w-full justify-start rounded-xl border-border/60 bg-background/40 text-left font-normal">
+                      {(activeSpecializationModalPlan.gapAnalysis?.gapTypes || []).length > 0
+                        ? `${(activeSpecializationModalPlan.gapAnalysis?.gapTypes || []).length} selected`
+                        : 'Select gap types...'}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-[--radix-select-trigger-width] max-h-60 overflow-y-auto">
+                    {GAP_TYPES.map((group) => (
+                      <React.Fragment key={group.group}>
+                        <DropdownMenuLabel>{group.group}</DropdownMenuLabel>
+                        {group.items.map((item) => (
+                          <DropdownMenuCheckboxItem
+                            key={item.name}
+                            checked={(activeSpecializationModalPlan.gapAnalysis?.gapTypes || []).includes(item.name)}
+                            onCheckedChange={() => handleGapTypeChange(activeSpecializationModalSpec.id, item.name)}
+                          >
+                            {item.name}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </React.Fragment>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <div>
+                <Label htmlFor={`modal-strain-${activeSpecializationModalSpec.id}`} className="text-sm">How will this reduce strain on the human body or mind?</Label>
+                <Textarea
+                  id={`modal-strain-${activeSpecializationModalSpec.id}`}
+                  className="mt-2 min-h-24 rounded-xl border-border/60 bg-background/40"
+                  value={activeSpecializationModalPlan.gapAnalysis?.strainReduction || ''}
+                  onChange={(e) => handleGapAnalysisChange(activeSpecializationModalSpec.id, 'strainReduction', e.target.value)}
+                  placeholder="Assist or automate daily manual work..."
+                />
+              </div>
+              <div>
+                <Label htmlFor={`modal-fill-${activeSpecializationModalSpec.id}`} className="text-sm">What You Can Fill</Label>
+                <Textarea
+                  id={`modal-fill-${activeSpecializationModalSpec.id}`}
+                  className="mt-2 min-h-24 rounded-xl border-border/60 bg-background/40"
+                  value={activeSpecializationModalPlan.gapAnalysis?.whatYouCanFill || ''}
+                  onChange={(e) => handleGapAnalysisChange(activeSpecializationModalSpec.id, 'whatYouCanFill', e.target.value)}
+                  placeholder="How can you specifically address this gap?"
+                />
+              </div>
+              <div>
+                <Label htmlFor={`modal-solution-${activeSpecializationModalSpec.id}`} className="text-sm">Core Solution / Offer</Label>
+                <Textarea
+                  id={`modal-solution-${activeSpecializationModalSpec.id}`}
+                  className="mt-2 min-h-24 rounded-xl border-border/60 bg-background/40"
+                  value={activeSpecializationModalPlan.gapAnalysis?.coreSolution || ''}
+                  onChange={(e) => handleGapAnalysisChange(activeSpecializationModalSpec.id, 'coreSolution', e.target.value)}
+                  placeholder="What is the core service or offer?"
+                />
+              </div>
+              <div>
+                <Label htmlFor={`modal-goal-${activeSpecializationModalSpec.id}`} className="text-sm">Outcome Goal</Label>
+                <Textarea
+                  id={`modal-goal-${activeSpecializationModalSpec.id}`}
+                  className="mt-2 min-h-24 rounded-xl border-border/60 bg-background/40"
+                  value={activeSpecializationModalPlan.gapAnalysis?.outcomeGoal || ''}
+                  onChange={(e) => handleGapAnalysisChange(activeSpecializationModalSpec.id, 'outcomeGoal', e.target.value)}
+                  placeholder="What is the desired result?"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button type="button" onClick={() => setSpecializationModal(null)}>Done</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {editingProject && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/35 p-4 backdrop-blur-sm">
@@ -2018,7 +2189,7 @@ function OfferizationContent() {
                     variant="ghost"
                     size="icon"
                     className="absolute right-4 top-4 h-9 w-9 rounded-full text-muted-foreground hover:text-foreground"
-                    onClick={handleSaveProjects}
+                  onClick={() => setEditingProject(null)}
                 >
                     <X className="h-4 w-4" />
                     <span className="sr-only">Close project manager</span>
@@ -2807,16 +2978,19 @@ const ProjectForm = ({ specialization, release, handleUpdateEditingRelease }: {
                     <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-1.5 rounded-2xl border border-border/60 bg-muted/15 p-4 md:col-span-2">
                             <Label htmlFor="release-name">Project Name</Label>
-                            <Select value={release.name || ''} onValueChange={(value) => handleUpdateEditingRelease('name', value)}>
-                                <SelectTrigger id="release-name" className="h-11 rounded-xl">
-                                    <SelectValue placeholder="Select a project..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {projectsInDomain.map(proj => (
-                                        <SelectItem key={proj.id} value={proj.name}>{proj.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                          <Input
+                            id="release-name"
+                            className="h-11 rounded-xl"
+                            value={release.name || ''}
+                            onChange={(e) => handleUpdateEditingRelease('name', e.target.value)}
+                            placeholder="Enter a project name"
+                            list={`project-name-suggestions-${specialization.id}`}
+                          />
+                          <datalist id={`project-name-suggestions-${specialization.id}`}>
+                            {projectsInDomain.map((proj) => (
+                              <option key={proj.id} value={proj.name} />
+                            ))}
+                          </datalist>
                         </div>
 
                         <div className="space-y-1.5 rounded-2xl border border-border/60 bg-muted/15 p-4 md:col-span-2">
@@ -3433,29 +3607,25 @@ function StrategicPlanningPageContent() {
   const router = useRouter();
   const { settings } = useAuth();
   const [activeTab, setActiveTab] = useState('planning');
-  const simpleMode = settings.ispSimpleMode ?? true;
 
   const allTabs = [
     { value: 'planning', label: 'Planning' },
     { value: 'productization', label: 'Productization' },
     { value: 'offerization', label: 'Offerization' },
     { value: 'offers', label: 'Offers' },
-    { value: 'progress', label: 'Visualize Progress' },
     { value: 'matrix', label: 'Matrix' },
   ];
-  const tabs = simpleMode
-    ? allTabs.filter((tab) => tab.value === 'planning' || tab.value === 'offerization' || tab.value === 'progress')
-    : allTabs;
+  const tabs = allTabs;
   
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const tab = urlParams.get('tab');
     if (tab && tabs.some(t => t.value === tab)) {
       setActiveTab(tab);
-    } else if (simpleMode) {
+    } else {
       setActiveTab('planning');
     }
-  }, [tabs, simpleMode]);
+  }, [tabs]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -3471,7 +3641,7 @@ function StrategicPlanningPageContent() {
       </div>
 
        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className={cn("grid w-full", simpleMode ? "grid-cols-3" : "grid-cols-2 md:grid-cols-6")}>
+            <TabsList className={cn("grid w-full grid-cols-2 md:grid-cols-5")}>
             {tabs.map(tab => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
         </TabsList>
         <TabsContent value="planning" className="mt-6">
@@ -3480,22 +3650,15 @@ function StrategicPlanningPageContent() {
         <TabsContent value="offerization" className="mt-6">
           <OfferizationContent />
         </TabsContent>
-        {!simpleMode && (
-          <>
-            <TabsContent value="productization" className="mt-6">
-              <ProductizationContent />
-            </TabsContent>
-            <TabsContent value="offers" className="mt-6">
-              <OffersContent />
-            </TabsContent>
-            <TabsContent value="progress" className="mt-6">
-              <VisualizeProgressContent />
-            </TabsContent>
-            <TabsContent value="matrix" className="mt-6">
-              <MatrixContent />
-            </TabsContent>
-          </>
-        )}
+          <TabsContent value="productization" className="mt-6">
+            <ProductizationContent />
+          </TabsContent>
+          <TabsContent value="offers" className="mt-6">
+            <OffersContent />
+          </TabsContent>
+          <TabsContent value="matrix" className="mt-6">
+            <MatrixContent />
+          </TabsContent>
       </Tabs>
     </div>
   );

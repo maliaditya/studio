@@ -412,6 +412,31 @@
 .react-calendar-heatmap .color-scale-2 { fill: hsl(var(--primary) / 0.5); }
 .react-calendar-heatmap .color-scale-3 { fill: hsl(var(--primary) / 0.7); }
 .react-calendar-heatmap .color-scale-4 { fill: hsl(var(--primary) / 1.0); }
+.react-calendar-heatmap .goal-milestone { fill: hsl(38 92% 50% / 0.85); }
+.react-calendar-heatmap .goal-milestone-progress { fill: hsl(25 95% 56% / 0.95); }
+.react-calendar-heatmap .goal-milestone-done { fill: hsl(160 84% 39% / 0.95); }
+.react-calendar-heatmap .goal-milestone-complete { fill: hsl(173 80% 36% / 1); }
+
+.goal-heatmap {
+  width: 100%;
+}
+
+.goal-heatmap svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 160px;
+  overflow: visible;
+}
+
+.goal-heatmap rect {
+  rx: 2;
+  ry: 2;
+}
+
+.goal-cube-card {
+  scroll-snap-align: center;
+}
 
 /* Remove outline on active/focus state */
 .react-calendar-heatmap rect:focus,

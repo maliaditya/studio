@@ -127,6 +127,7 @@ export interface DatedWorkout {
 
 export interface LocalUser {
   username: string;
+  email?: string;
 }
 
 export type WorkoutMode = 'one-muscle' | 'two-muscle';
@@ -914,6 +915,7 @@ export interface MindsetPoint {
   linkedResistanceIds?: string[];
   linkedMismatchIds?: string[];
   linkedExternalIds?: string[];
+  linkedGoalIds?: string[];
   tasks?: {
     id: string;
     type: ActivityType;
@@ -926,6 +928,7 @@ export interface MindsetPoint {
     repeatInterval?: number;
     repeatUnit?: 'day' | 'week' | 'month';
     startDate?: string;
+    linkedGoalId?: string;
     completionHistory?: Record<string, boolean>;
   }[];
 }
@@ -1178,6 +1181,28 @@ export interface BotheringMeansValue {
 
 export type BotheringMeans = Partial<Record<MeansPillar, BotheringMeansValue>>;
 
+export interface Goal {
+  id: string;
+  title: string;
+  description?: string;
+  status: 'active' | 'completed' | 'archived';
+  priority?: 'low' | 'medium' | 'high';
+  dueDate?: string;
+  createdDate: string;
+  completedDate?: string;
+  linkedBotheringIds?: string[];
+  linkedTaskIds?: string[];
+  milestones?: GoalMilestone[];
+}
+
+export interface GoalMilestone {
+  id: string;
+  title: string;
+  date: string;
+  completed?: boolean;
+  completedDate?: string;
+}
+
 export interface MeansEntry {
   id: string;
   pillar: MeansPillar;
@@ -1271,6 +1296,8 @@ export interface UserSettings {
   pdfDailyPageTargetByResourceId?: Record<string, number>;
   pdfDailyPageStatsByResourceId?: Record<string, { date: string; startPage: number; maxPage: number }>;
   pdfAnnotationsByResourceId?: Record<string, Record<string, PdfPageAnnotation[]>>;
+  pdfLinkedCanvasByResourceId?: Record<string, { resourceId: string; pointId: string; name?: string }>;
+  pdfDiagramTextByResourceId?: Record<string, string>;
   flashcardSessions?: FlashcardSessionIndex[];
   flashcardTopicTablesBySpecializationId?: Record<string, FlashcardTopicTable>;
   learningPerformanceDailyLogs?: Record<string, LearningPerformanceLogEntry[]>;

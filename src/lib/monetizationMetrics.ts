@@ -4,7 +4,7 @@ const METRICS_BLOB_PATH = "monetization-metrics.json";
 const MONTH_KEY_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 export type SupportEventType = "support_page_view" | "support_cta_click" | "donation_intent";
-export type SupportChannel = "buymeacoffee" | "upi";
+export type SupportChannel = "buymeacoffee" | "upi" | "razorpay";
 
 export interface MonthlyEngagementMetrics {
   activeUsers: string[];

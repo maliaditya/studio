@@ -25,11 +25,13 @@ import {
   Sparkles,
   Target,
   Trello,
+  Users,
   Wallet,
   Workflow,
 } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
+import { isAdminUsername } from "@/lib/adminUsers";
 import {
   Sidebar,
   SidebarContent,
@@ -69,6 +71,8 @@ const SIMPLE_SECTIONS: NavSection[] = [
   {
     label: "Strategy",
     links: [
+      { href: "/truth", label: "Truth", icon: Sparkles },
+      { href: "/goals", label: "Goals", icon: Target },
       { href: "/finance", label: "Finance", icon: Wallet },
       { href: "/strategic-planning", label: "Strategy", icon: Route },
       { href: "/support", label: "Support", icon: HeartHandshake },
@@ -80,6 +84,7 @@ const SIMPLE_SECTIONS: NavSection[] = [
       { href: "/workout-tracker", label: "Workout Tracker", icon: Dumbbell },
       { href: "/timetable", label: "Timetable", icon: CalendarClock },
       { href: "/canvas", label: "Canvas", icon: Paintbrush },
+      { href: "/patterns", label: "Patterns", icon: PieChart },
     ],
   },
 ];
@@ -99,6 +104,7 @@ const DEFAULT_SECTIONS: NavSection[] = [
     links: [
       { href: "/deep-work", label: "Deep Work", icon: Target },
       { href: "/finance", label: "Finance", icon: Wallet },
+      { href: "/goals", label: "Goals", icon: Target },
       { href: "/strategic-planning", label: "Strategy", icon: Route },
       { href: "/truth", label: "Truth", icon: Sparkles },
       { href: "/graph", label: "Graph", icon: Workflow },
@@ -112,7 +118,6 @@ const MORE_SECTIONS: NavSection[] = [
     links: [
       { href: "/workout-tracker", label: "Workout Tracker", icon: Dumbbell },
       { href: "/mind-programming", label: "Mind Programming", icon: BrainCircuit },
-      { href: "/deep-work", label: "Deep Work", icon: Target },
       { href: "/timetable", label: "Timetable", icon: CalendarClock },
     ],
   },
@@ -153,7 +158,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { state } = useSidebar();
   const simpleMode = settings.ispSimpleMode ?? true;
-  const isAdminUser = (currentUser?.username || "").trim().toLowerCase() === "lonewolf";
+  const isAdminUser = isAdminUsername(currentUser?.username);
 
   const baseSections = simpleMode ? SIMPLE_SECTIONS : DEFAULT_SECTIONS;
   const navSections = isAdminUser
@@ -163,6 +168,8 @@ export function AppSidebar() {
           label: "Admin",
           links: [
             { href: "/admin/monetization", label: "Monetization", icon: Wallet },
+            { href: "/admin/donors", label: "Donors", icon: HeartHandshake },
+            { href: "/admin/users", label: "Users", icon: Users },
             { href: "/admin/config", label: "Config", icon: Settings },
           ],
         },

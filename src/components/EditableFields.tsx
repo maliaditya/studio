@@ -511,13 +511,12 @@ export const EditableResponse = ({ field, label, resource, onUpdate, onOpenNeste
     );
 };
 
-export const EditableResourcePoint = ({ resource, point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onOpenContentView, onEditLinkText, dragHandle, onSeekTo, currentTime, onSetEndTime, onClearEndTime, onOpenDrawingCanvas, onInsertBelow, onChangeType, blockIndex = 0, autoFocus = false, onAutoFocusConsumed, onFocusPrevious }: { 
+export const EditableResourcePoint = ({ resource, point, onConvertToCard, onUpdate, onDelete, onOpenNestedPopup, onEditLinkText, dragHandle, onSeekTo, currentTime, onSetEndTime, onClearEndTime, onOpenDrawingCanvas, onInsertBelow, onChangeType, blockIndex = 0, autoFocus = false, onAutoFocusConsumed, onFocusPrevious }: { 
     resource?: Resource,
     point: ResourcePoint, 
     onUpdate: (pointId: string, updatedPoint: Partial<ResourcePoint>) => void, 
     onDelete: () => void,
     onOpenNestedPopup: (event: React.MouseEvent) => void;
-    onOpenContentView: (event: React.MouseEvent) => void;
     onConvertToCard: () => void;
     onEditLinkText?: (point: ResourcePoint) => void;
     dragHandle?: { attributes: any; listeners: any };
@@ -709,11 +708,26 @@ export const EditableResourcePoint = ({ resource, point, onConvertToCard, onUpda
     
     const handleLinkClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        if (point.text && point.text.startsWith('brainhack://')) {
+        if (!point.text || !point.text.trim()) {
+            setIsEditing(true);
+            return;
+        }
+        if (point.text.startsWith('brainhack://')) {
             const hackId = point.text.replace('brainhack://', '');
             openBrainHackPopup(hackId, e);
-        } else if (point.text) {
+        } else {
             setFloatingVideoUrl(point.text);
+        }
+    };
+
+    const handleLinkKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSave();
+        }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            setIsEditing(false);
         }
     };
     
@@ -745,44 +759,124 @@ export const EditableResourcePoint = ({ resource, point, onConvertToCard, onUpda
                     {renderBlockLead()}
                 </div>
             </div>
-             <div className="flex-grow min-w-0" onClick={() => isNotionBlockType(point.type) && setIsEditing(true)} onDoubleClick={() => !isEditing && setIsEditing(true)}>
-                {isEditing && isNotionBlockType(point.type) ? (
+             <div className="flex-grow min-w-0" onClick={() => (isNotionBlockType(point.type) || point.type === 'markdown' || point.type === 'code' || point.type === 'ai-note') && setIsEditing(true)} onDoubleClick={() => !isEditing && setIsEditing(true)}>
+                {isEditing && (isNotionBlockType(point.type) || point.type === 'markdown' || point.type === 'code' || point.type === 'ai-note') ? (
                     <Textarea
                         ref={textareaRef}
                         value={editText}
                         onChange={handleTextareaChange}
                         onBlur={handleSave}
-                        onKeyDown={handleBlockKeyDown}
+                        onKeyDown={(e) => {
+                          if (point.type === 'markdown' || point.type === 'code' || point.type === 'ai-note') {
+                            // For markdown/code: Ctrl+Enter to save, Escape to cancel
+                            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                              e.preventDefault();
+                              handleSave();
+                            }
+                            if (e.key === 'Escape') {
+                              e.preventDefault();
+                              setIsEditing(false);
+                            }
+                          } else {
+                            // For notion blocks: use the block keydown handler
+                            handleBlockKeyDown(e);
+                          }
+                        }}
                         className={cn(
                             "min-h-0 resize-none border-0 bg-transparent p-0 text-sm shadow-none outline-none ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none focus:border-transparent",
                             isListStyleBlock && "pt-0.5",
                             point.type === 'heading1' && "text-2xl font-semibold leading-tight",
                             point.type === 'heading2' && "text-xl font-semibold leading-tight",
                             point.type === 'heading3' && "text-lg font-semibold leading-tight",
-                            point.type === 'todo' && point.checked && "text-muted-foreground line-through"
+                            point.type === 'todo' && point.checked && "text-muted-foreground line-through",
+                            (point.type === 'code') && "font-mono text-xs",
+                            (point.type === 'markdown' || point.type === 'ai-note') && "min-h-[100px]"
                         )}
                         rows={1}
                         placeholder={getBlockPlaceholder(point.type)}
                     />
                 ) : point.type === 'markdown' || point.type === 'code' || point.type === 'ai-note' ? (
-                    <div className="w-full prose dark:prose-invert prose-sm cursor-pointer" onClick={onOpenContentView}>
+                    <div 
+                      className="w-full cursor-text rounded-md hover:bg-muted/30 p-2 -m-2 transition-colors"
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setIsEditing(true);
+                        }
+                      }}
+                    >
                       {point.type === 'markdown' || point.type === 'ai-note' ? (
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{point.text}</ReactMarkdown>
-                      ) : (
-                        <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{ margin: 0, padding: '0.5rem', borderRadius: '0.375rem', width: '100%', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }} codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}>
+                        <div className="prose dark:prose-invert prose-sm max-w-full overflow-hidden">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {point.text || ''}
+                          </ReactMarkdown>
+                        </div>
+                      ) : point.type === 'code' ? (
+                        <div className="bg-muted/50 rounded-md border border-muted-foreground/20 overflow-hidden">
+                          <SyntaxHighlighter 
+                            language="javascript" 
+                            style={vscDarkPlus} 
+                            customStyle={{ 
+                              margin: 0, 
+                              padding: '0.5rem', 
+                              borderRadius: '0', 
+                              width: '100%', 
+                              whiteSpace: 'pre-wrap', 
+                              wordBreak: 'break-word',
+                              maxHeight: '200px',
+                              overflow: 'auto'
+                            }} 
+                            codeTagProps={{style: {fontSize: '0.8rem', fontFamily: 'monospace'}}}
+                          >
                             {point.text || ""}
-                        </SyntaxHighlighter>
-                      )}
+                          </SyntaxHighlighter>
+                        </div>
+                      ) : null}
                     </div>
                 ) : point.type === 'link' ? (
-                     <div className="flex-grow min-w-0 flex items-center gap-1">
-                        <span 
-                            className="cursor-pointer text-foreground underline-offset-2 hover:underline" 
-                            onClick={handleLinkClick}
-                            onContextMenu={(e) => { e.preventDefault(); onEditLinkText?.(point); }}
-                        >
-                            {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin" /> : (point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>)}
-                        </span>
+                     <div className="flex-grow min-w-0 flex items-center gap-2">
+                        {isEditing ? (
+                            <Input
+                                value={editText}
+                                onChange={(e) => setEditText(e.target.value)}
+                                onBlur={handleSave}
+                                onKeyDown={handleLinkKeyDown}
+                                className="h-7 text-sm flex-grow"
+                                placeholder="Paste link..."
+                                autoFocus
+                            />
+                        ) : (
+                            <>
+                              <a 
+                                href={point.text || undefined}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="cursor-pointer text-primary underline-offset-2 hover:underline font-medium line-clamp-2 flex-grow"
+                                onClick={(e) => {
+                                  if (!point.text?.startsWith('brainhack://')) {
+                                    e.preventDefault();
+                                  }
+                                  handleLinkClick(e);
+                                }}
+                              >
+                                {isFetchingMeta ? <Loader2 className="h-4 w-4 animate-spin inline" /> : (point.displayText || point.text || <span className="text-muted-foreground italic">New link...</span>)}
+                              </a>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-5 w-5 flex-shrink-0"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditLinkText?.(point);
+                                }}
+                                title="Edit link text"
+                              >
+                                <LinkIcon className="h-3 w-3" />
+                              </Button>
+                            </>
+                        )}
                     </div>
                 ) : point.type === 'paint' ? (
                     <button
@@ -837,7 +931,16 @@ export const EditableResourcePoint = ({ resource, point, onConvertToCard, onUpda
                     </Popover>
                 )}
                 {point.type === 'text' && (
-                    <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={onConvertToCard}>
+                    <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6 text-muted-foreground hover:text-foreground" 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onConvertToCard();
+                        }}
+                        title="Convert to linked card"
+                    >
                         <ArrowRight className="h-3 w-3"/>
                     </Button>
                 )}

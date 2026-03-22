@@ -2,18 +2,9 @@ import { NextResponse } from "next/server";
 import { getMonetizationSummary, isMetricsStorageConfigured } from "@/lib/monetizationMetrics";
 import { getSessionUserFromRequest } from "@/lib/serverSession";
 import { verifyAccessToken } from "@/lib/authTokens";
+import { isAdminUsername } from "@/lib/adminUsers";
 
 export const dynamic = "force-dynamic";
-
-const getAdminUsernames = (): string[] => {
-  const fromEnv = (process.env.ADMIN_USERNAMES || "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-
-  if (fromEnv.length > 0) return fromEnv;
-  return ["lonewolf"];
-};
 
 export async function GET(request: Request) {
   const sessionUser = getSessionUserFromRequest(request);
@@ -22,8 +13,7 @@ export async function GET(request: Request) {
   const tokenPayload = bearerToken ? verifyAccessToken(bearerToken) : null;
   const tokenUser = tokenPayload?.sub?.trim().toLowerCase() || null;
   const effectiveUser = sessionUser || tokenUser;
-  const admins = getAdminUsernames();
-  if (!effectiveUser || !admins.includes(effectiveUser)) {
+  if (!isAdminUsername(effectiveUser)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 403 });
   }
 

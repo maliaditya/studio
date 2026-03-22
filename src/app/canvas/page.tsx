@@ -548,6 +548,34 @@ function DrawingCanvasPageContent() {
     }, [drawingCanvasState?.activeCanvasId, updateDrawingData, toast]);
 
     useEffect(() => {
+        const handleInject = (event: Event) => {
+            if (!excalidrawAPIRef.current || !drawingCanvasState?.activeCanvasId) return;
+            const detail = (event as CustomEvent<{
+                elements?: ExcalidrawElement[];
+                appState?: Partial<AppState>;
+                replace?: boolean;
+                scrollToContent?: boolean;
+            }>).detail;
+            if (!detail?.elements || detail.elements.length === 0) return;
+            const api = excalidrawAPIRef.current;
+            const existing = api.getSceneElements ? api.getSceneElements() : [];
+            const nextElements = detail.replace ? detail.elements : [...existing, ...detail.elements];
+            api.updateScene({
+                elements: nextElements,
+                appState: detail.appState || undefined,
+            });
+            if (detail.scrollToContent && typeof api.scrollToContent === "function") {
+                api.scrollToContent(nextElements, { fitToContent: true });
+            }
+            isUserChange.current = true;
+            setIsDirty(true);
+            void handleSaveClick();
+        };
+        window.addEventListener("excalidraw-inject", handleInject as EventListener);
+        return () => window.removeEventListener("excalidraw-inject", handleInject as EventListener);
+    }, [drawingCanvasState?.activeCanvasId, handleSaveClick]);
+
+    useEffect(() => {
         if (!drawingCanvasState?.activeCanvasId) return;
         const handleSaveShortcut = (event: KeyboardEvent) => {
             if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== 's') return;

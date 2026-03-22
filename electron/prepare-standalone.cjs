@@ -19,18 +19,49 @@ const nodeRuntimeBinary = path.join(
 
 const envPath = path.join(root, ".env.local");
 const envPayload = {};
+const desktopBundledEnvKeys = [
+  "ELECTRON_START_URL",
+  "ELECTRON_FORCE_REMOTE",
+  "ELECTRON_AUTH_BASE_URL",
+  "NEXT_PUBLIC_AUTH_BASE_URL",
+  "NEXT_PUBLIC_ADMIN_USERNAMES",
+  "ADMIN_USERNAMES",
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "SUPABASE_URL",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "SUPABASE_STORAGE_BUCKET",
+  "LIFEOS_SESSION_SECRET",
+  "LIFEOS_TOKEN_SECRET",
+  "RAZORPAY_KEY_ID",
+  "RAZORPAY_KEY_SECRET",
+];
+
+let parsedLocalEnv = {};
 if (fs.existsSync(envPath)) {
   try {
-    const parsed = dotenv.parse(fs.readFileSync(envPath));
-    const getValue = (key) => process.env[key] || parsed[key];
-    ["ELECTRON_START_URL", "ELECTRON_FORCE_REMOTE", "ELECTRON_AUTH_BASE_URL"].forEach((key) => {
-      const value = getValue(key);
-      if (value) envPayload[key] = String(value);
-    });
+    parsedLocalEnv = dotenv.parse(fs.readFileSync(envPath));
   } catch (error) {
     console.warn("Failed to parse .env.local for desktop env binding:", error?.message || error);
   }
 }
+
+const getValue = (key) => {
+  const processValue = process.env[key];
+  if (typeof processValue === "string" && processValue.trim().length > 0) {
+    return processValue.trim();
+  }
+  const localValue = parsedLocalEnv[key];
+  if (typeof localValue === "string" && localValue.trim().length > 0) {
+    return localValue.trim();
+  }
+  return "";
+};
+
+desktopBundledEnvKeys.forEach((key) => {
+  const value = getValue(key);
+  if (value) envPayload[key] = String(value);
+});
 if (Object.keys(envPayload).length > 0) {
   const targetEnvPath = path.join(root, "electron", "env.json");
   fs.mkdirSync(path.dirname(targetEnvPath), { recursive: true });

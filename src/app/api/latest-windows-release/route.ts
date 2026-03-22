@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { readDesktopAccessState, hasDesktopDownloadAccess, resolveDesktopAccessUser } from '@/lib/desktopAccessServer';
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,20 @@ type GitHubRelease = {
   assets?: GitHubAsset[];
 };
 
-export async function GET() {
+export async function GET(request: Request) {
+  const sessionUser = resolveDesktopAccessUser(request);
+  if (!sessionUser) {
+    return NextResponse.json({ error: 'Unauthorized. Please sign in again.' }, { status: 401 });
+  }
+
+  const access = await readDesktopAccessState(request, sessionUser);
+  if (!hasDesktopDownloadAccess(access)) {
+    return NextResponse.json(
+      { error: 'Desktop access is locked for this account. Complete payment first.' },
+      { status: 402 }
+    );
+  }
+
   try {
     const res = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`, {
       headers: {

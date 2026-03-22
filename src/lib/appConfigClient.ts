@@ -4,6 +4,7 @@ export type AppConfigPayload = {
   supabaseUrl: string | null;
   supabaseAnonKey: string | null;
   supabaseStorageBucket: string | null;
+  desktopPlanPriceInr: number | null;
   updatedAt?: string | null;
   source?: "db" | "env";
   storageConfigured?: boolean;
@@ -73,6 +74,7 @@ export async function saveAppConfig(
     supabaseUrl: string;
     supabaseAnonKey: string;
     supabaseStorageBucket?: string | null;
+    desktopPlanPriceInr: number;
   },
   accessToken?: string | null
 ): Promise<AppConfigPayload> {

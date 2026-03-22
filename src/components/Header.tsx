@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { ArrowRight, BrainCircuit, Heart, Settings, ChevronDown, Search, Play, Library, Info, Repeat, Book, CheckSquare, Calendar as CalendarIcon, ListChecks, Brain, Workflow, Activity as ActivityIcon, Github, Download, Paintbrush, UploadCloud, DownloadCloud, X, Link2, Plus, Pencil, GitBranch } from 'lucide-react';
 import { UserProfile } from './UserProfile';
 import { useAuth } from '@/contexts/AuthContext';
+import { isAdminUsername } from '@/lib/adminUsers';
 import { useRouter as useRouterShadCN, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { DemoTokenModal } from './DemoTokenModal';
@@ -172,7 +173,7 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
     setActivePath(pathname);
   }, [pathname]);
 
-  const isAdminUser = (currentUser?.username || '').trim().toLowerCase() === 'lonewolf';
+    const isAdminUser = isAdminUsername(currentUser?.username);
 
   const navLinks: Array<{ href: string; label: string; icon?: React.ComponentType<{ className?: string }> }> = simpleMode
     ? [
@@ -189,6 +190,8 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
         ...(isAdminUser
           ? [
               { href: '/admin/monetization', label: 'Monetization' },
+                            { href: '/admin/donors', label: 'Donors' },
+                            { href: '/admin/users', label: 'Users' },
               { href: '/admin/config', label: 'Config' },
             ]
           : []),
@@ -206,6 +209,8 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
         ...(isAdminUser
           ? [
               { href: '/admin/monetization', label: 'Monetization' },
+                            { href: '/admin/donors', label: 'Donors' },
+                            { href: '/admin/users', label: 'Users' },
               { href: '/admin/config', label: 'Config' },
             ]
           : []),

@@ -74,7 +74,7 @@ export const trackEngagementMetric = async (username: string, dateIso?: string) 
 
 export const trackSupportMetric = async (
   event: "support_page_view" | "support_cta_click" | "donation_intent",
-  channel?: "buymeacoffee" | "upi",
+  channel?: "buymeacoffee" | "upi" | "razorpay",
   amountUsd?: number
 ) => {
   const payload: Record<string, unknown> = {

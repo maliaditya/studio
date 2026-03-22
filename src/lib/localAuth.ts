@@ -1,15 +1,18 @@
 
 "use client";
 
-// IMPORTANT: This service now uses Supabase Storage for user data storage.
+// IMPORTANT: Cloud auth records now live in Supabase Postgres via server routes.
 // It keeps a local session token (the username) in localStorage.
 
 import type { LocalUser } from '@/types/workout';
+import { describeUnknownError } from '@/lib/errorMessage';
 import { safeSetLocalStorageItem, safeSetSessionStorageItem } from '@/lib/safeStorage';
 
 const CURRENT_USER_KEY = "currentUser"; // Stores username string of logged-in user
+const CURRENT_USER_PROFILE_KEY = "currentUserProfile";
 const ACTIVE_SESSION_KEY = "lifeos_active_session"; // Stores active session metadata
 const TRUSTED_USERS_KEY = "lifeos_trusted_users_v1";
+const DESKTOP_ENTITLEMENT_KEY_PREFIX = 'lifeos_desktop_entitlement_';
 const REFRESH_TOKEN_KEY_PREFIX = "lifeos_refresh_token_";
 const ACCESS_TOKEN_KEY_PREFIX = "lifeos_access_token_";
 const TAB_ID_KEY = "lifeos_tab_id";
@@ -36,11 +39,26 @@ type TrustedUsersMap = Record<string, TrustedUserRecord>;
 type AuthApiSuccess = {
   success: boolean;
   message?: string;
-  user?: { username: string };
+  user?: { username: string; email?: string };
+  desktopEntitlement?: { paymentCompleted: boolean; purchaseDate?: string | null; expiresAt?: string | null; isPriviledge?: boolean };
   accessToken?: string;
   accessTokenExpiresInSec?: number;
   refreshToken?: string;
   refreshTokenExpiresAt?: string;
+};
+
+type StoredCurrentUserProfile = {
+  username: string;
+  email?: string;
+};
+
+type DesktopEntitlementSnapshot = {
+  username: string;
+  isPriviledge: boolean;
+  paymentCompleted: boolean;
+  purchaseDate: string | null;
+  expiresAt: string | null;
+  updatedAt: number;
 };
 
 type AuthApiError = {
@@ -143,6 +161,111 @@ const buildAuthUrl = (path: string): string => {
   return new URL(path, base.endsWith("/") ? base : `${base}/`).toString();
 };
 
+const getDesktopEntitlementKey = (username: string) => `${DESKTOP_ENTITLEMENT_KEY_PREFIX}${normalizeUsername(username)}`;
+
+const readDesktopEntitlementSnapshot = (username: string): DesktopEntitlementSnapshot | null => {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(getDesktopEntitlementKey(username));
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as DesktopEntitlementSnapshot;
+    if (!parsed?.username) return null;
+    return {
+      username: normalizeUsername(parsed.username),
+      isPriviledge: Boolean((parsed as DesktopEntitlementSnapshot).isPriviledge),
+      paymentCompleted: Boolean(parsed.paymentCompleted),
+      purchaseDate: typeof parsed.purchaseDate === 'string' ? parsed.purchaseDate : null,
+      expiresAt: typeof parsed.expiresAt === 'string' ? parsed.expiresAt : null,
+      updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : Date.now(),
+    };
+  } catch {
+    return null;
+  }
+};
+
+export const persistDesktopEntitlementSnapshot = (
+  username: string,
+  payload: { paymentCompleted: boolean; purchaseDate?: string | null; expiresAt?: string | null; isPriviledge?: boolean }
+) => {
+  if (typeof window === 'undefined') return;
+  const normalizedUsername = normalizeUsername(username);
+  safeSetLocalStorageItem(
+    getDesktopEntitlementKey(normalizedUsername),
+    JSON.stringify({
+      username: normalizedUsername,
+      isPriviledge: Boolean(payload.isPriviledge),
+      paymentCompleted: Boolean(payload.paymentCompleted),
+      purchaseDate: typeof payload.purchaseDate === 'string' ? payload.purchaseDate : null,
+      expiresAt: typeof payload.expiresAt === 'string' ? payload.expiresAt : null,
+      updatedAt: Date.now(),
+    } satisfies DesktopEntitlementSnapshot)
+  );
+};
+
+const persistDesktopEntitlementFromAuthResponse = (username: string, payload?: AuthApiSuccess) => {
+  if (!payload?.desktopEntitlement) return;
+  persistDesktopEntitlementSnapshot(username, {
+    paymentCompleted: payload.desktopEntitlement.paymentCompleted,
+    purchaseDate: payload.desktopEntitlement.purchaseDate ?? null,
+    expiresAt: payload.desktopEntitlement.expiresAt ?? null,
+    isPriviledge: Boolean(payload.desktopEntitlement.isPriviledge),
+  });
+};
+
+const isDesktopEntitlementActive = (snapshot: DesktopEntitlementSnapshot | null): boolean => {
+  if (!snapshot?.paymentCompleted || !snapshot.expiresAt) return false;
+  const expiresAtTime = Date.parse(snapshot.expiresAt);
+  return Number.isFinite(expiresAtTime) && expiresAtTime > Date.now();
+};
+
+const hasValidCachedDesktopEntitlement = (snapshot: DesktopEntitlementSnapshot | null): boolean => {
+  if (snapshot?.isPriviledge) return true;
+  if (!snapshot?.paymentCompleted) return false;
+  if (!snapshot.purchaseDate) return false;
+  if (!snapshot.expiresAt) return false;
+  const purchaseDateTime = Date.parse(snapshot.purchaseDate);
+  const expiresAtTime = Date.parse(snapshot.expiresAt);
+  if (!Number.isFinite(purchaseDateTime) || !Number.isFinite(expiresAtTime)) return false;
+  if (expiresAtTime <= Date.now()) return false;
+  return expiresAtTime > purchaseDateTime;
+};
+
+const requireDesktopEntitlementFromAuthPayload = (username: string, payload: AuthApiSuccess): DesktopEntitlementSnapshot => {
+  if (payload?.desktopEntitlement?.isPriviledge) {
+    return {
+      username: normalizeUsername(username),
+      isPriviledge: true,
+      paymentCompleted: true,
+      purchaseDate: null,
+      expiresAt: null,
+      updatedAt: Date.now(),
+    };
+  }
+
+  if (!payload?.desktopEntitlement?.paymentCompleted) {
+    throw new Error('Desktop app is not purchased by this user. Buy desktop access first, then sign in again.');
+  }
+
+  const snapshot: DesktopEntitlementSnapshot = {
+    username: normalizeUsername(username),
+    isPriviledge: false,
+    paymentCompleted: Boolean(payload?.desktopEntitlement?.paymentCompleted),
+    purchaseDate:
+      typeof payload?.desktopEntitlement?.purchaseDate === 'string' ? payload.desktopEntitlement.purchaseDate : null,
+    expiresAt:
+      typeof payload?.desktopEntitlement?.expiresAt === 'string' ? payload.desktopEntitlement.expiresAt : null,
+    updatedAt: Date.now(),
+  };
+
+  if (!hasValidCachedDesktopEntitlement(snapshot)) {
+    throw new Error(
+      'Desktop purchase data is incomplete on this device. Connect to the internet and complete one successful desktop sign-in after purchase to cache purchase validity.'
+    );
+  }
+
+  return snapshot;
+};
+
 const authRequest = async <T = unknown>(
   path: string,
   init: { method: string; headers?: Record<string, string>; body?: string }
@@ -150,12 +273,16 @@ const authRequest = async <T = unknown>(
   const url = buildAuthUrl(path);
   const base = resolveAuthBaseUrl();
   const shouldProxyViaDesktop = isDesktopRuntime() && Boolean(base) && typeof window !== "undefined" && !url.startsWith(window.location.origin);
+  const headers = {
+    ...(init.headers || {}),
+    ...(isDesktopRuntime() ? { 'x-studio-desktop': '1' } : {}),
+  };
 
   const performBrowserFetch = async (): Promise<{ ok: boolean; status: number; data: T | AuthApiError | null }> => {
     try {
       const response = await fetch(url, {
         method: init.method,
-        headers: init.headers,
+        headers,
         credentials: "include",
         body: init.body,
       });
@@ -165,7 +292,7 @@ const authRequest = async <T = unknown>(
       return {
         ok: false,
         status: 0,
-        data: { error: error instanceof Error ? error.message : String(error) },
+        data: { error: describeUnknownError(error, 'Request failed.') },
       };
     }
   };
@@ -178,7 +305,7 @@ const authRequest = async <T = unknown>(
     const result = await proxy.request({
       url,
       method: init.method,
-      headers: init.headers,
+      headers,
       body: init.body,
     });
     if (!result.success) {
@@ -216,7 +343,10 @@ const storeRefreshToken = async (username: string, refreshToken?: string) => {
   const normalized = normalizeUsername(username);
   const desktopStore = getDesktopTokenStore();
   if (desktopStore) {
-    await desktopStore.set(normalized, refreshToken);
+    const result = await desktopStore.set(normalized, refreshToken);
+    if (!result?.success) {
+      throw new Error(result?.error || 'Failed to persist desktop refresh token.');
+    }
     return;
   }
   safeSetLocalStorageItem(`${REFRESH_TOKEN_KEY_PREFIX}${normalized}`, refreshToken);
@@ -228,7 +358,10 @@ const readRefreshToken = async (username: string): Promise<string | null> => {
   const desktopStore = getDesktopTokenStore();
   if (desktopStore) {
     const result = await desktopStore.get(normalized);
-    return result?.success ? result.token || null : null;
+    if (!result?.success) {
+      throw new Error(result?.error || 'Failed to read desktop refresh token.');
+    }
+    return result.token || null;
   }
   return localStorage.getItem(`${REFRESH_TOKEN_KEY_PREFIX}${normalized}`);
 };
@@ -238,10 +371,49 @@ const clearRefreshToken = async (username: string) => {
   const normalized = normalizeUsername(username);
   const desktopStore = getDesktopTokenStore();
   if (desktopStore) {
-    await desktopStore.clear(normalized);
+    const result = await desktopStore.clear(normalized);
+    if (!result?.success) {
+      throw new Error(result?.error || 'Failed to clear desktop refresh token.');
+    }
   } else {
     localStorage.removeItem(`${REFRESH_TOKEN_KEY_PREFIX}${normalized}`);
   }
+};
+
+const persistCurrentUserProfile = (user: LocalUser) => {
+  if (typeof window === 'undefined') return;
+  safeSetLocalStorageItem(CURRENT_USER_PROFILE_KEY, JSON.stringify(user));
+};
+
+export const persistCurrentLocalUserProfile = (user: LocalUser) => {
+  persistCurrentUserProfile({
+    username: normalizeUsername(user.username),
+    ...(user.email ? { email: user.email } : {}),
+  });
+};
+
+const readCurrentUserProfile = (username?: string): LocalUser | null => {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(CURRENT_USER_PROFILE_KEY);
+  if (!raw) return username ? { username } : null;
+  try {
+    const parsed = JSON.parse(raw) as StoredCurrentUserProfile;
+    if (!parsed?.username) return username ? { username } : null;
+    if (username && normalizeUsername(parsed.username) !== normalizeUsername(username)) {
+      return { username };
+    }
+    return {
+      username: normalizeUsername(parsed.username),
+      ...(parsed.email ? { email: parsed.email } : {}),
+    };
+  } catch {
+    return username ? { username } : null;
+  }
+};
+
+const clearCurrentUserProfile = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(CURRENT_USER_PROFILE_KEY);
 };
 
 const persistAuthTokens = async (username: string, payload: AuthApiSuccess) => {
@@ -371,13 +543,14 @@ export const isCurrentSessionOwner = (username: string): boolean => {
   return active.sessionId === getTabId();
 };
 
-export async function registerUser(username: string, password: string): Promise<{ success: boolean, message: string, user?: LocalUser }> {
+export async function registerUser(username: string, password: string, email: string): Promise<{ success: boolean, message: string, user?: LocalUser }> {
   const normalizedUsername = normalizeUsername(username);
+  const normalizedEmail = email.trim().toLowerCase();
   try {
     const response = await authRequest<AuthApiSuccess>('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: normalizedUsername, password }),
+      body: JSON.stringify({ username: normalizedUsername, password, email: normalizedEmail }),
     });
 
     const result = (response.data || {}) as ({ error?: string; code?: string; message?: string } & AuthApiSuccess);
@@ -393,12 +566,13 @@ export async function registerUser(username: string, password: string): Promise<
     }
     
     // On successful registration, automatically log the user in locally
-    const user: LocalUser = { username: normalizedUsername };
+    const user: LocalUser = { username: normalizedUsername, email: result.user?.email || normalizedEmail };
     if (typeof window !== 'undefined') {
-      safeSetLocalStorageItem(CURRENT_USER_KEY, normalizedUsername);
-      establishSession(normalizedUsername);
       await cacheTrustedCredentials(normalizedUsername, password);
       await persistAuthTokens(normalizedUsername, result);
+      safeSetLocalStorageItem(CURRENT_USER_KEY, normalizedUsername);
+      persistCurrentUserProfile(user);
+      establishSession(normalizedUsername);
     }
     return { success: true, message: result?.message || 'Registration successful.', user };
 
@@ -415,12 +589,14 @@ export async function loginUser(
 ): Promise<{ success: boolean, message: string, user?: LocalUser, code?: "SESSION_ACTIVE" }> {
   const normalizedUsername = normalizeUsername(username);
   const isDemoLogin = normalizedUsername === "demo" && password === "demo";
+  const desktopRuntime = isDesktopRuntime();
 
   const finalizeOfflineLogin = async (): Promise<{ success: boolean, message: string, user?: LocalUser, code?: "SESSION_ACTIVE" }> => {
     if (isDemoLogin) {
-      const user: LocalUser = { username: normalizedUsername };
+      const user: LocalUser = readCurrentUserProfile(normalizedUsername) || { username: normalizedUsername };
       if (typeof window !== "undefined") {
         safeSetLocalStorageItem(CURRENT_USER_KEY, normalizedUsername);
+        persistCurrentUserProfile(user);
         establishSession(normalizedUsername);
       }
       return {
@@ -428,6 +604,16 @@ export async function loginUser(
         message: "Demo login successful.",
         user,
       };
+    }
+    if (desktopRuntime) {
+      const desktopEntitlement = readDesktopEntitlementSnapshot(normalizedUsername);
+      if (!hasValidCachedDesktopEntitlement(desktopEntitlement)) {
+        return {
+          success: false,
+          message:
+            'Desktop purchase is not cached on this device or is expired. Connect to the internet and complete one successful desktop sign-in after purchase to refresh local purchase validity.',
+        };
+      }
     }
     const isTrusted = await verifyTrustedCredentials(normalizedUsername, password);
     if (!isTrusted) {
@@ -444,9 +630,10 @@ export async function loginUser(
         message: "This account is already open in another session. Please log out there first.",
       };
     }
-    const user: LocalUser = { username: normalizedUsername };
+    const user: LocalUser = readCurrentUserProfile(normalizedUsername) || { username: normalizedUsername };
     if (typeof window !== 'undefined') {
       safeSetLocalStorageItem(CURRENT_USER_KEY, normalizedUsername);
+      persistCurrentUserProfile(user);
       establishSession(normalizedUsername);
     }
     return {
@@ -466,11 +653,11 @@ export async function loginUser(
     const result = (response.data || {}) as ({ error?: string; code?: string; message?: string } & AuthApiSuccess);
 
     if (!response.ok) {
-      if (result?.code === 'CLOUD_AUTH_UNAVAILABLE') {
+      if (result?.code === 'CLOUD_AUTH_UNAVAILABLE' && desktopRuntime) {
         return await finalizeOfflineLogin();
       }
-      // Treat transient server failures as offline-compatible when trusted credentials exist.
-      if (response.status >= 500) {
+      // Only the desktop app supports trusted offline resume after a prior cloud login.
+      if (desktopRuntime && response.status >= 500) {
         return await finalizeOfflineLogin();
       }
       return { success: false, message: result?.error || 'Login failed.' };
@@ -480,19 +667,51 @@ export async function loginUser(
       return { success: false, code: "SESSION_ACTIVE", message: "This account is already open in another session. Please log out there first." };
     }
 
-    const user: LocalUser = { username: normalizedUsername };
+    if (desktopRuntime) {
+      try {
+        requireDesktopEntitlementFromAuthPayload(normalizedUsername, result);
+      } catch (error) {
+        return {
+          success: false,
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Desktop purchase validation is unavailable for this account.',
+        };
+      }
+    }
+
+        const user: LocalUser = {
+          username: result.user?.username || normalizedUsername,
+          ...(result.user?.email ? { email: result.user.email } : {}),
+        };
     if (typeof window !== 'undefined') {
-      safeSetLocalStorageItem(CURRENT_USER_KEY, normalizedUsername);
-      establishSession(normalizedUsername);
       await cacheTrustedCredentials(normalizedUsername, password);
       await persistAuthTokens(normalizedUsername, result);
+      persistDesktopEntitlementFromAuthResponse(normalizedUsername, result);
+      safeSetLocalStorageItem(CURRENT_USER_KEY, normalizedUsername);
+      persistCurrentUserProfile(user);
+      establishSession(normalizedUsername);
     }
     
     return { success: true, message: result?.message || 'Login successful.', user };
     
   } catch (error) {
     console.error("Login error (trying offline fallback):", error);
-    return await finalizeOfflineLogin();
+    const message = describeUnknownError(error, 'Cloud sign-in failed. Please try again.');
+    if (message.toLowerCase().includes('refresh token')) {
+      return {
+        success: false,
+        message: `${message} Cloud sign-in could not be completed on this device.`,
+      };
+    }
+    if (desktopRuntime) {
+      return await finalizeOfflineLogin();
+    }
+    return {
+      success: false,
+      message: message || 'Cloud sign-in failed. Please try again.',
+    };
   }
 }
 
@@ -517,6 +736,7 @@ export function logoutUser(): Promise<void> {
       }
       clearSessionIfOwned();
       localStorage.removeItem(CURRENT_USER_KEY);
+      clearCurrentUserProfile();
     }
     resolve();
   });
@@ -524,7 +744,12 @@ export function logoutUser(): Promise<void> {
 
 export async function refreshSessionFromStoredToken(username: string): Promise<{ success: boolean; message: string; user?: LocalUser }> {
   const normalized = normalizeUsername(username);
-  const refreshToken = await readRefreshToken(normalized);
+  let refreshToken: string | null = null;
+  try {
+    refreshToken = await readRefreshToken(normalized);
+  } catch (error) {
+    return { success: false, message: describeUnknownError(error, 'Failed to read refresh token.') };
+  }
   if (!refreshToken) {
     return { success: false, message: "No stored refresh token for this user." };
   }
@@ -534,16 +759,39 @@ export async function refreshSessionFromStoredToken(username: string): Promise<{
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
     });
-    const result = (response.data || {}) as AuthApiSuccess & { error?: string };
+    const result = (response.data || {}) as AuthApiSuccess & { error?: unknown };
     if (!response.ok || !result.success) {
-      return { success: false, message: result.error || 'Refresh failed.' };
+      return { success: false, message: describeUnknownError(result.error, 'Refresh failed.') };
     }
+
+    if (isDesktopRuntime()) {
+      try {
+        requireDesktopEntitlementFromAuthPayload(normalized, result);
+      } catch (error) {
+        await clearRefreshToken(normalized).catch(() => undefined);
+        clearAccessToken(normalized);
+        clearSessionIfOwned(normalized);
+        localStorage.removeItem(CURRENT_USER_KEY);
+        clearCurrentUserProfile();
+        return {
+          success: false,
+          message: describeUnknownError(error, 'Desktop purchase validation is unavailable for this account.'),
+        };
+      }
+    }
+
     await persistAuthTokens(normalized, result);
+    persistDesktopEntitlementFromAuthResponse(normalized, result);
+    const user: LocalUser = {
+      username: result.user?.username || normalized,
+      ...(result.user?.email ? { email: result.user.email } : {}),
+    };
     safeSetLocalStorageItem(CURRENT_USER_KEY, normalized);
+    persistCurrentUserProfile(user);
     establishSession(normalized);
-    return { success: true, message: 'Session refreshed.', user: { username: normalized } };
+    return { success: true, message: 'Session refreshed.', user };
   } catch (error) {
-    return { success: false, message: error instanceof Error ? error.message : 'Refresh failed.' };
+    return { success: false, message: describeUnknownError(error, 'Refresh failed.') };
   }
 }
 
@@ -551,6 +799,23 @@ export function getCurrentLocalUser(): LocalUser | null {
   if (typeof window !== 'undefined') {
     const username = localStorage.getItem(CURRENT_USER_KEY);
     if (!username) return null;
+
+    if (isDesktopRuntime()) {
+      const desktopEntitlement = readDesktopEntitlementSnapshot(username);
+      if (!hasValidCachedDesktopEntitlement(desktopEntitlement)) {
+        clearSessionIfOwned(username);
+        localStorage.removeItem(CURRENT_USER_KEY);
+        clearCurrentUserProfile();
+        clearAccessToken(username);
+        const desktopStore = getDesktopTokenStore();
+        if (desktopStore) {
+          void desktopStore.clear(normalizeUsername(username));
+        } else {
+          localStorage.removeItem(`${REFRESH_TOKEN_KEY_PREFIX}${normalizeUsername(username)}`);
+        }
+        return null;
+      }
+    }
 
     if (hasActiveSessionConflict(username)) {
       return null;
@@ -561,7 +826,7 @@ export function getCurrentLocalUser(): LocalUser | null {
       establishSession(username);
     }
 
-    return { username };
+    return readCurrentUserProfile(username) || { username };
   }
   return null;
 }

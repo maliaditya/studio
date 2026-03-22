@@ -14,6 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ProfileModal } from './ProfileModal';
 
 interface UserProfileProps {
   onSettingsClick: () => void;
@@ -21,6 +22,7 @@ interface UserProfileProps {
 
 export function UserProfile({ onSettingsClick }: UserProfileProps) {
   const { currentUser, signOut: localSignOut, loading, pushDataToCloud, pullDataFromCloud, exportData, importData } = useAuth();
+  const [isProfileOpen, setIsProfileOpen] = React.useState(false);
 
   if (loading) {
     return <div className="h-8 w-20 animate-pulse bg-muted rounded-md"></div>;
@@ -61,6 +63,11 @@ export function UserProfile({ onSettingsClick }: UserProfileProps) {
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => setIsProfileOpen(true)} className="cursor-pointer">
+          <UserIcon className="mr-2 h-4 w-4" />
+          <span>Profile</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem onClick={pushDataToCloud} className="cursor-pointer">
           <UploadCloud className="mr-2 h-4 w-4" />
           <span>Push to Cloud</span>
@@ -84,6 +91,7 @@ export function UserProfile({ onSettingsClick }: UserProfileProps) {
           <span>Log out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
+      <ProfileModal isOpen={isProfileOpen} onOpenChange={setIsProfileOpen} />
     </DropdownMenu>
   );
 }

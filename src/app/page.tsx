@@ -6,15 +6,19 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, HeartPulse, Briefcase, TrendingUp, DollarSign, GitMerge, Share2, LayoutDashboard, BookCopy, Activity as ActivityIcon, Download, Sparkles, CheckCircle2, Laptop, PhoneCall } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Heart, HeartPulse, Briefcase, TrendingUp, DollarSign, GitMerge, Share2, LayoutDashboard, BookCopy, Activity as ActivityIcon, Sparkles, CheckCircle2, Laptop, PhoneCall, Download } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 import { LoadingScreen } from '@/components/LoadingScreen';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { fetchAppConfig } from '@/lib/appConfigClient';
+import { DESKTOP_PAYMENT_METHODS, DESKTOP_PLAN_DISPLAY_PRICE, formatDesktopPlanPrice, type DesktopPaymentProvider } from '@/lib/desktopAccess';
 
-const WINDOWS_EXE_URL = "https://github.com/maliaditya/studio/releases/download/v1.0.0/Studio.Setup.0.1.0.exe";
 const SETUP_CALL_URL = process.env.NEXT_PUBLIC_SETUP_CALL_URL || "https://buymeacoffee.com/adityamali98/e/515325";
 const IS_EXTERNAL_SETUP_CALL_URL = /^https?:\/\//i.test(SETUP_CALL_URL);
 
@@ -157,15 +161,99 @@ const StrategicOverviewDiagram = () => {
 
 
 export default function LandingPage() {
-  const { currentUser, loading } = useAuth();
+    const {
+        currentUser,
+        loading,
+        desktopAccess,
+        desktopAccessLoading,
+        ensureCloudSession,
+        startDesktopCheckout,
+        confirmDesktopCheckout,
+        refreshDesktopAccess,
+    } = useAuth();
   const router = useRouter();
+    const { toast } = useToast();
   const [dontShowAgain, setDontShowAgain] = useState(false);
-  const [downloadCount, setDownloadCount] = useState<number | null>(null);
-  const [downloadUrl, setDownloadUrl] = useState(WINDOWS_EXE_URL);
   const [isPageReady, setIsPageReady] = useState(false);
+    const [isDesktopAccessDialogOpen, setIsDesktopAccessDialogOpen] = useState(false);
+    const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<DesktopPaymentProvider>('razorpay');
+    const [isProcessingDesktopAction, setIsProcessingDesktopAction] = useState(false);
+    const [isDownloadingDesktop, setIsDownloadingDesktop] = useState(false);
+    const [needsDesktopReauth, setNeedsDesktopReauth] = useState(false);
+    const [desktopPlanDisplayPrice, setDesktopPlanDisplayPrice] = useState(DESKTOP_PLAN_DISPLAY_PRICE);
+    const [downloadCount, setDownloadCount] = useState<number | null>(null);
   const isDesktopRuntime = typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
 
+    const loadRazorpayScript = async () => {
+        if (typeof window === 'undefined') return false;
+        if ((window as any).Razorpay) return true;
+
+        return await new Promise<boolean>((resolve) => {
+            const existing = document.querySelector('script[data-razorpay-checkout="true"]') as HTMLScriptElement | null;
+            if (existing) {
+                existing.addEventListener('load', () => resolve(true), { once: true });
+                existing.addEventListener('error', () => resolve(false), { once: true });
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+            script.async = true;
+            script.dataset.razorpayCheckout = 'true';
+            script.onload = () => resolve(true);
+            script.onerror = () => resolve(false);
+            document.body.appendChild(script);
+        });
+    };
+
   useEffect(() => {
+        let cancelled = false;
+
+        const loadAppConfig = async () => {
+            try {
+                const config = await fetchAppConfig();
+                if (!cancelled && typeof config.desktopPlanPriceInr === 'number') {
+                    setDesktopPlanDisplayPrice(formatDesktopPlanPrice(config.desktopPlanPriceInr));
+                }
+            } catch {
+                // Keep the built-in fallback display price.
+            }
+        };
+
+        void loadAppConfig();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadDownloadCount = async () => {
+            try {
+                const response = await fetch('/api/download-count', {
+                    cache: 'no-store',
+                });
+                const result = await response.json().catch(() => null);
+                if (!response.ok || typeof result?.count !== 'number') {
+                    return;
+                }
+                if (!cancelled) {
+                    setDownloadCount(result.count);
+                }
+            } catch {
+                // Keep the count hidden if the endpoint is unavailable.
+            }
+        };
+
+        void loadDownloadCount();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
+    useEffect(() => {
     if (loading) return;
     if (currentUser) {
       const hideLanding = localStorage.getItem('dock_hide_landing_page');
@@ -186,59 +274,273 @@ export default function LandingPage() {
     return () => window.clearTimeout(timeoutId);
   }, [isPageReady]);
 
-  useEffect(() => {
-    if (isDesktopRuntime) return;
-    let isMounted = true;
-    const loadLatestRelease = async () => {
-      try {
-        const res = await fetch("/api/latest-windows-release", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as { url?: string };
-        if (isMounted && typeof data.url === "string" && data.url.length > 0) {
-          setDownloadUrl(data.url);
+    useEffect(() => {
+        if (desktopAccess.currentSession?.provider) {
+            setSelectedPaymentMethod(desktopAccess.currentSession.provider);
         }
-      } catch {
-        // Keep fallback URL.
-      }
-    };
-    const loadDownloadCount = async () => {
-      try {
-        const res = await fetch("/api/download-count", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as { count?: number };
-        if (isMounted) setDownloadCount(typeof data.count === "number" ? data.count : 0);
-      } catch {
-        // Ignore API failures and keep count hidden.
-      }
-    };
-    void loadLatestRelease();
-    void loadDownloadCount();
-    return () => {
-      isMounted = false;
-    };
-  }, [isDesktopRuntime]);
+    }, [desktopAccess.currentSession?.provider]);
 
-  const handleDownloadClick = async () => {
-    try {
-      const res = await fetch("/api/download-count", { method: "POST" });
-      if (!res.ok) return;
-      const data = (await res.json()) as { count?: number };
-      if (typeof data.count === "number") {
-        setDownloadCount(data.count);
-      } else {
-        setDownloadCount((prev) => (typeof prev === "number" ? prev + 1 : 1));
-      }
-    } catch {
-      setDownloadCount((prev) => (typeof prev === "number" ? prev + 1 : 1));
-    }
-  };
-  
   const handleProceed = () => {
     if (dontShowAgain && currentUser) {
         safeSetLocalStorageItem('dock_hide_landing_page', 'true');
     }
     router.push(currentUser ? "/my-plate" : "/login");
   };
+
+    const openDesktopReauthDialog = () => {
+        setNeedsDesktopReauth(true);
+        setIsPaymentDialogOpen(false);
+        setIsDesktopAccessDialogOpen(true);
+    };
+
+    const openPaymentMethodsDialog = () => {
+        setNeedsDesktopReauth(false);
+        setIsDesktopAccessDialogOpen(false);
+        setIsPaymentDialogOpen(true);
+    };
+
+    const isDesktopReauthError = (message: string) =>
+        /cloud sign-in expired|sign in again|session expired/i.test(message);
+
+    const handleDesktopDownload = async () => {
+        setIsDownloadingDesktop(true);
+        try {
+            let response = await fetch('/api/latest-windows-release', {
+                credentials: 'include',
+                cache: 'no-store',
+                headers: currentUser?.username ? { 'x-local-username': currentUser.username } : undefined,
+            });
+            if (response.status === 401) {
+                const refreshed = await ensureCloudSession();
+                if (!refreshed.success) {
+                    openDesktopReauthDialog();
+                    throw new Error(refreshed.message);
+                }
+                response = await fetch('/api/latest-windows-release', {
+                    credentials: 'include',
+                    cache: 'no-store',
+                    headers: currentUser?.username ? { 'x-local-username': currentUser.username } : undefined,
+                });
+            }
+            const result = await response.json().catch(() => null);
+            if (!response.ok || !result?.url) {
+                if (response.status === 401 && result?.error) {
+                    openDesktopReauthDialog();
+                }
+                throw new Error(result?.error || 'Failed to fetch the desktop installer.');
+            }
+
+            try {
+                const countResponse = await fetch('/api/download-count', {
+                    method: 'POST',
+                });
+                const countResult = await countResponse.json().catch(() => null);
+                if (countResponse.ok && typeof countResult?.count === 'number') {
+                    setDownloadCount(countResult.count);
+                }
+            } catch {
+                // Download access should continue even if the counter update fails.
+            }
+
+            window.open(result.url, '_blank', 'noopener,noreferrer');
+            toast({ title: 'Desktop Download Ready', description: 'Your installer link has been opened.' });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to fetch the desktop installer.';
+            if (isDesktopReauthError(message)) {
+                return;
+            }
+            toast({
+                title: 'Desktop Download Failed',
+                description: message,
+                variant: 'destructive',
+            });
+        } finally {
+            setIsDownloadingDesktop(false);
+        }
+    };
+
+    const handleDesktopPricingClick = async () => {
+        if (desktopAccess.hasAccess) {
+            await handleDesktopDownload();
+            return;
+        }
+        if (currentUser) {
+            openPaymentMethodsDialog();
+            return;
+        }
+        setNeedsDesktopReauth(false);
+        setIsDesktopAccessDialogOpen(true);
+    };
+
+    const handleDesktopCheckoutAction = async () => {
+        if (!currentUser) {
+            setIsDesktopAccessDialogOpen(true);
+            return;
+        }
+
+        setIsProcessingDesktopAction(true);
+        try {
+            if (selectedPaymentMethod === 'razorpay' || selectedPaymentMethod === 'upi') {
+                const razorpayProvider = selectedPaymentMethod;
+                const result = await startDesktopCheckout(razorpayProvider);
+                if (!result.success) {
+                    if (isDesktopReauthError(result.message)) {
+                        openDesktopReauthDialog();
+                        return;
+                    }
+                    throw new Error(result.message);
+                }
+                if (!result.sessionId) {
+                    throw new Error('Razorpay checkout session was not created.');
+                }
+                const checkoutData = result.checkoutData as {
+                    keyId?: string;
+                    orderId?: string;
+                    amount?: number;
+                    currency?: string;
+                    name?: string;
+                    description?: string;
+                    method?: 'card' | 'upi';
+                    prefill?: { name?: string; contact?: string; email?: string };
+                } | null;
+                if (!checkoutData?.keyId || !checkoutData?.orderId || !checkoutData?.amount || !checkoutData?.currency) {
+                    throw new Error('Razorpay checkout details were not returned.');
+                }
+
+                const scriptLoaded = await loadRazorpayScript();
+                if (!scriptLoaded || !(window as any).Razorpay) {
+                    throw new Error('Failed to load Razorpay Checkout.');
+                }
+
+                await new Promise<void>((resolve, reject) => {
+                    const upiOnlyConfig = checkoutData.method === 'upi'
+                        ? {
+                              display: {
+                                  blocks: {
+                                      upi: {
+                                          name: 'Pay Using UPI',
+                                          instruments: [{ method: 'upi' }],
+                                      },
+                                  },
+                                  sequence: ['block.upi'],
+                                  preferences: {
+                                      show_default_blocks: false,
+                                  },
+                              },
+                          }
+                        : {};
+
+                    const razorpay = new (window as any).Razorpay({
+                        key: checkoutData.keyId,
+                        amount: checkoutData.amount,
+                        currency: checkoutData.currency,
+                        name: checkoutData.name || 'Dock',
+                        description: checkoutData.description || 'Desktop yearly access',
+                        order_id: checkoutData.orderId,
+                        prefill: checkoutData.prefill,
+                        readonly: {
+                            contact: Boolean(checkoutData.prefill?.contact),
+                            email: Boolean(checkoutData.prefill?.email),
+                        },
+                        modal: {
+                            ondismiss: () => reject(new Error('Razorpay checkout was cancelled.')),
+                        },
+                        ...upiOnlyConfig,
+                        handler: async (paymentResponse: {
+                            razorpay_payment_id: string;
+                            razorpay_order_id: string;
+                            razorpay_signature: string;
+                        }) => {
+                            const confirmation = await confirmDesktopCheckout(result.sessionId!, razorpayProvider, {
+                                providerSessionId: paymentResponse.razorpay_payment_id,
+                                providerOrderId: paymentResponse.razorpay_order_id,
+                                providerSignature: paymentResponse.razorpay_signature,
+                            });
+
+                            if (!confirmation.success) {
+                                reject(new Error(confirmation.message));
+                                return;
+                            }
+
+                            await refreshDesktopAccess();
+                            toast({
+                                title: 'Desktop Access Unlocked',
+                                description: confirmation.message,
+                            });
+                            resolve();
+                        },
+                    });
+
+                    razorpay.open();
+                });
+
+                setIsPaymentDialogOpen(false);
+                    return;
+            }
+
+            const pendingSession =
+                desktopAccess.currentSession?.status === 'pending' && desktopAccess.currentSession.provider === selectedPaymentMethod
+                    ? desktopAccess.currentSession
+                    : null;
+
+            if (pendingSession) {
+                const result = await confirmDesktopCheckout(pendingSession.id, pendingSession.provider);
+                if (!result.success) {
+                    if (isDesktopReauthError(result.message)) {
+                        openDesktopReauthDialog();
+                        return;
+                    }
+                    throw new Error(result.message);
+                }
+                toast({ title: 'Desktop Access Unlocked', description: result.message });
+                await refreshDesktopAccess();
+                return;
+            }
+
+            const result = await startDesktopCheckout(selectedPaymentMethod);
+            if (!result.success) {
+                if (isDesktopReauthError(result.message)) {
+                    openDesktopReauthDialog();
+                    return;
+                }
+                throw new Error(result.message);
+            }
+            toast({
+                title: 'Payment Session Created',
+                description: 'The checkout session is recorded. Confirm the placeholder payment step to unlock desktop access.',
+            });
+        } catch (error) {
+            toast({
+                title: 'Desktop Checkout Failed',
+                description: error instanceof Error ? error.message : 'Unable to continue desktop checkout.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsProcessingDesktopAction(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!currentUser || needsDesktopReauth || !isDesktopAccessDialogOpen) {
+            return;
+        }
+
+        openPaymentMethodsDialog();
+    }, [currentUser, needsDesktopReauth, isDesktopAccessDialogOpen]);
+
+    const pendingSelectedSession =
+        desktopAccess.currentSession?.status === 'pending' && desktopAccess.currentSession.provider === selectedPaymentMethod
+            ? desktopAccess.currentSession
+            : null;
+    const paymentActionLabel = desktopAccess.hasAccess
+        ? 'Download Desktop'
+        : selectedPaymentMethod === 'razorpay'
+        ? 'Pay With Razorpay'
+        : selectedPaymentMethod === 'upi'
+        ? 'Pay With UPI'
+        : pendingSelectedSession
+        ? 'Confirm Placeholder Payment'
+        : 'Create Payment Session';
 
   if (!isPageReady) {
     return (
@@ -283,6 +585,16 @@ export default function LandingPage() {
                         <p className="mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
                             Dock connects your botherings, tasks, schedules, routines, learning plans, resources, and AI review loop into one system so daily action compounds.
                         </p>
+                        <div className="mt-4 flex flex-wrap items-center gap-2">
+                          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-medium text-foreground">
+                            <span className="text-emerald-300">Web</span>
+                            <span className="text-muted-foreground">Free</span>
+                          </div>
+                          <div className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-medium text-foreground">
+                            <span className="text-primary">Desktop</span>
+                                                        <span className="text-muted-foreground">{desktopPlanDisplayPrice} yearly</span>
+                          </div>
+                        </div>
                         <ul className="mt-6 grid gap-2 sm:grid-cols-2">
                             {heroBullets.map((bullet) => (
                                 <li key={bullet} className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -304,8 +616,18 @@ export default function LandingPage() {
                             <Button asChild variant="outline" size="lg" className="text-base font-semibold">
                                 <Link href="/support">
                                     <Heart className="mr-2 h-4 w-4" />
-                                    Support Development
+                                Pricing & Support
                                 </Link>
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="lg"
+                                className="text-base font-semibold"
+                                onClick={() => void handleDesktopPricingClick()}
+                            >
+                                <Download className="mr-2 h-4 w-4" />
+                                Download for Windows
                             </Button>
                             <Button asChild variant="outline" size="lg" className="text-base font-semibold">
                                 {IS_EXTERNAL_SETUP_CALL_URL ? (
@@ -320,22 +642,35 @@ export default function LandingPage() {
                                     </Link>
                                 )}
                             </Button>
-                            {!isDesktopRuntime ? (
-                                <>
-                                    <Button asChild variant="outline" size="lg" className="text-base font-semibold">
-                                        <a href={downloadUrl} target="_blank" rel="noopener noreferrer" onClick={handleDownloadClick}>
-                                            <Download className="mr-2 h-4 w-4" />
-                                            Download for Windows
-                                        </a>
-                                    </Button>
-                                    {downloadCount !== null ? (
-                                        <div className="text-sm text-muted-foreground">
-                                            Downloads: <span className="font-semibold text-foreground">{downloadCount.toLocaleString()}</span>
-                                        </div>
-                                    ) : null}
-                                </>
-                            ) : null}
                         </div>
+                            <div className="mt-6 grid max-w-2xl gap-3 sm:grid-cols-2">
+                              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4 backdrop-blur-sm">
+                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-200">Web</p>
+                                <p className="mt-2 text-2xl font-bold text-foreground">Free</p>
+                                <p className="mt-1 text-sm text-muted-foreground">Use Dock on the web at no cost.</p>
+                              </div>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => void handleDesktopPricingClick()}
+                                                                className="rounded-2xl border border-primary/20 bg-primary/10 p-4 text-left backdrop-blur-sm transition-colors hover:border-primary/40 hover:bg-primary/15"
+                                                            >
+                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Desktop</p>
+                                <p className="mt-2 text-2xl font-bold text-foreground">{desktopPlanDisplayPrice} yearly</p>
+                                                                <p className="mt-1 text-sm text-muted-foreground">Annual desktop access billed once per year.</p>
+                                                                {downloadCount !== null && (
+                                                                    <p className="mt-2 text-xs text-muted-foreground">Downloads: {downloadCount.toLocaleString()}</p>
+                                                                )}
+                                                                <p className="mt-3 text-xs font-medium text-primary">
+                                                                    {desktopAccess.hasAccess
+                                                                        ? isDownloadingDesktop
+                                                                            ? 'Preparing your download...'
+                                                                            : 'Access unlocked. Click to download.'
+                                                                        : desktopAccess.status === 'pending'
+                                                                        ? 'Payment session pending. Click to continue.'
+                                                                        : 'Click to unlock desktop access'}
+                                                                </p>
+                                                            </button>
+                            </div>
                         {currentUser && (
                             <div className="mt-4 flex items-center gap-2">
                                 <Checkbox id="dont-show-again" checked={dontShowAgain} onCheckedChange={(checked) => setDontShowAgain(!!checked)} />
@@ -451,6 +786,136 @@ export default function LandingPage() {
             </div>
             </div>
         </section>
+
+                <Dialog open={isDesktopAccessDialogOpen} onOpenChange={setIsDesktopAccessDialogOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>
+                                {needsDesktopReauth ? 'Sign In Again' : currentUser ? 'Continue To Payment' : 'Unlock Desktop Access'}
+                            </DialogTitle>
+                            <DialogDescription>
+                                {needsDesktopReauth
+                                  ? 'Your cloud session expired. Sign in again to continue with desktop payment or download.'
+                                  : currentUser
+                                  ? 'Your account is already signed in. Continue to choose a payment method for desktop access.'
+                                  : 'Sign in or create an account first. After that, you can continue to the desktop payment flow.'}
+                            </DialogDescription>
+                        </DialogHeader>
+                        {currentUser?.username && (
+                            <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                                Signed in as <span className="font-semibold text-foreground">{currentUser.username}</span>
+                            </div>
+                        )}
+                        {currentUser && !needsDesktopReauth ? (
+                            <button
+                                type="button"
+                                onClick={openPaymentMethodsDialog}
+                                className="rounded-xl border border-primary/40 bg-primary/10 p-4 text-left transition-colors hover:border-primary/60 hover:bg-primary/15"
+                            >
+                                <p className="text-sm font-semibold text-foreground">Open Payment Methods</p>
+                                <p className="mt-1 text-sm text-muted-foreground">
+                                    Choose card, UPI, or PayPal and continue the desktop checkout flow.
+                                </p>
+                            </button>
+                        ) : (
+                            <div className={`grid gap-3 ${needsDesktopReauth ? '' : 'sm:grid-cols-2'}`}>
+                                <button
+                                  type="button"
+                                  onClick={() => router.push('/login?mode=login')}
+                                  className="rounded-xl border border-border/60 bg-background/60 p-4 text-left transition-colors hover:border-primary/40 hover:bg-background"
+                                >
+                                    <p className="text-sm font-semibold text-foreground">Login</p>
+                                    <p className="mt-1 text-sm text-muted-foreground">
+                                      {needsDesktopReauth ? 'Sign in again to restore your cloud session.' : 'Access your existing Dock account.'}
+                                    </p>
+                                </button>
+                                {!needsDesktopReauth && (
+                                  <button
+                                      type="button"
+                                      onClick={() => router.push('/login?mode=register')}
+                                      className="rounded-xl border border-border/60 bg-background/60 p-4 text-left transition-colors hover:border-primary/40 hover:bg-background"
+                                  >
+                                      <p className="text-sm font-semibold text-foreground">Register</p>
+                                      <p className="mt-1 text-sm text-muted-foreground">Create a new account to buy desktop access.</p>
+                                  </button>
+                                )}
+                            </div>
+                        )}
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setIsDesktopAccessDialogOpen(false)}>
+                                Close
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+                    <DialogContent className="sm:max-w-lg">
+                        <DialogHeader>
+                            <DialogTitle>Desktop Payment</DialogTitle>
+                            <DialogDescription>
+                                Select a payment method for desktop access. Entitlement is now stored server-side and download access is gated behind it.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {currentUser?.username && (
+                            <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                                Purchasing as <span className="font-semibold text-foreground">{currentUser.username}</span>
+                            </div>
+                        )}
+                        <div className="space-y-3">
+                            {DESKTOP_PAYMENT_METHODS.map((method) => (
+                                <button
+                                    key={method.id}
+                                    type="button"
+                                    onClick={() => setSelectedPaymentMethod(method.id)}
+                                    className={cn(
+                                        'w-full rounded-xl border p-4 text-left transition-colors',
+                                        selectedPaymentMethod === method.id
+                                            ? 'border-primary bg-primary/10'
+                                            : 'border-border/60 bg-background/60 hover:border-primary/30 hover:bg-background'
+                                    )}
+                                >
+                                    <p className="text-sm font-semibold text-foreground">{method.title}</p>
+                                    <p className="mt-1 text-sm text-muted-foreground">{method.description}</p>
+                                </button>
+                            ))}
+                            <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
+                                Selected plan: <span className="font-semibold text-foreground">Desktop • {desktopPlanDisplayPrice} yearly</span>
+                                                                <div className="mt-2">Selected method: <span className="font-semibold text-foreground">{DESKTOP_PAYMENT_METHODS.find((method) => method.id === selectedPaymentMethod)?.title || 'Unknown'}</span></div>
+                                                                <div className="mt-2">
+                                                                    {desktopAccess.hasAccess
+                                                                        ? 'This account already has desktop access.'
+                                                                        : pendingSelectedSession
+                                                                        ? 'A pending checkout session exists for this provider. Confirm it to unlock the download.'
+                                                                        : 'This creates a Razorpay checkout session. Access is enabled for one year after server-side payment signature verification.'}
+                                                                </div>
+                                                                {desktopAccess.currentSession?.id && !desktopAccess.hasAccess && (
+                                                                    <div className="mt-2 text-xs text-muted-foreground">
+                                                                        Current session: <span className="font-medium text-foreground">{desktopAccess.currentSession.id}</span>
+                                                                    </div>
+                                                                )}
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setIsPaymentDialogOpen(false)}>
+                                Cancel
+                            </Button>
+                                                        <Button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                if (desktopAccess.hasAccess) {
+                                                                    void handleDesktopDownload();
+                                                                    return;
+                                                                }
+                                                                void handleDesktopCheckoutAction();
+                                                            }}
+                                                            disabled={desktopAccessLoading || isProcessingDesktopAction || isDownloadingDesktop}
+                                                        >
+                                                                {desktopAccessLoading || isProcessingDesktopAction || isDownloadingDesktop ? 'Please wait...' : paymentActionLabel}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
       </main>
       
       <footer className="border-t border-border/60 bg-[rgba(3,10,28,0.96)]">

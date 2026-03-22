@@ -5,13 +5,14 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode, useRef, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, MindsetPoint, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise, DrawingCanvasPopupState, PdfViewerPopupState, FormalizationItem, AbandonmentLog, RecurrenceRule, KanbanBoard, KanbanList, KanbanCard, KanbanAttachment, KanbanComment, KanbanChecklistItem, SkillAcquisitionPlan, DailyJournalSession, MindsetSession, PdfViewerLaunchContext } from '@/types/workout';
+import type { LocalUser, WeightLog, Gender, UserDietPlan, FullSchedule, DatedWorkout, Activity, LoggedSet, WorkoutMode, AllWorkoutPlans, ExerciseDefinition, TopicGoal, ProductizationPlan, Release, ExerciseCategory, ActivityType, Offer, Resource, ResourceFolder, CanvasLayout, MindsetCard, MindsetPoint, PistonsCategoryData, SkillDomain, CoreSkill, Project, Company, Position, MicroSkill, PopupState, ResourcePoint, SkillArea, DailySchedule, PurposeData, Pattern, MetaRule, PistonsInitialState, PistonEntry, AutoSuggestionEntry, RuleDetailPopupState, TaskContextPopupState, PillarCardData, HabitEquation, PathNode, ContentViewPopupState, TodaysDietPopupState, HabitDetailPopupState, StrengthTrainingMode, Stopper, Strength, SubTask, MissedSlotReview, MindsetTechniquePopupState, StopperProgressPopupState, WorkoutSchedulingMode, UserSettings, Priority, BrainHack, PipState, ActiveFocusSession, SlotName, PillarPopupState, RepetitionData, DailyReviewLog, NodeType, PlaybackRequest, WorkoutExercise, DrawingCanvasPopupState, PdfViewerPopupState, FormalizationItem, AbandonmentLog, RecurrenceRule, KanbanBoard, KanbanList, KanbanCard, KanbanAttachment, KanbanComment, KanbanChecklistItem, SkillAcquisitionPlan, DailyJournalSession, MindsetSession, PdfViewerLaunchContext, Goal } from '@/types/workout';
 import { 
   registerUser as localRegisterUser, 
   loginUser as localLoginUser, 
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
   isCurrentSessionOwner,
+  persistDesktopEntitlementSnapshot,
   refreshSessionHeartbeat,
   refreshSessionFromStoredToken,
 } from '@/lib/localAuth';
@@ -36,7 +37,6 @@ import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { GeneralResourcePopup } from '@/components/GeneralResourcePopup';
-import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { TodaysDietPopup } from '@/components/TodaysDietPopup';
 import { HabitDetailPopup } from '@/components/HabitDetailPopup';
 import { deleteAudio, clearAllData, storeBackup, getBackup, deleteBackup, getAllExcalidrawFiles, getExcalidrawFile, storeExcalidrawFile, type ExcalidrawFileRecord, storeAudio, getAudioForResource, storePdf, getPdfForResource, getAllPdfKeys } from '@/lib/audioDB';
@@ -44,6 +44,7 @@ import { uploadPdfToSupabase, downloadPdfFromSupabase } from '@/lib/supabasePdfS
 import { normalizeAiSettings } from '@/lib/ai/config';
 import { buildDefaultPointsForResourceType, createDefaultTextPoint } from '@/lib/resourceDefaults';
 import { fetchAppConfig } from '@/lib/appConfigClient';
+import { createEmptyDesktopAccessState, type DesktopAccessState, type DesktopPaymentProvider } from '@/lib/desktopAccess';
 
 // Helper: convert ArrayBuffer to base64 in safe chunks to avoid "call stack size exceeded"
 const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
@@ -77,7 +78,7 @@ type RemoteAheadDecision = 'pull' | 'force' | 'cancel';
 interface AuthContextType {
   currentUser: LocalUser | null;
   loading: boolean;
-  register: (username: string, password:string) => Promise<void>;
+  register: (username: string, password:string, email: string) => Promise<void>;
   signIn: (username: string, password: string, opts?: { force?: boolean }) => Promise<{ success: boolean; message: string; code?: "SESSION_ACTIVE" }>;
   signOut: () => Promise<void>;
   pushDataToCloud: () => void;
@@ -130,6 +131,12 @@ interface AuthContextType {
   syncPdfFilesToGitHub: () => Promise<void>;
   fetchPdfFilesFromGitHub: () => Promise<void>;
   handleCreateTask: (activity: Activity, linkedActivityType: ActivityType, microSkillName: string, parentTaskId: string) => Promise<{ parentName: string, childName: string, childId: string } | null>;
+  desktopAccess: DesktopAccessState;
+  desktopAccessLoading: boolean;
+  ensureCloudSession: () => Promise<{ success: boolean; message: string }>;
+  refreshDesktopAccess: () => Promise<void>;
+  startDesktopCheckout: (provider: DesktopPaymentProvider) => Promise<{ success: boolean; message: string; access: DesktopAccessState; sessionId?: string | null; checkoutUrl?: string | null; checkoutData?: Record<string, unknown> | null }>;
+  confirmDesktopCheckout: (sessionId: string, provider?: DesktopPaymentProvider, paymentDetails?: { providerSessionId?: string; providerOrderId?: string; providerSignature?: string }) => Promise<{ success: boolean; message: string; access: DesktopAccessState }>;
   
   // App Data States
   schedule: FullSchedule;
@@ -342,6 +349,8 @@ interface AuthContextType {
   // Mindset
   mindsetCards: MindsetCard[];
   setMindsetCards: React.Dispatch<React.SetStateAction<MindsetCard[]>>;
+  goals: Goal[];
+  setGoals: React.Dispatch<React.SetStateAction<Goal[]>>;
   createShivGuideFlow: (input: {
     botheringType: 'external' | 'mismatch' | 'constraint';
     botheringText: string;
@@ -912,6 +921,8 @@ const normalizeKanbanBoards = (
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<LocalUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [desktopAccess, setDesktopAccess] = useState<DesktopAccessState>(createEmptyDesktopAccessState());
+  const [desktopAccessLoading, setDesktopAccessLoading] = useState(false);
   const [isDemoTokenModalOpen, setIsDemoTokenModalOpen] = useState(false);
   const [theme, setThemeState] = useState('ad-dark');
   const [floatingVideoUrl, setFloatingVideoUrl] = useState<string | null>(null);
@@ -972,6 +983,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     pdfDailyPageTargetByResourceId: {},
     pdfDailyPageStatsByResourceId: {},
     pdfAnnotationsByResourceId: {},
+    pdfLinkedCanvasByResourceId: {},
+    pdfDiagramTextByResourceId: {},
     flashcardSessions: [],
     flashcardTopicTablesBySpecializationId: {},
     learningPerformanceDailyLogs: {},
@@ -1088,6 +1101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   // Mindset State
   const [mindsetCards, setMindsetCards] = useState<MindsetCard[]>([]);
+  const [goals, setGoals] = useState<Goal[]>([]);
   
   // Pistons
   const [isPistonsHeadOpen, setIsPistonsHeadOpen] = useState(false);
@@ -2258,7 +2272,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals,
         deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, kanbanBoards, mindProgrammingDefinitions, allMindProgrammingLogs,
         resources, resourceFolders,
-        canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions,
+        canvasLayout, mindsetCards, goals, pistons, skillDomains, coreSkills, projects, companies, positions,
         purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans,
         autoSuggestions,
         pathNodes,
@@ -2283,7 +2297,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
   }, [
-    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, kanbanBoards, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, journalSessions, mindsetSessions, topPriorities, brainHacks, settings, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, selectedFormalizationSpecId, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pipState, spacedRepetitionData, dailyReviewLogs, abandonmentLogs
+    weightLogs, goalWeight, height, dateOfBirth, gender, dietPlan, schedule, dailyPurposes, allUpskillLogs, allDeepWorkLogs, allWorkoutLogs, brandingLogs, allLeadGenLogs, workoutMode, strengthTrainingMode, workoutPlanRotation, workoutPlans, exerciseDefinitions, upskillDefinitions, topicGoals, deepWorkDefinitions, leadGenDefinitions, productizationPlans, offerizationPlans, kanbanBoards, mindProgrammingDefinitions, allMindProgrammingLogs, resources, resourceFolders, canvasLayout, mindsetCards, goals, pistons, skillDomains, coreSkills, projects, companies, positions, purposeData, patterns, metaRules, pillarEquations, skillAcquisitionPlans, autoSuggestions, pathNodes, mindProgrammingCategories, mindProgrammingMode, mindProgrammingPlans, mindProgrammingPlanRotation, missedSlotReviews, journalSessions, mindsetSessions, topPriorities, brainHacks, settings, pinnedFolderIds, activeResourceTabIds, selectedResourceFolderId, lastSelectedHabitFolder, selectedUpskillTask, selectedDeepWorkTask, selectedMicroSkill, selectedFormalizationSpecId, expandedItems, selectedDomainId, selectedSkillId, selectedProjectId, selectedCompanyId, activeFocusSession, isAgendaDocked, recentItems, pipState, spacedRepetitionData, dailyReviewLogs, abandonmentLogs
   ]);
 
   const stripLocalOnlySecretsFromPayload = useCallback((payload: any) => {
@@ -2570,6 +2584,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setResources(updatedResources as Resource[]);
     setCanvasLayout(sanitizedMain.canvasLayout || { nodes: [], edges: [] });
     setMindsetCards(sanitizedMain.mindsetCards || []);
+    setGoals(sanitizedMain.goals || []);
     setPistons(sanitizedMain.pistons || {});
     setSkillDomains(sanitizedMain.skillDomains || []);
     setCoreSkills(sanitizedMain.coreSkills || []);
@@ -2657,10 +2672,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           },
           routineSkipByDate: {},
           routineSourceOverrides: {},
-          pdfLastOpenedPageByResourceId: {},
-          pdfDailyPageTargetByResourceId: {},
-          pdfDailyPageStatsByResourceId: {},
-          pdfAnnotationsByResourceId: {},
+      pdfLastOpenedPageByResourceId: {},
+      pdfDailyPageTargetByResourceId: {},
+      pdfDailyPageStatsByResourceId: {},
+      pdfAnnotationsByResourceId: {},
+      pdfLinkedCanvasByResourceId: {},
+      pdfDiagramTextByResourceId: {},
           flashcardSessions: [],
           flashcardTopicTablesBySpecializationId: {},
           learningPerformanceDailyLogs: {},
@@ -2761,9 +2778,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [loadImportedData, toast]);
   
-  const register = async (username: string, password: string) => {
+  const register = async (username: string, password: string, email: string) => {
     setLoading(true);
-    const { success, message, user } = await localRegisterUser(username, password);
+    const { success, message, user } = await localRegisterUser(username, password, email);
     if (success && user) {
       setCurrentUser(user);
       router.push('/my-plate');
@@ -2867,9 +2884,212 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await localLogoutUser();
     cloudRevisionRef.current = null;
     setCurrentUser(null);
+    setDesktopAccess(createEmptyDesktopAccessState());
     router.push('/login');
     setLoading(false);
   };
+
+  const ensureCloudSession = useCallback(async () => {
+    if (!currentUser?.username) {
+      return {
+        success: false,
+        message: 'You are not signed in.',
+      };
+    }
+
+    const refreshed = await refreshSessionFromStoredToken(currentUser.username);
+    if (refreshed.success) {
+      if (refreshed.user) {
+        setCurrentUser(refreshed.user);
+      }
+      return {
+        success: true,
+        message: refreshed.message || 'Session refreshed.',
+      };
+    }
+
+    return {
+      success: false,
+      message: 'Your local session is available, but your cloud sign-in expired. Please sign in again to continue using admin and cloud features.',
+    };
+  }, [currentUser?.username]);
+
+  const refreshDesktopAccess = useCallback(async () => {
+    if (!currentUser?.username) {
+      setDesktopAccess(createEmptyDesktopAccessState());
+      return;
+    }
+
+    setDesktopAccessLoading(true);
+    try {
+      let response = await fetch('/api/desktop-access', {
+        credentials: 'include',
+        cache: 'no-store',
+        headers: { 'x-local-username': currentUser.username },
+      });
+      if (response.status === 401) {
+        const refreshed = await ensureCloudSession();
+        if (!refreshed.success) {
+          throw new Error(refreshed.message);
+        }
+        response = await fetch('/api/desktop-access', {
+          credentials: 'include',
+          cache: 'no-store',
+          headers: { 'x-local-username': currentUser.username },
+        });
+      }
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        throw new Error(result?.error || 'Failed to load desktop access state.');
+      }
+      const nextAccess = result?.access || createEmptyDesktopAccessState();
+      setDesktopAccess(nextAccess);
+      persistDesktopEntitlementSnapshot(currentUser.username, {
+        paymentCompleted: Boolean(nextAccess.grantedAt),
+        purchaseDate: nextAccess.grantedAt,
+        expiresAt: nextAccess.expiresAt,
+        isPriviledge: false,
+      });
+    } catch (error) {
+      console.error('Failed to refresh desktop access:', error);
+      setDesktopAccess(createEmptyDesktopAccessState());
+    } finally {
+      setDesktopAccessLoading(false);
+    }
+  }, [currentUser?.username, ensureCloudSession]);
+
+  const startDesktopCheckout = useCallback(async (provider: DesktopPaymentProvider) => {
+    if (!currentUser?.username) {
+      return {
+        success: false,
+        message: 'You must be signed in to buy desktop access.',
+        access: createEmptyDesktopAccessState(),
+        sessionId: null,
+        checkoutUrl: null,
+        checkoutData: null,
+      };
+    }
+
+    setDesktopAccessLoading(true);
+    try {
+      let response = await fetch('/api/desktop-access/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ provider, username: currentUser.username }),
+      });
+      if (response.status === 401) {
+        const refreshed = await ensureCloudSession();
+        if (!refreshed.success) {
+          throw new Error(refreshed.message);
+        }
+        response = await fetch('/api/desktop-access/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ provider, username: currentUser.username }),
+        });
+      }
+      const result = await response.json().catch(() => null);
+      const nextAccess = result?.access || createEmptyDesktopAccessState();
+      if (!response.ok) {
+        throw new Error(result?.error || 'Failed to start desktop checkout.');
+      }
+      setDesktopAccess(nextAccess);
+      return {
+        success: true,
+        message: result?.message || 'Desktop checkout started.',
+        access: nextAccess,
+        sessionId: result?.sessionId || null,
+        checkoutUrl: result?.checkoutUrl || null,
+        checkoutData: result?.checkoutData || null,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to start desktop checkout.';
+      return {
+        success: false,
+        message,
+        access: desktopAccess,
+        sessionId: null,
+        checkoutUrl: null,
+        checkoutData: null,
+      };
+    } finally {
+      setDesktopAccessLoading(false);
+    }
+  }, [currentUser?.username, desktopAccess, ensureCloudSession]);
+
+  const confirmDesktopCheckout = useCallback(async (sessionId: string, provider?: DesktopPaymentProvider, paymentDetails?: { providerSessionId?: string; providerOrderId?: string; providerSignature?: string }) => {
+    if (!currentUser?.username) {
+      return {
+        success: false,
+        message: 'You must be signed in to confirm desktop access.',
+        access: createEmptyDesktopAccessState(),
+      };
+    }
+
+    setDesktopAccessLoading(true);
+    try {
+      let response = await fetch('/api/desktop-access/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          sessionId,
+          username: currentUser.username,
+          provider,
+          providerSessionId: paymentDetails?.providerSessionId,
+          providerOrderId: paymentDetails?.providerOrderId,
+          providerSignature: paymentDetails?.providerSignature,
+        }),
+      });
+      if (response.status === 401) {
+        const refreshed = await ensureCloudSession();
+        if (!refreshed.success) {
+          throw new Error(refreshed.message);
+        }
+        response = await fetch('/api/desktop-access/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            sessionId,
+            username: currentUser.username,
+            provider,
+            providerSessionId: paymentDetails?.providerSessionId,
+            providerOrderId: paymentDetails?.providerOrderId,
+            providerSignature: paymentDetails?.providerSignature,
+          }),
+        });
+      }
+      const result = await response.json().catch(() => null);
+      const nextAccess = result?.access || createEmptyDesktopAccessState();
+      if (!response.ok) {
+        throw new Error(result?.error || 'Failed to confirm desktop checkout.');
+      }
+      setDesktopAccess(nextAccess);
+      persistDesktopEntitlementSnapshot(currentUser.username, {
+        paymentCompleted: Boolean(nextAccess.grantedAt),
+        purchaseDate: nextAccess.grantedAt,
+        expiresAt: nextAccess.expiresAt,
+        isPriviledge: false,
+      });
+      return {
+        success: true,
+        message: result?.message || 'Desktop access unlocked.',
+        access: nextAccess,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to confirm desktop checkout.';
+      return {
+        success: false,
+        message,
+        access: desktopAccess,
+      };
+    } finally {
+      setDesktopAccessLoading(false);
+    }
+  }, [currentUser?.username, desktopAccess, ensureCloudSession]);
   
   const pushDemoDataWithToken = async (token: string) => {
     const username = 'demo';
@@ -8057,6 +8277,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [currentUser?.username]);
 
   useEffect(() => {
+    if (!currentUser?.username) {
+      setDesktopAccess(createEmptyDesktopAccessState());
+      return;
+    }
+    void refreshDesktopAccess();
+  }, [currentUser?.username, refreshDesktopAccess]);
+
+  useEffect(() => {
     if (!currentUser?.username) return;
     if (appConfigLoadedRef.current) return;
     appConfigLoadedRef.current = true;
@@ -8218,6 +8446,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     currentUser, loading, register, signIn, signOut,
     pushDataToCloud, pullDataFromCloud, exportData, importData,
     localChangeCount,
+    desktopAccess, desktopAccessLoading, ensureCloudSession, refreshDesktopAccess, startDesktopCheckout, confirmDesktopCheckout,
     isDemoTokenModalOpen, setIsDemoTokenModalOpen, pushDemoDataWithToken,
     theme, setTheme,
     floatingVideoUrl, setFloatingVideoUrl,
@@ -8296,7 +8525,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     logMindsetSet, deleteMindsetSet,
     canvasLayout, setCanvasLayout, globalElements, allComponentsForSpec,
     addGlobalElement, updateGlobalElement, deleteGlobalElement, handleAddNewResourceCard,
-    mindsetCards, setMindsetCards, createShivGuideFlow,
+    mindsetCards, setMindsetCards, goals, setGoals, createShivGuideFlow,
     isPistonsHeadOpen, setIsPistonsHeadOpen,
     pistons, setPistons,
     pistonsInitialState, openPistonsFor,

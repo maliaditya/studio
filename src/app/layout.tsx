@@ -24,6 +24,7 @@ import { TodaysScheduleCard } from '@/components/TodaysScheduleCard';
 import { MissedSlotModal } from '@/components/MissedSlotModal';
 import { InterruptModal } from '@/components/InterruptModal';
 import { IntentionDetailPopup } from '@/components/IntentionDetailModal';
+import { ContentViewPopup } from '@/components/ContentViewPopup';
 import { format, startOfToday, isAfter, parseISO, isBefore } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -172,6 +173,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     pillarPopupState, closePillarPopup, handlePillarPopupDragEnd,
     habitDetailPopup, openHabitDetailPopup, closeHabitDetailPopup, handleHabitDetailPopupDragEnd,
     taskContextPopups, closeTaskContextPopup, handleTaskContextPopupDragEnd, openTaskContextPopup,
+    contentViewPopups, handleContentViewPopupDragEnd,
     handlePdfViewerPopupDragEnd,
     drawingCanvasState, setDrawingCanvasState, handleDrawingCanvasPopupDragEnd,
     activeFocusSession,
@@ -362,6 +364,7 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
     handlePillarPopupDragEnd(event);
     handleHabitDetailPopupDragEnd(event);
     handleTaskContextPopupDragEnd(event);
+    handleContentViewPopupDragEnd(event);
     handleTodaysDietPopupDragEnd(event);
     handlePdfViewerPopupDragEnd(event);
     handleDrawingCanvasPopupDragEnd(event);
@@ -653,6 +656,9 @@ function AppWrapper({ children }: { children: React.ReactNode }) {
                     key={popupState.activityId}
                     popupState={popupState}
                 />
+            ))}
+            {contentViewPopups && Array.from(contentViewPopups.values()).map(popupState => (
+              <ContentViewPopup key={popupState.id} popupState={popupState} />
             ))}
             {todaysDietPopup && (
                 <TodaysDietPopup 

@@ -26,6 +26,11 @@ import {
   Highlighter,
   Pause,
   Play,
+  Copy,
+  RefreshCw,
+  Info,
+  Paintbrush,
+  TreeDeciduous,
 } from "lucide-react";
 import { getPdfForResource, storePdf } from "@/lib/audioDB";
 import { downloadPdfFromSupabase, uploadPdfToSupabase } from "@/lib/supabasePdfStorage";
@@ -42,6 +47,7 @@ import remarkGfm from "remark-gfm";
 import { addDays, addMonths, differenceInDays, differenceInMonths, isAfter, isBefore, parseISO, startOfDay } from "date-fns";
 import { getAiConfigFromSettings, normalizeAiSettings } from "@/lib/ai/config";
 import { cleanSpeechText, getKokoroLocalVoices, getOpenAiCloudVoices, loadSpeechPrefs, parseCloudVoiceURI, pickBestVoice, saveSpeechPrefs } from "@/lib/tts";
+import { consoleDiagramToExcalidraw } from "@/lib/consoleToExcalidraw";
 import type { FlashcardSessionIndex, FlashcardTopicEntry, Resource } from "@/types/workout";
 import { buildFlashcardTaskKey, normalizeFlashcardTopicName, sanitizeFlashcardAiCandidate } from "@/lib/flashcards";
 
@@ -240,13 +246,15 @@ const getPageNumberFromSpeechKey = (key?: string | null) => {
 };
 
 const makeId = (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
+const randomId = () => Math.random().toString(36).slice(2, 11);
 
 const getDateKey = (value?: string | Date | null) => {
     const date = value instanceof Date ? value : value ? new Date(value) : new Date();
     const time = date.getTime();
     if (!Number.isFinite(time)) return "";
-    return date.toISOString().slice(0, 10);
+  return date.toISOString().slice(0, 10);
 };
+
 
 export default function PdfViewerPopup() {
     const {
@@ -255,6 +263,8 @@ export default function PdfViewerPopup() {
         settings,
         setSettings,
         setResources,
+        resources,
+        updateDrawingData,
         resourceFolders,
         setResourceFolders,
         currentUser,
@@ -284,11 +294,20 @@ export default function PdfViewerPopup() {
     const [selectedText, setSelectedText] = useState("");
     const [selectedTextRects, setSelectedTextRects] = useState<TextHighlightRect[]>([]);
     const [isExplaining, setIsExplaining] = useState(false);
+    const [isCreatingDiagram, setIsCreatingDiagram] = useState(false);
+    const [isCreatingExcalidraw, setIsCreatingExcalidraw] = useState(false);
+    const [isUpdatingKnowledgeTree, setIsUpdatingKnowledgeTree] = useState(false);
+    const [isInjectingCanvas, setIsInjectingCanvas] = useState(false);
+    const [diagramText, setDiagramText] = useState<string>("");
+    const [diagramMessageIndex, setDiagramMessageIndex] = useState<number | null>(null);
     const [explainError, setExplainError] = useState("");
     const [showExplainPanel, setShowExplainPanel] = useState(false);
     const [activeExplainText, setActiveExplainText] = useState("");
     const [chatInput, setChatInput] = useState("");
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+    const [highlightExplainFrom, setHighlightExplainFrom] = useState("1");
+    const [highlightExplainTo, setHighlightExplainTo] = useState("1");
+    const [highlightRangeLockedPage, setHighlightRangeLockedPage] = useState<number | null>(null);
     const [ttsVoices, setTtsVoices] = useState<SpeechSynthesisVoice[]>([]);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [isSpeechPaused, setIsSpeechPaused] = useState(false);
@@ -2602,6 +2621,113 @@ export default function PdfViewerPopup() {
         }
     };
 
+    const handleRegenerateExplanation = async () => {
+        const text = explainContextText.trim();
+        if (!text || isExplaining) return;
+        setIsExplaining(true);
+        setExplainError("");
+        setChatMessages([]);
+        try {
+            const response = await fetch("/api/ai/explain", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(isDesktopRuntime ? { "x-studio-desktop": "1" } : {}),
+                },
+                body: JSON.stringify({
+                    text,
+                    context: `PDF: ${resource?.name || "Untitled"}`,
+                    aiConfig,
+                }),
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result?.details || result?.error || "Failed to regenerate explanation.");
+            }
+            const explanation = String(result?.explanation || "");
+            setChatMessages([{ role: "assistant", content: explanation }]);
+        } catch (error) {
+            setChatMessages([]);
+            setExplainError(error instanceof Error ? error.message : "Failed to regenerate explanation.");
+        } finally {
+            setIsExplaining(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!showExplainPanel) return;
+        setHighlightExplainFrom(String(pageNumber));
+        setHighlightExplainTo(String(pageNumber));
+        setHighlightRangeLockedPage(null);
+    }, [showExplainPanel, pageNumber]);
+
+    const getHighlightsForRange = useCallback((fromPage: number, toPage: number) => {
+        const start = Math.min(fromPage, toPage);
+        const end = Math.max(fromPage, toPage);
+        const entries: Array<{ pageNumber: number; text: string; createdAt?: string }> = [];
+        for (let p = start; p <= end; p += 1) {
+            const pageAnnotations = annotations[p] || [];
+            pageAnnotations.forEach((annotation) => {
+                if (!isTextHighlight(annotation)) return;
+                const text = String(annotation.text || "").trim();
+                if (!text) return;
+                entries.push({ pageNumber: p, text, createdAt: annotation.createdAt });
+            });
+        }
+        entries.sort((a, b) => (a.pageNumber - b.pageNumber) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
+        return entries;
+    }, [annotations]);
+
+    const handleExplainHighlightsRange = async () => {
+        const useCurrentPageForHighlightRange = highlightRangeLockedPage === pageNumber;
+        const fromValue = useCurrentPageForHighlightRange ? pageNumber : Number(highlightExplainFrom);
+        const toValue = useCurrentPageForHighlightRange ? pageNumber : Number(highlightExplainTo);
+        if (!Number.isFinite(fromValue) || !Number.isFinite(toValue)) {
+            toast({ title: "Enter valid pages", description: "Use numeric page values.", variant: "destructive" });
+            return;
+        }
+        const fromPage = Math.max(1, Math.min(fromValue, numPages || fromValue));
+        const toPage = Math.max(1, Math.min(toValue, numPages || toValue));
+        const highlights = getHighlightsForRange(fromPage, toPage);
+        if (highlights.length === 0) {
+            toast({ title: "No highlights found", description: "Add highlights in this page range first." });
+            return;
+        }
+        const combined = highlights
+            .map((item) => `Page ${item.pageNumber}: ${item.text}`)
+            .join("\n");
+        const trimmed = combined.length > 6000 ? `${combined.slice(0, 6000)}…` : combined;
+        setActiveExplainText(`Highlights pages ${fromPage}-${toPage}`);
+        setIsExplaining(true);
+        setExplainError("");
+        setChatMessages([]);
+        try {
+            const response = await fetch("/api/ai/explain", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(isDesktopRuntime ? { "x-studio-desktop": "1" } : {}),
+                },
+                body: JSON.stringify({
+                    text: trimmed,
+                    context: `PDF highlights pages ${fromPage}-${toPage}: ${resource?.name || "Untitled"}`,
+                    aiConfig,
+                }),
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result?.details || result?.error || "Failed to explain highlights.");
+            }
+            const explanation = String(result?.explanation || "");
+            setChatMessages([{ role: "assistant", content: explanation }]);
+        } catch (error) {
+            setChatMessages([]);
+            setExplainError(error instanceof Error ? error.message : "Failed to explain highlights.");
+        } finally {
+            setIsExplaining(false);
+        }
+    };
+
 
     if (!pdfViewerState || !pdfViewerState.isOpen) return null;
     
@@ -2643,6 +2769,35 @@ export default function PdfViewerPopup() {
     }
     
     const resource = pdfViewerState.resource;
+    useEffect(() => {
+        if (!resource?.id) return;
+        const saved = settings.pdfDiagramTextByResourceId?.[resource.id];
+        if (saved && saved.trim()) {
+            setDiagramText(saved);
+            setDiagramMessageIndex(null);
+        }
+    }, [resource?.id, settings.pdfDiagramTextByResourceId]);
+    const linkedCanvas = useMemo(() => {
+        const resourceId = resource?.id;
+        if (!resourceId) return null;
+        return settings.pdfLinkedCanvasByResourceId?.[resourceId] || null;
+    }, [resource?.id, settings.pdfLinkedCanvasByResourceId]);
+    const knowledgeCanvasId = useMemo(() => {
+        if (!linkedCanvas) return undefined;
+        return `${linkedCanvas.resourceId}-${linkedCanvas.pointId}`;
+    }, [linkedCanvas]);
+    const canvasOptions = useMemo(() => {
+        const allResources = Array.isArray(resources) ? resources : [];
+        const canvasResource = allResources.find((res) => res.type === "card" && res.name === "Canvas");
+        if (!canvasResource?.points) return [];
+        return canvasResource.points
+            .filter((point) => point.type === "paint")
+            .map((point) => ({
+                resourceId: canvasResource.id,
+                pointId: point.id,
+                name: point.text || "Canvas",
+            }));
+    }, [resources]);
     const hasPageAnnotations = (annotations[pageNumber] || []).length > 0;
     const canGoPrev = pageNumber > 1;
     const canGoNext = !!numPages && pageNumber < numPages;
@@ -2655,6 +2810,234 @@ export default function PdfViewerPopup() {
     const hasCurrentPageFlashcardHighlights = currentPageFlashcardHighlights.length > 0;
     const hasExplainableSelection = isDesktopRuntime && hasSelectedText && isAiEnabled;
     const explainContextText = activeExplainText || selectedText;
+
+    const handleCreateDiagramFromMessage = async (content: string, messageIndex: number) => {
+        if (!content || isCreatingDiagram) return;
+        setIsCreatingDiagram(true);
+        try {
+            const response = await fetch("/api/ai/diagram-from-explanation", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(isDesktopRuntime ? { "x-studio-desktop": "1" } : {}),
+                },
+                body: JSON.stringify({
+                    text: content,
+                    context: `PDF: ${resource?.name || "Untitled"}`,
+                    aiConfig,
+                }),
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result?.details || result?.error || "Failed to create diagram.");
+            }
+            const textDiagram = String(result?.diagramText || "").trim();
+            if (!textDiagram) {
+                throw new Error("Diagram was empty.");
+            }
+            let nextDiagramText = textDiagram;
+            if (resource?.id) {
+                try {
+                    await fetch("/api/knowledge-tree/merge", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            text: textDiagram,
+                            sourceId: `pdf:${resource.id}`,
+                            pageId: typeof pageNumber === "number" ? `page-${pageNumber}` : undefined,
+                            snippet: textDiagram.slice(0, 400),
+                            canvasId: knowledgeCanvasId,
+                        }),
+                    });
+                    const rootLabel = textDiagram.split(/\r?\n/)[0]?.trim();
+                    if (rootLabel) {
+                        const proj = await fetch("/api/knowledge-tree/project", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ rootLabel, canvasId: knowledgeCanvasId }),
+                        });
+                        const projResult = await proj.json().catch(() => ({}));
+                        if (proj.ok && projResult?.diagramText) {
+                            nextDiagramText = String(projResult.diagramText).trim();
+                        }
+                    }
+                } catch {
+                    // fall back to raw diagramText
+                }
+            }
+            setDiagramText(nextDiagramText);
+            if (resource?.id) {
+                setSettings((prev) => ({
+                    ...prev,
+                    pdfDiagramTextByResourceId: {
+                        ...(prev.pdfDiagramTextByResourceId || {}),
+                        [resource.id]: nextDiagramText,
+                    },
+                }));
+            }
+            setDiagramMessageIndex(messageIndex);
+            toast({ title: "Diagram generated", description: "Shown below the AI response." });
+        } catch (error) {
+            const rawMessage = error instanceof Error ? error.message : "Failed to create diagram.";
+            const isAbort = /aborted|aborterror/i.test(rawMessage);
+            toast({
+                title: "Diagram failed",
+                description: isAbort ? "AI request timed out. Try again or shorten the selection." : rawMessage,
+                variant: "destructive",
+            });
+        } finally {
+            setIsCreatingDiagram(false);
+        }
+    };
+
+    const handleCopyText = async (text: string, successTitle: string) => {
+        if (!text) return;
+        try {
+            await navigator.clipboard.writeText(text);
+            toast({ title: successTitle });
+        } catch {
+            toast({ title: "Copy failed", description: "Could not copy to clipboard.", variant: "destructive" });
+        }
+    };
+
+    const fetchMasterDiagramText = async () => {
+        const base = diagramText?.trim();
+        if (!base) return "";
+        const rootLabel = base.split(/\r?\n/)[0]?.trim();
+        if (!rootLabel) return base;
+        const response = await fetch("/api/knowledge-tree/project", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rootLabel, canvasId: knowledgeCanvasId }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (response.ok && result?.diagramText) {
+            return String(result.diagramText).trim();
+        }
+        return base;
+    };
+
+    const handleCopyExcalidrawJson = async () => {
+        if (!diagramText?.trim()) {
+            toast({ title: "No diagram found", description: "Generate a diagram first." });
+            return;
+        }
+        if (isCreatingExcalidraw) return;
+        setIsCreatingExcalidraw(true);
+        try {
+            const sourceDiagram = await fetchMasterDiagramText();
+            if (!sourceDiagram) throw new Error("Master diagram was empty.");
+            const scene = consoleDiagramToExcalidraw(sourceDiagram);
+            const payload = JSON.stringify(scene, null, 2);
+            await navigator.clipboard.writeText(payload);
+            toast({ title: "Copied Excalidraw JSON", description: "Paste it into Excalidraw." });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to generate Excalidraw JSON.";
+            toast({ title: "Excalidraw export failed", description: message, variant: "destructive" });
+        } finally {
+            setIsCreatingExcalidraw(false);
+        }
+    };
+
+    const handleUpdateKnowledgeTree = async () => {
+        if (!diagramText?.trim()) {
+            toast({ title: "No diagram found", description: "Generate a diagram first." });
+            return;
+        }
+        if (isUpdatingKnowledgeTree) return;
+        setIsUpdatingKnowledgeTree(true);
+        try {
+            const sourceId = resource?.id ? `pdf:${resource.id}` : "diagram:unknown";
+            const pageId = typeof pageNumber === "number" ? `page-${pageNumber}` : undefined;
+            const snippet = diagramText.slice(0, 400);
+            const response = await fetch("/api/knowledge-tree/merge", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    text: diagramText,
+                    sourceId,
+                    pageId,
+                    snippet,
+                    canvasId: knowledgeCanvasId,
+                }),
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(result?.details || result?.error || "Failed to update knowledge tree.");
+            }
+            toast({
+                title: "Knowledge tree updated",
+                description: `Nodes: ${result?.nodes ?? "?"}, edges: ${result?.edges ?? "?"}.`,
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to update knowledge tree.";
+            toast({ title: "Knowledge tree update failed", description: message, variant: "destructive" });
+        } finally {
+            setIsUpdatingKnowledgeTree(false);
+        }
+    };
+
+    const handleLinkCanvasChange = (value: string) => {
+        if (!resource?.id) return;
+        const [resourceId, pointId] = value.split(":");
+        if (!resourceId || !pointId) return;
+        const linked = canvasOptions.find(
+            (option) => option.resourceId === resourceId && option.pointId === pointId
+        );
+        if (!linked) return;
+        setSettings((prev) => ({
+            ...prev,
+            pdfLinkedCanvasByResourceId: {
+                ...(prev.pdfLinkedCanvasByResourceId || {}),
+                [resource.id]: linked,
+            },
+        }));
+        toast({ title: "Canvas linked", description: linked.name || "Canvas" });
+    };
+
+    const handleInjectDiagramToCanvas = () => {
+        if (!diagramText?.trim()) {
+            toast({ title: "No diagram found", description: "Generate a diagram first." });
+            return;
+        }
+        if (!linkedCanvas) {
+            toast({ title: "No linked canvas", description: "Link a canvas first." });
+            return;
+        }
+        if (isInjectingCanvas) return;
+        setIsInjectingCanvas(true);
+        try {
+            const scene = consoleDiagramToExcalidraw(diagramText);
+            const payload = JSON.stringify(scene, null, 2);
+            const canvasId = `${linkedCanvas.resourceId}-${linkedCanvas.pointId}`;
+            setResources((prevResources) =>
+                prevResources.map((res) => {
+                    if (res.id !== linkedCanvas.resourceId) return res;
+                    return {
+                        ...res,
+                        points: (res.points || []).map((point) =>
+                            point.id === linkedCanvas.pointId ? { ...point, drawing: payload } : point
+                        ),
+                    };
+                })
+            );
+            updateDrawingData(canvasId, payload, () => {
+                toast({ title: "Canvas updated", description: linkedCanvas.name || "Linked canvas" });
+                setIsInjectingCanvas(false);
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : "Failed to inject diagram.";
+            toast({ title: "Inject failed", description: message, variant: "destructive" });
+            setIsInjectingCanvas(false);
+        }
+    };
+
+    const buildMessageCopyText = (content: string, index: number) => {
+        if (diagramMessageIndex === index && diagramText) {
+            return `${content}\n\nDiagram:\n${diagramText}`;
+        }
+        return content;
+    };
 
     return (
         <div ref={setNodeRef} style={style}>
@@ -2731,6 +3114,44 @@ export default function PdfViewerPopup() {
                                     {fitMode === "custom" ? `${Math.round(scale * 100)}%` : "Fit Width"}
                                 </div>
                             </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/70 bg-muted/20 px-2 py-1.5">
+                            <span className="text-xs text-muted-foreground">Linked canvas</span>
+                            <select
+                                value={linkedCanvas ? `${linkedCanvas.resourceId}:${linkedCanvas.pointId}` : ""}
+                                onChange={(e) => handleLinkCanvasChange(e.target.value)}
+                                className="h-8 rounded-md border border-border/60 bg-transparent px-2 text-xs text-zinc-100"
+                            >
+                                <option value="">Select canvas</option>
+                                {canvasOptions.map((option) => (
+                                    <option
+                                        key={`${option.resourceId}:${option.pointId}`}
+                                        value={`${option.resourceId}:${option.pointId}`}
+                                    >
+                                        {option.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => void handleCopyExcalidrawJson()}
+                                disabled={!diagramText?.trim() || isCreatingExcalidraw}
+                                title="Copy Excalidraw JSON"
+                            >
+                                <Paintbrush className={cn("h-4 w-4", isCreatingExcalidraw && "animate-spin")} />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => void handleCopyText(diagramText, "Copied diagram")}
+                                disabled={!diagramText?.trim()}
+                                title="Copy console tree"
+                            >
+                                <Copy className="h-4 w-4" />
+                            </Button>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 rounded-md border border-border/70 bg-muted/20 px-2 py-1.5">
                             <Button
@@ -2982,6 +3403,35 @@ export default function PdfViewerPopup() {
                         <div className="px-4 py-2 text-xs text-zinc-300 border-b border-zinc-800 bg-zinc-900 truncate">
                             Selected: {explainContextText ? explainContextText : "No active selection."}
                         </div>
+                        <div className="px-4 py-2 border-b border-zinc-800 bg-zinc-900">
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-300">
+                                <span className="text-[11px] uppercase tracking-wide text-zinc-400">Explain highlights</span>
+                                <span>Pages</span>
+                                <input
+                                    value={highlightExplainFrom}
+                                    onChange={(e) => setHighlightExplainFrom(e.target.value)}
+                                    className="h-7 w-12 rounded border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-100 outline-none"
+                                    disabled={highlightRangeLockedPage === pageNumber}
+                                />
+                                <span>to</span>
+                                <input
+                                    value={highlightExplainTo}
+                                    onChange={(e) => setHighlightExplainTo(e.target.value)}
+                                    className="h-7 w-12 rounded border border-zinc-700 bg-zinc-950 px-2 text-xs text-zinc-100 outline-none"
+                                    disabled={highlightRangeLockedPage === pageNumber}
+                                />
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 border-zinc-700 bg-zinc-950 text-xs text-zinc-100 hover:bg-zinc-800"
+                                    onClick={() => void handleExplainHighlightsRange()}
+                                    disabled={isExplaining}
+                                    title="Explain highlighted text across this page range"
+                                >
+                                    Explain Highlights
+                                </Button>
+                            </div>
+                        </div>
                         <div className="flex-1 min-h-0 px-4 py-3">
                             <ScrollArea className="h-full pr-3">
                                 <div className="space-y-3">
@@ -2991,21 +3441,57 @@ export default function PdfViewerPopup() {
                                                 <div className="text-[11px] uppercase tracking-wide text-zinc-400">
                                                     {message.role === "user" ? "You" : "AI"}
                                                 </div>
-                                                {message.role === "assistant" && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="h-7 border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100 hover:bg-zinc-800"
-                                                        onClick={() => speakText(message.content, `assistant:${idx}`)}
-                                                        title="Read this AI response aloud"
-                                                    >
-                                                        {activeSpeechKey === `assistant:${idx}` && isSpeaking ? (
-                                                            <VolumeX className="h-3.5 w-3.5 mr-1" />
-                                                        ) : (
-                                                            <Volume2 className="h-3.5 w-3.5 mr-1" />
-                                                        )}
-                                                        {activeSpeechKey === `assistant:${idx}` && isSpeaking ? "Stop" : "Read"}
-                                                    </Button>
+                                                    {message.role === "assistant" && (
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-7 border-amber-500/50 bg-amber-500/10 px-2 text-[11px] text-amber-100 hover:bg-amber-500/20"
+                                                            onClick={() => void handleCreateDiagramFromMessage(message.content, idx)}
+                                                            disabled={isCreatingDiagram}
+                                                            title="Generate a text diagram from this explanation"
+                                                        >
+                                                            {isCreatingDiagram ? (
+                                                                <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+                                                            ) : (
+                                                                <Sparkles className="mr-1 h-3.5 w-3.5" />
+                                                            )}
+                                                            Diagram
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-7 w-7 border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-800"
+                                                            onClick={() => void handleRegenerateExplanation()}
+                                                            disabled={isExplaining || !explainContextText}
+                                                            title="Regenerate explanation"
+                                                        >
+                                                            <RefreshCw className={cn("h-3.5 w-3.5", isExplaining && "animate-spin")} />
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            className="h-7 w-7 border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-800"
+                                                            onClick={() => void handleCopyText(buildMessageCopyText(message.content, idx), "Copied text + diagram")}
+                                                            title="Copy explanation and diagram"
+                                                        >
+                                                            <Copy className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-7 border-zinc-700 bg-zinc-950 px-2 text-[11px] text-zinc-100 hover:bg-zinc-800"
+                                                            onClick={() => speakText(message.content, `assistant:${idx}`)}
+                                                            title="Read this AI response aloud"
+                                                        >
+                                                            {activeSpeechKey === `assistant:${idx}` && isSpeaking ? (
+                                                                <VolumeX className="h-3.5 w-3.5 mr-1" />
+                                                            ) : (
+                                                                <Volume2 className="h-3.5 w-3.5 mr-1" />
+                                                            )}
+                                                            {activeSpeechKey === `assistant:${idx}` && isSpeaking ? "Stop" : "Read"}
+                                                        </Button>
+                                                    </div>
                                                 )}
                                             </div>
                                             <div className="text-sm leading-relaxed whitespace-pre-wrap text-zinc-100 [&_hr]:my-3 [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-zinc-700/90 [&_strong]:font-bold">
@@ -3013,8 +3499,96 @@ export default function PdfViewerPopup() {
                                                     {message.content}
                                                 </ReactMarkdown>
                                             </div>
+                                            {diagramMessageIndex === idx && diagramText && (
+                                                <div className="mt-3 rounded-md border border-zinc-700 bg-zinc-950/60 p-3 text-xs text-zinc-100">
+                                                    <div className="mb-2 flex items-center justify-between gap-2 text-[11px] uppercase tracking-wide text-zinc-400">
+                                                        <span>Diagram</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="icon"
+                                                                className="h-6 w-6 border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-800"
+                                                                onClick={() => void handleUpdateKnowledgeTree()}
+                                                                title="Update background knowledge tree"
+                                                                disabled={isUpdatingKnowledgeTree}
+                                                            >
+                                                                <TreeDeciduous className={cn("h-3 w-3", isUpdatingKnowledgeTree && "animate-spin")} />
+                                                            </Button>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="icon"
+                                                                className="h-6 w-6 border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-800"
+                                                                onClick={async () => {
+                                                                    const masterText = await fetchMasterDiagramText();
+                                                                    void handleCopyText(masterText || diagramText, "Copied diagram");
+                                                                }}
+                                                                title="Copy diagram"
+                                                            >
+                                                                <Copy className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="icon"
+                                                                className="h-6 w-6 border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-800"
+                                                                onClick={() => void handleCopyExcalidrawJson()}
+                                                                title="Copy Excalidraw JSON"
+                                                                disabled={isCreatingExcalidraw}
+                                                            >
+                                                                <Paintbrush className={cn("h-3 w-3", isCreatingExcalidraw && "animate-spin")} />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                    <pre className="whitespace-pre-wrap font-mono text-[12px] leading-relaxed">
+                                                        {diagramText}
+                                                    </pre>
+                                                </div>
+                                            )}
                                         </div>
                                     ))}
+                                    {diagramMessageIndex === null && diagramText && (
+                                        <div className="mt-3 rounded-md border border-zinc-700 bg-zinc-950/60 p-3 text-xs text-zinc-100">
+                                            <div className="mb-2 flex items-center justify-between gap-2 text-[11px] uppercase tracking-wide text-zinc-400">
+                                                <span>Diagram</span>
+                                                <div className="flex items-center gap-1">
+                                                    <Button
+                                                        variant="outline"
+                                                        size="icon"
+                                                        className="h-6 w-6 border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-800"
+                                                        onClick={() => void handleUpdateKnowledgeTree()}
+                                                        title="Update background knowledge tree"
+                                                        disabled={isUpdatingKnowledgeTree}
+                                                    >
+                                                        <TreeDeciduous className={cn("h-3 w-3", isUpdatingKnowledgeTree && "animate-spin")} />
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="icon"
+                                                        className="h-6 w-6 border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-800"
+                                                        onClick={async () => {
+                                                            const masterText = await fetchMasterDiagramText();
+                                                            void handleCopyText(masterText || diagramText, "Copied diagram");
+                                                        }}
+                                                        title="Copy diagram"
+                                                    >
+                                                        <Copy className="h-3 w-3" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="icon"
+                                                        className="h-6 w-6 border-zinc-700 bg-zinc-950 text-zinc-100 hover:bg-zinc-800"
+                                                        onClick={() => void handleCopyExcalidrawJson()}
+                                                        title="Copy Excalidraw JSON"
+                                                        disabled={isCreatingExcalidraw}
+                                                    >
+                                                        <Paintbrush className={cn("h-3 w-3", isCreatingExcalidraw && "animate-spin")} />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <pre className="whitespace-pre-wrap font-mono text-[12px] leading-relaxed">
+                                                {diagramText}
+                                            </pre>
+                                        </div>
+                                    )}
                                     {isExplaining && (
                                         <div className="flex items-center gap-2 text-zinc-400 text-sm">
                                             <Loader2 className="h-4 w-4 animate-spin" />
@@ -3439,6 +4013,16 @@ export default function PdfViewerPopup() {
                             variant="outline"
                             size="icon"
                             className="h-9 w-9 shadow-lg"
+                            onClick={() => setShowExplainPanel(true)}
+                            disabled={!isAiEnabled || !isDesktopRuntime}
+                            title="Open AI explanation"
+                        >
+                            <Sparkles className="h-4 w-4" />
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 shadow-lg"
                             onClick={handleClearAnnotations}
                             disabled={!hasPageAnnotations}
                             title="Clear page annotations and highlights"
@@ -3459,6 +4043,32 @@ export default function PdfViewerPopup() {
                         >
                             <Sparkles className="h-4 w-4" />
                         </Button>
+                    </div>
+                )}
+                {isReaderOnly && (
+                    <div className="absolute bottom-4 left-4 z-30 flex items-center gap-2 rounded-md border border-zinc-800 bg-zinc-950/90 px-2 py-1 text-xs text-zinc-200 shadow-lg">
+                        <span className="text-[11px] uppercase tracking-wide text-zinc-400">Page {pageNumber}</span>
+                        <div className="flex items-center gap-1">
+                            <Checkbox
+                                checked={highlightRangeLockedPage === pageNumber}
+                                onCheckedChange={(value) => {
+                                    const next = Boolean(value);
+                                    setHighlightRangeLockedPage(next ? pageNumber : null);
+                                    if (next) {
+                                        setHighlightExplainFrom(String(pageNumber));
+                                        setHighlightExplainTo(String(pageNumber));
+                                    }
+                                }}
+                                className="h-4 w-4"
+                            />
+                            <button
+                                type="button"
+                                className="flex h-5 w-5 items-center justify-center rounded-sm border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"
+                                title="When enabled, the highlight explanation range is locked to the current page. Turn off to choose a custom start/end page range."
+                            >
+                                <Info className="h-3 w-3" />
+                            </button>
+                        </div>
                     </div>
                 )}
                 <Button

@@ -1,0 +1,954 @@
+{
+  "nodes": [
+    {
+      "id": "environmental-crisis",
+      "label": "Environmental Crisis",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.735Z",
+      "updatedAt": "2026-03-21T05:40:21.735Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "core-argument",
+      "label": "Core Argument",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.736Z",
+      "updatedAt": "2026-03-21T05:40:21.736Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "root-cause",
+      "label": "Root Cause",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.738Z",
+      "updatedAt": "2026-03-21T05:40:21.738Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "lack-of-awareness",
+      "label": "Lack Of Awareness",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.738Z",
+      "updatedAt": "2026-03-21T05:40:21.738Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "individual-consumption",
+      "label": "Individual Consumption",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.738Z",
+      "updatedAt": "2026-03-21T05:40:21.738Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "scale-of-the-problem",
+      "label": "Scale Of The Problem",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.738Z",
+      "updatedAt": "2026-03-21T05:40:21.738Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "population-growth",
+      "label": "Population Growth",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.738Z",
+      "updatedAt": "2026-03-21T05:40:21.738Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "11-billion",
+      "label": "11 Billion",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.738Z",
+      "updatedAt": "2026-03-21T05:40:21.738Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "consumption-patterns",
+      "label": "Consumption Patterns",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.738Z",
+      "updatedAt": "2026-03-21T05:40:21.738Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "wealthy-nations",
+      "label": "Wealthy Nations",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.738Z",
+      "updatedAt": "2026-03-21T05:40:21.738Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "us",
+      "label": "US",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.738Z",
+      "updatedAt": "2026-03-21T05:40:21.738Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "germany",
+      "label": "Germany",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.739Z",
+      "updatedAt": "2026-03-21T05:40:21.739Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "inevitable-collapse",
+      "label": "Inevitable Collapse",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.739Z",
+      "updatedAt": "2026-03-21T05:40:21.739Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "individual-responsibility",
+      "label": "Individual Responsibility",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.739Z",
+      "updatedAt": "2026-03-21T05:40:21.739Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "critical-examination",
+      "label": "Critical Examination",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.739Z",
+      "updatedAt": "2026-03-21T05:40:21.739Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "consumption-habits",
+      "label": "Consumption Habits",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.739Z",
+      "updatedAt": "2026-03-21T05:40:21.739Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "third-car",
+      "label": "Third Car",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.739Z",
+      "updatedAt": "2026-03-21T05:40:21.739Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "wise-consumption",
+      "label": "Wise Consumption",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.739Z",
+      "updatedAt": "2026-03-21T05:40:21.739Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "awareness",
+      "label": "Awareness",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.740Z",
+      "updatedAt": "2026-03-21T05:40:21.740Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "role-of-government-and-collective-action",
+      "label": "Role Of Government And Collective Action",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.741Z",
+      "updatedAt": "2026-03-21T05:40:21.741Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "government-influence",
+      "label": "Government Influence",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.742Z",
+      "updatedAt": "2026-03-21T05:40:21.742Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "population-focus",
+      "label": "Population Focus",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.742Z",
+      "updatedAt": "2026-03-21T05:40:21.742Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "more-consumption",
+      "label": "More Consumption",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.742Z",
+      "updatedAt": "2026-03-21T05:40:21.742Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "ineffective-tools",
+      "label": "Ineffective Tools",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.742Z",
+      "updatedAt": "2026-03-21T05:40:21.742Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "treaties-and-laws",
+      "label": "Treaties And Laws",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.742Z",
+      "updatedAt": "2026-03-21T05:40:21.742Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "summits",
+      "label": "Summits",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.743Z",
+      "updatedAt": "2026-03-21T05:40:21.743Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "solution-personal-change",
+      "label": "Solution: Personal Change",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.743Z",
+      "updatedAt": "2026-03-21T05:40:21.743Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "non-political",
+      "label": "Non-Political",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.743Z",
+      "updatedAt": "2026-03-21T05:40:21.743Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "originating-within",
+      "label": "Originating Within",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.744Z",
+      "updatedAt": "2026-03-21T05:40:21.744Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "clarity-and-realism",
+      "label": "Clarity And Realism",
+      "aliases": [],
+      "confidence": 0.7,
+      "createdAt": "2026-03-21T05:40:21.744Z",
+      "updatedAt": "2026-03-21T05:40:21.744Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "environmental-crisis__core-argument__parent",
+      "from": "environmental-crisis",
+      "to": "core-argument",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "core-argument__root-cause__parent",
+      "from": "core-argument",
+      "to": "root-cause",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "root-cause__lack-of-awareness__parent",
+      "from": "root-cause",
+      "to": "lack-of-awareness",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "lack-of-awareness__individual-consumption__parent",
+      "from": "lack-of-awareness",
+      "to": "individual-consumption",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "environmental-crisis__scale-of-the-problem__parent",
+      "from": "environmental-crisis",
+      "to": "scale-of-the-problem",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "scale-of-the-problem__population-growth__parent",
+      "from": "scale-of-the-problem",
+      "to": "population-growth",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "population-growth__11-billion__parent",
+      "from": "population-growth",
+      "to": "11-billion",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "scale-of-the-problem__consumption-patterns__parent",
+      "from": "scale-of-the-problem",
+      "to": "consumption-patterns",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "consumption-patterns__wealthy-nations__parent",
+      "from": "consumption-patterns",
+      "to": "wealthy-nations",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "wealthy-nations__us__parent",
+      "from": "wealthy-nations",
+      "to": "us",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "wealthy-nations__germany__parent",
+      "from": "wealthy-nations",
+      "to": "germany",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "scale-of-the-problem__inevitable-collapse__parent",
+      "from": "scale-of-the-problem",
+      "to": "inevitable-collapse",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "environmental-crisis__individual-responsibility__parent",
+      "from": "environmental-crisis",
+      "to": "individual-responsibility",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "individual-responsibility__critical-examination__parent",
+      "from": "individual-responsibility",
+      "to": "critical-examination",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "critical-examination__consumption-habits__parent",
+      "from": "critical-examination",
+      "to": "consumption-habits",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "consumption-habits__third-car__parent",
+      "from": "consumption-habits",
+      "to": "third-car",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "individual-responsibility__wise-consumption__parent",
+      "from": "individual-responsibility",
+      "to": "wise-consumption",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "wise-consumption__awareness__parent",
+      "from": "wise-consumption",
+      "to": "awareness",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.745Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "environmental-crisis__role-of-government-and-collective-action__parent",
+      "from": "environmental-crisis",
+      "to": "role-of-government-and-collective-action",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.746Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "role-of-government-and-collective-action__government-influence__parent",
+      "from": "role-of-government-and-collective-action",
+      "to": "government-influence",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.746Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "government-influence__population-focus__parent",
+      "from": "government-influence",
+      "to": "population-focus",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.746Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "population-focus__more-consumption__parent",
+      "from": "population-focus",
+      "to": "more-consumption",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.746Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "role-of-government-and-collective-action__ineffective-tools__parent",
+      "from": "role-of-government-and-collective-action",
+      "to": "ineffective-tools",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.746Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "ineffective-tools__treaties-and-laws__parent",
+      "from": "ineffective-tools",
+      "to": "treaties-and-laws",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.746Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "ineffective-tools__summits__parent",
+      "from": "ineffective-tools",
+      "to": "summits",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.746Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "environmental-crisis__solution-personal-change__parent",
+      "from": "environmental-crisis",
+      "to": "solution-personal-change",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.746Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "solution-personal-change__non-political__parent",
+      "from": "solution-personal-change",
+      "to": "non-political",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.746Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "solution-personal-change__originating-within__parent",
+      "from": "solution-personal-change",
+      "to": "originating-within",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.746Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    },
+    {
+      "id": "solution-personal-change__clarity-and-realism__parent",
+      "from": "solution-personal-change",
+      "to": "clarity-and-realism",
+      "type": "parent",
+      "confidence": 0.8,
+      "createdAt": "2026-03-21T05:40:21.746Z",
+      "sources": [
+        {
+          "sourceId": "pdf:res_pdf_1772824475247",
+          "pageId": "page-81",
+          "snippet": "Environmental Crisis\n├─ Core Argument\n│  └─ Root Cause\n│     └─ Lack of Awareness\n│        └─ Individual Consumption\n├─ Scale of the Problem\n│  ├─ Population Growth\n│  │  └─ 11 Billion\n│  ├─ Consumption Patterns\n│  │  └─ Wealthy Nations\n│  │     ├─ US\n│  │     └─ Germany\n│  └─ Inevitable Collapse\n├─ Individual Responsibility\n│  ├─ Critical Examination\n│  │  └─ Consumption Habits\n│  │     └─ Third",
+          "createdAt": "2026-03-21T05:40:21.735Z"
+        }
+      ]
+    }
+  ],
+  "aliases": {},
+  "version": 1,
+  "createdAt": "2026-03-21T05:40:21.734Z",
+  "updatedAt": "2026-03-21T05:40:21.746Z"
+}

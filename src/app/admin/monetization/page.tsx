@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { describeUnknownError } from "@/lib/errorMessage";
 import { getAccessToken } from "@/lib/localAuth";
+import { isAdminUsername } from "@/lib/adminUsers";
 
 type MonetizationSummary = {
   month: string | null;
@@ -21,14 +23,6 @@ type MonetizationSummary = {
   monthlyDonationRevenueUsd: number;
   storageConfigured?: boolean;
 };
-
-const ADMIN_USERS = (() => {
-  const fromEnv = (process.env.NEXT_PUBLIC_ADMIN_USERNAMES || "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-  return fromEnv.length > 0 ? fromEnv : ["lonewolf"];
-})();
 
 const resolveCloudBase = () => {
   if (typeof window === "undefined") return "";
@@ -82,16 +76,16 @@ function MetricStatusRow({
 }
 
 function AdminMonetizationPageContent() {
-  const { currentUser } = useAuth();
+  const { currentUser, ensureCloudSession, signOut } = useAuth();
   const [month, setMonth] = useState<string>(toMonthInputValue(new Date()));
   const [summary, setSummary] = useState<MonetizationSummary | null>(null);
   const [loading, setLoading] = useState(false);
+  const [refreshingSession, setRefreshingSession] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   const isAdmin = useMemo(() => {
-    const username = currentUser?.username?.trim().toLowerCase() || "";
-    return ADMIN_USERS.includes(username);
+    return isAdminUsername(currentUser?.username);
   }, [currentUser?.username]);
 
   const fetchSummary = async (monthKey: string) => {
@@ -99,7 +93,14 @@ function AdminMonetizationPageContent() {
     setError(null);
     try {
       const username = (currentUser?.username || "").trim().toLowerCase();
-      const accessToken = username ? getAccessToken(username) : null;
+      let accessToken = username ? getAccessToken(username) : null;
+      if (username && !accessToken) {
+        const refreshed = await ensureCloudSession();
+        if (!refreshed.success) {
+          throw new Error(refreshed.message || "Your cloud admin session expired. Please sign in again.");
+        }
+        accessToken = getAccessToken(username);
+      }
       const cloudBase = resolveCloudBase();
       const localUrl = `/api/metrics/monetization-summary?month=${encodeURIComponent(monthKey)}`;
       const url = cloudBase ? `${cloudBase.replace(/\/$/, "")}/api/metrics/monetization-summary?month=${encodeURIComponent(monthKey)}` : localUrl;
@@ -123,7 +124,7 @@ function AdminMonetizationPageContent() {
           headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
         });
         if (!proxied?.success) {
-          throw new Error(proxied?.error || "Failed to call cloud metrics API.");
+          throw new Error(describeUnknownError(proxied?.error, "Failed to call cloud metrics API."));
         }
         ok = Boolean(proxied.ok);
         payload = (proxied.data || null) as MonetizationSummary & { error?: string };
@@ -137,13 +138,45 @@ function AdminMonetizationPageContent() {
         payload = (await response.json()) as MonetizationSummary & { error?: string };
       }
 
+      if ((!ok || !payload) && payload?.error === "Unauthorized." && username) {
+        const refreshed = await ensureCloudSession();
+        if (refreshed.success) {
+          accessToken = getAccessToken(username);
+
+          if (shouldUseDesktopProxy) {
+            const bridge = (window as any)?.studioDesktop?.authHttp;
+            if (!bridge?.request) {
+              throw new Error("Desktop cloud proxy is unavailable.");
+            }
+            const proxied = await bridge.request({
+              url,
+              method: "GET",
+              headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+            });
+            if (!proxied?.success) {
+              throw new Error(describeUnknownError(proxied?.error, "Failed to call cloud metrics API."));
+            }
+            ok = Boolean(proxied.ok);
+            payload = (proxied.data || null) as MonetizationSummary & { error?: string };
+          } else {
+            const response = await fetch(url, {
+              cache: "no-store",
+              credentials: "include",
+              headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+            });
+            ok = response.ok;
+            payload = (await response.json()) as MonetizationSummary & { error?: string };
+          }
+        }
+      }
+
       if (!ok || !payload) {
         throw new Error(payload?.error || "Failed to load monetization summary.");
       }
       setSummary(payload);
       setLastUpdated(new Date().toLocaleString());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load monetization summary.");
+      setError(describeUnknownError(err, "Failed to load monetization summary."));
     } finally {
       setLoading(false);
     }
@@ -152,7 +185,25 @@ function AdminMonetizationPageContent() {
   React.useEffect(() => {
     if (!isAdmin) return;
     void fetchSummary(month);
-  }, [isAdmin, month]);
+  }, [ensureCloudSession, isAdmin, month]);
+
+  const handleRefreshCloudSignIn = async () => {
+    setRefreshingSession(true);
+    setError(null);
+    try {
+      const refreshed = await ensureCloudSession();
+      if (!refreshed.success) {
+        setError(refreshed.message || 'Your cloud admin session expired. Redirecting to sign in.');
+        await signOut();
+        return;
+      }
+      await fetchSummary(month);
+    } catch (err) {
+      setError(describeUnknownError(err, 'Failed to refresh cloud sign-in.'));
+    } finally {
+      setRefreshingSession(false);
+    }
+  };
 
   if (!isAdmin) {
     return (
@@ -193,6 +244,10 @@ function AdminMonetizationPageContent() {
               className="w-[180px]"
             />
           </div>
+          <Button variant="outline" onClick={() => void handleRefreshCloudSignIn()} disabled={loading || refreshingSession}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshingSession ? "animate-spin" : ""}`} />
+            Refresh Cloud Sign-In
+          </Button>
           <Button variant="outline" onClick={() => void fetchSummary(month)} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -206,6 +261,12 @@ function AdminMonetizationPageContent() {
             <CardTitle className="text-destructive">Error</CardTitle>
             <CardDescription>{error}</CardDescription>
           </CardHeader>
+          <CardContent>
+            <Button variant="outline" onClick={() => void handleRefreshCloudSignIn()} disabled={loading || refreshingSession}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshingSession ? "animate-spin" : ""}`} />
+              Refresh Cloud Sign-In
+            </Button>
+          </CardContent>
         </Card>
       )}
 

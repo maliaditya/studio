@@ -9,30 +9,25 @@ import { Button } from "@/components/ui/button";
 import { AlertTriangle, CheckCircle2, RefreshCw, Save } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { fetchAppConfig, saveAppConfig, type AppConfigPayload } from "@/lib/appConfigClient";
+import { describeUnknownError } from "@/lib/errorMessage";
 import { getAccessToken } from "@/lib/localAuth";
-
-const ADMIN_USERS = (() => {
-  const fromEnv = (process.env.NEXT_PUBLIC_ADMIN_USERNAMES || "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-  return fromEnv.length > 0 ? fromEnv : ["lonewolf"];
-})();
+import { isAdminUsername } from "@/lib/adminUsers";
 
 function AdminConfigPageContent() {
-  const { currentUser, setSettings } = useAuth();
+  const { currentUser, setSettings, ensureCloudSession, signOut } = useAuth();
   const { toast } = useToast();
   const [config, setConfig] = useState<AppConfigPayload | null>(null);
   const [supabaseUrl, setSupabaseUrl] = useState("");
   const [supabaseAnonKey, setSupabaseAnonKey] = useState("");
   const [supabaseStorageBucket, setSupabaseStorageBucket] = useState("");
+  const [desktopPlanPriceInr, setDesktopPlanPriceInr] = useState('799');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [refreshingSession, setRefreshingSession] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const isAdmin = useMemo(() => {
-    const username = currentUser?.username?.trim().toLowerCase() || "";
-    return ADMIN_USERS.includes(username);
+    return isAdminUsername(currentUser?.username);
   }, [currentUser?.username]);
 
   const loadConfig = async () => {
@@ -44,8 +39,9 @@ function AdminConfigPageContent() {
       setSupabaseUrl(data.supabaseUrl || "");
       setSupabaseAnonKey(data.supabaseAnonKey || "");
       setSupabaseStorageBucket(data.supabaseStorageBucket || "");
+      setDesktopPlanPriceInr(String(data.desktopPlanPriceInr || 799));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load config.");
+      setError(describeUnknownError(err, "Failed to load config."));
     } finally {
       setLoading(false);
     }
@@ -56,17 +52,46 @@ function AdminConfigPageContent() {
     void loadConfig();
   }, [isAdmin]);
 
+  const handleRefreshCloudSignIn = async () => {
+    setRefreshingSession(true);
+    setError(null);
+    try {
+      const refreshed = await ensureCloudSession();
+      if (!refreshed.success) {
+        setError(refreshed.message || 'Your cloud admin session expired. Redirecting to sign in.');
+        await signOut();
+        return;
+      }
+      await loadConfig();
+      toast({ title: 'Cloud Sign-In Refreshed', description: 'Admin cloud session is active again.' });
+    } catch (err) {
+      const message = describeUnknownError(err, 'Failed to refresh cloud sign-in.');
+      setError(message);
+      toast({ title: 'Refresh Failed', description: message, variant: 'destructive' });
+    } finally {
+      setRefreshingSession(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
     try {
       const username = (currentUser?.username || "").trim().toLowerCase();
-      const accessToken = username ? getAccessToken(username) : null;
+      let accessToken = username ? getAccessToken(username) : null;
+      if (username && !accessToken) {
+        const refreshed = await ensureCloudSession();
+        if (!refreshed.success) {
+          throw new Error(refreshed.message || "Your cloud admin session expired. Please sign in again.");
+        }
+        accessToken = getAccessToken(username);
+      }
       const payload = await saveAppConfig(
         {
           supabaseUrl: supabaseUrl.trim(),
           supabaseAnonKey: supabaseAnonKey.trim(),
           supabaseStorageBucket: supabaseStorageBucket.trim() || null,
+          desktopPlanPriceInr: Number(desktopPlanPriceInr),
         },
         accessToken
       );
@@ -79,7 +104,7 @@ function AdminConfigPageContent() {
       }));
       toast({ title: "Saved", description: "Supabase config updated for all apps." });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to save config.";
+      const message = describeUnknownError(err, "Failed to save config.");
       setError(message);
       toast({ title: "Save Failed", description: message, variant: "destructive" });
     } finally {
@@ -113,6 +138,10 @@ function AdminConfigPageContent() {
           </p>
         </div>
         <div className="flex items-end gap-2">
+          <Button variant="outline" onClick={() => void handleRefreshCloudSignIn()} disabled={loading || saving || refreshingSession}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${refreshingSession ? "animate-spin" : ""}`} />
+            Refresh Cloud Sign-In
+          </Button>
           <Button variant="outline" onClick={() => void loadConfig()} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -130,6 +159,12 @@ function AdminConfigPageContent() {
             <CardTitle className="text-destructive">Error</CardTitle>
             <CardDescription>{error}</CardDescription>
           </CardHeader>
+          <CardContent>
+            <Button variant="outline" onClick={() => void handleRefreshCloudSignIn()} disabled={loading || saving || refreshingSession}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshingSession ? "animate-spin" : ""}`} />
+              Refresh Cloud Sign-In
+            </Button>
+          </CardContent>
         </Card>
       )}
 
@@ -162,6 +197,17 @@ function AdminConfigPageContent() {
               value={supabaseStorageBucket}
               onChange={(event) => setSupabaseStorageBucket(event.target.value)}
               placeholder="dock-data"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Desktop Yearly Price (INR)</label>
+            <Input
+              type="number"
+              min="1"
+              step="1"
+              value={desktopPlanPriceInr}
+              onChange={(event) => setDesktopPlanPriceInr(event.target.value)}
+              placeholder="799"
             />
           </div>
         </CardContent>

@@ -9,7 +9,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const VALID_EVENTS: SupportEventType[] = ["support_page_view", "support_cta_click", "donation_intent"];
-const VALID_CHANNELS: SupportChannel[] = ["buymeacoffee", "upi"];
+const VALID_CHANNELS: SupportChannel[] = ["buymeacoffee", "upi", "razorpay"];
 
 export async function POST(request: Request) {
   if (!isMetricsStorageConfigured()) {

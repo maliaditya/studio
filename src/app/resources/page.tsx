@@ -26,8 +26,6 @@ import { DndContext, useDraggable, useDroppable, type DragEndEvent, DragOverlay,
 import { SortableContext, useSortable, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { motion } from 'framer-motion';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format, parseISO } from 'date-fns';
 import { ModelViewer } from '@/components/ModelViewer';
@@ -37,8 +35,6 @@ import { EditableField, DoubleEditableField, EmotionEditableField, EditableResou
 import { HabitResourceCard } from '@/components/HabitResourceCard';
 import { MechanismResourceCard } from '@/components/MechanismResourceCard';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { storePdf } from '@/lib/audioDB';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { FlashcardResourceTile } from '@/components/FlashcardResourceTile';
@@ -258,7 +254,7 @@ interface ResourceCardComponentProps {
     onUpdate: (resource: Resource) => void; 
     onDelete: (resourceId: string) => void; 
     onOpenNestedPopup: (resourceId: string, event: React.MouseEvent) => void; 
-    onOpenMarkdownModal: (resourceId: string, pointId: string) => void;
+    onOpenMarkdownModal: (resourceId: string, pointId: string, event?: React.MouseEvent) => void;
     playingAudio: { id: string; isPlaying: boolean } | null;
     setPlayingAudio: React.Dispatch<React.SetStateAction<{ id: string; isPlaying: boolean } | null>>;
     onLinkClick: (resourceId: string) => void;
@@ -445,7 +441,7 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
                    </div>
                    <div className="flex items-center">
                         {markdownOrCodeCount > 0 && !isPopup && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => onOpenMarkdownModal(draftResource.id, '')}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={(e) => onOpenMarkdownModal(draftResource.id, '', e)}>
                                 <Expand className="h-4 w-4" />
                             </Button>
                         )}
@@ -508,9 +504,12 @@ const ResourceCardComponent = React.memo(({ resource, onUpdate, onDelete, onOpen
                                         }}
                                         onDelete={() => handleDeletePoint(point.id)}
                                         onOpenNestedPopup={(e: React.MouseEvent) => onOpenNestedPopup(point.resourceId!, e)}
-                                        onOpenMarkdownModal={() => onOpenMarkdownModal(draftResource.id, point.id)}
+                                        onOpenMarkdownModal={(e) => onOpenMarkdownModal(draftResource.id, point.id, e)}
                                         onEditLinkText={onEditLinkText}
-                                        onConvertToCard={onConvertToCard}
+                                        onConvertToCard={() => {
+                                            flush();
+                                            onConvertToCard(point);
+                                        }}
                                         onOpenPdfViewer={() => {}}
                                         onInsertBelow={(type) => handleInsertPointBelow(point.id, type)}
                                         onChangeType={(type) => handleChangePointType(point.id, type)}
@@ -638,7 +637,7 @@ const SortablePoint = React.memo(({ resource, point, onConvertToCard, onUpdate, 
     onUpdate: (updatedPoint: Partial<ResourcePoint>) => void;
     onDelete: () => void;
     onOpenNestedPopup: (event: React.MouseEvent) => void;
-    onOpenMarkdownModal: () => void;
+    onOpenMarkdownModal: (event: React.MouseEvent) => void;
     onEditLinkText: (point: ResourcePoint) => void;
     onOpenPdfViewer: () => void;
     onInsertBelow: (type?: ResourcePoint['type']) => void;
@@ -686,7 +685,6 @@ const SortablePoint = React.memo(({ resource, point, onConvertToCard, onUpdate, 
                 onUpdate={(pointId, updates) => { onUpdate(updates); }}
                 onDelete={onDelete}
                 onOpenNestedPopup={onOpenNestedPopup}
-                onOpenContentView={onOpenMarkdownModal}
                 onConvertToCard={onConvertToCard}
                 onEditLinkText={onEditLinkText}
                 dragHandle={{ attributes, listeners }}
@@ -888,6 +886,7 @@ function ResourcesPageContent() {
     openGeneralPopup,
     createResourceWithHierarchy,
     openPdfViewer,
+    openContentViewPopup,
   } = useAuth();
   const { toast } = useToast();
   
@@ -931,7 +930,6 @@ function ResourcesPageContent() {
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [shareUrl, setShareUrl] = useState('');
 
-  const [markdownModalState, setMarkdownModalState] = useState<{ isOpen: boolean; resource: Resource | null; point: ResourcePoint | null; }>({ isOpen: false, resource: null, point: null });
   
   const tabsContainerRef = useRef<HTMLDivElement>(null);
   
@@ -1001,14 +999,15 @@ function ResourcesPageContent() {
     }
   }, [linkingFromId, resources, setResources, toast]);
   
-  const handleOpenMarkdownModal = (resourceId: string, pointId: string) => {
+  const handleOpenMarkdownModal = (resourceId: string, pointId: string, event?: React.MouseEvent) => {
     const resource = resources.find(r => r.id === resourceId);
-    const point = resource?.points?.find(p => p.id === pointId);
-    setMarkdownModalState({
-      isOpen: true,
-      resource: resource || null,
-      point: point || null,
-    });
+    if (!resource) return;
+    const point =
+      pointId
+        ? resource.points?.find(p => p.id === pointId)
+        : resource.points?.find(p => p.type === 'markdown' || p.type === 'code' || p.type === 'ai-note');
+    if (!point) return;
+    openContentViewPopup(`content-${point.id}`, resource, point, event);
   };
 
   const handleContextMenu = useCallback((event: React.MouseEvent, item: ResourceFolder) => {
@@ -1813,29 +1812,6 @@ function ResourcesPageContent() {
           </DialogContent>
         </Dialog>
         
-        <Dialog open={markdownModalState.isOpen} onOpenChange={(isOpen) => setMarkdownModalState(prev => ({...prev, isOpen}))}>
-          <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
-            <DialogHeader className="p-4 border-b">
-              <DialogTitle>{markdownModalState.resource?.name || "Content"}</DialogTitle>
-            </DialogHeader>
-            <div className="flex-grow min-h-0">
-                <ScrollArea className="h-full">
-                    <div className="p-6">
-                      {markdownModalState.point?.type === 'markdown' ? (
-                        <div className="prose dark:prose-invert max-w-none">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{markdownModalState.point.text}</ReactMarkdown>
-                        </div>
-                      ) : (
-                        <SyntaxHighlighter language="javascript" style={vscDarkPlus} customStyle={{margin: 0}} showLineNumbers>
-                          {markdownModalState.point?.text || ""}
-                        </SyntaxHighlighter>
-                      )}
-                    </div>
-                </ScrollArea>
-            </div>
-          </DialogContent>
-        </Dialog>
-
          <Dialog open={modelModalState.isOpen} onOpenChange={(isOpen) => setModelModalState({isOpen, modelUrl: null})}>
             <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-2">
                 <DialogHeader className="p-4 border-b">

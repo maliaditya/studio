@@ -2,22 +2,16 @@ import { NextResponse } from "next/server";
 import { getSessionUserFromRequest } from "@/lib/serverSession";
 import { verifyAccessToken } from "@/lib/authTokens";
 import { isAppConfigStorageConfigured, readAppConfigFromDb, upsertAppConfig } from "@/lib/appConfigServer";
+import { isAdminUsername } from "@/lib/adminUsers";
+import { DESKTOP_PLAN_PRICE_INR, normalizeDesktopPlanPriceInr } from '@/lib/desktopAccess';
 
 export const dynamic = "force-dynamic";
-
-const getAdminUsernames = (): string[] => {
-  const fromEnv = (process.env.ADMIN_USERNAMES || "")
-    .split(",")
-    .map((value) => value.trim().toLowerCase())
-    .filter(Boolean);
-  if (fromEnv.length > 0) return fromEnv;
-  return ["lonewolf"];
-};
 
 const readEnvFallback = () => ({
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || null,
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || null,
   supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET || null,
+  desktopPlanPriceInr: normalizeDesktopPlanPriceInr(process.env.NEXT_PUBLIC_DESKTOP_PLAN_PRICE_INR, DESKTOP_PLAN_PRICE_INR),
 });
 
 export async function GET() {
@@ -61,9 +55,8 @@ export async function POST(request: Request) {
   const tokenPayload = bearerToken ? verifyAccessToken(bearerToken) : null;
   const tokenUser = tokenPayload?.sub?.trim().toLowerCase() || null;
   const effectiveUser = sessionUser || tokenUser;
-  const admins = getAdminUsernames();
 
-  if (!effectiveUser || !admins.includes(effectiveUser)) {
+  if (!isAdminUsername(effectiveUser)) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 403 });
   }
 
@@ -75,9 +68,13 @@ export async function POST(request: Request) {
   const supabaseUrl = String(payload?.supabaseUrl || "").trim();
   const supabaseAnonKey = String(payload?.supabaseAnonKey || "").trim();
   const supabaseStorageBucket = String(payload?.supabaseStorageBucket || "").trim() || null;
+  const desktopPlanPriceInr = normalizeDesktopPlanPriceInr(payload?.desktopPlanPriceInr, Number.NaN);
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return NextResponse.json({ error: "Supabase URL and anon key are required." }, { status: 400 });
+  }
+  if (!Number.isFinite(desktopPlanPriceInr) || desktopPlanPriceInr <= 0) {
+    return NextResponse.json({ error: 'Desktop yearly price must be a positive whole-number INR amount.' }, { status: 400 });
   }
 
   try {
@@ -85,6 +82,7 @@ export async function POST(request: Request) {
       supabaseUrl,
       supabaseAnonKey,
       supabaseStorageBucket,
+      desktopPlanPriceInr,
     });
     return NextResponse.json({
       ...saved,

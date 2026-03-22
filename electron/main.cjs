@@ -4,8 +4,25 @@ const http = require("http");
 const net = require("net");
 const { spawn, spawnSync } = require("child_process");
 const fs = require("fs");
+const dotenv = require("dotenv");
 
-const loadBundledEnv = () => {
+const loadDesktopEnv = () => {
+  if (!app.isPackaged) {
+    const localEnvPath = path.join(__dirname, "..", ".env.local");
+    if (fs.existsSync(localEnvPath)) {
+      try {
+        const parsed = dotenv.parse(fs.readFileSync(localEnvPath, "utf8"));
+        Object.entries(parsed).forEach(([key, value]) => {
+          if (!process.env[key] && typeof value === "string" && value.trim().length > 0) {
+            process.env[key] = value.trim();
+          }
+        });
+      } catch (error) {
+        console.warn("Failed to load .env.local for Electron dev:", error?.message || error);
+      }
+    }
+  }
+
   const candidates = [
     path.join(__dirname, "env.json"),
     path.join(process.resourcesPath, "electron", "env.json"),
@@ -29,7 +46,7 @@ const loadBundledEnv = () => {
   }
 };
 
-loadBundledEnv();
+loadDesktopEnv();
 
 const isDev = !app.isPackaged;
 const DEV_URL = process.env.ELECTRON_DEV_URL || "http://localhost:9002";
@@ -1852,6 +1869,7 @@ function readSecureAuthMap() {
 
 function writeSecureAuthMap(data) {
   const filePath = getSecureAuthPath();
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
   const payload =
     safeStorage.isEncryptionAvailable()
       ? {
@@ -1909,9 +1927,9 @@ function registerSecureAuthIpc() {
       if (parsed.origin !== allowedOrigin) {
         return { success: false, error: `Auth proxy origin mismatch. Allowed: ${allowedOrigin}` };
       }
-      const allowedPrefixes = ["/api/auth/", "/api/metrics/"];
+      const allowedPrefixes = ["/api/auth/", "/api/metrics/", "/api/app-config", "/api/admin/"];
       if (!allowedPrefixes.some((prefix) => parsed.pathname.startsWith(prefix))) {
-        return { success: false, error: "Only /api/auth/* and /api/metrics/* routes are allowed." };
+        return { success: false, error: "Only /api/auth/*, /api/metrics/*, /api/app-config, and /api/admin/* routes are allowed." };
       }
 
       const response = await fetch(url, {

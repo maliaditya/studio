@@ -12,6 +12,7 @@ import { parseJsonWithRecovery } from "@/lib/jsonRecovery";
 import { useToast } from "@/hooks/use-toast";
 import { getAiConfigFromSettings, normalizeAiSettings } from "@/lib/ai/config";
 import { cleanSpeechText, getKokoroLocalVoices, getOpenAiCloudVoices, loadSpeechPrefs, parseCloudVoiceURI, pickBestVoice, saveSpeechPrefs } from "@/lib/tts";
+import type { KnowledgeGraph } from "@/lib/knowledgeTree/types";
 
 type GraphNodeType =
   | "bothering-type"
@@ -22,7 +23,8 @@ type GraphNodeType =
   | "project"
   | "kanban-card"
   | "resource"
-  | "canvas";
+  | "canvas"
+  | "knowledge";
 type GraphEdgeType =
   | "contains"
   | "mismatch-link"
@@ -32,7 +34,8 @@ type GraphEdgeType =
   | "pattern-flow"
   | "project-board"
   | "resource-canvas"
-  | "canvas-link";
+  | "canvas-link"
+  | "knowledge";
 
 type GraphNode = {
   id: string;
@@ -129,7 +132,8 @@ const isHierarchicalEdge = (type: GraphEdgeType) =>
   type === "linked-task" ||
   type === "pattern-flow" ||
   type === "project-board" ||
-  type === "resource-canvas";
+  type === "resource-canvas" ||
+  type === "knowledge";
 
 const edgeForceMultiplier = (type: GraphEdgeType) => {
   if (type === "contains") return 0.32;
@@ -137,6 +141,7 @@ const edgeForceMultiplier = (type: GraphEdgeType) => {
   if (type === "linked-task") return 0.48;
   if (type === "pattern-flow") return 0.5;
   if (type === "project-board" || type === "resource-canvas") return 0.38;
+  if (type === "knowledge") return 0.32;
   return 1;
 };
 
@@ -157,6 +162,7 @@ const nodeTypeLabel = (type: GraphNodeType) => {
   if (type === "project") return "Project";
   if (type === "kanban-card") return "Kanban Task";
   if (type === "resource") return "Resource Card";
+  if (type === "knowledge") return "Knowledge Node";
   return "Canvas";
 };
 
@@ -171,6 +177,81 @@ const pathAccentForType = (type: GraphNodeType, mode?: GraphNode["mode"]) => {
   return "#e5e7eb";
 };
 
+const KNOWLEDGE_CLUSTER_PALETTE = [
+  "#38bdf8",
+  "#f472b6",
+  "#34d399",
+  "#facc15",
+  "#a78bfa",
+  "#fb923c",
+  "#22d3ee",
+  "#e879f9",
+  "#4ade80",
+  "#fb7185",
+];
+const DEFAULT_KNOWLEDGE_ACCENT = "#60a5fa";
+
+const toRgba = (hex: string, alpha: number) => {
+  const cleaned = hex.replace("#", "");
+  if (cleaned.length !== 6) return `rgba(248, 250, 252, ${alpha})`;
+  const r = parseInt(cleaned.slice(0, 2), 16);
+  const g = parseInt(cleaned.slice(2, 4), 16);
+  const b = parseInt(cleaned.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
+const buildKnowledgeCommunities = (graph: KnowledgeGraph) => {
+  const nodeIds = graph.nodes.map((node) => node.id).sort();
+  const adjacency = new Map<string, string[]>();
+  nodeIds.forEach((id) => adjacency.set(id, []));
+  graph.edges.forEach((edge) => {
+    if (!adjacency.has(edge.source) || !adjacency.has(edge.target)) return;
+    adjacency.get(edge.source)!.push(edge.target);
+    adjacency.get(edge.target)!.push(edge.source);
+  });
+
+  let labels = new Map<string, string>();
+  nodeIds.forEach((id) => labels.set(id, id));
+
+  const rounds = 7;
+  for (let round = 0; round < rounds; round += 1) {
+    const next = new Map(labels);
+    nodeIds.forEach((id) => {
+      const neighbors = adjacency.get(id) || [];
+      if (neighbors.length === 0) return;
+      const counts = new Map<string, number>();
+      neighbors.forEach((neighbor) => {
+        const label = labels.get(neighbor) || neighbor;
+        counts.set(label, (counts.get(label) || 0) + 1);
+      });
+      const sorted = Array.from(counts.entries()).sort((a, b) => {
+        if (b[1] !== a[1]) return b[1] - a[1];
+        return a[0].localeCompare(b[0]);
+      });
+      if (sorted.length > 0) next.set(id, sorted[0][0]);
+    });
+    labels = next;
+  }
+
+  const communities = new Map<string, string>();
+  labels.forEach((label, id) => communities.set(id, label));
+
+  const uniqueLabels = Array.from(new Set(labels.values()));
+  const palette = uniqueLabels.length <= 1 ? [DEFAULT_KNOWLEDGE_ACCENT] : KNOWLEDGE_CLUSTER_PALETTE;
+  const communityToColor = new Map<string, string>();
+  uniqueLabels.forEach((label) => {
+    const idx = hashString(label) % palette.length;
+    communityToColor.set(label, palette[idx]);
+  });
+
+  const nodeToColor = new Map<string, string>();
+  communities.forEach((label, id) => {
+    nodeToColor.set(id, communityToColor.get(label) || DEFAULT_KNOWLEDGE_ACCENT);
+  });
+
+  return { nodeToColor, communityOf: communities };
+};
+
 const colorForNode = (type: GraphNodeType, lightTheme = false, mode?: GraphNode["mode"]) => {
   if (type === "bothering-type") return "#a855f7";
   if (type === "bothering") return "#f97316";
@@ -180,6 +261,7 @@ const colorForNode = (type: GraphNodeType, lightTheme = false, mode?: GraphNode[
   if (type === "project") return lightTheme ? "#7c3aed" : "#a78bfa";
   if (type === "kanban-card") return lightTheme ? "#10b981" : "#34d399";
   if (type === "resource") return "#f59e0b";
+  if (type === "knowledge") return lightTheme ? "#0f172a" : "#f8fafc";
   return lightTheme ? "#475569" : "#e5e7eb";
 };
 
@@ -192,6 +274,7 @@ const strokeForEdge = (type: GraphEdgeType, lightTheme = false, mode?: GraphEdge
     if (type === "mismatch-link") return "rgba(168, 85, 247, 0.65)";
     if (type === "specialization-fit") return "rgba(2, 132, 199, 0.55)";
     if (type === "routine-source") return "rgba(124, 58, 237, 0.6)";
+    if (type === "knowledge") return "rgba(15, 23, 42, 0.6)";
     return "rgba(71, 85, 105, 0.38)";
   }
   if (type === "pattern-flow") return mode === "growth" ? "rgba(52, 211, 153, 0.68)" : "rgba(244, 114, 182, 0.68)";
@@ -201,6 +284,7 @@ const strokeForEdge = (type: GraphEdgeType, lightTheme = false, mode?: GraphEdge
   if (type === "mismatch-link") return "rgba(168, 85, 247, 0.78)";
   if (type === "specialization-fit") return "rgba(56, 189, 248, 0.65)";
   if (type === "routine-source") return "rgba(168, 85, 247, 0.65)";
+  if (type === "knowledge") return "rgba(248, 250, 252, 0.6)";
   return "rgba(163, 163, 163, 0.45)";
 };
 
@@ -323,6 +407,9 @@ export default function GraphPage() {
   const [showResources, setShowResources] = useState(true);
   const [showCanvases, setShowCanvases] = useState(true);
   const [showOrphans, setShowOrphans] = useState(false);
+  const [showKnowledgeTree, setShowKnowledgeTree] = useState(false);
+  const [knowledgeGraph, setKnowledgeGraph] = useState<KnowledgeGraph | null>(null);
+  const [knowledgeCanvasId, setKnowledgeCanvasId] = useState<string>("global");
   const [animate, setAnimate] = useState(true);
   const [repel, setRepel] = useState(450);
   const [linkDistance, setLinkDistance] = useState(60);
@@ -365,6 +452,21 @@ export default function GraphPage() {
   const isAiEnabled = useMemo(() => normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== "none", [settings.ai, isDesktopRuntime]);
   const kokoroEnabled = isDesktopRuntime && Boolean(settings.kokoroTtsBaseUrl?.trim());
   const cloudVoices = useMemo(() => [...getOpenAiCloudVoices(aiConfig), ...getKokoroLocalVoices(kokoroEnabled)], [aiConfig, kokoroEnabled]);
+  const knowledgeCommunities = useMemo(() => {
+    if (!knowledgeGraph) return { nodeToColor: new Map<string, string>(), communityOf: new Map<string, string>() };
+    return buildKnowledgeCommunities(knowledgeGraph);
+  }, [knowledgeGraph]);
+  const knowledgeCanvasOptions = useMemo(() => {
+    const allResources = Array.isArray(resources) ? resources : [];
+    const canvasResource = allResources.find((res) => res.type === "card" && res.name === "Canvas");
+    if (!canvasResource?.points) return [];
+    return canvasResource.points
+      .filter((point) => point.type === "paint")
+      .map((point) => ({
+        id: `${canvasResource.id}-${point.id}`,
+        label: point.text || "Canvas",
+      }));
+  }, [resources]);
 
   useEffect(() => {
     setHasMounted(true);
@@ -396,6 +498,8 @@ export default function GraphPage() {
       if (typeof prefs.showResources === "boolean") setShowResources(prefs.showResources);
       if (typeof prefs.showCanvases === "boolean") setShowCanvases(prefs.showCanvases);
       if (typeof prefs.showOrphans === "boolean") setShowOrphans(prefs.showOrphans);
+      if (typeof prefs.showKnowledgeTree === "boolean") setShowKnowledgeTree(prefs.showKnowledgeTree);
+      if (typeof prefs.knowledgeCanvasId === "string") setKnowledgeCanvasId(prefs.knowledgeCanvasId);
       if (typeof prefs.animate === "boolean") setAnimate(prefs.animate);
       if (typeof prefs.showLabels === "boolean") setShowLabels(prefs.showLabels);
       if (typeof prefs.showArrows === "boolean") setShowArrows(prefs.showArrows);
@@ -477,6 +581,29 @@ export default function GraphPage() {
   }, [ttsVoiceURI, ttsRate]);
 
   useEffect(() => {
+    if (!showKnowledgeTree) return;
+    let cancelled = false;
+    const loadKnowledgeGraph = async () => {
+      try {
+        const effectiveCanvasId = knowledgeCanvasId && knowledgeCanvasId !== "global"
+          ? knowledgeCanvasId
+          : "";
+        const query = effectiveCanvasId ? `?canvasId=${encodeURIComponent(effectiveCanvasId)}` : "";
+        const response = await fetch(`/api/knowledge-tree/graph${query}`);
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !result?.graph) return;
+        if (!cancelled) setKnowledgeGraph(result.graph as KnowledgeGraph);
+      } catch {
+        // ignore fetch failures
+      }
+    };
+    void loadKnowledgeGraph();
+    return () => {
+      cancelled = true;
+    };
+  }, [showKnowledgeTree, knowledgeCanvasId]);
+
+  useEffect(() => {
     if (!hasLoadedPrefsRef.current) return;
     try {
       window.localStorage.setItem(
@@ -491,6 +618,8 @@ export default function GraphPage() {
           showResources,
           showCanvases,
           showOrphans,
+          showKnowledgeTree,
+          knowledgeCanvasId,
           animate,
           showLabels,
           showArrows,
@@ -527,6 +656,8 @@ export default function GraphPage() {
     showResources,
     showCanvases,
     showOrphans,
+    showKnowledgeTree,
+    knowledgeCanvasId,
     animate,
     showLabels,
     showArrows,
@@ -546,6 +677,21 @@ export default function GraphPage() {
   ]);
 
   const graph = useMemo(() => {
+    if (showKnowledgeTree && knowledgeGraph) {
+      return {
+        nodes: knowledgeGraph.nodes.map((node) => ({
+          id: node.id,
+          label: node.label,
+          type: "knowledge" as const,
+        })),
+        edges: knowledgeGraph.edges.map((edge) => ({
+          id: edge.id,
+          source: edge.from,
+          target: edge.to,
+          type: "knowledge" as const,
+        })),
+      };
+    }
     const nodes = new Map<string, GraphNode>();
     const edges = new Map<string, GraphEdge>();
     const botheringNodeIdByPointId = new Map<string, string>();
@@ -875,11 +1021,12 @@ export default function GraphPage() {
       nodes: Array.from(nodes.values()),
       edges: Array.from(edges.values()),
     };
-  }, [mindsetCards, settings.routines, settings.routineSourceOverrides, coreSkills, resources, projects, kanbanBoards, patterns]);
+  }, [showKnowledgeTree, knowledgeGraph, mindsetCards, settings.routines, settings.routineSourceOverrides, coreSkills, resources, projects, kanbanBoards, patterns]);
 
   const filtered = useMemo(() => {
     const q = normalizeText(query);
     const nodeTypeAllowed = (type: GraphNodeType) => {
+      if (type === "knowledge") return true;
       if (type === "bothering" || type === "bothering-type") return showBotherings;
       if (type === "routine") return showRoutines;
       if (type === "specialization") return showSpecializations;
@@ -1273,12 +1420,16 @@ export default function GraphPage() {
     }
 
     const selectedNode = filteredNodeById.get(selectedNodeId);
-    if (pathMode && selectedNode?.type === "bothering") {
+    if (pathMode && (selectedNode?.type === "bothering" || selectedNode?.type === "bothering-type")) {
       const outgoing = new Map<string, GraphEdge[]>();
+      const incoming = new Map<string, GraphEdge[]>();
       filtered.edges.forEach((edge) => {
-        const list = outgoing.get(edge.source);
-        if (list) list.push(edge);
+        const out = outgoing.get(edge.source);
+        if (out) out.push(edge);
         else outgoing.set(edge.source, [edge]);
+        const inc = incoming.get(edge.target);
+        if (inc) inc.push(edge);
+        else incoming.set(edge.target, [edge]);
       });
 
       const edgeIds = new Set<string>();
@@ -1288,8 +1439,12 @@ export default function GraphPage() {
 
       while (queue.length > 0) {
         const current = queue.shift()!;
-        const nextEdges = outgoing.get(current.nodeId) || [];
+        const nextEdges = [
+          ...(outgoing.get(current.nodeId) || []),
+          ...(incoming.get(current.nodeId) || []),
+        ];
         nextEdges.forEach((edge) => {
+          const neighborId = edge.source === current.nodeId ? edge.target : edge.source;
           if (edge.type === "pattern-flow") {
             const nextChainKeys = edge.chainKeys?.length
               ? edge.chainKeys
@@ -1305,10 +1460,10 @@ export default function GraphPage() {
             nodeIds.add(edge.source);
             nodeIds.add(edge.target);
             allowedChainKeys.forEach((allowedChainKey) => {
-              const visitKey = `${edge.target}|${allowedChainKey}`;
+              const visitKey = `${neighborId}|${allowedChainKey}`;
               if (!visited.has(visitKey)) {
                 visited.add(visitKey);
-                queue.push({ nodeId: edge.target, chainKey: allowedChainKey });
+                queue.push({ nodeId: neighborId, chainKey: allowedChainKey });
               }
             });
             return;
@@ -1318,10 +1473,10 @@ export default function GraphPage() {
           edgeIds.add(edge.id);
           nodeIds.add(edge.source);
           nodeIds.add(edge.target);
-          const visitKey = `${edge.target}|root`;
+          const visitKey = `${neighborId}|root`;
           if (!visited.has(visitKey)) {
             visited.add(visitKey);
-            queue.push({ nodeId: edge.target, chainKey: null });
+            queue.push({ nodeId: neighborId, chainKey: null });
           }
         });
       }
@@ -2028,6 +2183,28 @@ export default function GraphPage() {
                   />
                   <div className="space-y-2 text-zinc-100">
                     <div className="flex items-center gap-2">
+                      <Checkbox checked={showKnowledgeTree} onCheckedChange={(v) => setShowKnowledgeTree(!!v)} id="f-k" />
+                      <Label htmlFor="f-k">Knowledge Tree</Label>
+                    </div>
+                    {showKnowledgeTree ? (
+                      <div className="flex items-center gap-2 pl-6">
+                        <Label htmlFor="knowledge-canvas" className="text-xs text-zinc-400">Knowledge source</Label>
+                        <select
+                          id="knowledge-canvas"
+                          value={knowledgeCanvasId}
+                          onChange={(e) => setKnowledgeCanvasId(e.target.value)}
+                          className="h-7 w-full rounded-md border border-white/15 bg-black/40 px-2 text-xs text-zinc-100"
+                        >
+                          <option value="global">Global (unlinked)</option>
+                          {knowledgeCanvasOptions.map((option) => (
+                            <option key={option.id} value={option.id}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
+                    <div className="flex items-center gap-2">
                       <Checkbox checked={showBotherings} onCheckedChange={(v) => setShowBotherings(!!v)} id="f-b" />
                       <Label htmlFor="f-b">Botherings</Label>
                     </div>
@@ -2386,10 +2563,16 @@ export default function GraphPage() {
                   const aiDimmed = !!aiInsights && !aiActive;
                   const sourceNode = filteredNodeById.get(edge.source);
                   const targetNode = filteredNodeById.get(edge.target);
-                  const pathAccent = pathAccentForType(
-                    targetNode?.type || sourceNode?.type || "canvas",
-                    targetNode?.mode || sourceNode?.mode
-                  );
+                  const knowledgeColor = edge.type === "knowledge"
+                    ? knowledgeCommunities.nodeToColor.get(edge.source) ||
+                      knowledgeCommunities.nodeToColor.get(edge.target)
+                    : undefined;
+                  const pathAccent = edge.type === "knowledge"
+                    ? (knowledgeColor || "#e5e7eb")
+                    : pathAccentForType(
+                        targetNode?.type || sourceNode?.type || "canvas",
+                        targetNode?.mode || sourceNode?.mode
+                      );
                   const pathPulse = 0.76 + ((frame % 48) / 48) * 0.18;
                   const dashOffset = -((frame * 0.9) % 24);
                   return (
@@ -2411,7 +2594,15 @@ export default function GraphPage() {
                         y1={s.y}
                         x2={t.x}
                         y2={t.y}
-                        stroke={active ? pathAccent : aiActive ? "rgba(34, 211, 238, 0.82)" : strokeForEdge(edge.type, false, edge.mode)}
+                        stroke={
+                          active
+                            ? pathAccent
+                            : aiActive
+                              ? "rgba(34, 211, 238, 0.82)"
+                              : edge.type === "knowledge" && knowledgeColor
+                                ? toRgba(knowledgeColor, 0.5)
+                                : strokeForEdge(edge.type, false, edge.mode)
+                        }
                         strokeOpacity={selectedNodeId ? (active ? 0.94 : 0.24) : aiDimmed ? 0.14 : 1}
                         strokeWidth={active ? Math.max(2.15, linkThickness + 0.7) : aiActive ? Math.max(2.1, linkThickness + 0.75) : edge.type === "canvas-link" ? linkThickness + 0.5 : linkThickness}
                         strokeDasharray={active ? "10 8" : undefined}
@@ -2437,7 +2628,12 @@ export default function GraphPage() {
                   const labelY = labelAbove ? -(radius + 7) : radius + 7;
                   const tooltipY = labelAbove ? -(radius + 28) : radius + 24;
                   const hovered = hoveredNodeId === node.id;
-                  const pathAccent = pathAccentForType(node.type, node.mode);
+                  const communityColor = node.type === "knowledge"
+                    ? knowledgeCommunities.nodeToColor.get(node.id)
+                    : undefined;
+                  const pathAccent = node.type === "knowledge"
+                    ? (communityColor || "#e5e7eb")
+                    : pathAccentForType(node.type, node.mode);
                   const labelLines = labelLinesForNode(node);
                   const pulse = 0.88 + ((frame % 42) / 42) * 0.18;
                   return (
@@ -2459,8 +2655,22 @@ export default function GraphPage() {
                     >
                       <circle
                         r={radius}
-                        fill={aiActive ? "#06b6d4" : colorForNode(node.type, false, node.mode)}
-                        stroke={active ? pathAccent : aiActive ? "rgba(165, 243, 252, 0.9)" : "rgba(255,255,255,0.2)"}
+                        fill={
+                          aiActive
+                            ? "#06b6d4"
+                            : node.type === "knowledge" && communityColor
+                              ? communityColor
+                              : colorForNode(node.type, false, node.mode)
+                        }
+                        stroke={
+                          active
+                            ? pathAccent
+                            : aiActive
+                              ? "rgba(165, 243, 252, 0.9)"
+                              : node.type === "knowledge" && communityColor
+                                ? toRgba(communityColor, 0.65)
+                                : "rgba(255,255,255,0.2)"
+                        }
                         strokeWidth={active ? 1.8 : aiActive ? 2.2 : 0.8}
                         opacity={selectedNodeId && !active ? 0.42 : aiDimmed ? 0.28 : 1}
                       />

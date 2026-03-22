@@ -149,7 +149,6 @@ const PointTree = ({ resource, points, onUpdate, onDelete, onOpenNestedPopup, op
               onUpdate={onUpdate}
               onDelete={() => onDelete(point.id)}
               onOpenNestedPopup={(e) => onOpenNestedPopup(point.resourceId!, e)}
-              onOpenContentView={(e) => openContentViewPopup(`content-${point.id}`, point, e)}
               onConvertToCard={() => createResourceWithHierarchy(point, 'card')}
               onSeekTo={onSeekTo}
               currentTime={currentTime}

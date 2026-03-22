@@ -3,11 +3,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import Image from 'next/image';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Heart, ArrowLeft, Loader2, Rocket, Calendar } from 'lucide-react';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { Heart, Loader2, Rocket, Calendar } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -16,59 +14,97 @@ import { format, parseISO } from 'date-fns';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 import { trackSupportMetric } from '@/lib/metricsClient';
 import { cn } from '@/lib/utils';
+import { fetchAppConfig } from '@/lib/appConfigClient';
+import { DESKTOP_PLAN_DISPLAY_PRICE, formatDesktopPlanPrice } from '@/lib/desktopAccess';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 
 type TierId = 'supporter' | 'backer' | 'champion' | 'custom';
 
-const SUPPORT_TIERS: Array<{ id: TierId; title: string; amountUsd: number; tagline: string }> = [
-    { id: 'supporter', title: 'Supporter', amountUsd: 5, tagline: 'Quick thank-you boost' },
-    { id: 'backer', title: 'Backer', amountUsd: 15, tagline: 'Most common support level' },
-    { id: 'champion', title: 'Champion', amountUsd: 49, tagline: 'Big push for faster shipping' },
+const SUPPORT_TIERS: Array<{ id: TierId; title: string; amountInr: number; tagline: string }> = [
+    { id: 'supporter', title: 'Supporter', amountInr: 199, tagline: 'Quick thank-you boost' },
+    { id: 'backer', title: 'Backer', amountInr: 499, tagline: 'Most common support level' },
+    { id: 'champion', title: 'Champion', amountInr: 1499, tagline: 'Big push for faster shipping' },
 ];
-const BMC_PROFILE_URL = 'https://buymeacoffee.com/adityamali98';
-const DEFAULT_BMC_TIER_URLS: Record<Exclude<TierId, 'custom'>, string> = {
-    supporter: 'https://buymeacoffee.com/adityamali98/e/515315',
-    backer: 'https://buymeacoffee.com/adityamali98/e/515318',
-    champion: 'https://buymeacoffee.com/adityamali98/e/515322',
-};
+const SUPPORT_AMOUNT_FORMATTER = new Intl.NumberFormat('en-IN', {
+    style: 'currency',
+    currency: 'INR',
+    maximumFractionDigits: 0,
+});
 
-const BMC_TIER_URLS: Partial<Record<TierId, string | undefined>> = {
-    supporter: process.env.NEXT_PUBLIC_BMC_SUPPORTER_URL || DEFAULT_BMC_TIER_URLS.supporter,
-    backer: process.env.NEXT_PUBLIC_BMC_BACKER_URL || DEFAULT_BMC_TIER_URLS.backer,
-    champion: process.env.NEXT_PUBLIC_BMC_CHAMPION_URL || DEFAULT_BMC_TIER_URLS.champion,
-    custom: process.env.NEXT_PUBLIC_BMC_CUSTOM_URL || BMC_PROFILE_URL,
+const loadRazorpayScript = async () => {
+    if (typeof window === 'undefined') return false;
+    if ((window as any).Razorpay) return true;
+
+    return await new Promise<boolean>((resolve) => {
+        const existing = document.querySelector('script[data-razorpay-checkout="true"]') as HTMLScriptElement | null;
+        if (existing) {
+            existing.addEventListener('load', () => resolve(true), { once: true });
+            existing.addEventListener('error', () => resolve(false), { once: true });
+            return;
+        }
+
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.async = true;
+        script.dataset.razorpayCheckout = 'true';
+        script.onload = () => resolve(true);
+        script.onerror = () => resolve(false);
+        document.body.appendChild(script);
+    });
 };
 
 export default function SupportPage() {
-    const isMobile = useIsMobile();
-    const [showQr, setShowQr] = useState(false);
+    const { toast } = useToast();
+    const { currentUser } = useAuth();
     const [count, setCount] = useState<number | null>(null);
     const [hasSupported, setHasSupported] = useState(false);
     const [releases, setReleases] = useState<Release[]>([]);
     const [isLoadingReleases, setIsLoadingReleases] = useState(true);
     const [selectedTier, setSelectedTier] = useState<TierId>('backer');
-    const [customAmountInput, setCustomAmountInput] = useState('3');
+    const [customAmountInput, setCustomAmountInput] = useState('99');
+    const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+    const [desktopPlanDisplayPrice, setDesktopPlanDisplayPrice] = useState(DESKTOP_PLAN_DISPLAY_PRICE);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadAppConfig = async () => {
+            try {
+                const config = await fetchAppConfig();
+                if (!cancelled && typeof config.desktopPlanPriceInr === 'number') {
+                    setDesktopPlanDisplayPrice(formatDesktopPlanPrice(config.desktopPlanPriceInr));
+                }
+            } catch {
+                // Keep the default display price.
+            }
+        };
+
+        void loadAppConfig();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const parseCustomAmount = (): number => {
         const parsed = Number(customAmountInput);
         return Number.isFinite(parsed) ? parsed : 0;
     };
 
-    const selectedAmountUsd =
+    const selectedAmountInr =
         selectedTier === 'custom'
             ? parseCustomAmount()
-            : (SUPPORT_TIERS.find((tier) => tier.id === selectedTier)?.amountUsd ?? 15);
+            : (SUPPORT_TIERS.find((tier) => tier.id === selectedTier)?.amountInr ?? 499);
 
-    const isCustomAmountValid = selectedTier !== 'custom' || selectedAmountUsd >= 3;
-    const selectedTierBmcUrl = BMC_TIER_URLS[selectedTier];
-    const hasTierSpecificBmcCheckout = typeof selectedTierBmcUrl === 'string' && selectedTierBmcUrl.trim().length > 0;
+    const isCustomAmountValid = selectedTier !== 'custom' || selectedAmountInr >= 99;
 
     const trackSupportEvent = async (
         event: 'support_page_view' | 'support_cta_click' | 'donation_intent',
-        channel?: 'buymeacoffee' | 'upi',
-        amountUsd?: number
+        channel?: 'razorpay',
+        amountInr?: number
     ) => {
         try {
-            await trackSupportMetric(event, channel, amountUsd);
+            await trackSupportMetric(event, channel, amountInr);
         } catch {
             // Metrics should never block support flow.
         }
@@ -143,30 +179,109 @@ export default function SupportPage() {
         }
     };
 
-    const handleUpiClick = async () => {
+    const handleRazorpayClick = async () => {
         if (!isCustomAmountValid) return;
-        void trackSupportEvent('support_cta_click', 'upi', selectedAmountUsd);
-        await markSupporterIfNeeded();
-        void trackSupportEvent('donation_intent', 'upi', selectedAmountUsd);
+        setIsProcessingPayment(true);
+        void trackSupportEvent('support_cta_click', 'razorpay', selectedAmountInr);
 
-        if (isMobile) {
-            window.open('upi://pay?pa=adityamali33@okaxis&pn=Aditya%20Mali&cu=INR', '_blank', 'noopener,noreferrer');
-        } else {
-            setShowQr(true);
+        try {
+            const startResponse = await fetch('/api/support-payment/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amountInr: selectedAmountInr,
+                    username: currentUser?.username,
+                    email: currentUser?.email,
+                }),
+            });
+            const startResult = await startResponse.json().catch(() => null) as {
+                error?: string;
+                sessionId?: string;
+                checkoutData?: {
+                    keyId?: string;
+                    orderId?: string;
+                    amount?: number;
+                    currency?: string;
+                    name?: string;
+                    description?: string;
+                    prefill?: { name?: string; contact?: string; email?: string };
+                } | null;
+            } | null;
+
+            if (!startResponse.ok || !startResult?.sessionId || !startResult.checkoutData?.keyId || !startResult.checkoutData?.orderId) {
+                throw new Error(startResult?.error || 'Failed to start Razorpay support checkout.');
+            }
+
+            const scriptLoaded = await loadRazorpayScript();
+            if (!scriptLoaded || !(window as any).Razorpay) {
+                throw new Error('Failed to load Razorpay Checkout.');
+            }
+
+            await new Promise<void>((resolve, reject) => {
+                const razorpay = new (window as any).Razorpay({
+                    key: startResult.checkoutData!.keyId,
+                    amount: startResult.checkoutData!.amount,
+                    currency: startResult.checkoutData!.currency,
+                    name: startResult.checkoutData!.name || 'Dock',
+                    description: startResult.checkoutData!.description || 'Support Dock',
+                    order_id: startResult.checkoutData!.orderId,
+                    prefill: startResult.checkoutData!.prefill,
+                    readonly: {
+                        contact: Boolean(startResult.checkoutData?.prefill?.contact),
+                        email: Boolean(startResult.checkoutData?.prefill?.email),
+                    },
+                    modal: {
+                        ondismiss: () => reject(new Error('Razorpay checkout was cancelled.')),
+                    },
+                    handler: async (paymentResponse: {
+                        razorpay_payment_id: string;
+                        razorpay_order_id: string;
+                        razorpay_signature: string;
+                    }) => {
+                        const confirmResponse = await fetch('/api/support-payment/confirm', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                sessionId: startResult.sessionId,
+                                providerSessionId: paymentResponse.razorpay_payment_id,
+                                providerOrderId: paymentResponse.razorpay_order_id,
+                                providerSignature: paymentResponse.razorpay_signature,
+                                amountInr: selectedAmountInr,
+                            }),
+                        });
+                        const confirmResult = await confirmResponse.json().catch(() => null) as { error?: string; success?: boolean; message?: string } | null;
+
+                        if (!confirmResponse.ok || !confirmResult?.success) {
+                            reject(new Error(confirmResult?.error || confirmResult?.message || 'Razorpay payment verification failed.'));
+                            return;
+                        }
+
+                        await markSupporterIfNeeded();
+                        void trackSupportEvent('donation_intent', 'razorpay', selectedAmountInr);
+                        toast({
+                            title: 'Support Received',
+                            description: confirmResult.message || `Thanks for supporting Dock with ${SUPPORT_AMOUNT_FORMATTER.format(selectedAmountInr)}.`,
+                        });
+                        resolve();
+                    },
+                    theme: {
+                        color: '#4F5DFF',
+                    },
+                });
+
+                razorpay.open();
+            });
+        } catch (error) {
+            toast({
+                title: 'Payment Error',
+                description: error instanceof Error ? error.message : 'Failed to open Razorpay support checkout.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsProcessingPayment(false);
         }
     };
 
-    const handleBuyMeCoffeeClick = async () => {
-        if (!isCustomAmountValid) return;
-        if (!hasTierSpecificBmcCheckout) return;
-        void trackSupportEvent('support_cta_click', 'buymeacoffee', selectedAmountUsd);
-        await markSupporterIfNeeded();
-        void trackSupportEvent('donation_intent', 'buymeacoffee', selectedAmountUsd);
-
-        const finalUrl = selectedTierBmcUrl!.trim();
-        window.open(finalUrl, '_blank', 'noopener,noreferrer');
-    };
-    
     const renderReleases = () => {
         if (isLoadingReleases) {
           return (
@@ -224,123 +339,87 @@ export default function SupportPage() {
             <Card className="w-full max-w-md shadow-2xl">
                 <CardHeader>
                     <CardTitle className="flex items-center justify-center gap-2 text-2xl">
-                        <Heart className="text-red-500" /> Support the Project
+                        <Heart className="text-red-500" /> Pricing & Support
                     </CardTitle>
                     <CardDescription className="text-center pt-2">
-                        {showQr
-                            ? "Scan the QR code to pay with any UPI app. Your contribution directly supports the development of the features below. Thank you!"
-                            : "Choose a supporter tier. Stage 1 is donations-only: no paywall, no feature gating."}
+                        {`Dock web stays free. Desktop access is ${desktopPlanDisplayPrice} yearly. If you want to support development beyond that, you can contribute below.`}
                     </CardDescription>
                 </CardHeader>
 
                 <CardContent>
-                    {showQr ? (
-                        <div className="flex flex-col items-center justify-center gap-4">
-                            <Image
-                                src="/QRcode.jpg"
-                                data-ai-hint="qr code"
-                                alt="UPI QR Code"
-                                width={250}
-                                height={250}
-                                className="rounded-lg border bg-white p-2"
-                            />
-                            <p className="text-xs text-center text-muted-foreground">
-                                Selected support amount: <strong className="text-foreground">${selectedAmountUsd.toFixed(2)}</strong>
-                            </p>
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                            {SUPPORT_TIERS.map((tier) => (
+                                <button
+                                    key={tier.id}
+                                    type="button"
+                                    onClick={() => setSelectedTier(tier.id)}
+                                    className={cn(
+                                        "rounded-lg border p-3 text-left transition-colors",
+                                        selectedTier === tier.id
+                                            ? "border-primary bg-primary/10"
+                                            : "border-border bg-muted/30 hover:bg-muted/50"
+                                    )}
+                                >
+                                    <p className="text-sm font-semibold">{tier.title}</p>
+                                    <p className="text-lg font-bold">{SUPPORT_AMOUNT_FORMATTER.format(tier.amountInr)}</p>
+                                    <p className="text-[11px] text-muted-foreground">{tier.tagline}</p>
+                                </button>
+                            ))}
                         </div>
-                    ) : (
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                                {SUPPORT_TIERS.map((tier) => (
-                                    <button
-                                        key={tier.id}
-                                        type="button"
-                                        onClick={() => setSelectedTier(tier.id)}
-                                        className={cn(
-                                            "rounded-lg border p-3 text-left transition-colors",
-                                            selectedTier === tier.id
-                                                ? "border-primary bg-primary/10"
-                                                : "border-border bg-muted/30 hover:bg-muted/50"
-                                        )}
-                                    >
-                                        <p className="text-sm font-semibold">{tier.title}</p>
-                                        <p className="text-lg font-bold">${tier.amountUsd}</p>
-                                        <p className="text-[11px] text-muted-foreground">{tier.tagline}</p>
-                                    </button>
-                                ))}
-                            </div>
 
-                            <div className={cn(
-                                "rounded-lg border p-3",
-                                selectedTier === 'custom' ? "border-primary bg-primary/10" : "border-border bg-muted/30"
-                            )}>
-                                <div className="flex items-center justify-between gap-3">
-                                    <button
-                                        type="button"
-                                        onClick={() => setSelectedTier('custom')}
-                                        className="text-left"
-                                    >
-                                        <p className="text-sm font-semibold">Custom</p>
-                                        <p className="text-[11px] text-muted-foreground">Minimum $3</p>
-                                    </button>
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-sm text-muted-foreground">$</span>
-                                        <Input
-                                            type="number"
-                                            min={3}
-                                            step="1"
-                                            value={customAmountInput}
-                                            onChange={(e) => {
-                                                setSelectedTier('custom');
-                                                setCustomAmountInput(e.target.value);
-                                            }}
-                                            className="h-9 w-24"
-                                        />
-                                    </div>
+                        <div className={cn(
+                            "rounded-lg border p-3",
+                            selectedTier === 'custom' ? "border-primary bg-primary/10" : "border-border bg-muted/30"
+                        )}>
+                            <div className="flex items-center justify-between gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setSelectedTier('custom')}
+                                    className="text-left"
+                                >
+                                    <p className="text-sm font-semibold">Custom</p>
+                                    <p className="text-[11px] text-muted-foreground">Minimum {SUPPORT_AMOUNT_FORMATTER.format(99)}</p>
+                                </button>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-sm text-muted-foreground">Rs.</span>
+                                    <Input
+                                        type="number"
+                                        min={99}
+                                        step="1"
+                                        value={customAmountInput}
+                                        onChange={(e) => {
+                                            setSelectedTier('custom');
+                                            setCustomAmountInput(e.target.value);
+                                        }}
+                                        className="h-9 w-24"
+                                    />
                                 </div>
-                                {!isCustomAmountValid && (
-                                    <p className="mt-2 text-xs text-destructive">Custom amount must be at least $3.</p>
-                                )}
                             </div>
-
-                            <p className="text-center text-xs text-muted-foreground">
-                                Selected amount: <strong className="text-foreground">${selectedAmountUsd.toFixed(2)} USD</strong>
-                            </p>
-                            <p className="text-center text-[11px] text-muted-foreground">
-                                {hasTierSpecificBmcCheckout
-                                    ? "Tier-specific Buy Me a Coffee checkout is configured for this selection."
-                                    : "Buy Me a Coffee cannot enforce selected tier on profile links. Configure tier URLs to enable exact-amount BMC checkout."}
-                            </p>
-
-                            <div className="flex flex-col items-center justify-center gap-3">
-                                <Button
-                                    onClick={handleBuyMeCoffeeClick}
-                                    disabled={!isCustomAmountValid || !hasTierSpecificBmcCheckout}
-                                    className="h-11 w-full bg-[#FFDD00] text-black hover:bg-[#FFDD00]/90 font-bold rounded-lg shadow-md"
-                                >
-                                    {hasTierSpecificBmcCheckout
-                                        ? `Buy Me a Coffee ($${selectedAmountUsd.toFixed(0)})`
-                                        : "Buy Me a Coffee (Configure Tier URL)"}
-                                </Button>
-                                <Button
-                                    onClick={handleUpiClick}
-                                    disabled={!isCustomAmountValid}
-                                    variant="outline"
-                                    className="h-11 w-full font-semibold rounded-lg"
-                                >
-                                    Support via UPI
-                                </Button>
-                            </div>
+                            {!isCustomAmountValid && (
+                                <p className="mt-2 text-xs text-destructive">Custom amount must be at least {SUPPORT_AMOUNT_FORMATTER.format(99)}.</p>
+                            )}
                         </div>
-                    )}
+
+                        <p className="text-center text-xs text-muted-foreground">
+                            Selected amount: <strong className="text-foreground">{SUPPORT_AMOUNT_FORMATTER.format(selectedAmountInr)}</strong>
+                        </p>
+
+                        <div className="flex flex-col items-center justify-center gap-3">
+                            <Button
+                                onClick={handleRazorpayClick}
+                                disabled={!isCustomAmountValid || isProcessingPayment}
+                                className="h-11 w-full bg-[#0B72E7] text-white hover:bg-[#0B72E7]/90 font-bold rounded-lg shadow-md"
+                            >
+                                {isProcessingPayment
+                                    ? 'Opening Razorpay...'
+                                    : `Pay with Razorpay (${SUPPORT_AMOUNT_FORMATTER.format(selectedAmountInr)})`}
+                            </Button>
+                        </div>
+                    </div>
                 </CardContent>
                 
                 <CardFooter className="flex flex-col items-center justify-center gap-4">
-                     {showQr && (
-                         <Button variant="outline" onClick={() => setShowQr(false)} className="w-full">
-                            <ArrowLeft className="mr-2 h-4 w-4" /> Back to options
-                        </Button>
-                     )}
                      <div className="text-center text-xs text-muted-foreground">
                         {count !== null ? (
                             <p>
