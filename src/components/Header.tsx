@@ -190,6 +190,7 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
         ...(isAdminUser
           ? [
               { href: '/admin/monetization', label: 'Monetization' },
+                            { href: '/admin/setup-support-purchases', label: 'Plan Purchases' },
                             { href: '/admin/donors', label: 'Donors' },
                             { href: '/admin/users', label: 'Users' },
               { href: '/admin/config', label: 'Config' },
@@ -209,6 +210,7 @@ function NavigationMenu({ simpleMode }: { simpleMode: boolean }) {
         ...(isAdminUser
           ? [
               { href: '/admin/monetization', label: 'Monetization' },
+                            { href: '/admin/setup-support-purchases', label: 'Plan Purchases' },
                             { href: '/admin/donors', label: 'Donors' },
                             { href: '/admin/users', label: 'Users' },
               { href: '/admin/config', label: 'Config' },

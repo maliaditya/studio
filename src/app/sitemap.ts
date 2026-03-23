@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 
-const SITE_URL = 'https://vdock.vercel.app';
+const SITE_URL = 'https://dockflow.life';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();

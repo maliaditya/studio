@@ -1,5 +1,5 @@
 export default function Head() {
-  const site = "https://vdock.vercel.app";
+  const site = "https://dockflow.life";
   const url = `${site}/login`;
   const title = "Login | Dock";
   const description = "Sign in to Dock to access your dashboard, planning, and execution workflows.";

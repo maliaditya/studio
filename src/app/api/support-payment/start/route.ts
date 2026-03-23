@@ -37,7 +37,7 @@ const toRazorpayPrefill = (username?: string, email?: string) => {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as { amountInr?: number; username?: string; email?: string };
+    const payload = (await request.json()) as { amountInr?: number; username?: string; email?: string; planId?: string; planHeading?: string };
     const amountInr = Math.round(Number(payload?.amountInr || 0));
     if (!Number.isFinite(amountInr) || amountInr < 99) {
       return NextResponse.json({ error: 'A valid support amount of at least Rs. 99 is required.' }, { status: 400 });
@@ -66,6 +66,8 @@ export async function POST(request: Request) {
         sessionId,
         username: payload?.username,
         email: payload?.email,
+        planId: payload?.planId,
+        planHeading: payload?.planHeading,
         provider: 'razorpay',
         providerOrderId: order.id,
         amountInr,
@@ -84,7 +86,7 @@ export async function POST(request: Request) {
         amount: order.amount,
         currency: order.currency,
         name: 'Dock',
-        description: `Support Dock (${formatAmount(amountInr)})`,
+        description: payload?.planHeading ? `${payload.planHeading} (${formatAmount(amountInr)})` : `Support Dock (${formatAmount(amountInr)})`,
         prefill: toRazorpayPrefill(payload?.username, payload?.email),
       },
       message: 'Razorpay support order created.',

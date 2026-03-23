@@ -22,6 +22,7 @@ import {
   PieChart,
   Route,
   Settings,
+  ShoppingBag,
   Sparkles,
   Target,
   Trello,
@@ -168,6 +169,7 @@ export function AppSidebar() {
           label: "Admin",
           links: [
             { href: "/admin/monetization", label: "Monetization", icon: Wallet },
+            { href: "/admin/setup-support-purchases", label: "Plan Purchases", icon: ShoppingBag },
             { href: "/admin/donors", label: "Donors", icon: HeartHandshake },
             { href: "/admin/users", label: "Users", icon: Users },
             { href: "/admin/config", label: "Config", icon: Settings },

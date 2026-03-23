@@ -61,6 +61,8 @@ create table if not exists public.user_support_donations (
   username text references public.auth_users(username) on delete set null,
   email text,
   session_id text not null unique,
+  plan_id text,
+  plan_heading text,
   provider text not null,
   provider_payment_id text,
   provider_order_id text,
@@ -86,6 +88,12 @@ create index if not exists user_support_donations_created_at_idx
 
 create index if not exists user_support_donations_completed_at_idx
   on public.user_support_donations (completed_at desc);
+
+alter table public.user_support_donations
+  add column if not exists plan_id text;
+
+alter table public.user_support_donations
+  add column if not exists plan_heading text;
 
 comment on table public.user_support_donations is 'Verified and pending support donations for Dock, linked to auth_users when the donor is signed in.';
 

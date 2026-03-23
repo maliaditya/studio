@@ -11,6 +11,8 @@ export type SupportDonationRecord = {
   username: string | null;
   email: string | null;
   sessionId: string;
+  planId: string | null;
+  planHeading: string | null;
   provider: SupportDonationProvider;
   providerPaymentId: string | null;
   providerOrderId: string | null;
@@ -29,6 +31,8 @@ type SupportDonationRow = {
   username: string | null;
   email: string | null;
   session_id: string;
+  plan_id: string | null;
+  plan_heading: string | null;
   provider: string;
   provider_payment_id: string | null;
   provider_order_id: string | null;
@@ -77,6 +81,8 @@ const toRecord = (row: SupportDonationRow): SupportDonationRecord => ({
   username: normalizeUsername(row.username),
   email: normalizeEmail(row.email),
   sessionId: row.session_id,
+  planId: typeof row.plan_id === 'string' && row.plan_id.trim() ? row.plan_id.trim() : null,
+  planHeading: typeof row.plan_heading === 'string' && row.plan_heading.trim() ? row.plan_heading.trim() : null,
   provider: normalizeProvider(row.provider),
   providerPaymentId: row.provider_payment_id || null,
   providerOrderId: row.provider_order_id || null,
@@ -122,6 +128,8 @@ export async function recordSupportDonationStarted(payload: {
   sessionId: string;
   username?: string | null;
   email?: string | null;
+  planId?: string | null;
+  planHeading?: string | null;
   provider: SupportDonationProvider;
   providerOrderId?: string | null;
   amountInr: number;
@@ -141,6 +149,8 @@ export async function recordSupportDonationStarted(payload: {
           username: normalizeUsername(payload.username),
           email: normalizeEmail(payload.email),
           session_id: String(payload.sessionId || '').trim(),
+          plan_id: payload.planId ? String(payload.planId).trim() : null,
+          plan_heading: payload.planHeading ? String(payload.planHeading).trim() : null,
           provider: normalizeProvider(payload.provider),
           provider_order_id: payload.providerOrderId ? String(payload.providerOrderId).trim() : null,
           amount_inr: Math.max(0, Math.round(Number(payload.amountInr || 0))),
@@ -150,7 +160,7 @@ export async function recordSupportDonationStarted(payload: {
         },
         { onConflict: 'session_id' }
       )
-      .select('id, username, email, session_id, provider, provider_payment_id, provider_order_id, amount_inr, currency, status, created_at, updated_at, completed_at')
+      .select('id, username, email, session_id, plan_id, plan_heading, provider, provider_payment_id, provider_order_id, amount_inr, currency, status, created_at, updated_at, completed_at')
       .single<SupportDonationRow>();
 
     if (error) {
@@ -165,6 +175,8 @@ export async function recordSupportDonationStarted(payload: {
 
 export async function markSupportDonationCompleted(payload: {
   sessionId: string;
+  planId?: string | null;
+  planHeading?: string | null;
   provider: SupportDonationProvider;
   providerPaymentId: string;
   providerOrderId: string;
@@ -183,6 +195,8 @@ export async function markSupportDonationCompleted(payload: {
     const { data, error } = await client
       .from(SUPPORT_DONATIONS_TABLE)
       .update({
+        plan_id: payload.planId ? String(payload.planId).trim() : null,
+        plan_heading: payload.planHeading ? String(payload.planHeading).trim() : null,
         provider: normalizeProvider(payload.provider),
         provider_payment_id: String(payload.providerPaymentId || '').trim(),
         provider_order_id: String(payload.providerOrderId || '').trim(),
@@ -192,7 +206,7 @@ export async function markSupportDonationCompleted(payload: {
         updated_at: now,
       })
       .eq('session_id', sessionId)
-      .select('id, username, email, session_id, provider, provider_payment_id, provider_order_id, amount_inr, currency, status, created_at, updated_at, completed_at')
+      .select('id, username, email, session_id, plan_id, plan_heading, provider, provider_payment_id, provider_order_id, amount_inr, currency, status, created_at, updated_at, completed_at')
       .maybeSingle<SupportDonationRow>();
 
     if (error) {
@@ -208,6 +222,8 @@ export async function markSupportDonationCompleted(payload: {
       .insert({
         id: randomUUID(),
         session_id: sessionId,
+        plan_id: payload.planId ? String(payload.planId).trim() : null,
+        plan_heading: payload.planHeading ? String(payload.planHeading).trim() : null,
         provider: normalizeProvider(payload.provider),
         provider_payment_id: String(payload.providerPaymentId || '').trim(),
         provider_order_id: String(payload.providerOrderId || '').trim(),
@@ -217,7 +233,7 @@ export async function markSupportDonationCompleted(payload: {
         completed_at: now,
         updated_at: now,
       })
-      .select('id, username, email, session_id, provider, provider_payment_id, provider_order_id, amount_inr, currency, status, created_at, updated_at, completed_at')
+      .select('id, username, email, session_id, plan_id, plan_heading, provider, provider_payment_id, provider_order_id, amount_inr, currency, status, created_at, updated_at, completed_at')
       .single<SupportDonationRow>();
 
     if (insertError) {
@@ -237,7 +253,7 @@ export async function listSupportDonations(): Promise<SupportDonationOverview[]>
     const client = getAdminClient();
     const { data, error } = await client
       .from(SUPPORT_DONATIONS_TABLE)
-      .select('id, username, email, session_id, provider, provider_payment_id, provider_order_id, amount_inr, currency, status, created_at, updated_at, completed_at')
+      .select('id, username, email, session_id, plan_id, plan_heading, provider, provider_payment_id, provider_order_id, amount_inr, currency, status, created_at, updated_at, completed_at')
       .order('completed_at', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
       .returns<SupportDonationRow[]>();
@@ -250,4 +266,9 @@ export async function listSupportDonations(): Promise<SupportDonationOverview[]>
   } catch (error) {
     withHelpfulTableError(error, 'Failed to list support donations.');
   }
+}
+
+export async function listSetupSupportPurchases(): Promise<SupportDonationOverview[]> {
+  const donations = await listSupportDonations();
+  return donations.filter((donation) => donation.status === 'completed' && Boolean(donation.planHeading));
 }

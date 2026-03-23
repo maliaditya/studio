@@ -1,5 +1,5 @@
 export default function Head() {
-  const site = "https://vdock.vercel.app";
+  const site = "https://dockflow.life";
   const url = `${site}/changelog`;
   const title = "Changelog | Dock";
   const description = "Latest product updates and release notes for Dock.";

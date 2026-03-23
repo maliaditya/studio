@@ -1,7 +1,7 @@
 import { DESKTOP_PLAN_DISPLAY_PRICE } from '@/lib/desktopAccess';
 
 export default function Head() {
-  const site = "https://vdock.vercel.app";
+  const site = "https://dockflow.life";
   const url = `${site}/support`;
   const title = "Dock Pricing & Support";
   const description =

@@ -1,6 +1,7 @@
 "use client";
 
 import type { DesktopPlanCatalog } from '@/lib/desktopPlans';
+import type { SetupSupportPlanCatalog } from '@/lib/setupSupportPlans';
 
 export type AppConfigPayload = {
   supabaseUrl: string | null;
@@ -8,6 +9,7 @@ export type AppConfigPayload = {
   supabaseStorageBucket: string | null;
   desktopPlanPriceInr: number | null;
   desktopPlans?: DesktopPlanCatalog | null;
+  setupSupportPlans?: SetupSupportPlanCatalog | null;
   updatedAt?: string | null;
   source?: "db" | "env";
   storageConfigured?: boolean;
@@ -79,6 +81,7 @@ export async function saveAppConfig(
     supabaseStorageBucket?: string | null;
     desktopPlanPriceInr: number;
     desktopPlans?: DesktopPlanCatalog | null;
+    setupSupportPlans?: SetupSupportPlanCatalog | null;
   },
   accessToken?: string | null
 ): Promise<AppConfigPayload> {

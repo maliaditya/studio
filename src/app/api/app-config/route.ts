@@ -5,18 +5,21 @@ import { isAppConfigStorageConfigured, readAppConfigFromDb, upsertAppConfig } fr
 import { isAdminUsername } from "@/lib/adminUsers";
 import { DESKTOP_PLAN_PRICE_INR, normalizeDesktopPlanPriceInr } from '@/lib/desktopAccess';
 import { createDefaultDesktopPlanCatalog, getDesktopPlanFinalPriceInr, getFeaturedDesktopPlan, normalizeDesktopPlanCatalog } from '@/lib/desktopPlans';
+import { createDefaultSetupSupportPlanCatalog, normalizeSetupSupportPlanCatalog } from '@/lib/setupSupportPlans';
 
 export const dynamic = "force-dynamic";
 
 const readEnvFallback = () => {
   const desktopPlanPriceInr = normalizeDesktopPlanPriceInr(process.env.NEXT_PUBLIC_DESKTOP_PLAN_PRICE_INR, DESKTOP_PLAN_PRICE_INR);
   const desktopPlans = createDefaultDesktopPlanCatalog(desktopPlanPriceInr);
+  const setupSupportPlans = createDefaultSetupSupportPlanCatalog();
   return {
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || null,
     supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || null,
     supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET || null,
     desktopPlanPriceInr,
     desktopPlans,
+    setupSupportPlans,
   };
 };
 
@@ -75,6 +78,7 @@ export async function POST(request: Request) {
   const supabaseAnonKey = String(payload?.supabaseAnonKey || "").trim();
   const supabaseStorageBucket = String(payload?.supabaseStorageBucket || "").trim() || null;
   const desktopPlans = normalizeDesktopPlanCatalog(payload?.desktopPlans, normalizeDesktopPlanPriceInr(payload?.desktopPlanPriceInr, DESKTOP_PLAN_PRICE_INR));
+  const setupSupportPlans = normalizeSetupSupportPlanCatalog(payload?.setupSupportPlans);
   const desktopPlanPriceInr = getDesktopPlanFinalPriceInr(getFeaturedDesktopPlan(desktopPlans));
 
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -91,6 +95,7 @@ export async function POST(request: Request) {
       supabaseStorageBucket,
       desktopPlanPriceInr,
       desktopPlans,
+      setupSupportPlans,
     });
     return NextResponse.json({
       ...saved,

@@ -1,5 +1,5 @@
 export default function Head() {
-  const site = "https://vdock.vercel.app";
+  const site = "https://dockflow.life";
   const url = `${site}/privacy`;
   const title = "Privacy Policy | Dock";
   const description = "Privacy policy for Dock web and desktop app.";

@@ -24,6 +24,12 @@ import {
   type DesktopPlanTaxMode,
   type DesktopPlanValidity,
 } from "@/lib/desktopPlans";
+import {
+  createDefaultSetupSupportPlanCatalog,
+  normalizeSetupSupportPlanCatalog,
+  type SetupSupportFeature,
+  type SetupSupportPlanDefinition,
+} from "@/lib/setupSupportPlans";
 import { describeUnknownError } from "@/lib/errorMessage";
 import { getAccessToken } from "@/lib/localAuth";
 import { isAdminUsername } from "@/lib/adminUsers";
@@ -37,6 +43,8 @@ function AdminConfigPageContent() {
   const [supabaseStorageBucket, setSupabaseStorageBucket] = useState("");
   const [desktopPlanFeatures, setDesktopPlanFeatures] = useState<DesktopPlanFeature[]>(createDefaultDesktopPlanCatalog().features);
   const [desktopPlans, setDesktopPlans] = useState<DesktopPlanDefinition[]>(createDefaultDesktopPlanCatalog().plans);
+  const [setupSupportFeatures, setSetupSupportFeatures] = useState<SetupSupportFeature[]>(createDefaultSetupSupportPlanCatalog().features);
+  const [setupSupportPlans, setSetupSupportPlans] = useState<SetupSupportPlanDefinition[]>(createDefaultSetupSupportPlanCatalog().plans);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refreshingSession, setRefreshingSession] = useState(false);
@@ -60,8 +68,11 @@ function AdminConfigPageContent() {
       setSupabaseAnonKey(data.supabaseAnonKey || "");
       setSupabaseStorageBucket(data.supabaseStorageBucket || "");
       const catalog = normalizeDesktopPlanCatalog(data.desktopPlans, data.desktopPlanPriceInr || 799);
+      const setupSupportCatalog = normalizeSetupSupportPlanCatalog(data.setupSupportPlans);
       setDesktopPlanFeatures(catalog.features);
       setDesktopPlans(catalog.plans);
+      setSetupSupportFeatures(setupSupportCatalog.features);
+      setSetupSupportPlans(setupSupportCatalog.plans);
     } catch (err) {
       setError(describeUnknownError(err, "Failed to load config."));
     } finally {
@@ -131,6 +142,63 @@ function AdminConfigPageContent() {
     setDesktopPlans((prev) => prev.filter((plan) => plan.id !== planId));
   };
 
+  const addSetupSupportFeature = () => {
+    setSetupSupportFeatures((prev) => [...prev, { id: `setup_support_feature_${Date.now()}_${prev.length + 1}`, label: '' }]);
+  };
+
+  const updateSetupSupportFeature = (featureId: string, updates: Partial<SetupSupportFeature>) => {
+    setSetupSupportFeatures((prev) => prev.map((feature) => (feature.id === featureId ? { ...feature, ...updates } : feature)));
+  };
+
+  const removeSetupSupportFeature = (featureId: string) => {
+    setSetupSupportFeatures((prev) => prev.filter((feature) => feature.id !== featureId));
+    setSetupSupportPlans((prev) => prev.map((plan) => ({
+      ...plan,
+      featureIds: plan.featureIds.filter((id) => id !== featureId),
+    })));
+  };
+
+  const addSetupSupportPlan = () => {
+    setSetupSupportPlans((prev) => [
+      ...prev,
+      {
+        id: `setup_support_${Date.now()}_${prev.length + 1}`,
+        heading: 'New Support Plan',
+        description: 'Describe the setup or support help included in this plan.',
+        priceInr: 999,
+        durationLabel: '30 mins',
+        ctaLabel: 'Book Now',
+        featureIds: [],
+        recommended: prev.length === 0,
+      },
+    ]);
+  };
+
+  const updateSetupSupportPlan = (planId: string, updates: Partial<SetupSupportPlanDefinition>) => {
+    setSetupSupportPlans((prev) => prev.map((plan) => (plan.id === planId ? { ...plan, ...updates } : plan)));
+  };
+
+  const toggleSetupSupportRecommendation = (planId: string, checked: boolean) => {
+    setSetupSupportPlans((prev) => prev.map((plan) => ({
+      ...plan,
+      recommended: checked ? plan.id === planId : plan.id === planId ? false : plan.recommended,
+    })));
+  };
+
+  const removeSetupSupportPlan = (planId: string) => {
+    setSetupSupportPlans((prev) => prev.filter((plan) => plan.id !== planId));
+  };
+
+  const toggleSetupSupportFeature = (planId: string, featureId: string, checked: boolean) => {
+    setSetupSupportPlans((prev) => prev.map((plan) => {
+      if (plan.id !== planId) return plan;
+      const nextFeatureIds = checked
+        ? Array.from(new Set([...plan.featureIds, featureId]))
+        : plan.featureIds.filter((id) => id !== featureId);
+      return { ...plan, featureIds: nextFeatureIds };
+    }));
+  };
+
   useEffect(() => {
     if (!isAdmin) return;
     void loadConfig();
@@ -180,6 +248,10 @@ function AdminConfigPageContent() {
             features: desktopPlanFeatures,
             plans: desktopPlans,
           },
+          setupSupportPlans: {
+            features: setupSupportFeatures,
+            plans: setupSupportPlans,
+          },
         },
         accessToken
       );
@@ -190,7 +262,7 @@ function AdminConfigPageContent() {
         supabaseAnonKey: payload.supabaseAnonKey || prev.supabaseAnonKey,
         supabasePdfBucket: payload.supabaseStorageBucket || prev.supabasePdfBucket,
       }));
-      toast({ title: "Saved", description: "Supabase config and desktop plans updated for all apps." });
+      toast({ title: "Saved", description: "Supabase config, desktop plans, and setup/support plans updated for all apps." });
     } catch (err) {
       const message = describeUnknownError(err, "Failed to save config.");
       setError(message);
@@ -482,6 +554,140 @@ function AdminConfigPageContent() {
                 </div>
               ))}
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Setup & Support Plans</CardTitle>
+          <CardDescription>
+            These plans appear when the user clicks the setup call button on the landing page.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Support Plans</h3>
+              <p className="text-xs text-muted-foreground">Add pricing and text for onboarding or support sessions. Checkout uses the same in-app Razorpay flow.</p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={addSetupSupportPlan}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Support Plan
+            </Button>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">Shared What You Get List</h3>
+                <p className="text-xs text-muted-foreground">Each setup/support plan can check or uncheck the same items.</p>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={addSetupSupportFeature}>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Feature
+              </Button>
+            </div>
+            <div className="space-y-2">
+              {setupSupportFeatures.map((feature, index) => (
+                <div key={feature.id} className="flex items-center gap-2 rounded-lg border border-border/60 bg-background/40 p-2">
+                  <span className="w-8 text-center text-xs text-muted-foreground">{index + 1}</span>
+                  <Input
+                    value={feature.label}
+                    onChange={(event) => updateSetupSupportFeature(feature.id, { label: event.target.value })}
+                    placeholder="Feature label"
+                  />
+                  <Button type="button" variant="ghost" size="icon" onClick={() => removeSetupSupportFeature(feature.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="grid gap-4 xl:grid-cols-2">
+            {setupSupportPlans.map((plan) => (
+              <div key={plan.id} className="rounded-xl border border-border/60 bg-background/40 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1 space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Heading</label>
+                      <Input
+                        value={plan.heading}
+                        onChange={(event) => updateSetupSupportPlan(plan.id, { heading: event.target.value })}
+                        placeholder="1:1 Setup Call"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">What You Get</label>
+                      <Textarea
+                        value={plan.description}
+                        onChange={(event) => updateSetupSupportPlan(plan.id, { description: event.target.value })}
+                        placeholder="Short description shown in the support plans dialog"
+                        className="min-h-[96px]"
+                      />
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Price (INR)</label>
+                        <Input
+                          type="number"
+                          min="1"
+                          step="1"
+                          value={String(plan.priceInr)}
+                          onChange={(event) => updateSetupSupportPlan(plan.id, { priceInr: Number(event.target.value) || 0 })}
+                          placeholder="999"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-muted-foreground">Duration Label</label>
+                        <Input
+                          value={plan.durationLabel}
+                          onChange={(event) => updateSetupSupportPlan(plan.id, { durationLabel: event.target.value })}
+                          placeholder="30 mins"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs text-muted-foreground">Button Label</label>
+                      <Input
+                        value={plan.ctaLabel}
+                        onChange={(event) => updateSetupSupportPlan(plan.id, { ctaLabel: event.target.value })}
+                        placeholder="Pay with Razorpay"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+                      <Checkbox
+                        id={`setup-support-recommended-${plan.id}`}
+                        checked={plan.recommended}
+                        onCheckedChange={(checked) => toggleSetupSupportRecommendation(plan.id, Boolean(checked))}
+                      />
+                      <label htmlFor={`setup-support-recommended-${plan.id}`} className="text-xs text-muted-foreground">
+                        Mark as recommended
+                      </label>
+                    </div>
+                    <div className="space-y-2 rounded-lg border border-border/60 bg-muted/10 p-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">What You Get</p>
+                      <div className="space-y-2">
+                        {setupSupportFeatures.map((feature) => {
+                          const checked = plan.featureIds.includes(feature.id);
+                          return (
+                            <label key={`${plan.id}:${feature.id}`} className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(value) => toggleSetupSupportFeature(plan.id, feature.id, Boolean(value))}
+                              />
+                              <span>{feature.label || 'Untitled feature'}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => removeSetupSupportPlan(plan.id)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

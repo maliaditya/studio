@@ -1,5 +1,5 @@
 export default function Head() {
-  const site = "https://vdock.vercel.app";
+  const site = "https://dockflow.life";
   const url = `${site}/installer-handling`;
   const title = "Installer Handling | Dock";
   const description = "Installer return code documentation for Dock desktop EXE submission.";

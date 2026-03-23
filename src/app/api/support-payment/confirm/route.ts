@@ -16,6 +16,8 @@ export async function POST(request: Request) {
   try {
     const payload = (await request.json()) as {
       sessionId?: string;
+      planId?: string;
+      planHeading?: string;
       providerSessionId?: string;
       providerOrderId?: string;
       providerSignature?: string;
@@ -49,6 +51,8 @@ export async function POST(request: Request) {
     try {
       await markSupportDonationCompleted({
         sessionId,
+        planId: payload.planId,
+        planHeading: payload.planHeading,
         provider: 'razorpay',
         providerPaymentId: providerSessionId,
         providerOrderId,

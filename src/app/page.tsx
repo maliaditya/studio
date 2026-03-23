@@ -19,9 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { fetchAppConfig } from '@/lib/appConfigClient';
 import { DESKTOP_PAYMENT_METHODS, DESKTOP_PLAN_DISPLAY_PRICE, formatDesktopPlanPrice, type DesktopPaymentProvider } from '@/lib/desktopAccess';
 import { createDefaultDesktopPlanCatalog, DESKTOP_PLAN_TAX_MODE_LABELS, DESKTOP_PLAN_VALIDITY_LABELS, getDesktopPlanById, getDesktopPlanFinalPriceInr, getFeaturedDesktopPlan, normalizeDesktopPlanCatalog, type DesktopPlanCatalog } from '@/lib/desktopPlans';
-
-const SETUP_CALL_URL = process.env.NEXT_PUBLIC_SETUP_CALL_URL || "https://buymeacoffee.com/adityamali98/e/515325";
-const IS_EXTERNAL_SETUP_CALL_URL = /^https?:\/\//i.test(SETUP_CALL_URL);
+import { createDefaultSetupSupportPlanCatalog, normalizeSetupSupportPlanCatalog, type SetupSupportPlanCatalog } from '@/lib/setupSupportPlans';
 
 const featureCards = [
     {
@@ -78,7 +76,7 @@ const ORGANIZATION_SCHEMA = {
   "@context": "https://schema.org",
   "@type": "Organization",
   name: "Dock",
-  url: "https://vdock.vercel.app",
+    url: "https://dockflow.life",
   sameAs: ["https://github.com/maliaditya/studio"],
 };
 
@@ -88,7 +86,7 @@ const SOFTWARE_APP_SCHEMA = {
   name: "Dock",
   applicationCategory: "ProductivityApplication",
   operatingSystem: "Web, Windows",
-  url: "https://vdock.vercel.app",
+    url: "https://dockflow.life",
   offers: {
     "@type": "Offer",
     price: "0",
@@ -184,19 +182,27 @@ export default function LandingPage() {
   const [isPageReady, setIsPageReady] = useState(false);
     const [isDesktopAccessDialogOpen, setIsDesktopAccessDialogOpen] = useState(false);
         const [isPlansDialogOpen, setIsPlansDialogOpen] = useState(false);
+    const [isSetupSupportDialogOpen, setIsSetupSupportDialogOpen] = useState(false);
     const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<DesktopPaymentProvider>('razorpay');
     const [isProcessingDesktopAction, setIsProcessingDesktopAction] = useState(false);
+    const [processingSetupSupportPlanId, setProcessingSetupSupportPlanId] = useState<string | null>(null);
     const [isDownloadingDesktop, setIsDownloadingDesktop] = useState(false);
     const [needsDesktopReauth, setNeedsDesktopReauth] = useState(false);
     const [desktopPlanDisplayPrice, setDesktopPlanDisplayPrice] = useState(DESKTOP_PLAN_DISPLAY_PRICE);
         const [desktopPlanCatalog, setDesktopPlanCatalog] = useState<DesktopPlanCatalog>(createDefaultDesktopPlanCatalog());
+        const [setupSupportPlanCatalog, setSetupSupportPlanCatalog] = useState<SetupSupportPlanCatalog>(createDefaultSetupSupportPlanCatalog());
         const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+    const [selectedSetupSupportPlanId, setSelectedSetupSupportPlanId] = useState<string | null>(null);
     const [downloadCount, setDownloadCount] = useState<number | null>(null);
   const isDesktopRuntime = typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
     const landingPreferenceKey = 'dock_hide_landing_page';
         const featuredDesktopPlan = useMemo(() => getFeaturedDesktopPlan(desktopPlanCatalog), [desktopPlanCatalog]);
         const selectedDesktopPlan = useMemo(() => getDesktopPlanById(desktopPlanCatalog, selectedPlanId) || featuredDesktopPlan, [desktopPlanCatalog, featuredDesktopPlan, selectedPlanId]);
+    const selectedSetupSupportPlan = useMemo(() => {
+        const recommendedPlan = setupSupportPlanCatalog.plans.find((plan) => plan.recommended) || setupSupportPlanCatalog.plans[0] || null;
+        return setupSupportPlanCatalog.plans.find((plan) => plan.id === selectedSetupSupportPlanId) || recommendedPlan;
+    }, [selectedSetupSupportPlanId, setupSupportPlanCatalog.plans]);
                 const selectedDesktopPlanFinalPrice = useMemo(() => getDesktopPlanFinalPriceInr(selectedDesktopPlan), [selectedDesktopPlan]);
                 const selectedDesktopPlanBasePrice = useMemo(() => selectedDesktopPlan.priceInr, [selectedDesktopPlan]);
                 const selectedDesktopPlanGstAmount = useMemo(
@@ -234,10 +240,13 @@ export default function LandingPage() {
                 const config = await fetchAppConfig();
                 if (!cancelled) {
                     const catalog = normalizeDesktopPlanCatalog(config.desktopPlans, typeof config.desktopPlanPriceInr === 'number' ? config.desktopPlanPriceInr : undefined);
+                    const setupSupportCatalog = normalizeSetupSupportPlanCatalog(config.setupSupportPlans);
                     const featuredPlan = getFeaturedDesktopPlan(catalog);
                     setDesktopPlanCatalog(catalog);
+                    setSetupSupportPlanCatalog(setupSupportCatalog);
                     setDesktopPlanDisplayPrice(formatDesktopPlanPrice(featuredPlan.priceInr));
                     setSelectedPlanId((current) => current || featuredPlan.id);
+                    setSelectedSetupSupportPlanId((current) => current || setupSupportCatalog.plans.find((plan) => plan.recommended)?.id || setupSupportCatalog.plans[0]?.id || null);
                 }
             } catch {
                 // Keep the built-in fallback display price.
@@ -414,6 +423,118 @@ export default function LandingPage() {
         openPlansDialog();
     };
 
+    const handleSetupSupportCheckout = async (plan: SetupSupportPlanCatalog['plans'][number]) => {
+        let setupSupportDialogClosedForCheckout = false;
+        let setupSupportCheckoutCompleted = false;
+        setProcessingSetupSupportPlanId(plan.id);
+        try {
+            const startResponse = await fetch('/api/support-payment/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    amountInr: plan.priceInr,
+                    username: currentUser?.username,
+                    email: currentUser?.email,
+                    planId: plan.id,
+                    planHeading: plan.heading,
+                }),
+            });
+            const startResult = await startResponse.json().catch(() => null) as {
+                error?: string;
+                sessionId?: string;
+                checkoutData?: {
+                    keyId?: string;
+                    orderId?: string;
+                    amount?: number;
+                    currency?: string;
+                    name?: string;
+                    description?: string;
+                    prefill?: { name?: string; contact?: string; email?: string };
+                } | null;
+            } | null;
+
+            if (!startResponse.ok || !startResult?.sessionId || !startResult.checkoutData?.keyId || !startResult.checkoutData?.orderId) {
+                throw new Error(startResult?.error || 'Failed to start setup/support checkout.');
+            }
+
+            const scriptLoaded = await loadRazorpayScript();
+            if (!scriptLoaded || !(window as any).Razorpay) {
+                throw new Error('Failed to load Razorpay Checkout.');
+            }
+
+            setIsSetupSupportDialogOpen(false);
+            setupSupportDialogClosedForCheckout = true;
+            await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
+
+            await new Promise<void>((resolve, reject) => {
+                const razorpay = new (window as any).Razorpay({
+                    key: startResult.checkoutData!.keyId,
+                    amount: startResult.checkoutData!.amount,
+                    currency: startResult.checkoutData!.currency,
+                    name: startResult.checkoutData!.name || 'Dock',
+                    description: startResult.checkoutData!.description || plan.heading,
+                    order_id: startResult.checkoutData!.orderId,
+                    prefill: startResult.checkoutData!.prefill,
+                    readonly: {
+                        contact: Boolean(startResult.checkoutData?.prefill?.contact),
+                        email: Boolean(startResult.checkoutData?.prefill?.email),
+                    },
+                    modal: {
+                        ondismiss: () => reject(new Error('Razorpay checkout was cancelled.')),
+                    },
+                    handler: async (paymentResponse: {
+                        razorpay_payment_id: string;
+                        razorpay_order_id: string;
+                        razorpay_signature: string;
+                    }) => {
+                        const confirmResponse = await fetch('/api/support-payment/confirm', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                sessionId: startResult.sessionId,
+                                planId: plan.id,
+                                planHeading: plan.heading,
+                                providerSessionId: paymentResponse.razorpay_payment_id,
+                                providerOrderId: paymentResponse.razorpay_order_id,
+                                providerSignature: paymentResponse.razorpay_signature,
+                                amountInr: plan.priceInr,
+                            }),
+                        });
+                        const confirmResult = await confirmResponse.json().catch(() => null) as { error?: string; success?: boolean; message?: string } | null;
+
+                        if (!confirmResponse.ok || !confirmResult?.success) {
+                            reject(new Error(confirmResult?.error || confirmResult?.message || 'Razorpay payment verification failed.'));
+                            return;
+                        }
+
+                        toast({
+                            title: 'Payment Received',
+                            description: confirmResult.message || `Payment completed for ${plan.heading}.`,
+                        });
+                        setupSupportCheckoutCompleted = true;
+                        resolve();
+                    },
+                    theme: {
+                        color: '#4F5DFF',
+                    },
+                });
+
+                razorpay.open();
+            });
+        } catch (error) {
+            toast({
+                title: 'Payment Error',
+                description: error instanceof Error ? error.message : 'Failed to open setup/support checkout.',
+                variant: 'destructive',
+            });
+            if (setupSupportDialogClosedForCheckout && !setupSupportCheckoutCompleted) {
+                setIsSetupSupportDialogOpen(true);
+            }
+        } finally {
+            setProcessingSetupSupportPlanId(null);
+        }
+    };
+
     const handleContinueFromPlans = () => {
         if (currentUser) {
             openPaymentMethodsDialog();
@@ -430,6 +551,8 @@ export default function LandingPage() {
             return;
         }
 
+        let paymentDialogClosedForCheckout = false;
+        let desktopCheckoutCompleted = false;
         setIsProcessingDesktopAction(true);
         try {
             if (selectedPaymentMethod === 'razorpay' || selectedPaymentMethod === 'upi') {
@@ -463,6 +586,10 @@ export default function LandingPage() {
                 if (!scriptLoaded || !(window as any).Razorpay) {
                     throw new Error('Failed to load Razorpay Checkout.');
                 }
+
+                setIsPaymentDialogOpen(false);
+                paymentDialogClosedForCheckout = true;
+                await new Promise<void>((resolve) => window.setTimeout(resolve, 0));
 
                 await new Promise<void>((resolve, reject) => {
                     const upiOnlyConfig = checkoutData.method === 'upi'
@@ -519,6 +646,7 @@ export default function LandingPage() {
                                 title: 'Desktop Access Unlocked',
                                 description: confirmation.message,
                             });
+                            desktopCheckoutCompleted = true;
                             resolve();
                         },
                     });
@@ -526,8 +654,7 @@ export default function LandingPage() {
                     razorpay.open();
                 });
 
-                setIsPaymentDialogOpen(false);
-                    return;
+                return;
             }
 
             const pendingSession =
@@ -567,6 +694,9 @@ export default function LandingPage() {
                 description: error instanceof Error ? error.message : 'Unable to continue desktop checkout.',
                 variant: 'destructive',
             });
+            if (paymentDialogClosedForCheckout && !desktopCheckoutCompleted) {
+                setIsPaymentDialogOpen(true);
+            }
         } finally {
             setIsProcessingDesktopAction(false);
         }
@@ -684,18 +814,9 @@ export default function LandingPage() {
                                 <Download className="mr-2 h-4 w-4" />
                                 Download for Windows
                             </Button>
-                            <Button asChild variant="outline" size="lg" className="text-base font-semibold">
-                                {IS_EXTERNAL_SETUP_CALL_URL ? (
-                                    <a href={SETUP_CALL_URL} target="_blank" rel="noopener noreferrer">
-                                        <PhoneCall className="mr-2 h-4 w-4" />
-                                        Book 1:1 Setup Call
-                                    </a>
-                                ) : (
-                                    <Link href={SETUP_CALL_URL}>
-                                        <PhoneCall className="mr-2 h-4 w-4" />
-                                        Book 1:1 Setup Call
-                                    </Link>
-                                )}
+                            <Button type="button" variant="outline" size="lg" className="text-base font-semibold" onClick={() => setIsSetupSupportDialogOpen(true)}>
+                                <PhoneCall className="mr-2 h-4 w-4" />
+                                Book 1:1 Setup Call
                             </Button>
                         </div>
                             <div className="mt-6 grid max-w-2xl gap-3 sm:grid-cols-2">
@@ -905,6 +1026,83 @@ export default function LandingPage() {
                     </DialogContent>
                 </Dialog>
 
+                <Dialog open={isSetupSupportDialogOpen} onOpenChange={setIsSetupSupportDialogOpen}>
+                    <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+                        <DialogHeader>
+                            <DialogTitle>Setup & Support Plans</DialogTitle>
+                            <DialogDescription>
+                                Compare plans first, then continue to the setup or support payment step.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {setupSupportPlanCatalog.plans.map((plan) => {
+                                const isSelected = selectedSetupSupportPlan?.id === plan.id;
+                                return (
+                                <button
+                                    key={plan.id}
+                                    type="button"
+                                    onClick={() => setSelectedSetupSupportPlanId(plan.id)}
+                                    className={cn(
+                                        'rounded-2xl border p-5 text-left transition-colors',
+                                        isSelected
+                                            ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]'
+                                            : 'border-border/60 bg-background/60 hover:border-primary/30 hover:bg-background'
+                                    )}
+                                >
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="text-2xl font-bold text-foreground">{plan.heading}</div>
+                                            <div className="mt-2 text-3xl font-bold text-foreground">{formatDesktopPlanPrice(plan.priceInr)}</div>
+                                            <div className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">INR / session</div>
+                                            <div className="mt-2 text-xs font-medium text-muted-foreground">Duration: {plan.durationLabel}</div>
+                                        </div>
+                                        {plan.recommended ? (
+                                            <span className="shrink-0 rounded-full bg-primary/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+                                                Recommended
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                    <p className="mt-4 text-sm font-medium text-foreground">{plan.description}</p>
+                                    <div className="mt-5 space-y-2">
+                                        {setupSupportPlanCatalog.features.map((feature) => {
+                                            const included = plan.featureIds.includes(feature.id);
+                                            return (
+                                                <div key={`${plan.id}:${feature.id}`} className="flex items-center gap-2 text-sm">
+                                                    {included ? (
+                                                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                                                    ) : (
+                                                        <Circle className="h-4 w-4 shrink-0 text-muted-foreground/70" />
+                                                    )}
+                                                    <span className={cn(included ? 'text-foreground' : 'text-muted-foreground')}>
+                                                        {feature.label}
+                                                    </span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </button>
+                            )})}
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setIsSetupSupportDialogOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={() => {
+                                    if (!selectedSetupSupportPlan) return;
+                                    void handleSetupSupportCheckout(selectedSetupSupportPlan);
+                                }}
+                                disabled={!selectedSetupSupportPlan || processingSetupSupportPlanId !== null}
+                            >
+                                {processingSetupSupportPlanId !== null
+                                    ? 'Opening Razorpay...'
+                                    : selectedSetupSupportPlan?.ctaLabel || 'Pay with Razorpay'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
                 <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
                     <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
                         <DialogHeader>
@@ -1095,8 +1293,8 @@ export default function LandingPage() {
                                                 : 'border-border/60 bg-background/60 hover:border-primary/30 hover:bg-background'
                                         )}
                                     >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div>
+                                        <div className="flex flex-wrap items-start justify-between gap-3">
+                                            <div className="min-w-0 flex-1">
                                                 <div className="text-2xl font-bold text-foreground">{plan.heading}</div>
                                                 <div className="mt-2 text-4xl font-bold text-foreground">{formatDesktopPlanPrice(plan.priceInr)}</div>
                                                 <div className="mt-1 flex items-center gap-1 whitespace-nowrap text-xs uppercase tracking-[0.16em] text-muted-foreground">
@@ -1109,7 +1307,7 @@ export default function LandingPage() {
                                                 <div className="mt-1 text-xs font-medium text-muted-foreground">{plan.taxMode === 'inclusive' ? 'Included in displayed price' : `${plan.gstPercent}% GST added later in summary`}</div>
                                             </div>
                                             {plan.recommended ? (
-                                                <span className="rounded-full bg-primary/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+                                                <span className="shrink-0 rounded-full bg-primary/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
                                                     Recommended
                                                 </span>
                                             ) : null}

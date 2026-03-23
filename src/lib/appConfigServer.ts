@@ -7,6 +7,7 @@ import {
   normalizeDesktopPlanCatalog,
   type DesktopPlanCatalog,
 } from '@/lib/desktopPlans';
+import { createDefaultSetupSupportPlanCatalog, normalizeSetupSupportPlanCatalog, type SetupSupportPlanCatalog } from '@/lib/setupSupportPlans';
 
 export type AppConfigRecord = {
   supabaseUrl: string | null;
@@ -14,12 +15,13 @@ export type AppConfigRecord = {
   supabaseStorageBucket: string | null;
   desktopPlanPriceInr: number;
   desktopPlans: DesktopPlanCatalog;
+  setupSupportPlans: SetupSupportPlanCatalog;
   updatedAt: string | null;
 };
 
 const CONFIG_TABLE = "app_config";
 const CONFIG_ID = "default";
-const CONFIG_SELECT = 'id, supabase_url, supabase_anon_key, supabase_storage_bucket, desktop_price_inr, desktop_plans, updated_at';
+const CONFIG_SELECT = 'id, supabase_url, supabase_anon_key, supabase_storage_bucket, desktop_price_inr, desktop_plans, setup_support_plans, updated_at';
 const CONFIG_SELECT_LEGACY = 'id, supabase_url, supabase_anon_key, supabase_storage_bucket, updated_at';
 
 const getSupabaseUrl = () => process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -70,6 +72,7 @@ const toRecord = (row: any): AppConfigRecord => ({
   supabaseStorageBucket: row?.supabase_storage_bucket ?? null,
   desktopPlanPriceInr: normalizeDesktopPlanPriceInr(row?.desktop_price_inr, DESKTOP_PLAN_PRICE_INR),
   desktopPlans: normalizeDesktopPlanCatalog(row?.desktop_plans, normalizeDesktopPlanPriceInr(row?.desktop_price_inr, DESKTOP_PLAN_PRICE_INR)),
+  setupSupportPlans: normalizeSetupSupportPlanCatalog(row?.setup_support_plans),
   updatedAt: row?.updated_at ?? null,
 });
 
@@ -77,7 +80,7 @@ export async function readAppConfigFromDb(): Promise<AppConfigRecord | null> {
   const client = getAdminClient();
   let result = await client.from(CONFIG_TABLE).select(CONFIG_SELECT).eq('id', CONFIG_ID).maybeSingle();
 
-  if (result.error && (isMissingConfigColumnError(result.error, 'desktop_price_inr') || isMissingConfigColumnError(result.error, 'desktop_plans'))) {
+  if (result.error && (isMissingConfigColumnError(result.error, 'desktop_price_inr') || isMissingConfigColumnError(result.error, 'desktop_plans') || isMissingConfigColumnError(result.error, 'setup_support_plans'))) {
     result = await client.from(CONFIG_TABLE).select(CONFIG_SELECT_LEGACY).eq('id', CONFIG_ID).maybeSingle();
   }
 
@@ -94,10 +97,12 @@ export async function upsertAppConfig(payload: {
   supabaseStorageBucket?: string | null;
   desktopPlanPriceInr: number;
   desktopPlans?: DesktopPlanCatalog | null;
+  setupSupportPlans?: SetupSupportPlanCatalog | null;
 }): Promise<AppConfigRecord> {
   const client = getAdminClient();
   const now = new Date().toISOString();
   const desktopPlans = normalizeDesktopPlanCatalog(payload.desktopPlans, payload.desktopPlanPriceInr);
+  const setupSupportPlans = normalizeSetupSupportPlanCatalog(payload.setupSupportPlans);
   const featuredPlan = getFeaturedDesktopPlan(desktopPlans);
   const { data, error } = await client
     .from(CONFIG_TABLE)
@@ -109,6 +114,7 @@ export async function upsertAppConfig(payload: {
         supabase_storage_bucket: payload.supabaseStorageBucket ?? null,
         desktop_price_inr: getDesktopPlanFinalPriceInr(featuredPlan),
         desktop_plans: desktopPlans,
+        setup_support_plans: setupSupportPlans,
         updated_at: now,
       },
       { onConflict: "id" }
@@ -117,8 +123,8 @@ export async function upsertAppConfig(payload: {
     .single();
 
   if (error) {
-    if (isMissingConfigColumnError(error, 'desktop_price_inr') || isMissingConfigColumnError(error, 'desktop_plans')) {
-      throw new Error('App config table is missing desktop pricing columns. Run docs/app-config.sql in Supabase SQL Editor before saving plans from admin.');
+    if (isMissingConfigColumnError(error, 'desktop_price_inr') || isMissingConfigColumnError(error, 'desktop_plans') || isMissingConfigColumnError(error, 'setup_support_plans')) {
+      throw new Error('App config table is missing pricing config columns. Run docs/app-config.sql in Supabase SQL Editor before saving plans from admin.');
     }
     throw new Error(describeDbError(error) || "Failed to save app config.");
   }
@@ -142,5 +148,15 @@ export async function readConfiguredDesktopPlanCatalog(): Promise<DesktopPlanCat
     return normalizeDesktopPlanCatalog(config?.desktopPlans, config?.desktopPlanPriceInr || DESKTOP_PLAN_PRICE_INR);
   } catch {
     return createDefaultDesktopPlanCatalog(DESKTOP_PLAN_PRICE_INR);
+  }
+}
+
+export async function readConfiguredSetupSupportPlanCatalog(): Promise<SetupSupportPlanCatalog> {
+  if (!isAppConfigStorageConfigured()) return createDefaultSetupSupportPlanCatalog();
+  try {
+    const config = await readAppConfigFromDb();
+    return normalizeSetupSupportPlanCatalog(config?.setupSupportPlans);
+  } catch {
+    return createDefaultSetupSupportPlanCatalog();
   }
 }
