@@ -7,15 +7,22 @@ create table if not exists public.app_config (
   supabase_anon_key text,
   supabase_storage_bucket text,
   desktop_price_inr integer not null default 799,
+  desktop_plans jsonb,
   updated_at timestamptz not null default now()
 );
 
 alter table public.app_config
   add column if not exists desktop_price_inr integer not null default 799;
 
+alter table public.app_config
+  add column if not exists desktop_plans jsonb;
+
 -- Optional seed row
-insert into public.app_config (id, supabase_url, supabase_anon_key, supabase_storage_bucket, desktop_price_inr)
-values ('default', '', '', '', 799)
+insert into public.app_config (id, supabase_url, supabase_anon_key, supabase_storage_bucket, desktop_price_inr, desktop_plans)
+values ('default', '', '', '', 799, null)
 on conflict (id) do nothing;
+
+
+
 
 

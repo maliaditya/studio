@@ -15,7 +15,13 @@ import { BrainCircuit } from 'lucide-react';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 
 const REMEMBER_LOGIN_KEY = 'dock_remember_login_v1';
+const HIDE_LANDING_PAGE_KEY = 'dock_hide_landing_page';
 type RememberLoginPayload = { username?: string; password?: string; remember?: boolean };
+
+const getPostLoginRoute = () => {
+  if (typeof window === 'undefined') return '/';
+  return window.localStorage.getItem(HIDE_LANDING_PAGE_KEY) === 'true' ? '/my-plate' : '/';
+};
 
 function LoginPageContent() {
   const [username, setUsername] = useState('');
@@ -33,7 +39,7 @@ function LoginPageContent() {
 
   useEffect(() => {
     if (!loading && currentUser) {
-      router.replace('/my-plate');
+      router.replace(getPostLoginRoute());
     }
   }, [currentUser, loading, router]);
 
@@ -83,7 +89,7 @@ function LoginPageContent() {
       setSessionBlockedMessage(result.message);
     } else if (result?.success) {
       setSessionBlockedMessage('');
-      router.replace('/my-plate');
+      router.replace(getPostLoginRoute());
     }
   };
 
@@ -192,6 +198,7 @@ function LoginPageContent() {
                         const result = await signIn(username, password, { force: true });
                         if (result?.success) {
                           setSessionBlockedMessage('');
+                          router.replace(getPostLoginRoute());
                         }
                       }}
                       disabled={loading}

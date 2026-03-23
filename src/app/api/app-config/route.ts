@@ -4,15 +4,21 @@ import { verifyAccessToken } from "@/lib/authTokens";
 import { isAppConfigStorageConfigured, readAppConfigFromDb, upsertAppConfig } from "@/lib/appConfigServer";
 import { isAdminUsername } from "@/lib/adminUsers";
 import { DESKTOP_PLAN_PRICE_INR, normalizeDesktopPlanPriceInr } from '@/lib/desktopAccess';
+import { createDefaultDesktopPlanCatalog, getDesktopPlanFinalPriceInr, getFeaturedDesktopPlan, normalizeDesktopPlanCatalog } from '@/lib/desktopPlans';
 
 export const dynamic = "force-dynamic";
 
-const readEnvFallback = () => ({
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || null,
-  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || null,
-  supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET || null,
-  desktopPlanPriceInr: normalizeDesktopPlanPriceInr(process.env.NEXT_PUBLIC_DESKTOP_PLAN_PRICE_INR, DESKTOP_PLAN_PRICE_INR),
-});
+const readEnvFallback = () => {
+  const desktopPlanPriceInr = normalizeDesktopPlanPriceInr(process.env.NEXT_PUBLIC_DESKTOP_PLAN_PRICE_INR, DESKTOP_PLAN_PRICE_INR);
+  const desktopPlans = createDefaultDesktopPlanCatalog(desktopPlanPriceInr);
+  return {
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || null,
+    supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || null,
+    supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET || null,
+    desktopPlanPriceInr,
+    desktopPlans,
+  };
+};
 
 export async function GET() {
   const fallback = readEnvFallback();
@@ -68,7 +74,8 @@ export async function POST(request: Request) {
   const supabaseUrl = String(payload?.supabaseUrl || "").trim();
   const supabaseAnonKey = String(payload?.supabaseAnonKey || "").trim();
   const supabaseStorageBucket = String(payload?.supabaseStorageBucket || "").trim() || null;
-  const desktopPlanPriceInr = normalizeDesktopPlanPriceInr(payload?.desktopPlanPriceInr, Number.NaN);
+  const desktopPlans = normalizeDesktopPlanCatalog(payload?.desktopPlans, normalizeDesktopPlanPriceInr(payload?.desktopPlanPriceInr, DESKTOP_PLAN_PRICE_INR));
+  const desktopPlanPriceInr = getDesktopPlanFinalPriceInr(getFeaturedDesktopPlan(desktopPlans));
 
   if (!supabaseUrl || !supabaseAnonKey) {
     return NextResponse.json({ error: "Supabase URL and anon key are required." }, { status: 400 });
@@ -83,6 +90,7 @@ export async function POST(request: Request) {
       supabaseAnonKey,
       supabaseStorageBucket,
       desktopPlanPriceInr,
+      desktopPlans,
     });
     return NextResponse.json({
       ...saved,

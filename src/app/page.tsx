@@ -1,12 +1,12 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowRight, BrainCircuit, Heart, HeartPulse, Briefcase, TrendingUp, DollarSign, GitMerge, Share2, LayoutDashboard, BookCopy, Activity as ActivityIcon, Sparkles, CheckCircle2, Laptop, PhoneCall, Download } from 'lucide-react';
+import { ArrowRight, BrainCircuit, Circle, Heart, HeartPulse, Briefcase, TrendingUp, DollarSign, GitMerge, Share2, LayoutDashboard, BookCopy, Activity as ActivityIcon, Sparkles, CheckCircle2, Laptop, PhoneCall, Download } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { fetchAppConfig } from '@/lib/appConfigClient';
 import { DESKTOP_PAYMENT_METHODS, DESKTOP_PLAN_DISPLAY_PRICE, formatDesktopPlanPrice, type DesktopPaymentProvider } from '@/lib/desktopAccess';
+import { createDefaultDesktopPlanCatalog, DESKTOP_PLAN_TAX_MODE_LABELS, DESKTOP_PLAN_VALIDITY_LABELS, getDesktopPlanById, getDesktopPlanFinalPriceInr, getFeaturedDesktopPlan, normalizeDesktopPlanCatalog, type DesktopPlanCatalog } from '@/lib/desktopPlans';
 
 const SETUP_CALL_URL = process.env.NEXT_PUBLIC_SETUP_CALL_URL || "https://buymeacoffee.com/adityamali98/e/515325";
 const IS_EXTERNAL_SETUP_CALL_URL = /^https?:\/\//i.test(SETUP_CALL_URL);
@@ -66,6 +67,12 @@ const heroPanelItems = [
   { title: "Timeslot-Driven Execution", detail: "Today cards align to your routine schedule." },
   { title: "AI Review Loop", detail: "Explain and rebalance from your real logs." },
 ];
+
+const formatDesktopPlanValidity = (validity: 'monthly' | 'yearly' | 'lifetime') => {
+    if (validity === 'monthly') return '30 days';
+    if (validity === 'yearly') return '365 days';
+    return 'Lifetime access';
+};
 
 const ORGANIZATION_SCHEMA = {
   "@context": "https://schema.org",
@@ -176,14 +183,26 @@ export default function LandingPage() {
   const [dontShowAgain, setDontShowAgain] = useState(false);
   const [isPageReady, setIsPageReady] = useState(false);
     const [isDesktopAccessDialogOpen, setIsDesktopAccessDialogOpen] = useState(false);
+        const [isPlansDialogOpen, setIsPlansDialogOpen] = useState(false);
     const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<DesktopPaymentProvider>('razorpay');
     const [isProcessingDesktopAction, setIsProcessingDesktopAction] = useState(false);
     const [isDownloadingDesktop, setIsDownloadingDesktop] = useState(false);
     const [needsDesktopReauth, setNeedsDesktopReauth] = useState(false);
     const [desktopPlanDisplayPrice, setDesktopPlanDisplayPrice] = useState(DESKTOP_PLAN_DISPLAY_PRICE);
+        const [desktopPlanCatalog, setDesktopPlanCatalog] = useState<DesktopPlanCatalog>(createDefaultDesktopPlanCatalog());
+        const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
     const [downloadCount, setDownloadCount] = useState<number | null>(null);
   const isDesktopRuntime = typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
+    const landingPreferenceKey = 'dock_hide_landing_page';
+        const featuredDesktopPlan = useMemo(() => getFeaturedDesktopPlan(desktopPlanCatalog), [desktopPlanCatalog]);
+        const selectedDesktopPlan = useMemo(() => getDesktopPlanById(desktopPlanCatalog, selectedPlanId) || featuredDesktopPlan, [desktopPlanCatalog, featuredDesktopPlan, selectedPlanId]);
+                const selectedDesktopPlanFinalPrice = useMemo(() => getDesktopPlanFinalPriceInr(selectedDesktopPlan), [selectedDesktopPlan]);
+                const selectedDesktopPlanBasePrice = useMemo(() => selectedDesktopPlan.priceInr, [selectedDesktopPlan]);
+                const selectedDesktopPlanGstAmount = useMemo(
+                    () => Math.max(0, selectedDesktopPlanFinalPrice - selectedDesktopPlanBasePrice),
+                    [selectedDesktopPlanBasePrice, selectedDesktopPlanFinalPrice]
+                );
 
     const loadRazorpayScript = async () => {
         if (typeof window === 'undefined') return false;
@@ -213,8 +232,12 @@ export default function LandingPage() {
         const loadAppConfig = async () => {
             try {
                 const config = await fetchAppConfig();
-                if (!cancelled && typeof config.desktopPlanPriceInr === 'number') {
-                    setDesktopPlanDisplayPrice(formatDesktopPlanPrice(config.desktopPlanPriceInr));
+                if (!cancelled) {
+                    const catalog = normalizeDesktopPlanCatalog(config.desktopPlans, typeof config.desktopPlanPriceInr === 'number' ? config.desktopPlanPriceInr : undefined);
+                    const featuredPlan = getFeaturedDesktopPlan(catalog);
+                    setDesktopPlanCatalog(catalog);
+                    setDesktopPlanDisplayPrice(formatDesktopPlanPrice(featuredPlan.priceInr));
+                    setSelectedPlanId((current) => current || featuredPlan.id);
                 }
             } catch {
                 // Keep the built-in fallback display price.
@@ -256,14 +279,22 @@ export default function LandingPage() {
     useEffect(() => {
     if (loading) return;
     if (currentUser) {
-      const hideLanding = localStorage.getItem('dock_hide_landing_page');
+            const hideLanding = localStorage.getItem(landingPreferenceKey);
       if (hideLanding === 'true') {
         router.replace('/my-plate');
         return;
       }
+            setDontShowAgain(false);
+            setIsPageReady(true);
+            return;
     }
     setIsPageReady(true);
-  }, [currentUser, loading, router]);
+    }, [currentUser, loading, landingPreferenceKey, router]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined' || !currentUser) return;
+        setDontShowAgain(window.localStorage.getItem(landingPreferenceKey) === 'true');
+    }, [currentUser, landingPreferenceKey]);
 
   useEffect(() => {
     if (isPageReady) return;
@@ -278,25 +309,41 @@ export default function LandingPage() {
         if (desktopAccess.currentSession?.provider) {
             setSelectedPaymentMethod(desktopAccess.currentSession.provider);
         }
-    }, [desktopAccess.currentSession?.provider]);
+        if (desktopAccess.currentSession?.planId) {
+            setSelectedPlanId(desktopAccess.currentSession.planId);
+        }
+    }, [desktopAccess.currentSession?.planId, desktopAccess.currentSession?.provider]);
 
   const handleProceed = () => {
-    if (dontShowAgain && currentUser) {
-        safeSetLocalStorageItem('dock_hide_landing_page', 'true');
+        if (currentUser) {
+            if (dontShowAgain) {
+                safeSetLocalStorageItem(landingPreferenceKey, 'true');
+            } else if (typeof window !== 'undefined') {
+                window.localStorage.removeItem(landingPreferenceKey);
+            }
     }
     router.push(currentUser ? "/my-plate" : "/login");
   };
 
     const openDesktopReauthDialog = () => {
         setNeedsDesktopReauth(true);
+        setIsPlansDialogOpen(false);
         setIsPaymentDialogOpen(false);
         setIsDesktopAccessDialogOpen(true);
     };
 
     const openPaymentMethodsDialog = () => {
         setNeedsDesktopReauth(false);
+        setIsPlansDialogOpen(false);
         setIsDesktopAccessDialogOpen(false);
         setIsPaymentDialogOpen(true);
+    };
+
+    const openPlansDialog = () => {
+        setNeedsDesktopReauth(false);
+        setIsDesktopAccessDialogOpen(false);
+        setIsPaymentDialogOpen(false);
+        setIsPlansDialogOpen(true);
     };
 
     const isDesktopReauthError = (message: string) =>
@@ -364,11 +411,16 @@ export default function LandingPage() {
             await handleDesktopDownload();
             return;
         }
+        openPlansDialog();
+    };
+
+    const handleContinueFromPlans = () => {
         if (currentUser) {
             openPaymentMethodsDialog();
             return;
         }
         setNeedsDesktopReauth(false);
+        setIsPlansDialogOpen(false);
         setIsDesktopAccessDialogOpen(true);
     };
 
@@ -382,7 +434,7 @@ export default function LandingPage() {
         try {
             if (selectedPaymentMethod === 'razorpay' || selectedPaymentMethod === 'upi') {
                 const razorpayProvider = selectedPaymentMethod;
-                const result = await startDesktopCheckout(razorpayProvider);
+                const result = await startDesktopCheckout(razorpayProvider, selectedDesktopPlan.id);
                 if (!result.success) {
                     if (isDesktopReauthError(result.message)) {
                         openDesktopReauthDialog();
@@ -479,7 +531,7 @@ export default function LandingPage() {
             }
 
             const pendingSession =
-                desktopAccess.currentSession?.status === 'pending' && desktopAccess.currentSession.provider === selectedPaymentMethod
+                desktopAccess.currentSession?.status === 'pending' && desktopAccess.currentSession.provider === selectedPaymentMethod && desktopAccess.currentSession.planId === selectedDesktopPlan.id
                     ? desktopAccess.currentSession
                     : null;
 
@@ -497,7 +549,7 @@ export default function LandingPage() {
                 return;
             }
 
-            const result = await startDesktopCheckout(selectedPaymentMethod);
+            const result = await startDesktopCheckout(selectedPaymentMethod, selectedDesktopPlan.id);
             if (!result.success) {
                 if (isDesktopReauthError(result.message)) {
                     openDesktopReauthDialog();
@@ -525,11 +577,11 @@ export default function LandingPage() {
             return;
         }
 
-        openPaymentMethodsDialog();
+        openPlansDialog();
     }, [currentUser, needsDesktopReauth, isDesktopAccessDialogOpen]);
 
     const pendingSelectedSession =
-        desktopAccess.currentSession?.status === 'pending' && desktopAccess.currentSession.provider === selectedPaymentMethod
+        desktopAccess.currentSession?.status === 'pending' && desktopAccess.currentSession.provider === selectedPaymentMethod && desktopAccess.currentSession.planId === selectedDesktopPlan.id
             ? desktopAccess.currentSession
             : null;
     const paymentActionLabel = desktopAccess.hasAccess
@@ -582,6 +634,9 @@ export default function LandingPage() {
                         <h1 className="mt-5 text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl">
                             Build execution momentum every day, not just plans.
                         </h1>
+                        <p className="mt-4 max-w-2xl text-lg font-medium text-foreground/90 sm:text-xl">
+                            <span className="text-emerald-300">Dock</span> your thoughts. Let action <span className="text-sky-300">flow</span> from clarity.
+                        </p>
                         <p className="mt-5 max-w-2xl text-base text-muted-foreground sm:text-lg">
                             Dock connects your botherings, tasks, schedules, routines, learning plans, resources, and AI review loop into one system so daily action compounds.
                         </p>
@@ -656,7 +711,8 @@ export default function LandingPage() {
                                                             >
                                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Desktop</p>
                                 <p className="mt-2 text-2xl font-bold text-foreground">{desktopPlanDisplayPrice} yearly</p>
-                                                                <p className="mt-1 text-sm text-muted-foreground">Annual desktop access billed once per year.</p>
+                                                                <p className="mt-1 text-sm text-muted-foreground">{featuredDesktopPlan.heading} plan with {DESKTOP_PLAN_VALIDITY_LABELS[featuredDesktopPlan.validity]} validity.</p>
+                                                                <p className="mt-2 text-xs text-muted-foreground">{featuredDesktopPlan.taxMode === 'inclusive' ? 'Includes GST' : `${featuredDesktopPlan.gstPercent}% GST extra at checkout`}</p>
                                                                 {downloadCount !== null && (
                                                                     <p className="mt-2 text-xs text-muted-foreground">Downloads: {downloadCount.toLocaleString()}</p>
                                                                 )}
@@ -667,7 +723,7 @@ export default function LandingPage() {
                                                                             : 'Access unlocked. Click to download.'
                                                                         : desktopAccess.status === 'pending'
                                                                         ? 'Payment session pending. Click to continue.'
-                                                                        : 'Click to unlock desktop access'}
+                                                                        : 'Click to compare plans'}
                                                                 </p>
                                                             </button>
                             </div>
@@ -814,7 +870,7 @@ export default function LandingPage() {
                             >
                                 <p className="text-sm font-semibold text-foreground">Open Payment Methods</p>
                                 <p className="mt-1 text-sm text-muted-foreground">
-                                    Choose card, UPI, or PayPal and continue the desktop checkout flow.
+                                    Choose card or UPI and continue the desktop checkout flow.
                                 </p>
                             </button>
                         ) : (
@@ -850,11 +906,11 @@ export default function LandingPage() {
                 </Dialog>
 
                 <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
-                    <DialogContent className="sm:max-w-lg">
+                    <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
                         <DialogHeader>
                             <DialogTitle>Desktop Payment</DialogTitle>
                             <DialogDescription>
-                                Select a payment method for desktop access. Entitlement is now stored server-side and download access is gated behind it.
+                                Select a payment method for the chosen plan. Entitlement is stored server-side and download access is gated behind it.
                             </DialogDescription>
                         </DialogHeader>
                         {currentUser?.username && (
@@ -862,56 +918,230 @@ export default function LandingPage() {
                                 Purchasing as <span className="font-semibold text-foreground">{currentUser.username}</span>
                             </div>
                         )}
-                        <div className="space-y-3">
-                            {DESKTOP_PAYMENT_METHODS.map((method) => (
-                                <button
-                                    key={method.id}
-                                    type="button"
-                                    onClick={() => setSelectedPaymentMethod(method.id)}
-                                    className={cn(
-                                        'w-full rounded-xl border p-4 text-left transition-colors',
-                                        selectedPaymentMethod === method.id
-                                            ? 'border-primary bg-primary/10'
-                                            : 'border-border/60 bg-background/60 hover:border-primary/30 hover:bg-background'
+                        <div className="grid items-start gap-6 lg:grid-cols-[minmax(320px,0.95fr)_minmax(420px,1.05fr)]">
+                            <div className="space-y-4 rounded-3xl border border-border/60 bg-background/60 p-5">
+                                <div>
+                                    <div className="text-lg font-semibold text-foreground">Choose payment method</div>
+                                    <div className="mt-1 text-sm text-muted-foreground">
+                                        Select how you want to pay for desktop access.
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    {DESKTOP_PAYMENT_METHODS.map((method) => (
+                                        <button
+                                            key={method.id}
+                                            type="button"
+                                            onClick={() => setSelectedPaymentMethod(method.id)}
+                                            className={cn(
+                                                'w-full rounded-2xl border px-4 py-4 text-left transition-colors',
+                                                selectedPaymentMethod === method.id
+                                                    ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_rgba(255,255,255,0.05)]'
+                                                    : 'border-border/60 bg-background/40 hover:border-primary/30 hover:bg-background/70'
+                                            )}
+                                        >
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div>
+                                                    <p className="text-base font-semibold text-foreground">{method.title}</p>
+                                                    <p className="mt-1 text-sm text-muted-foreground">{method.description}</p>
+                                                </div>
+                                                <div
+                                                    className={cn(
+                                                        'mt-1 h-3 w-3 shrink-0 rounded-full border',
+                                                        selectedPaymentMethod === method.id
+                                                            ? 'border-primary bg-primary'
+                                                            : 'border-border/70 bg-transparent'
+                                                    )}
+                                                />
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="rounded-2xl border border-border/50 bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
+                                    Secure checkout is created only after you continue. Your selected plan and entitlement stay verified server-side.
+                                </div>
+                            </div>
+                            <div className="rounded-3xl border border-border/60 bg-background/90 p-6">
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="text-2xl font-semibold text-foreground">Summary</div>
+                                    <div className="rounded-full border border-border/60 px-3 py-1 text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                                        {selectedDesktopPlan.validity}
+                                    </div>
+                                </div>
+                                <div className="mt-7 space-y-5">
+                                    <div className="flex items-start justify-between gap-6">
+                                        <div className="min-w-0">
+                                            <div className="text-xl font-semibold text-foreground">{selectedDesktopPlan.heading}</div>
+                                            <div className="mt-1 text-sm text-muted-foreground">
+                                                {selectedDesktopPlan.validity === 'lifetime'
+                                                    ? 'One-time purchase'
+                                                    : `Billed ${selectedDesktopPlan.billingLabel} starting today`}
+                                            </div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-2xl font-semibold text-foreground">{formatDesktopPlanPrice(selectedDesktopPlanBasePrice)}</div>
+                                            <div className="mt-1 text-sm text-muted-foreground">Base price</div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4 rounded-2xl border border-border/50 bg-muted/10 p-4">
+                                        <div className="flex items-start justify-between gap-6">
+                                            <div>
+                                                <div className="text-sm font-medium text-foreground">Payment method</div>
+                                                <div className="mt-1 text-xs text-muted-foreground">Selected for this checkout</div>
+                                            </div>
+                                            <div className="text-right text-base font-semibold text-foreground">
+                                                {DESKTOP_PAYMENT_METHODS.find((method) => method.id === selectedPaymentMethod)?.title || 'Unknown'}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-start justify-between gap-6">
+                                            <div>
+                                                <div className="text-sm font-medium text-foreground">GST</div>
+                                                <div className="mt-1 text-xs text-muted-foreground">
+                                                    {selectedDesktopPlan.taxMode === 'inclusive'
+                                                        ? `Included in plan price (${selectedDesktopPlan.gstPercent}%)`
+                                                        : `${selectedDesktopPlan.gstPercent}% added on top of base price`}
+                                                </div>
+                                            </div>
+                                            <div className="text-right text-base font-semibold text-foreground">
+                                                {selectedDesktopPlan.taxMode === 'inclusive'
+                                                    ? 'Included'
+                                                    : formatDesktopPlanPrice(selectedDesktopPlanGstAmount)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-5 rounded-2xl border border-border/60 bg-muted/20 p-5">
+                                    <div className="flex items-start justify-between gap-6">
+                                        <div>
+                                            <div className="text-2xl font-semibold leading-none text-foreground">Today's total</div>
+                                            <div className="mt-2 text-sm text-muted-foreground">
+                                                {selectedDesktopPlan.validity === 'lifetime'
+                                                    ? 'Billed once starting today'
+                                                    : `Billed ${selectedDesktopPlan.billingLabel} starting today`}
+                                            </div>
+                                        </div>
+                                        <div className="text-right text-3xl font-semibold leading-none text-foreground">
+                                            INR {formatDesktopPlanPrice(selectedDesktopPlanFinalPrice).replace(/^₹/, '')}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-5 rounded-2xl border border-border/50 bg-muted/10 p-4 text-sm text-muted-foreground">
+                                    <div>
+                                        GST: <span className="font-semibold text-foreground">{DESKTOP_PLAN_TAX_MODE_LABELS[selectedDesktopPlan.taxMode]}{selectedDesktopPlan.taxMode === 'exclusive' ? ` • ${selectedDesktopPlan.gstPercent}%` : ''}</span>
+                                    </div>
+                                    <div className="mt-2">
+                                        Validity: <span className="font-semibold text-foreground">{formatDesktopPlanValidity(selectedDesktopPlan.validity)}</span>{selectedDesktopPlan.validity === 'lifetime' ? ' • Privileged access will be enabled' : ''}
+                                    </div>
+                                    <div className="mt-2">
+                                        {desktopAccess.hasAccess
+                                            ? 'This account already has desktop access.'
+                                            : pendingSelectedSession
+                                            ? 'A pending checkout session exists for this provider. Confirm it to unlock the download.'
+                                            : selectedDesktopPlan.validity === 'lifetime'
+                                            ? `This creates a checkout session for the ${selectedDesktopPlan.heading} lifetime plan. After payment verification the account is marked privileged.`
+                                            : `This creates a checkout session for the ${selectedDesktopPlan.heading} plan. Access is enabled for one ${selectedDesktopPlan.billingLabel} term after server-side payment signature verification.`}
+                                    </div>
+                                    {desktopAccess.currentSession?.id && !desktopAccess.hasAccess && (
+                                        <div className="mt-2 break-all text-[11px] text-muted-foreground">
+                                            Current session: <span className="font-medium text-foreground">{desktopAccess.currentSession.id}</span>
+                                        </div>
                                     )}
-                                >
-                                    <p className="text-sm font-semibold text-foreground">{method.title}</p>
-                                    <p className="mt-1 text-sm text-muted-foreground">{method.description}</p>
-                                </button>
-                            ))}
-                            <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
-                                Selected plan: <span className="font-semibold text-foreground">Desktop • {desktopPlanDisplayPrice} yearly</span>
-                                                                <div className="mt-2">Selected method: <span className="font-semibold text-foreground">{DESKTOP_PAYMENT_METHODS.find((method) => method.id === selectedPaymentMethod)?.title || 'Unknown'}</span></div>
-                                                                <div className="mt-2">
-                                                                    {desktopAccess.hasAccess
-                                                                        ? 'This account already has desktop access.'
-                                                                        : pendingSelectedSession
-                                                                        ? 'A pending checkout session exists for this provider. Confirm it to unlock the download.'
-                                                                        : 'This creates a Razorpay checkout session. Access is enabled for one year after server-side payment signature verification.'}
-                                                                </div>
-                                                                {desktopAccess.currentSession?.id && !desktopAccess.hasAccess && (
-                                                                    <div className="mt-2 text-xs text-muted-foreground">
-                                                                        Current session: <span className="font-medium text-foreground">{desktopAccess.currentSession.id}</span>
-                                                                    </div>
-                                                                )}
+                                </div>
+                                <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                                    <Button type="button" variant="outline" onClick={openPlansDialog}>
+                                        Back To Plans
+                                    </Button>
+                                    <Button type="button" variant="outline" onClick={() => setIsPaymentDialogOpen(false)}>
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        onClick={() => {
+                                            if (desktopAccess.hasAccess) {
+                                                void handleDesktopDownload();
+                                                return;
+                                            }
+                                            void handleDesktopCheckoutAction();
+                                        }}
+                                        disabled={desktopAccessLoading || isProcessingDesktopAction || isDownloadingDesktop}
+                                    >
+                                        {desktopAccessLoading || isProcessingDesktopAction || isDownloadingDesktop ? 'Please wait...' : paymentActionLabel}
+                                    </Button>
+                                </div>
                             </div>
                         </div>
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog open={isPlansDialogOpen} onOpenChange={setIsPlansDialogOpen}>
+                    <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
+                        <DialogHeader>
+                            <DialogTitle>Choose A Plan</DialogTitle>
+                            <DialogDescription>
+                                Compare plans first, then continue to the desktop payment step.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                            {desktopPlanCatalog.plans.map((plan) => {
+                                const isSelected = selectedDesktopPlan.id === plan.id;
+                                return (
+                                    <button
+                                        key={plan.id}
+                                        type="button"
+                                        onClick={() => setSelectedPlanId(plan.id)}
+                                        className={cn(
+                                            'rounded-2xl border p-5 text-left transition-colors',
+                                            isSelected
+                                                ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]'
+                                                : 'border-border/60 bg-background/60 hover:border-primary/30 hover:bg-background'
+                                        )}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <div className="text-2xl font-bold text-foreground">{plan.heading}</div>
+                                                <div className="mt-2 text-4xl font-bold text-foreground">{formatDesktopPlanPrice(plan.priceInr)}</div>
+                                                <div className="mt-1 flex items-center gap-1 whitespace-nowrap text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                                                    <span>INR / {plan.billingLabel}</span>
+                                                    <span className="normal-case tracking-normal text-[10px] text-muted-foreground/90">
+                                                        ({plan.taxMode === 'inclusive' ? 'GST inclusive' : 'GST exclusive'})
+                                                    </span>
+                                                </div>
+                                                <div className="mt-2 text-xs font-medium text-muted-foreground">Validity: {formatDesktopPlanValidity(plan.validity)}</div>
+                                                <div className="mt-1 text-xs font-medium text-muted-foreground">{plan.taxMode === 'inclusive' ? 'Included in displayed price' : `${plan.gstPercent}% GST added later in summary`}</div>
+                                            </div>
+                                            {plan.recommended ? (
+                                                <span className="rounded-full bg-primary/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+                                                    Recommended
+                                                </span>
+                                            ) : null}
+                                        </div>
+                                        <p className="mt-4 text-sm font-medium text-foreground">{plan.description}</p>
+                                        <div className="mt-5 space-y-2">
+                                            {desktopPlanCatalog.features.map((feature) => {
+                                                const included = plan.featureIds.includes(feature.id);
+                                                return (
+                                                    <div key={`${plan.id}:${feature.id}`} className="flex items-center gap-2 text-sm">
+                                                        {included ? (
+                                                            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400" />
+                                                        ) : (
+                                                            <Circle className="h-4 w-4 shrink-0 text-muted-foreground/70" />
+                                                        )}
+                                                        <span className={cn(included ? 'text-foreground' : 'text-muted-foreground')}>
+                                                            {feature.label}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setIsPaymentDialogOpen(false)}>
+                            <Button type="button" variant="outline" onClick={() => setIsPlansDialogOpen(false)}>
                                 Cancel
                             </Button>
-                                                        <Button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                if (desktopAccess.hasAccess) {
-                                                                    void handleDesktopDownload();
-                                                                    return;
-                                                                }
-                                                                void handleDesktopCheckoutAction();
-                                                            }}
-                                                            disabled={desktopAccessLoading || isProcessingDesktopAction || isDownloadingDesktop}
-                                                        >
-                                                                {desktopAccessLoading || isProcessingDesktopAction || isDownloadingDesktop ? 'Please wait...' : paymentActionLabel}
+                            <Button type="button" onClick={handleContinueFromPlans}>
+                                {currentUser ? 'Continue To Payment' : 'Sign In To Continue'}
                             </Button>
                         </DialogFooter>
                     </DialogContent>

@@ -1,17 +1,25 @@
 import { createClient } from "@supabase/supabase-js";
 import { DESKTOP_PLAN_PRICE_INR, normalizeDesktopPlanPriceInr } from '@/lib/desktopAccess';
+import {
+  createDefaultDesktopPlanCatalog,
+  getFeaturedDesktopPlan,
+  getDesktopPlanFinalPriceInr,
+  normalizeDesktopPlanCatalog,
+  type DesktopPlanCatalog,
+} from '@/lib/desktopPlans';
 
 export type AppConfigRecord = {
   supabaseUrl: string | null;
   supabaseAnonKey: string | null;
   supabaseStorageBucket: string | null;
   desktopPlanPriceInr: number;
+  desktopPlans: DesktopPlanCatalog;
   updatedAt: string | null;
 };
 
 const CONFIG_TABLE = "app_config";
 const CONFIG_ID = "default";
-const CONFIG_SELECT = 'id, supabase_url, supabase_anon_key, supabase_storage_bucket, desktop_price_inr, updated_at';
+const CONFIG_SELECT = 'id, supabase_url, supabase_anon_key, supabase_storage_bucket, desktop_price_inr, desktop_plans, updated_at';
 const CONFIG_SELECT_LEGACY = 'id, supabase_url, supabase_anon_key, supabase_storage_bucket, updated_at';
 
 const getSupabaseUrl = () => process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -51,9 +59,9 @@ const describeDbError = (error: unknown): string => {
   return String(error || '');
 };
 
-const isMissingDesktopPriceColumnError = (error: unknown) => {
+const isMissingConfigColumnError = (error: unknown, columnName: string) => {
   const lower = describeDbError(error).toLowerCase();
-  return lower.includes('desktop_price_inr') && (lower.includes('column') || lower.includes('schema cache'));
+  return lower.includes(columnName.toLowerCase()) && (lower.includes('column') || lower.includes('schema cache'));
 };
 
 const toRecord = (row: any): AppConfigRecord => ({
@@ -61,6 +69,7 @@ const toRecord = (row: any): AppConfigRecord => ({
   supabaseAnonKey: row?.supabase_anon_key ?? null,
   supabaseStorageBucket: row?.supabase_storage_bucket ?? null,
   desktopPlanPriceInr: normalizeDesktopPlanPriceInr(row?.desktop_price_inr, DESKTOP_PLAN_PRICE_INR),
+  desktopPlans: normalizeDesktopPlanCatalog(row?.desktop_plans, normalizeDesktopPlanPriceInr(row?.desktop_price_inr, DESKTOP_PLAN_PRICE_INR)),
   updatedAt: row?.updated_at ?? null,
 });
 
@@ -68,7 +77,7 @@ export async function readAppConfigFromDb(): Promise<AppConfigRecord | null> {
   const client = getAdminClient();
   let result = await client.from(CONFIG_TABLE).select(CONFIG_SELECT).eq('id', CONFIG_ID).maybeSingle();
 
-  if (result.error && isMissingDesktopPriceColumnError(result.error)) {
+  if (result.error && (isMissingConfigColumnError(result.error, 'desktop_price_inr') || isMissingConfigColumnError(result.error, 'desktop_plans'))) {
     result = await client.from(CONFIG_TABLE).select(CONFIG_SELECT_LEGACY).eq('id', CONFIG_ID).maybeSingle();
   }
 
@@ -84,9 +93,12 @@ export async function upsertAppConfig(payload: {
   supabaseAnonKey: string;
   supabaseStorageBucket?: string | null;
   desktopPlanPriceInr: number;
+  desktopPlans?: DesktopPlanCatalog | null;
 }): Promise<AppConfigRecord> {
   const client = getAdminClient();
   const now = new Date().toISOString();
+  const desktopPlans = normalizeDesktopPlanCatalog(payload.desktopPlans, payload.desktopPlanPriceInr);
+  const featuredPlan = getFeaturedDesktopPlan(desktopPlans);
   const { data, error } = await client
     .from(CONFIG_TABLE)
     .upsert(
@@ -95,7 +107,8 @@ export async function upsertAppConfig(payload: {
         supabase_url: payload.supabaseUrl,
         supabase_anon_key: payload.supabaseAnonKey,
         supabase_storage_bucket: payload.supabaseStorageBucket ?? null,
-        desktop_price_inr: normalizeDesktopPlanPriceInr(payload.desktopPlanPriceInr, DESKTOP_PLAN_PRICE_INR),
+        desktop_price_inr: getDesktopPlanFinalPriceInr(featuredPlan),
+        desktop_plans: desktopPlans,
         updated_at: now,
       },
       { onConflict: "id" }
@@ -104,8 +117,8 @@ export async function upsertAppConfig(payload: {
     .single();
 
   if (error) {
-    if (isMissingDesktopPriceColumnError(error)) {
-      throw new Error('App config table is missing desktop_price_inr. Run docs/app-config.sql in Supabase SQL Editor before saving desktop pricing from admin.');
+    if (isMissingConfigColumnError(error, 'desktop_price_inr') || isMissingConfigColumnError(error, 'desktop_plans')) {
+      throw new Error('App config table is missing desktop pricing columns. Run docs/app-config.sql in Supabase SQL Editor before saving plans from admin.');
     }
     throw new Error(describeDbError(error) || "Failed to save app config.");
   }
@@ -119,5 +132,15 @@ export async function readConfiguredDesktopPlanPriceInr(): Promise<number> {
     return normalizeDesktopPlanPriceInr(config?.desktopPlanPriceInr, DESKTOP_PLAN_PRICE_INR);
   } catch {
     return DESKTOP_PLAN_PRICE_INR;
+  }
+}
+
+export async function readConfiguredDesktopPlanCatalog(): Promise<DesktopPlanCatalog> {
+  if (!isAppConfigStorageConfigured()) return createDefaultDesktopPlanCatalog(DESKTOP_PLAN_PRICE_INR);
+  try {
+    const config = await readAppConfigFromDb();
+    return normalizeDesktopPlanCatalog(config?.desktopPlans, config?.desktopPlanPriceInr || DESKTOP_PLAN_PRICE_INR);
+  } catch {
+    return createDefaultDesktopPlanCatalog(DESKTOP_PLAN_PRICE_INR);
   }
 }

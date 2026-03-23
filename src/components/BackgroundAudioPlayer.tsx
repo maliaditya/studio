@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { Button } from './ui/button';
-import { Play, Pause, Volume1, Volume2, VolumeX, Eye, EyeOff, Bot, X, Check, Settings2, Filter, RefreshCw, Loader2, Mic, MicOff, Phone, Lock, Unlock, Square, Save, Library } from 'lucide-react';
+import { Play, Pause, Volume1, Volume2, VolumeX, Eye, EyeOff, Bot, X, Check, Settings2, Filter, RefreshCw, Loader2, Mic, MicOff, Phone, Lock, Unlock, Square, Save, Library, Target } from 'lucide-react';
 import { Slider } from './ui/slider';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -15,6 +15,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { ScrollArea } from './ui/scroll-area';
 import { Textarea } from './ui/textarea';
 import { getAiConfigFromSettings } from '@/lib/ai/config';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { getStaticTaskAliasMap, mergeTaskAliasMaps } from '@/lib/shiv/taskAliases';
 import { cleanSpeechText, getKokoroLocalVoices, parseCloudVoiceURI } from '@/lib/tts';
@@ -210,6 +211,95 @@ type GuideStep =
   | 'routine_repeat_unit'
   | 'routine_link'
   | 'confirm';
+
+type GoalTrayTaskStatus = 'completed' | 'due' | 'upcoming';
+
+const GOAL_TRAY_SLOT_ORDER = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+const GOAL_TRAY_SLOT_START_HOURS: Record<string, number> = {
+  'Late Night': 0,
+  Dawn: 5,
+  Morning: 8,
+  Afternoon: 13,
+  Evening: 18,
+  Night: 21,
+};
+
+const stripScheduledInstanceSuffix = (value?: string) => (value || '').replace(/_\d{4}-\d{2}-\d{2}$/, '');
+const normalizeGoalTrayText = (value?: string) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+const parseGoalTrayDate = (value?: string | null) => {
+  if (!value) return null;
+  const normalized = value.length === 10 ? `${value}T00:00:00` : value;
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return null;
+  parsed.setHours(0, 0, 0, 0);
+  return parsed;
+};
+const diffGoalTrayDays = (left: Date, right: Date) => {
+  const ms = left.getTime() - right.getTime();
+  return Math.floor(ms / (24 * 60 * 60 * 1000));
+};
+const diffGoalTrayMonths = (left: Date, right: Date) => {
+  const years = left.getFullYear() - right.getFullYear();
+  const months = left.getMonth() - right.getMonth();
+  return years * 12 + months;
+};
+const isGoalTrayRoutineDueOnDate = (routine: any, date: Date) => {
+  const rule = routine?.routine;
+  if (!rule) return false;
+  const base = parseGoalTrayDate(routine?.baseDate || routine?.createdAt);
+  if (rule.type === 'daily') return true;
+  if (!base) return false;
+  if (rule.type === 'weekly') {
+    return base.getDay() === date.getDay();
+  }
+  if (rule.type === 'custom') {
+    const interval = Math.max(1, Number(rule.repeatInterval ?? rule.days ?? 1));
+    const unit = rule.repeatUnit ?? 'day';
+    if (unit === 'month') {
+      if (base.getDate() !== date.getDate()) return false;
+      const months = diffGoalTrayMonths(date, base);
+      return months >= 0 && months % interval === 0;
+    }
+    const days = diffGoalTrayDays(date, base);
+    if (unit === 'week') return days >= 0 && days % (interval * 7) === 0;
+    return days >= 0 && days % interval === 0;
+  }
+  return false;
+};
+const getGoalTrayLoggedMinutes = (activity: any) => {
+  if (!activity || !activity.completed) return 0;
+  if (activity.focusSessionInitialStartTime && activity.focusSessionEndTime) {
+    const totalSessionMs = activity.focusSessionEndTime - activity.focusSessionInitialStartTime;
+    const pauseDurationsMs = (activity.focusSessionPauses || [])
+      .filter((pause: any) => pause.resumeTime)
+      .reduce((sum: number, pause: any) => sum + (pause.resumeTime - pause.pauseTime), 0);
+    return Math.max(0, Math.round((totalSessionMs - pauseDurationsMs) / 60000));
+  }
+  if (typeof activity.duration === 'number' && activity.duration > 0) return Math.max(0, activity.duration);
+  if (typeof activity.focusSessionInitialDuration === 'number' && activity.focusSessionInitialDuration > 0) {
+    return Math.max(0, activity.focusSessionInitialDuration);
+  }
+  return 0;
+};
+const formatGoalTrayLoggedDuration = (minutes: number) => {
+  if (!Number.isFinite(minutes) || minutes <= 0) return '';
+  const roundedMinutes = Math.max(1, Math.round(minutes));
+  if (roundedMinutes < 60) return `${roundedMinutes}m logged`;
+  const hours = Math.floor(roundedMinutes / 60);
+  const remainderMinutes = roundedMinutes % 60;
+  if (remainderMinutes === 0) return `${hours}h logged`;
+  return `${hours}h ${remainderMinutes}m logged`;
+};
+const formatGoalTrayDateLabel = (dateKey?: string, pattern = 'MMM d') => {
+  if (!dateKey) return '';
+  const date = new Date(`${dateKey}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return dateKey;
+  return format(date, pattern);
+};
 
 const getDefaultXttsSpeakerPath = (voiceName?: string) => {
   const normalizedVoice = String(voiceName || 'my_voice')
@@ -1000,6 +1090,7 @@ export function BackgroundAudioPlayer() {
   const speechSessionRef = useRef(0);
   const isMobile = useIsMobile();
   const [isShivOpen, setIsShivOpen] = useState(false);
+  const [isGoalTasksOpen, setIsGoalTasksOpen] = useState(false);
   const [isClientMounted, setIsClientMounted] = useState(false);
   const [shivInput, setShivInput] = useState('');
   const [shivMessages, setShivMessages] = useState<ShivChatMessage[]>([]);
@@ -1110,6 +1201,139 @@ export function BackgroundAudioPlayer() {
   const guideSaveActionRef = useRef<null | (() => void)>(null);
   const skillDomains = Array.isArray(auth?.skillDomains) ? auth.skillDomains : [];
   const specializations = Array.isArray(auth?.specializations) ? auth.specializations : [];
+  const todayGoalPopupData = useMemo(() => {
+    const now = new Date();
+    const todayKey = format(now, 'yyyy-MM-dd');
+    const todayDate = parseGoalTrayDate(todayKey) || now;
+    const goals = Array.isArray(auth?.goals) ? auth.goals : [];
+    const activeGoals = goals.filter((goal: any) => {
+      const status = String(goal?.status || '').trim().toLowerCase();
+      return status !== 'completed' && status !== 'archived';
+    });
+    const routines = Array.isArray(settings?.routines) ? settings.routines : [];
+    const skipByDate = settings?.routineSkipByDate || {};
+    const routineById = new Map(
+      routines
+        .map((routine: any) => {
+          const normalizedId = stripScheduledInstanceSuffix(String(routine?.id || ''));
+          return normalizedId ? [normalizedId, routine] : null;
+        })
+        .filter(Boolean) as Array<[string, any]>
+    );
+    const schedule = auth?.schedule && typeof auth.schedule === 'object' ? auth.schedule : {};
+    const todaySchedule = schedule?.[todayKey] && typeof schedule[todayKey] === 'object' ? schedule[todayKey] : {};
+    const nowHour = now.getHours() + now.getMinutes() / 60;
+
+    const scheduledActivities = GOAL_TRAY_SLOT_ORDER.flatMap((slotName) => {
+      const slotActivities = Array.isArray(todaySchedule?.[slotName]) ? todaySchedule[slotName] : [];
+      return slotActivities.map((activity: any) => ({ slotName, activity }));
+    });
+
+    const entries = activeGoals.map((goal: any) => {
+      const linkedTaskIds = Array.from(
+        (Array.isArray(goal?.linkedTaskIds) ? goal.linkedTaskIds : [])
+          .map((taskId: unknown) => stripScheduledInstanceSuffix(String(taskId || '')))
+          .filter(Boolean)
+      );
+      const linkedRoutineDetails = new Set(
+        linkedTaskIds.map((taskId) => normalizeGoalTrayText(routineById.get(taskId)?.details)).filter(Boolean)
+      );
+
+      const tasks = linkedTaskIds.flatMap((linkedTaskId) => {
+        const linkedRoutine = routineById.get(linkedTaskId);
+        const linkedRoutineDetailsKey = normalizeGoalTrayText(linkedRoutine?.details);
+        const matchedScheduledTasks = scheduledActivities.flatMap(({ slotName, activity }: { slotName: string; activity: any }) => {
+          const normalizedIds = new Set(
+            [
+              stripScheduledInstanceSuffix(String(activity?.id || '')),
+              ...((Array.isArray(activity?.taskIds) ? activity.taskIds : []).map((taskId: unknown) =>
+                stripScheduledInstanceSuffix(String(taskId || ''))
+              )),
+            ].filter(Boolean)
+          );
+          const activityDetailsKey = normalizeGoalTrayText(activity?.details);
+          const matchesById = normalizedIds.has(linkedTaskId);
+          const matchesByDetails = Boolean(linkedRoutineDetailsKey) && activityDetailsKey === linkedRoutineDetailsKey;
+          if (!matchesById && !matchesByDetails) return [];
+
+          const slotStart = GOAL_TRAY_SLOT_START_HOURS[slotName] ?? 0;
+          const status: GoalTrayTaskStatus = activity?.completed ? 'completed' : nowHour >= slotStart ? 'due' : 'upcoming';
+          const loggedMinutes = getGoalTrayLoggedMinutes(activity);
+          const loggedDurationLabel = formatGoalTrayLoggedDuration(loggedMinutes);
+
+          return [{
+            id: `${goal.id}:${slotName}:${activity?.id || linkedTaskId}`,
+            linkedTaskId,
+            title: String(activity?.details || linkedRoutine?.details || 'Untitled task').trim() || 'Untitled task',
+            slotName,
+            status,
+            completed: Boolean(activity?.completed),
+            loggedMinutes,
+            loggedDurationLabel,
+          }];
+        });
+
+        if (matchedScheduledTasks.length > 0) return matchedScheduledTasks;
+
+        const skippedToday = (skipByDate[todayKey] || []).includes(linkedTaskId);
+        const dueToday = Boolean(linkedRoutine && !skippedToday && isGoalTrayRoutineDueOnDate(linkedRoutine, todayDate));
+        if (!linkedRoutine || !dueToday) return [];
+
+        const fallbackSlotName = String(linkedRoutine.slot || '').trim() || 'Unscheduled';
+        const fallbackStatus: GoalTrayTaskStatus = (GOAL_TRAY_SLOT_START_HOURS[fallbackSlotName] ?? 24) <= nowHour ? 'due' : 'upcoming';
+        return [{
+          id: `${goal.id}:routine:${linkedTaskId}`,
+          linkedTaskId,
+          title: String(linkedRoutine.details || 'Untitled task').trim() || 'Untitled task',
+          slotName: fallbackSlotName,
+          status: fallbackStatus,
+          completed: false,
+          loggedMinutes: 0,
+          loggedDurationLabel: '',
+        }];
+      });
+
+      const dedupedTasks = tasks.filter(
+        (task, index, collection) => collection.findIndex((entry) => entry.id === task.id) === index
+      );
+
+      return {
+        id: String(goal?.id || ''),
+        title: String(goal?.title || 'Untitled goal').trim() || 'Untitled goal',
+        priority: String(goal?.priority || 'medium'),
+        dueDate: typeof goal?.dueDate === 'string' ? goal.dueDate : '',
+        tasks: dedupedTasks,
+      };
+    });
+
+    const allTasks = entries.flatMap((entry) => entry.tasks);
+    const totalLoggedMinutes = allTasks.reduce((sum, task) => sum + Number(task.loggedMinutes || 0), 0);
+    const completedTaskCount = allTasks.filter((task) => task.completed).length;
+    const pendingTaskCount = allTasks.length - completedTaskCount;
+
+    const weightLogs = Array.isArray(auth?.weightLogs) ? [...auth.weightLogs] : [];
+    weightLogs.sort((left: any, right: any) => String(left?.date || '').localeCompare(String(right?.date || '')));
+    const latestWeightLog = weightLogs.length > 0 ? weightLogs[weightLogs.length - 1] : null;
+    const currentWeight = typeof latestWeightLog?.weight === 'number' ? latestWeightLog.weight : null;
+    const goalWeight = typeof auth?.goalWeight === 'number' ? auth.goalWeight : null;
+    const weightDifference = currentWeight !== null && goalWeight !== null
+      ? parseFloat((goalWeight - currentWeight).toFixed(1))
+      : null;
+
+    return {
+      todayKey,
+      entries,
+      activeGoalCount: entries.length,
+      goalsWithScheduledTasks: entries.filter((entry) => entry.tasks.length > 0).length,
+      scheduledTaskCount: entries.reduce((sum, entry) => sum + entry.tasks.length, 0),
+      totalLoggedMinutes,
+      completedTaskCount,
+      pendingTaskCount,
+      currentWeight,
+      goalWeight,
+      weightDifference,
+    };
+  }, [auth?.goalWeight, auth?.goals, auth?.schedule, auth?.weightLogs, settings?.routines]);
   const pdfResources = useMemo(
     () => (Array.isArray(auth?.resources) ? auth.resources : []).filter((resource: any) => resource?.type === 'pdf'),
     [auth?.resources]
@@ -1203,6 +1427,17 @@ export function BackgroundAudioPlayer() {
   useEffect(() => {
     setIsClientMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!isGoalTasksOpen) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsGoalTasksOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isGoalTasksOpen]);
 
   useEffect(() => {
     voiceChatModeRef.current = isVoiceChatMode;
@@ -5033,6 +5268,16 @@ export function BackgroundAudioPlayer() {
             <span className="sr-only">Ask Astra</span>
           </Button>
         ) : null}
+        <Button
+          onClick={() => setIsGoalTasksOpen(true)}
+          variant="ghost"
+          size="icon"
+          className="h-10 w-10 rounded-full"
+          title="Show today's goal-linked tasks"
+        >
+          <Target className="h-5 w-5" />
+          <span className="sr-only">Show today's goal-linked tasks</span>
+        </Button>
         {isAudioPlaying && (
           <div className="flex h-5 w-5 items-end justify-between gap-0.5">
             <div className="h-full w-1 origin-bottom animate-audio-wave-1 rounded-full bg-primary"></div>
@@ -5057,6 +5302,179 @@ export function BackgroundAudioPlayer() {
             </PopoverContent>
         </Popover>
       </div>
+      {isGoalTasksOpen && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-[2px]"
+          onClick={() => setIsGoalTasksOpen(false)}
+        >
+          <div
+            className="flex h-[90vh] w-[95vw] max-w-[95vw] flex-col overflow-hidden rounded-3xl border border-border/70 bg-background/95 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-border/60 px-6 py-4">
+              <div>
+                <div className="text-lg font-semibold">Today's Goal Tasks</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  {formatGoalTrayDateLabel(todayGoalPopupData.todayKey, 'EEEE, MMM d')}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+                onClick={() => setIsGoalTasksOpen(false)}
+                title="Close goal tasks popup"
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close goal tasks popup</span>
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2 border-b border-border/60 px-6 py-3 text-xs text-muted-foreground">
+              <span className="rounded-full border border-border/60 bg-muted/30 px-3 py-1">
+                {todayGoalPopupData.activeGoalCount} active goal{todayGoalPopupData.activeGoalCount === 1 ? '' : 's'}
+              </span>
+              <span className="rounded-full border border-border/60 bg-muted/30 px-3 py-1">
+                {todayGoalPopupData.goalsWithScheduledTasks} goal{todayGoalPopupData.goalsWithScheduledTasks === 1 ? '' : 's'} with tasks today
+              </span>
+              <span className="rounded-full border border-border/60 bg-muted/30 px-3 py-1">
+                {todayGoalPopupData.scheduledTaskCount} linked task{todayGoalPopupData.scheduledTaskCount === 1 ? '' : 's'} scheduled today
+              </span>
+            </div>
+            <ScrollArea className="flex-1 px-6 py-5">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                    <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Total Time Logged</div>
+                    <div className="mt-3 text-2xl font-semibold text-foreground">
+                      {formatGoalTrayLoggedDuration(todayGoalPopupData.totalLoggedMinutes) || '0m logged'}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Across today&apos;s linked goal tasks
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                    <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Completed / Total</div>
+                    <div className="mt-3 text-2xl font-semibold text-foreground">
+                      {todayGoalPopupData.completedTaskCount}/{todayGoalPopupData.scheduledTaskCount}
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {todayGoalPopupData.pendingTaskCount} pending today
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
+                    <div className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Weight Goal</div>
+                    <div className="mt-3 flex items-end justify-between gap-3">
+                      <div>
+                        <div className="text-2xl font-semibold text-foreground">
+                          {todayGoalPopupData.currentWeight !== null ? `${todayGoalPopupData.currentWeight.toFixed(1)} kg/lb` : '--'}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">Current weight</div>
+                      </div>
+                      <div className="text-right">
+                        <div className={cn(
+                          'text-lg font-semibold',
+                          typeof todayGoalPopupData.weightDifference === 'number'
+                            ? todayGoalPopupData.weightDifference < 0
+                              ? 'text-emerald-300'
+                              : todayGoalPopupData.weightDifference > 0
+                                ? 'text-amber-300'
+                                : 'text-sky-300'
+                            : 'text-foreground'
+                        )}>
+                          {typeof todayGoalPopupData.weightDifference === 'number'
+                            ? todayGoalPopupData.weightDifference === 0
+                              ? 'At goal'
+                              : `${Math.abs(todayGoalPopupData.weightDifference).toFixed(1)} ${todayGoalPopupData.weightDifference < 0 ? 'to lose' : 'to gain'}`
+                            : '--'}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {todayGoalPopupData.goalWeight !== null ? `Goal ${todayGoalPopupData.goalWeight.toFixed(1)} kg/lb` : 'Set a goal weight'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                {todayGoalPopupData.entries.length === 0 ? (
+                  <div className="col-span-full rounded-2xl border border-dashed border-border/60 bg-muted/20 px-4 py-10 text-center text-sm text-muted-foreground">
+                    No active goals found.
+                  </div>
+                ) : (
+                  todayGoalPopupData.entries.map((goal) => (
+                    <div key={goal.id} className="flex h-full flex-col rounded-2xl border border-border/60 bg-muted/20 p-3.5">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-[15px] font-semibold">{goal.title}</div>
+                          <div className="mt-1 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+                            <span className="rounded-full border border-border/60 bg-background/70 px-2.5 py-1 capitalize">
+                              {goal.priority} priority
+                            </span>
+                            {goal.dueDate ? (
+                              <span className="rounded-full border border-border/60 bg-background/70 px-2.5 py-1">
+                                Due {formatGoalTrayDateLabel(goal.dueDate, 'MMM d')}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1 text-[11px] text-muted-foreground">
+                          {goal.tasks.length} scheduled today
+                        </div>
+                      </div>
+                      {goal.tasks.length === 0 ? (
+                        <div className="mt-3 rounded-xl border border-dashed border-border/60 bg-background/50 px-3 py-3 text-sm text-muted-foreground">
+                          No linked tasks from this goal are scheduled in today's time slots.
+                        </div>
+                      ) : (
+                        <div className="mt-3 overflow-hidden rounded-xl border border-border/50 bg-background/40">
+                          {goal.tasks.map((task) => (
+                            <div
+                              key={task.id}
+                              className="flex items-center justify-between gap-3 border-b border-border/40 px-3 py-2.5 last:border-b-0"
+                            >
+                              <div className="flex min-w-0 flex-1 items-start gap-2.5">
+                                <span
+                                  className={cn(
+                                    "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
+                                    task.completed
+                                      ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-300"
+                                      : "border-border/70 bg-background/70 text-transparent"
+                                  )}
+                                  aria-hidden="true"
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <div className={cn("truncate text-sm font-medium leading-5", task.completed && "line-through text-muted-foreground")}>{task.title}</div>
+                                  <div className={cn("text-[11px] text-muted-foreground", task.completed && "line-through")}>{task.slotName}</div>
+                                  {task.loggedDurationLabel ? (
+                                    <div className="text-[11px] text-muted-foreground">{task.loggedDurationLabel}</div>
+                                  ) : null}
+                                </div>
+                              </div>
+                              <span
+                                className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                                  task.status === 'completed'
+                                    ? 'bg-emerald-500/15 text-emerald-300'
+                                    : task.status === 'due'
+                                      ? 'bg-amber-500/15 text-amber-300'
+                                      : 'bg-sky-500/15 text-sky-300'
+                                }`}
+                              >
+                                {task.status === 'completed' ? 'Completed' : task.status === 'due' ? 'Due now' : 'Upcoming'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+                </div>
+              </div>
+            </ScrollArea>
+          </div>
+        </div>
+      )}
       {isDesktopRuntime && isShivOpen && (
         <div className="fixed bottom-20 right-4 z-[70] flex h-[40rem] max-h-[calc(100vh-6rem)] w-[32rem] max-w-[calc(100vw-1rem)] flex-col rounded-xl border bg-background/95 shadow-2xl backdrop-blur-sm">
           <div className="flex items-center justify-between border-b px-3 py-2">

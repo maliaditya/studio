@@ -1,10 +1,13 @@
 "use client";
 
+import type { DesktopPlanCatalog } from '@/lib/desktopPlans';
+
 export type AppConfigPayload = {
   supabaseUrl: string | null;
   supabaseAnonKey: string | null;
   supabaseStorageBucket: string | null;
   desktopPlanPriceInr: number | null;
+  desktopPlans?: DesktopPlanCatalog | null;
   updatedAt?: string | null;
   source?: "db" | "env";
   storageConfigured?: boolean;
@@ -75,6 +78,7 @@ export async function saveAppConfig(
     supabaseAnonKey: string;
     supabaseStorageBucket?: string | null;
     desktopPlanPriceInr: number;
+    desktopPlans?: DesktopPlanCatalog | null;
   },
   accessToken?: string | null
 ): Promise<AppConfigPayload> {

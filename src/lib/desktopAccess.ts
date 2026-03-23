@@ -1,8 +1,9 @@
+import { type DesktopPlanValidity } from '@/lib/desktopPlans';
+
 export const DESKTOP_PLAN_ID = 'desktop_yearly' as const;
 export const DESKTOP_PLAN_PRICE_INR = 799;
 export const DESKTOP_PLAN_CURRENCY = 'INR' as const;
 export const DESKTOP_PLAN_PRICE_SUBUNITS = DESKTOP_PLAN_PRICE_INR * 100;
-export const DESKTOP_PLAN_DURATION_DAYS = 365;
 export const DESKTOP_PLAN_BILLING_LABEL = 'yearly' as const;
 const DESKTOP_PLAN_PRICE_FORMATTER = new Intl.NumberFormat('en-IN', {
   style: 'currency',
@@ -29,6 +30,10 @@ export type DesktopAccessStatus = 'locked' | 'pending' | 'active';
 
 export interface DesktopCheckoutSession {
   id: string;
+  planId: string;
+  planHeading: string;
+  planValidity: DesktopPlanValidity;
+  billingLabel: string;
   provider: DesktopPaymentProvider;
   providerSessionId: string | null;
   status: DesktopCheckoutStatus;
@@ -41,7 +46,10 @@ export interface DesktopCheckoutSession {
 }
 
 export interface DesktopAccessState {
-  planId: typeof DESKTOP_PLAN_ID;
+  planId: string;
+  planHeading: string;
+  planValidity: DesktopPlanValidity;
+  billingLabel: string;
   amountUsd: number;
   currency: typeof DESKTOP_PLAN_CURRENCY;
   hasAccess: boolean;
@@ -69,15 +77,13 @@ export const DESKTOP_PAYMENT_METHODS: Array<{
     title: 'UPI',
     description: 'Razorpay-backed UPI checkout flow for supported regions.',
   },
-  {
-    id: 'paypal',
-    title: 'PayPal',
-    description: 'PayPal checkout for global access.',
-  },
 ];
 
 export const createEmptyDesktopAccessState = (): DesktopAccessState => ({
   planId: DESKTOP_PLAN_ID,
+  planHeading: 'Desktop',
+  planValidity: 'yearly',
+  billingLabel: DESKTOP_PLAN_BILLING_LABEL,
   amountUsd: DESKTOP_PLAN_PRICE_INR,
   currency: DESKTOP_PLAN_CURRENCY,
   hasAccess: false,
@@ -90,11 +96,18 @@ export const createEmptyDesktopAccessState = (): DesktopAccessState => ({
   history: [],
 });
 
-const addYearToIso = (value: string): string | null => {
+const addMonthsToIso = (value: string, monthCount: number): string | null => {
   const next = new Date(value);
   if (Number.isNaN(next.getTime())) return null;
-  next.setFullYear(next.getFullYear() + 1);
+  next.setMonth(next.getMonth() + monthCount);
   return next.toISOString();
+};
+
+const getExpiryFromValidity = (grantedAt: string | null, planValidity: DesktopPlanValidity): string | null => {
+  if (!grantedAt) return null;
+  if (planValidity === 'lifetime') return null;
+  if (planValidity === 'monthly') return addMonthsToIso(grantedAt, 1);
+  return addMonthsToIso(grantedAt, 12);
 };
 
 const isProvider = (value: unknown): value is DesktopPaymentProvider =>
@@ -120,6 +133,10 @@ const normalizeSession = (value: unknown): DesktopCheckoutSession | null => {
 
   return {
     id: candidate.id,
+    planId: typeof candidate.planId === 'string' && candidate.planId.trim() ? candidate.planId.trim() : DESKTOP_PLAN_ID,
+    planHeading: typeof candidate.planHeading === 'string' && candidate.planHeading.trim() ? candidate.planHeading.trim() : 'Desktop',
+    planValidity: candidate.planValidity === 'monthly' || candidate.planValidity === 'yearly' || candidate.planValidity === 'lifetime' ? candidate.planValidity : 'yearly',
+    billingLabel: typeof candidate.billingLabel === 'string' && candidate.billingLabel.trim() ? candidate.billingLabel.trim() : DESKTOP_PLAN_BILLING_LABEL,
     provider,
     providerSessionId: typeof candidate.providerSessionId === 'string' ? candidate.providerSessionId : null,
     status: isCheckoutStatus(candidate.status) ? candidate.status : 'pending',
@@ -142,16 +159,20 @@ export const normalizeDesktopAccessState = (value: unknown): DesktopAccessState 
     ? candidate.history.map(normalizeSession).filter((session): session is DesktopCheckoutSession => Boolean(session))
     : [];
   const grantedAt = typeof candidate.grantedAt === 'string' ? candidate.grantedAt : null;
+  const planValidity = candidate.planValidity === 'monthly' || candidate.planValidity === 'yearly' || candidate.planValidity === 'lifetime'
+    ? candidate.planValidity
+    : currentSession?.planValidity || 'yearly';
   const expiresAt = typeof candidate.expiresAt === 'string'
     ? candidate.expiresAt
-    : grantedAt
-    ? addYearToIso(grantedAt)
-    : null;
+    : getExpiryFromValidity(grantedAt, planValidity);
   const expiresAtTime = expiresAt ? Date.parse(expiresAt) : Number.NaN;
-  const isExpired = Number.isFinite(expiresAtTime) && expiresAtTime <= Date.now();
+  const isExpired = planValidity === 'lifetime' ? false : Number.isFinite(expiresAtTime) && expiresAtTime <= Date.now();
 
   const normalized: DesktopAccessState = {
-    planId: candidate.planId === DESKTOP_PLAN_ID ? DESKTOP_PLAN_ID : DESKTOP_PLAN_ID,
+    planId: typeof candidate.planId === 'string' && candidate.planId.trim() ? candidate.planId.trim() : DESKTOP_PLAN_ID,
+    planHeading: typeof candidate.planHeading === 'string' && candidate.planHeading.trim() ? candidate.planHeading.trim() : currentSession?.planHeading || 'Desktop',
+    planValidity,
+    billingLabel: typeof candidate.billingLabel === 'string' && candidate.billingLabel.trim() ? candidate.billingLabel.trim() : currentSession?.billingLabel || DESKTOP_PLAN_BILLING_LABEL,
     amountUsd: typeof candidate.amountUsd === 'number' && Number.isFinite(candidate.amountUsd) ? candidate.amountUsd : DESKTOP_PLAN_PRICE_INR,
     currency: candidate.currency === DESKTOP_PLAN_CURRENCY ? DESKTOP_PLAN_CURRENCY : DESKTOP_PLAN_CURRENCY,
     hasAccess: Boolean(candidate.hasAccess) && !isExpired,
@@ -171,6 +192,11 @@ export const normalizeDesktopAccessState = (value: unknown): DesktopAccessState 
   } else if (normalized.status !== 'active') {
     normalized.status = 'locked';
   }
-
   return normalized;
 };
+
+
+
+
+
+

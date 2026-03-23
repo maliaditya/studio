@@ -227,6 +227,7 @@ const buildStatusPayloadFromAccessState = (accessState: DesktopAccessState) => {
 };
 
 export const isDesktopUserStatusActive = (record: DesktopUserStatusRecord | null | undefined): boolean => {
+  if (record?.isPriviledge) return true;
   if (!record?.paymentCompleted || !record.expiresAt) return false;
   const expiresAtTime = Date.parse(record.expiresAt);
   return Number.isFinite(expiresAtTime) && expiresAtTime > Date.now();
@@ -443,6 +444,21 @@ export async function migrateLegacyDesktopUserStatusToDb(username: string): Prom
 
 export async function readDesktopUserStatus(username: string): Promise<DesktopUserStatusRecord | null> {
   if (!isDesktopStatusDbConfigured()) return null;
+  const authUser = await readAuthUserByUsername(username);
+  if (authUser?.isPriviledge) {
+    const existing = await readDesktopUserStatusFromDb(username);
+    return {
+      username: authUser.username,
+      isPriviledge: true,
+      paymentCompleted: true,
+      purchaseDate: existing?.purchaseDate || null,
+      expiresAt: null,
+      paymentProvider: existing?.paymentProvider || null,
+      createdAt: existing?.createdAt || authUser.createdAt,
+      updatedAt: existing?.updatedAt || authUser.updatedAt,
+      migratedFromStorageAt: existing?.migratedFromStorageAt || authUser.migratedFromStorageAt,
+    };
+  }
   const existing = await readDesktopUserStatusFromDb(username);
   if (existing) return existing;
   return await migrateLegacyDesktopUserStatusToDb(username);

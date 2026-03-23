@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createDesktopCheckoutState, readDesktopAccessState, resolveDesktopAccessUser, writeDesktopAccessState } from '@/lib/desktopAccessServer';
-import { readConfiguredDesktopPlanPriceInr } from '@/lib/appConfigServer';
+import { readConfiguredDesktopPlanCatalog } from '@/lib/appConfigServer';
 import { DESKTOP_PLAN_CURRENCY, DESKTOP_PLAN_ID, formatDesktopPlanPrice, type DesktopPaymentProvider } from '@/lib/desktopAccess';
+import { getDesktopPlanById, getDesktopPlanFinalPriceInr, getFeaturedDesktopPlan } from '@/lib/desktopPlans';
 import { getRazorpayClient, getRazorpayKeyId, isRazorpayConfigured } from '@/lib/razorpayServer';
 
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,7 @@ const toRazorpayPrefill = (username: string) => {
 
 export async function POST(request: Request) {
   try {
-    const payload = (await request.json()) as { provider?: DesktopPaymentProvider; username?: string };
+    const payload = (await request.json()) as { provider?: DesktopPaymentProvider; username?: string; planId?: string };
     const sessionUser = resolveDesktopAccessUser(request, payload?.username);
     if (!sessionUser) {
       return NextResponse.json({ error: 'Unauthorized. Please sign in again.' }, { status: 401 });
@@ -48,11 +49,18 @@ export async function POST(request: Request) {
       });
     }
 
-    const desktopPlanPriceInr = await readConfiguredDesktopPlanPriceInr();
+    const desktopPlanCatalog = await readConfiguredDesktopPlanCatalog();
+    const selectedPlan = getDesktopPlanById(desktopPlanCatalog, payload.planId) || getFeaturedDesktopPlan(desktopPlanCatalog);
+    const desktopPlanPriceInr = getDesktopPlanFinalPriceInr(selectedPlan);
     const desktopPlanPriceSubunits = desktopPlanPriceInr * 100;
     const desktopPlanDisplayPrice = formatDesktopPlanPrice(desktopPlanPriceInr);
 
-    let next = createDesktopCheckoutState(current, payload.provider, desktopPlanPriceInr);
+    let next = createDesktopCheckoutState(current, payload.provider, desktopPlanPriceInr, {
+      planId: selectedPlan.id || DESKTOP_PLAN_ID,
+      planHeading: selectedPlan.heading,
+      planValidity: selectedPlan.validity,
+      billingLabel: selectedPlan.billingLabel,
+    });
     let checkoutUrl: string | null = null;
     let checkoutData: Record<string, unknown> | null = null;
 
@@ -73,7 +81,8 @@ export async function POST(request: Request) {
         receipt: internalSessionId,
         notes: {
           desktopAccessSessionId: internalSessionId,
-          desktopPlanId: DESKTOP_PLAN_ID,
+            desktopPlanId: selectedPlan.id || DESKTOP_PLAN_ID,
+            desktopPlanHeading: selectedPlan.heading,
           username: sessionUser,
         },
       });
@@ -84,7 +93,7 @@ export async function POST(request: Request) {
         amount: order.amount,
         currency: order.currency,
         name: 'Dock',
-        description: payload.provider === 'upi' ? `Desktop yearly access via UPI (${desktopPlanDisplayPrice})` : `Desktop yearly access (${desktopPlanDisplayPrice})`,
+        description: payload.provider === 'upi' ? `${selectedPlan.heading} ${selectedPlan.billingLabel} access via UPI (${desktopPlanDisplayPrice})` : `${selectedPlan.heading} ${selectedPlan.billingLabel} access (${desktopPlanDisplayPrice})`,
         method: payload.provider === 'upi' ? 'upi' : 'card',
         prefill: toRazorpayPrefill(sessionUser),
       };
@@ -96,8 +105,8 @@ export async function POST(request: Request) {
               providerSessionId: order.id,
               note:
                 payload.provider === 'upi'
-                  ? 'Razorpay UPI order created. Open Razorpay Checkout to complete payment.'
-                  : 'Razorpay card order created. Open Razorpay Checkout to complete payment.',
+                  ? `Razorpay UPI order created for ${selectedPlan.heading}. Open Razorpay Checkout to complete payment.`
+                  : `Razorpay card order created for ${selectedPlan.heading}. Open Razorpay Checkout to complete payment.`,
             }
           : null,
       };

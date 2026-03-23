@@ -135,7 +135,7 @@ interface AuthContextType {
   desktopAccessLoading: boolean;
   ensureCloudSession: () => Promise<{ success: boolean; message: string }>;
   refreshDesktopAccess: () => Promise<void>;
-  startDesktopCheckout: (provider: DesktopPaymentProvider) => Promise<{ success: boolean; message: string; access: DesktopAccessState; sessionId?: string | null; checkoutUrl?: string | null; checkoutData?: Record<string, unknown> | null }>;
+  startDesktopCheckout: (provider: DesktopPaymentProvider, planId?: string | null) => Promise<{ success: boolean; message: string; access: DesktopAccessState; sessionId?: string | null; checkoutUrl?: string | null; checkoutData?: Record<string, unknown> | null }>;
   confirmDesktopCheckout: (sessionId: string, provider?: DesktopPaymentProvider, paymentDetails?: { providerSessionId?: string; providerOrderId?: string; providerSignature?: string }) => Promise<{ success: boolean; message: string; access: DesktopAccessState }>;
   
   // App Data States
@@ -2958,7 +2958,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [currentUser?.username, ensureCloudSession]);
 
-  const startDesktopCheckout = useCallback(async (provider: DesktopPaymentProvider) => {
+  const startDesktopCheckout = useCallback(async (provider: DesktopPaymentProvider, planId?: string | null) => {
     if (!currentUser?.username) {
       return {
         success: false,
@@ -2976,7 +2976,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ provider, username: currentUser.username }),
+        body: JSON.stringify({ provider, username: currentUser.username, planId: planId || undefined }),
       });
       if (response.status === 401) {
         const refreshed = await ensureCloudSession();
@@ -2987,7 +2987,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ provider, username: currentUser.username }),
+          body: JSON.stringify({ provider, username: currentUser.username, planId: planId || undefined }),
         });
       }
       const result = await response.json().catch(() => null);

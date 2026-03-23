@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createHmac } from 'crypto';
 import { completeDesktopCheckoutState, createDesktopCheckoutState, readDesktopAccessState, resolveDesktopAccessUser, writeDesktopAccessState } from '@/lib/desktopAccessServer';
 import { upsertDesktopUserStatusFromAccessState } from '@/lib/desktopStatusServer';
+import { updateAuthUserPrivilege } from '@/lib/authUsersServer';
 import type { DesktopPaymentProvider } from '@/lib/desktopAccess';
 import { getRazorpayKeySecret, isRazorpayConfigured } from '@/lib/razorpayServer';
 
@@ -77,6 +78,10 @@ export async function POST(request: Request) {
             ...createDesktopCheckoutState(current, recoveryProvider),
             currentSession: {
               id: sessionId,
+              planId: current.planId,
+              planHeading: current.planHeading,
+              planValidity: current.planValidity,
+              billingLabel: current.billingLabel,
               provider: recoveryProvider,
               providerSessionId: providerSessionId,
               status: 'pending',
@@ -97,6 +102,9 @@ export async function POST(request: Request) {
       message: 'Desktop access unlocked for this account.',
     });
     await writeDesktopAccessState(sessionUser, next, response);
+    if (next.planValidity === 'lifetime') {
+      await updateAuthUserPrivilege({ username: sessionUser, isPriviledge: true });
+    }
     await upsertDesktopUserStatusFromAccessState(sessionUser, next);
     return response;
   } catch (error) {

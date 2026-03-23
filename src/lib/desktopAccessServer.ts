@@ -4,12 +4,12 @@ import {
   createEmptyDesktopAccessState,
   DESKTOP_PLAN_BILLING_LABEL,
   DESKTOP_PLAN_CURRENCY,
-  DESKTOP_PLAN_DURATION_DAYS,
   DESKTOP_PLAN_PRICE_INR,
   normalizeDesktopAccessState,
   type DesktopAccessState,
   type DesktopPaymentProvider,
 } from '@/lib/desktopAccess';
+import { type DesktopPlanValidity } from '@/lib/desktopPlans';
 import { isDesktopUserStatusActive, readDesktopUserStatus } from '@/lib/desktopStatusServer';
 import { isSupabaseStorageConfigured, readJsonFromStorage, writeJsonToStorage } from '@/lib/supabaseStorageServer';
 import { getSessionUserFromRequest } from '@/lib/serverSession';
@@ -149,28 +149,46 @@ export const writeDesktopAccessState = async (
   });
 };
 
-const getPlanExpiryIso = (fromIso: string): string => {
+const getPlanExpiryIso = (fromIso: string, planValidity: DesktopPlanValidity): string | null => {
   const next = new Date(fromIso);
-  next.setFullYear(next.getFullYear() + 1);
+  if (planValidity === 'lifetime') return null;
+  if (planValidity === 'monthly') {
+    next.setMonth(next.getMonth() + 1);
+  } else {
+    next.setFullYear(next.getFullYear() + 1);
+  }
   return next.toISOString();
 };
 
 export const createDesktopCheckoutState = (
   current: DesktopAccessState,
   provider: DesktopPaymentProvider,
-  amountInr = DESKTOP_PLAN_PRICE_INR
+  amountInr = DESKTOP_PLAN_PRICE_INR,
+  planDetails?: { planId?: string; planHeading?: string; planValidity?: DesktopPlanValidity; billingLabel?: string }
 ): DesktopAccessState => {
   const now = new Date().toISOString();
   const previousHistory = current.currentSession ? [...current.history, current.currentSession] : [...current.history];
+  const planId = String(planDetails?.planId || current.planId || 'desktop_yearly').trim() || 'desktop_yearly';
+  const planHeading = String(planDetails?.planHeading || current.planHeading || 'Desktop').trim() || 'Desktop';
+  const planValidity = planDetails?.planValidity || current.planValidity || 'yearly';
+  const billingLabel = String(planDetails?.billingLabel || current.billingLabel || DESKTOP_PLAN_BILLING_LABEL).trim() || DESKTOP_PLAN_BILLING_LABEL;
 
   return normalizeDesktopAccessState({
     ...current,
+    planId,
+    planHeading,
+    planValidity,
+    billingLabel,
     hasAccess: false,
     status: 'pending',
     activeProvider: provider,
     updatedAt: now,
     currentSession: {
       id: randomUUID(),
+      planId,
+      planHeading,
+      planValidity,
+      billingLabel,
       provider,
       providerSessionId: null,
       status: 'pending',
@@ -197,17 +215,21 @@ export const completeDesktopCheckoutState = (
   }
 
   const now = new Date().toISOString();
-  const expiresAt = getPlanExpiryIso(now);
+  const expiresAt = getPlanExpiryIso(now, current.currentSession.planValidity);
   const completedSession = {
     ...current.currentSession,
     status: 'completed' as const,
     updatedAt: now,
     completedAt: now,
-    note: `${current.currentSession.provider} payment confirmed. Desktop access unlocked for one ${DESKTOP_PLAN_BILLING_LABEL} term.`,
+    note: `${current.currentSession.provider} payment confirmed. ${current.currentSession.planHeading} unlocked for one ${current.currentSession.billingLabel} term.`,
   };
 
   return normalizeDesktopAccessState({
     ...current,
+    planId: completedSession.planId,
+    planHeading: completedSession.planHeading,
+    planValidity: completedSession.planValidity,
+    billingLabel: completedSession.billingLabel,
     hasAccess: true,
     status: 'active',
     activeProvider: completedSession.provider,
