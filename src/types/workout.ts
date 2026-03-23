@@ -223,6 +223,7 @@ export interface Activity {
   routine?: RecurrenceRule | null;
   isRoutine?: boolean;
   baseDate?: string;
+  contributedGoalId?: string;
   linkedEntityType?: 'specialization' | 'intention' | 'curiosity';
   linkedActivityType?: ActivityType;
 };

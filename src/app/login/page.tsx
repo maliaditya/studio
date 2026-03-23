@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BrainCircuit } from 'lucide-react';
+import { ArrowLeft, BrainCircuit } from 'lucide-react';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 
 const REMEMBER_LOGIN_KEY = 'dock_remember_login_v1';
@@ -104,9 +104,19 @@ function LoginPageContent() {
     setSessionBlockedMessage('');
   };
 
+  const handleBack = () => {
+    router.push('/');
+  };
+
   return (
     <div className="flex items-center justify-center min-h-screen p-4">
       <Card className="w-full max-w-md shadow-2xl">
+        <div className="px-6 pt-6">
+          <Button type="button" variant="ghost" size="sm" className="h-8 px-2" onClick={handleBack}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+        </div>
         <CardHeader className="text-center">
           <BrainCircuit className="mx-auto h-14 w-14 text-primary mb-2" />
           <CardTitle className="text-2xl lg:text-3xl font-bold text-primary">Dock</CardTitle>

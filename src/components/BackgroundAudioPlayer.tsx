@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { Button } from './ui/button';
-import { Play, Pause, Volume1, Volume2, VolumeX, Eye, EyeOff, Bot, X, Check, Settings2, Filter, RefreshCw, Loader2, Mic, MicOff, Phone, Lock, Unlock, Square, Save, Library, Target } from 'lucide-react';
+import { Play, Pause, Volume1, Volume2, VolumeX, Eye, EyeOff, Bot, X, Check, Settings2, Filter, RefreshCw, Loader2, Mic, MicOff, Phone, Lock, Unlock, Square, Save, Library, Target, Plus } from 'lucide-react';
 import { Slider } from './ui/slider';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -1091,6 +1091,7 @@ export function BackgroundAudioPlayer() {
   const isMobile = useIsMobile();
   const [isShivOpen, setIsShivOpen] = useState(false);
   const [isGoalTasksOpen, setIsGoalTasksOpen] = useState(false);
+  const [activeGoalContributionId, setActiveGoalContributionId] = useState<string | null>(null);
   const [isClientMounted, setIsClientMounted] = useState(false);
   const [shivInput, setShivInput] = useState('');
   const [shivMessages, setShivMessages] = useState<ShivChatMessage[]>([]);
@@ -1201,6 +1202,65 @@ export function BackgroundAudioPlayer() {
   const guideSaveActionRef = useRef<null | (() => void)>(null);
   const skillDomains = Array.isArray(auth?.skillDomains) ? auth.skillDomains : [];
   const specializations = Array.isArray(auth?.specializations) ? auth.specializations : [];
+  const openGoalContributionComposer = useCallback((goalId: string) => {
+    setActiveGoalContributionId(goalId);
+  }, []);
+  const closeGoalContributionComposer = useCallback((goalId: string) => {
+    setActiveGoalContributionId((current) => current === goalId ? null : current);
+  }, []);
+  const handleAssignScheduledTaskToGoal = useCallback((goalId: string, goalTitle: string, activityId: string) => {
+    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    let assignedTaskTitle = '';
+    let reassignedFromGoalId = '';
+    let updated = false;
+
+    auth?.setSchedule?.((prev: Record<string, any>) => {
+      const daySchedule = prev?.[todayKey];
+      if (!daySchedule || typeof daySchedule !== 'object') return prev;
+
+      const nextDaySchedule = { ...daySchedule };
+      for (const slotName of GOAL_TRAY_SLOT_ORDER) {
+        const activities = Array.isArray(nextDaySchedule[slotName]) ? nextDaySchedule[slotName] : [];
+        const activityIndex = activities.findIndex((activity: any) => String(activity?.id || '') === activityId);
+        if (activityIndex === -1) continue;
+
+        const nextActivities = [...activities];
+        const currentActivity = nextActivities[activityIndex];
+        assignedTaskTitle = String(currentActivity?.details || 'Untitled task').trim() || 'Untitled task';
+        reassignedFromGoalId = String(currentActivity?.contributedGoalId || '');
+        nextActivities[activityIndex] = {
+          ...currentActivity,
+          contributedGoalId: goalId,
+        };
+        nextDaySchedule[slotName] = nextActivities;
+        updated = true;
+        break;
+      }
+
+      if (!updated) return prev;
+      return {
+        ...prev,
+        [todayKey]: nextDaySchedule,
+      };
+    });
+
+    if (!updated) {
+      toast({
+        title: 'Task not found',
+        description: 'That scheduled task could not be assigned to this goal.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    toast({
+      title: 'Task added to goal',
+      description: reassignedFromGoalId && reassignedFromGoalId !== goalId
+        ? `${assignedTaskTitle} now contributes to ${goalTitle} for today.`
+        : `${assignedTaskTitle} now contributes to ${goalTitle} for today.`,
+    });
+    closeGoalContributionComposer(goalId);
+  }, [auth, closeGoalContributionComposer, toast]);
   const todayGoalPopupData = useMemo(() => {
     const now = new Date();
     const todayKey = format(now, 'yyyy-MM-dd');
@@ -1293,7 +1353,27 @@ export function BackgroundAudioPlayer() {
         }];
       });
 
-      const dedupedTasks = tasks.filter(
+      const contributionTasks = scheduledActivities.flatMap(({ slotName, activity }: { slotName: string; activity: any }) => {
+        if (String(activity?.contributedGoalId || '') !== String(goal?.id || '')) return [];
+        const slotStart = GOAL_TRAY_SLOT_START_HOURS[slotName] ?? 0;
+        const status: GoalTrayTaskStatus = activity?.completed ? 'completed' : nowHour >= slotStart ? 'due' : 'upcoming';
+        const loggedMinutes = getGoalTrayLoggedMinutes(activity);
+        const loggedDurationLabel = formatGoalTrayLoggedDuration(loggedMinutes);
+
+        return [{
+          id: `${goal.id}:${slotName}:${activity?.id || 'contribution'}`,
+          linkedTaskId: '',
+          title: String(activity?.details || 'Untitled task').trim() || 'Untitled task',
+          slotName,
+          status,
+          completed: Boolean(activity?.completed),
+          loggedMinutes,
+          loggedDurationLabel,
+          source: 'contribution' as const,
+        }];
+      });
+
+      const dedupedTasks = [...tasks, ...contributionTasks].filter(
         (task, index, collection) => collection.findIndex((entry) => entry.id === task.id) === index
       );
 
@@ -1323,6 +1403,24 @@ export function BackgroundAudioPlayer() {
     return {
       todayKey,
       entries,
+      scheduledNonRoutineTasks: scheduledActivities
+        .filter(({ activity }: { activity: any }) => {
+          const normalizedActivityId = stripScheduledInstanceSuffix(String(activity?.id || ''));
+          const normalizedTaskIds = (Array.isArray(activity?.taskIds) ? activity.taskIds : [])
+            .map((taskId: unknown) => stripScheduledInstanceSuffix(String(taskId || '')))
+            .filter(Boolean);
+          const isRoutineTask = Boolean(activity?.isRoutine || activity?.routine) ||
+            routineById.has(normalizedActivityId) ||
+            normalizedTaskIds.some((taskId: string) => routineById.has(taskId));
+          return !isRoutineTask;
+        })
+        .map(({ slotName, activity }: { slotName: string; activity: any }) => ({
+          id: String(activity?.id || ''),
+          title: String(activity?.details || 'Untitled task').trim() || 'Untitled task',
+          slotName,
+          completed: Boolean(activity?.completed),
+          contributedGoalId: String(activity?.contributedGoalId || ''),
+        })),
       activeGoalCount: entries.length,
       goalsWithScheduledTasks: entries.filter((entry) => entry.tasks.length > 0).length,
       scheduledTaskCount: entries.reduce((sum, entry) => sum + entry.tasks.length, 0),
@@ -5409,6 +5507,9 @@ export function BackgroundAudioPlayer() {
                             <span className="rounded-full border border-border/60 bg-background/70 px-2.5 py-1 capitalize">
                               {goal.priority} priority
                             </span>
+                            <span className="rounded-full border border-border/60 bg-background/70 px-2.5 py-1">
+                              {goal.tasks.length} scheduled today
+                            </span>
                             {goal.dueDate ? (
                               <span className="rounded-full border border-border/60 bg-background/70 px-2.5 py-1">
                                 Due {formatGoalTrayDateLabel(goal.dueDate, 'MMM d')}
@@ -5416,10 +5517,62 @@ export function BackgroundAudioPlayer() {
                             ) : null}
                           </div>
                         </div>
-                        <div className="rounded-full border border-border/60 bg-background/70 px-3 py-1 text-[11px] text-muted-foreground">
-                          {goal.tasks.length} scheduled today
-                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full border border-border/60 bg-background/70 text-muted-foreground hover:text-foreground"
+                          onClick={() => activeGoalContributionId === goal.id ? closeGoalContributionComposer(goal.id) : openGoalContributionComposer(goal.id)}
+                          title="Add a one-off task that contributed to this goal today"
+                        >
+                          <Plus className="h-4 w-4" />
+                          <span className="sr-only">Add one-off contribution task</span>
+                        </Button>
                       </div>
+                      {activeGoalContributionId === goal.id ? (
+                        <div className="mt-3 rounded-xl border border-border/60 bg-background/50 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Pick from today&apos;s scheduled tasks</div>
+                            <Button type="button" variant="ghost" size="sm" onClick={() => closeGoalContributionComposer(goal.id)}>
+                              Close
+                            </Button>
+                          </div>
+                          {todayGoalPopupData.scheduledNonRoutineTasks.length === 0 ? (
+                            <div className="mt-3 rounded-lg border border-dashed border-border/60 bg-background/40 px-3 py-3 text-sm text-muted-foreground">
+                              No non-routine tasks are scheduled today.
+                            </div>
+                          ) : (
+                            <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
+                              {todayGoalPopupData.scheduledNonRoutineTasks.map((scheduledTask) => {
+                                const alreadyAssignedToThisGoal = scheduledTask.contributedGoalId === goal.id;
+                                return (
+                                  <button
+                                    key={scheduledTask.id}
+                                    type="button"
+                                    className={cn(
+                                      'flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors',
+                                      alreadyAssignedToThisGoal
+                                        ? 'border-emerald-500/40 bg-emerald-500/10'
+                                        : 'border-border/60 bg-background/40 hover:border-primary/40 hover:bg-background/70'
+                                    )}
+                                    onClick={() => handleAssignScheduledTaskToGoal(goal.id, goal.title, scheduledTask.id)}
+                                  >
+                                    <div className="min-w-0 flex-1">
+                                      <div className={cn('truncate text-sm font-medium', scheduledTask.completed && 'line-through text-muted-foreground')}>
+                                        {scheduledTask.title}
+                                      </div>
+                                      <div className="mt-0.5 text-[11px] text-muted-foreground">{scheduledTask.slotName}</div>
+                                    </div>
+                                    <div className="shrink-0 text-[11px] text-muted-foreground">
+                                      {alreadyAssignedToThisGoal ? 'Added' : 'Add'}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
                       {goal.tasks.length === 0 ? (
                         <div className="mt-3 rounded-xl border border-dashed border-border/60 bg-background/50 px-3 py-3 text-sm text-muted-foreground">
                           No linked tasks from this goal are scheduled in today's time slots.
@@ -5448,6 +5601,9 @@ export function BackgroundAudioPlayer() {
                                   <div className={cn("text-[11px] text-muted-foreground", task.completed && "line-through")}>{task.slotName}</div>
                                   {task.loggedDurationLabel ? (
                                     <div className="text-[11px] text-muted-foreground">{task.loggedDurationLabel}</div>
+                                  ) : null}
+                                  {task.source === 'contribution' ? (
+                                    <div className="text-[11px] text-sky-300">One-off contribution</div>
                                   ) : null}
                                 </div>
                               </div>

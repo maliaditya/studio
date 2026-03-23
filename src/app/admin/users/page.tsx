@@ -223,17 +223,92 @@ function AdminUsersPageContent() {
         accessToken = getAccessToken(username);
       }
 
-      const response = await fetch('/api/admin/desktop-users', {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        body: JSON.stringify({ username: targetUsername, isPriviledge }),
-      });
-      const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-      if (!response.ok) {
+      const cloudBase = resolveCloudBase();
+      const localUrl = '/api/admin/desktop-users';
+      const url = cloudBase ? `${cloudBase.replace(/\/$/, '')}/api/admin/desktop-users` : localUrl;
+      const shouldUseDesktopProxy =
+        Boolean((window as any)?.studioDesktop?.isDesktop) &&
+        Boolean(cloudBase) &&
+        typeof window !== 'undefined' &&
+        !url.startsWith(window.location.origin);
+      const requestBody = JSON.stringify({ username: targetUsername, isPriviledge });
+
+      let ok = false;
+      let payload = null as { error?: string; user?: { username: string; isPriviledge: boolean } } | null;
+
+      if (shouldUseDesktopProxy) {
+        const bridge = (window as any)?.studioDesktop?.authHttp;
+        if (!bridge?.request) {
+          throw new Error('Desktop cloud proxy is unavailable.');
+        }
+        const proxied = await bridge.request({
+          url,
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+          body: requestBody,
+        });
+        if (!proxied?.success) {
+          throw new Error(describeUnknownError(proxied?.error, 'Failed to call desktop users API.'));
+        }
+        ok = Boolean(proxied.ok);
+        payload = (proxied.data || null) as { error?: string; user?: { username: string; isPriviledge: boolean } } | null;
+      } else {
+        const response = await fetch(url, {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
+          body: requestBody,
+        });
+        ok = response.ok;
+        payload = (await response.json().catch(() => null)) as { error?: string; user?: { username: string; isPriviledge: boolean } } | null;
+      }
+
+      if ((!ok || !payload) && payload?.error === 'Unauthorized.' && username) {
+        const refreshed = await ensureCloudSession();
+        if (refreshed.success) {
+          accessToken = getAccessToken(username);
+          if (shouldUseDesktopProxy) {
+            const bridge = (window as any)?.studioDesktop?.authHttp;
+            if (!bridge?.request) {
+              throw new Error('Desktop cloud proxy is unavailable.');
+            }
+            const proxied = await bridge.request({
+              url,
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+              },
+              body: requestBody,
+            });
+            if (!proxied?.success) {
+              throw new Error(describeUnknownError(proxied?.error, 'Failed to call desktop users API.'));
+            }
+            ok = Boolean(proxied.ok);
+            payload = (proxied.data || null) as { error?: string; user?: { username: string; isPriviledge: boolean } } | null;
+          } else {
+            const response = await fetch(url, {
+              method: 'PATCH',
+              credentials: 'include',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+              },
+              body: requestBody,
+            });
+            ok = response.ok;
+            payload = (await response.json().catch(() => null)) as { error?: string; user?: { username: string; isPriviledge: boolean } } | null;
+          }
+        }
+      }
+
+      if (!ok || !payload) {
         throw new Error(payload?.error || 'Failed to update privilege.');
       }
 

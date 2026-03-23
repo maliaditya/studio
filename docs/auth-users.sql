@@ -16,6 +16,9 @@ create table if not exists public.auth_users (
 create index if not exists auth_users_email_idx on public.auth_users (lower(email));
 create index if not exists auth_users_created_at_idx on public.auth_users (created_at desc);
 
+alter table public.auth_users
+  add column if not exists is_priviledge boolean not null default false;
+
 comment on table public.auth_users is 'Cloud auth records migrated from auth/*.json storage files into Postgres.';
 
 create table if not exists public.user_github_settings (
@@ -96,6 +99,14 @@ alter table public.user_support_donations
   add column if not exists plan_heading text;
 
 comment on table public.user_support_donations is 'Verified and pending support donations for Dock, linked to auth_users when the donor is signed in.';
+
+
+
+
+
+
+
+
 
 
 

@@ -89,6 +89,15 @@ const isMissingPrivilegeColumnError = (error: unknown): boolean => {
   return lower.includes('is_priviledge') && (lower.includes('column') || lower.includes('schema cache'));
 };
 
+async function ensureAuthPrivilegeColumn(client: SupabaseClient): Promise<void> {
+  const { error } = await client.from(AUTH_USERS_TABLE).select('is_priviledge').limit(1);
+  if (!error) return;
+  if (isMissingPrivilegeColumnError(error)) {
+    throw new Error('Auth database is missing auth_users.is_priviledge. Run docs/auth-users.sql in Supabase SQL Editor to add the column.');
+  }
+  withHelpfulTableError(error, 'Failed to verify auth user privilege schema.');
+}
+
 async function selectAuthUserByUsername(
   client: SupabaseClient,
   username: string
@@ -416,6 +425,7 @@ export async function updateAuthUserPrivilege(payload: {
 
   try {
     const client = getAdminClient();
+    await ensureAuthPrivilegeColumn(client);
     return await updateAuthUserRow(
       client,
       normalizedUsername,

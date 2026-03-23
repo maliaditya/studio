@@ -49,7 +49,7 @@ const featureCards = [
 ];
 
 const heroBullets = [
-  "Convert friction into clear next actions",
+    "Convert friction into clear actions",
   "Run routines, projects, learning, and review in one loop",
   "Use local or API AI enhancements with explicit control",
 ];
@@ -62,7 +62,7 @@ const quickStats = [
 
 const heroPanelItems = [
   { title: "Botherings -> Routine Links", detail: "Friction gets mapped to executable tasks." },
-  { title: "Timeslot-Driven Execution", detail: "Today cards align to your routine schedule." },
+    { title: "Timeslot Driven Execution", detail: "Today cards align to your routine schedule." },
   { title: "AI Review Loop", detail: "Explain and rebalance from your real logs." },
 ];
 
@@ -782,9 +782,9 @@ export default function LandingPage() {
                         </div>
                         <ul className="mt-6 grid gap-2 sm:grid-cols-2">
                             {heroBullets.map((bullet) => (
-                                <li key={bullet} className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-                                    {bullet}
+                                <li key={bullet} className="flex items-start gap-2 text-sm leading-6 text-muted-foreground">
+                                    <CheckCircle2 className="mt-1 h-4 w-4 shrink-0 text-emerald-300" />
+                                    <span className="leading-6">{bullet}</span>
                                 </li>
                             ))}
                         </ul>
@@ -885,8 +885,8 @@ export default function LandingPage() {
                             <CardContent className="space-y-4">
                                 {heroPanelItems.map((item) => (
                                     <div key={item.title} className="rounded-lg border border-border/60 bg-background/55 p-3">
-                                        <p className="text-sm font-semibold text-foreground">{item.title}</p>
-                                        <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>
+                                        <p className="text-sm font-semibold leading-6 text-foreground">{item.title}</p>
+                                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>
                                     </div>
                                 ))}
                                 <div className="rounded-lg border border-emerald-400/25 bg-emerald-500/10 p-3 text-xs text-emerald-100">
