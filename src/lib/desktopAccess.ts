@@ -16,7 +16,7 @@ export const normalizeDesktopPlanPriceInr = (value: unknown, fallback = DESKTOP_
   const parsed = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   const rounded = Math.round(parsed);
-  return rounded > 0 ? rounded : fallback;
+  return rounded >= 0 ? rounded : fallback;
 };
 
 export const formatDesktopPlanPrice = (amountInr: number): string =>
@@ -24,7 +24,7 @@ export const formatDesktopPlanPrice = (amountInr: number): string =>
 
 export const DESKTOP_PLAN_DISPLAY_PRICE = formatDesktopPlanPrice(DESKTOP_PLAN_PRICE_INR);
 
-export type DesktopPaymentProvider = 'razorpay' | 'upi' | 'paypal';
+export type DesktopPaymentProvider = 'razorpay' | 'upi' | 'paypal' | 'free';
 export type DesktopCheckoutStatus = 'pending' | 'completed' | 'failed';
 export type DesktopAccessStatus = 'locked' | 'pending' | 'active';
 
@@ -111,7 +111,7 @@ const getExpiryFromValidity = (grantedAt: string | null, planValidity: DesktopPl
 };
 
 const isProvider = (value: unknown): value is DesktopPaymentProvider =>
-  value === 'razorpay' || value === 'upi' || value === 'paypal';
+  value === 'razorpay' || value === 'upi' || value === 'paypal' || value === 'free';
 
 const normalizeProvider = (value: unknown): DesktopPaymentProvider | null => {
   if (value === 'stripe') return 'razorpay';

@@ -167,6 +167,7 @@ export const createDesktopCheckoutState = (
   planDetails?: { planId?: string; planHeading?: string; planValidity?: DesktopPlanValidity; billingLabel?: string }
 ): DesktopAccessState => {
   const now = new Date().toISOString();
+  const preserveExistingAccess = current.hasAccess;
   const previousHistory = current.currentSession ? [...current.history, current.currentSession] : [...current.history];
   const planId = String(planDetails?.planId || current.planId || 'desktop_yearly').trim() || 'desktop_yearly';
   const planHeading = String(planDetails?.planHeading || current.planHeading || 'Desktop').trim() || 'Desktop';
@@ -179,9 +180,9 @@ export const createDesktopCheckoutState = (
     planHeading,
     planValidity,
     billingLabel,
-    hasAccess: false,
-    status: 'pending',
-    activeProvider: provider,
+    hasAccess: preserveExistingAccess,
+    status: preserveExistingAccess ? 'active' : 'pending',
+    activeProvider: preserveExistingAccess ? current.activeProvider : provider,
     updatedAt: now,
     currentSession: {
       id: randomUUID(),

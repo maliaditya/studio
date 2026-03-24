@@ -11,8 +11,10 @@ import {
   loginUser as localLoginUser, 
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
+  hasValidCachedDesktopEntitlement,
   isCurrentSessionOwner,
   persistDesktopEntitlementSnapshot,
+  readCachedDesktopEntitlementSnapshot,
   refreshSessionHeartbeat,
   refreshSessionFromStoredToken,
 } from '@/lib/localAuth';
@@ -74,6 +76,24 @@ type GitHubSyncNotification = {
   updatedAt: number;
 };
 type RemoteAheadDecision = 'pull' | 'force' | 'cancel';
+
+const isDesktopRuntimeClient = () => typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop);
+
+const getCachedDesktopAccessState = (username: string): DesktopAccessState | null => {
+  const snapshot = readCachedDesktopEntitlementSnapshot(username);
+  if (!hasValidCachedDesktopEntitlement(snapshot)) {
+    return null;
+  }
+
+  return {
+    ...createEmptyDesktopAccessState(),
+    hasAccess: true,
+    status: 'active',
+    grantedAt: snapshot?.purchaseDate ?? null,
+    expiresAt: snapshot?.expiresAt ?? null,
+    updatedAt: snapshot ? new Date(snapshot.updatedAt).toISOString() : null,
+  };
+};
 
 interface AuthContextType {
   currentUser: LocalUser | null;
@@ -2952,7 +2972,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       });
     } catch (error) {
       console.error('Failed to refresh desktop access:', error);
-      setDesktopAccess(createEmptyDesktopAccessState());
+      const cachedAccess = getCachedDesktopAccessState(currentUser.username);
+      setDesktopAccess(cachedAccess || createEmptyDesktopAccessState());
     } finally {
       setDesktopAccessLoading(false);
     }
@@ -8252,7 +8273,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const user = getCurrentLocalUser();
     if (user) {
       setCurrentUser(user);
-      void refreshSessionFromStoredToken(user.username);
+      if (!(isDesktopRuntimeClient() && getCachedDesktopAccessState(user.username))) {
+        void refreshSessionFromStoredToken(user.username);
+      }
       void loadState(user.username);
     }
     setLoading(false);
@@ -8281,6 +8304,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setDesktopAccess(createEmptyDesktopAccessState());
       return;
     }
+
+    if (isDesktopRuntimeClient()) {
+      const cachedAccess = getCachedDesktopAccessState(currentUser.username);
+      if (cachedAccess) {
+        setDesktopAccess(cachedAccess);
+        return;
+      }
+    }
+
     void refreshDesktopAccess();
   }, [currentUser?.username, refreshDesktopAccess]);
 

@@ -2,13 +2,13 @@ import { NextResponse } from 'next/server';
 import { createDesktopCheckoutState, readDesktopAccessState, resolveDesktopAccessUser, writeDesktopAccessState } from '@/lib/desktopAccessServer';
 import { readConfiguredDesktopPlanCatalog } from '@/lib/appConfigServer';
 import { DESKTOP_PLAN_CURRENCY, DESKTOP_PLAN_ID, formatDesktopPlanPrice, type DesktopPaymentProvider } from '@/lib/desktopAccess';
-import { getDesktopPlanById, getDesktopPlanFinalPriceInr, getFeaturedDesktopPlan } from '@/lib/desktopPlans';
+import { getDesktopPlanById, getDesktopPlanFinalPriceInr, getFeaturedDesktopPlan, getVisibleDesktopPlans, isHigherDesktopPlanValidity } from '@/lib/desktopPlans';
 import { getRazorpayClient, getRazorpayKeyId, isRazorpayConfigured } from '@/lib/razorpayServer';
 
 export const dynamic = 'force-dynamic';
 
 const isProvider = (value: unknown): value is DesktopPaymentProvider =>
-  value === 'razorpay' || value === 'upi' || value === 'paypal';
+  value === 'razorpay' || value === 'upi' || value === 'paypal' || value === 'free';
 
 const toRazorpayPrefill = (username: string) => {
   const trimmed = String(username || '').trim();
@@ -42,18 +42,32 @@ export async function POST(request: Request) {
     }
 
     const current = await readDesktopAccessState(request, sessionUser);
-    if (current.hasAccess) {
-      return NextResponse.json({
-        access: current,
-        message: 'Desktop access is already active for this account.',
-      });
-    }
 
     const desktopPlanCatalog = await readConfiguredDesktopPlanCatalog();
+    if (getVisibleDesktopPlans(desktopPlanCatalog).length === 0) {
+      return NextResponse.json({ error: 'Desktop plans are currently unavailable.' }, { status: 400 });
+    }
     const selectedPlan = getDesktopPlanById(desktopPlanCatalog, payload.planId) || getFeaturedDesktopPlan(desktopPlanCatalog);
+    if (current.hasAccess && !isHigherDesktopPlanValidity(current.planValidity, selectedPlan.validity)) {
+      return NextResponse.json(
+        {
+          error: selectedPlan.validity === current.planValidity
+            ? 'This plan is already active for your account. Choose a higher-validity plan to upgrade.'
+            : 'You cannot select a lower-validity desktop plan while your current access is still active.',
+        },
+        { status: 400 }
+      );
+    }
     const desktopPlanPriceInr = getDesktopPlanFinalPriceInr(selectedPlan);
     const desktopPlanPriceSubunits = desktopPlanPriceInr * 100;
     const desktopPlanDisplayPrice = formatDesktopPlanPrice(desktopPlanPriceInr);
+
+    if (desktopPlanPriceInr === 0 && payload.provider !== 'free') {
+      return NextResponse.json({ error: 'Free plans must use the free checkout flow.' }, { status: 400 });
+    }
+    if (desktopPlanPriceInr > 0 && payload.provider === 'free') {
+      return NextResponse.json({ error: 'Only zero-price plans can use the free checkout flow.' }, { status: 400 });
+    }
 
     let next = createDesktopCheckoutState(current, payload.provider, desktopPlanPriceInr, {
       planId: selectedPlan.id || DESKTOP_PLAN_ID,
@@ -118,6 +132,9 @@ export async function POST(request: Request) {
       checkoutUrl,
       checkoutData,
       message:
+        payload.provider === 'free'
+          ? 'Free desktop access is ready to confirm.'
+          :
         payload.provider === 'razorpay'
           ? 'Razorpay order created. Open the card checkout to complete payment.'
           : payload.provider === 'upi'

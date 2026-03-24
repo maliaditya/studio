@@ -13,6 +13,7 @@ export type AppConfigPayload = {
   updatedAt?: string | null;
   source?: "db" | "env";
   storageConfigured?: boolean;
+  readError?: string | null;
 };
 
 const resolveCloudBase = () => {

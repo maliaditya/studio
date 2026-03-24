@@ -14,6 +14,17 @@ export const DESKTOP_PLAN_VALIDITY_LABELS: Record<DesktopPlanValidity, string> =
   lifetime: 'lifetime',
 };
 
+const DESKTOP_PLAN_VALIDITY_RANKS: Record<DesktopPlanValidity, number> = {
+  monthly: 0,
+  yearly: 1,
+  lifetime: 2,
+};
+
+export const getDesktopPlanValidityRank = (validity: DesktopPlanValidity): number => DESKTOP_PLAN_VALIDITY_RANKS[validity];
+
+export const isHigherDesktopPlanValidity = (current: DesktopPlanValidity, candidate: DesktopPlanValidity): boolean =>
+  getDesktopPlanValidityRank(candidate) > getDesktopPlanValidityRank(current);
+
 export const DESKTOP_PLAN_TAX_MODE_LABELS: Record<DesktopPlanTaxMode, string> = {
   inclusive: 'Including GST',
   exclusive: 'Excluding GST',
@@ -24,7 +35,9 @@ export type DesktopPlanDefinition = {
   heading: string;
   description: string;
   recommended: boolean;
+  visible?: boolean;
   priceInr: number;
+  compareAtPriceInr?: number | null;
   taxMode: DesktopPlanTaxMode;
   gstPercent: number;
   validity: DesktopPlanValidity;
@@ -63,6 +76,20 @@ export const normalizeDesktopPlanGstPercent = (value: unknown, fallback = 18): n
   return rounded >= 0 && rounded <= 100 ? rounded : fallback;
 };
 
+export const normalizeDesktopPlanCompareAtPriceInr = (value: unknown): number | null => {
+  if (value === null || typeof value === 'undefined' || value === '') return null;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.round(parsed);
+};
+
+export const isDesktopPlanVisible = (plan: Pick<DesktopPlanDefinition, 'visible'>): boolean => plan.visible !== false;
+
+export const getVisibleDesktopPlans = (catalog: DesktopPlanCatalog): DesktopPlanDefinition[] => {
+  const normalized = normalizeDesktopPlanCatalog(catalog);
+  return normalized.plans.filter((plan) => isDesktopPlanVisible(plan));
+};
+
 export const getDesktopPlanFinalPriceInr = (plan: DesktopPlanDefinition): number => {
   const basePrice = normalizeDesktopPlanPriceInr(plan.priceInr, DESKTOP_PLAN_PRICE_INR);
   if (plan.taxMode === 'inclusive') return basePrice;
@@ -85,7 +112,9 @@ export const createDefaultDesktopPlanCatalog = (basePriceInr = DESKTOP_PLAN_PRIC
       heading: 'Starter',
       description: 'Essential desktop access for solo use.',
       recommended: false,
+      visible: true,
       priceInr: normalizeDesktopPlanPriceInr(basePriceInr, DESKTOP_PLAN_PRICE_INR),
+      compareAtPriceInr: null,
       taxMode: 'inclusive',
       gstPercent: 18,
       validity: 'monthly',
@@ -97,7 +126,9 @@ export const createDefaultDesktopPlanCatalog = (basePriceInr = DESKTOP_PLAN_PRIC
       heading: 'Plus',
       description: 'Desktop access with local AI workflows enabled.',
       recommended: true,
+      visible: true,
       priceInr: normalizeDesktopPlanPriceInr(Math.round(basePriceInr * 1.9), DESKTOP_PLAN_PRICE_INR),
+      compareAtPriceInr: null,
       taxMode: 'inclusive',
       gstPercent: 18,
       validity: 'yearly',
@@ -109,7 +140,9 @@ export const createDefaultDesktopPlanCatalog = (basePriceInr = DESKTOP_PLAN_PRIC
       heading: 'Pro',
       description: 'Full desktop access with priority setup support.',
       recommended: false,
+      visible: true,
       priceInr: normalizeDesktopPlanPriceInr(Math.round(basePriceInr * 3.1), DESKTOP_PLAN_PRICE_INR),
+      compareAtPriceInr: null,
       taxMode: 'inclusive',
       gstPercent: 18,
       validity: 'lifetime',
@@ -165,7 +198,9 @@ export const normalizeDesktopPlanCatalog = (
             heading,
             description: String(planRecord.description || '').trim(),
             recommended: Boolean(planRecord.recommended),
+            visible: planRecord.visible !== false,
             priceInr: normalizeDesktopPlanPriceInr(planRecord.priceInr, fallbackPriceInr),
+            compareAtPriceInr: normalizeDesktopPlanCompareAtPriceInr(planRecord.compareAtPriceInr),
             taxMode: normalizeTaxMode(planRecord.taxMode),
             gstPercent: normalizeDesktopPlanGstPercent(planRecord.gstPercent, 18),
             validity: normalizeValidity(planRecord.validity),
@@ -191,11 +226,13 @@ export const normalizeDesktopPlanCatalog = (
 
 export const getFeaturedDesktopPlan = (catalog: DesktopPlanCatalog): DesktopPlanDefinition => {
   const normalized = normalizeDesktopPlanCatalog(catalog);
-  return normalized.plans.find((plan) => plan.recommended) || normalized.plans[0];
+  const visiblePlans = normalized.plans.filter((plan) => isDesktopPlanVisible(plan));
+  const candidatePlans = visiblePlans.length > 0 ? visiblePlans : normalized.plans;
+  return candidatePlans.find((plan) => plan.recommended) || candidatePlans[0];
 };
 
 export const getDesktopPlanById = (catalog: DesktopPlanCatalog, planId?: string | null): DesktopPlanDefinition | null => {
   const normalized = normalizeDesktopPlanCatalog(catalog);
   if (!planId) return null;
-  return normalized.plans.find((plan) => plan.id === planId) || null;
+  return normalized.plans.find((plan) => plan.id === planId && isDesktopPlanVisible(plan)) || null;
 };

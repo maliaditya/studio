@@ -163,7 +163,7 @@ const buildAuthUrl = (path: string): string => {
 
 const getDesktopEntitlementKey = (username: string) => `${DESKTOP_ENTITLEMENT_KEY_PREFIX}${normalizeUsername(username)}`;
 
-const readDesktopEntitlementSnapshot = (username: string): DesktopEntitlementSnapshot | null => {
+export const readCachedDesktopEntitlementSnapshot = (username: string): DesktopEntitlementSnapshot | null => {
   if (typeof window === 'undefined') return null;
   const raw = localStorage.getItem(getDesktopEntitlementKey(username));
   if (!raw) return null;
@@ -218,7 +218,7 @@ const isDesktopEntitlementActive = (snapshot: DesktopEntitlementSnapshot | null)
   return Number.isFinite(expiresAtTime) && expiresAtTime > Date.now();
 };
 
-const hasValidCachedDesktopEntitlement = (snapshot: DesktopEntitlementSnapshot | null): boolean => {
+export const hasValidCachedDesktopEntitlement = (snapshot: DesktopEntitlementSnapshot | null): boolean => {
   if (snapshot?.isPriviledge) return true;
   if (!snapshot?.paymentCompleted) return false;
   if (!snapshot.purchaseDate) return false;
@@ -606,7 +606,7 @@ export async function loginUser(
       };
     }
     if (desktopRuntime) {
-      const desktopEntitlement = readDesktopEntitlementSnapshot(normalizedUsername);
+      const desktopEntitlement = readCachedDesktopEntitlementSnapshot(normalizedUsername);
       if (!hasValidCachedDesktopEntitlement(desktopEntitlement)) {
         return {
           success: false,
@@ -801,7 +801,7 @@ export function getCurrentLocalUser(): LocalUser | null {
     if (!username) return null;
 
     if (isDesktopRuntime()) {
-      const desktopEntitlement = readDesktopEntitlementSnapshot(username);
+      const desktopEntitlement = readCachedDesktopEntitlementSnapshot(username);
       if (!hasValidCachedDesktopEntitlement(desktopEntitlement)) {
         clearSessionIfOwned(username);
         localStorage.removeItem(CURRENT_USER_KEY);

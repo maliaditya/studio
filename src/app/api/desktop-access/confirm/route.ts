@@ -9,7 +9,7 @@ import { getRazorpayKeySecret, isRazorpayConfigured } from '@/lib/razorpayServer
 export const dynamic = 'force-dynamic';
 
 const isProvider = (value: unknown): value is DesktopPaymentProvider =>
-  value === 'razorpay' || value === 'upi' || value === 'paypal';
+  value === 'razorpay' || value === 'upi' || value === 'paypal' || value === 'free';
 
 export async function POST(request: Request) {
   try {

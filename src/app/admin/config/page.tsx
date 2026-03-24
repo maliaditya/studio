@@ -73,8 +73,10 @@ function AdminConfigPageContent() {
       setDesktopPlans(catalog.plans);
       setSetupSupportFeatures(setupSupportCatalog.features);
       setSetupSupportPlans(setupSupportCatalog.plans);
+      return data;
     } catch (err) {
       setError(describeUnknownError(err, "Failed to load config."));
+      return null;
     } finally {
       setLoading(false);
     }
@@ -104,7 +106,9 @@ function AdminConfigPageContent() {
         heading: "New Plan",
         description: "Describe what the buyer gets in this plan.",
         recommended: false,
+        visible: true,
         priceInr: featuredPlan?.priceInr || 799,
+        compareAtPriceInr: null,
         taxMode: 'inclusive',
         gstPercent: 18,
         validity: 'yearly',
@@ -230,8 +234,8 @@ function AdminConfigPageContent() {
     setError(null);
     try {
       const username = (currentUser?.username || "").trim().toLowerCase();
-      let accessToken = username ? getAccessToken(username) : null;
-      if (username && !accessToken) {
+      let accessToken = null as string | null;
+      if (username) {
         const refreshed = await ensureCloudSession();
         if (!refreshed.success) {
           throw new Error(refreshed.message || "Your cloud admin session expired. Please sign in again.");
@@ -262,6 +266,23 @@ function AdminConfigPageContent() {
         supabaseAnonKey: payload.supabaseAnonKey || prev.supabaseAnonKey,
         supabasePdfBucket: payload.supabaseStorageBucket || prev.supabasePdfBucket,
       }));
+      const reloaded = await loadConfig();
+      if (!reloaded) {
+        toast({
+          title: 'Saved, but reload failed',
+          description: 'The config was saved, but the page could not verify the saved DB row. Check the fallback warning card.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (reloaded.source !== 'db' || reloaded.readError) {
+        toast({
+          title: 'Saved, but app is using fallback config',
+          description: reloaded.readError || 'The save completed, but the app is still loading env/default values on refresh.',
+          variant: 'destructive',
+        });
+        return;
+      }
       toast({ title: "Saved", description: "Supabase config, desktop plans, and setup/support plans updated for all apps." });
     } catch (err) {
       const message = describeUnknownError(err, "Failed to save config.");
@@ -328,6 +349,20 @@ function AdminConfigPageContent() {
         </Card>
       )}
 
+      {config?.readError && (
+        <Card className="border-amber-500/40">
+          <CardHeader>
+            <CardTitle className="text-amber-400">Config Fallback Active</CardTitle>
+            <CardDescription>
+              The app is loading fallback env/default values instead of the saved database row.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            {config.readError}
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Supabase Public Config</CardTitle>
@@ -372,7 +407,12 @@ function AdminConfigPageContent() {
         <CardContent className="space-y-6">
           <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
             Featured plan on landing page: <span className="font-semibold text-foreground">{featuredPlan.heading}</span>
-            <span className="text-foreground"> ({getDesktopPlanFinalPriceInr(featuredPlan)} INR / {featuredPlan.billingLabel})</span>
+            <span className="text-foreground">
+              {' '}
+              (
+              {featuredPlan.compareAtPriceInr && featuredPlan.compareAtPriceInr > featuredPlan.priceInr ? `${featuredPlan.compareAtPriceInr} INR -> ` : ''}
+              {getDesktopPlanFinalPriceInr(featuredPlan)} INR / {featuredPlan.billingLabel})
+            </span>
             {featuredPlan.validity === 'lifetime' ? (
               <span className="ml-2 text-emerald-400">Lifetime plans mark the buyer as privileged.</span>
             ) : null}
@@ -444,13 +484,29 @@ function AdminConfigPageContent() {
                           <label className="text-xs text-muted-foreground">Price (INR)</label>
                           <Input
                             type="number"
-                            min="1"
+                            min="0"
                             step="1"
                             value={String(plan.priceInr)}
                             onChange={(event) => updateDesktopPlan(plan.id, { priceInr: Number(event.target.value) || 0 })}
-                            placeholder="799"
+                            placeholder="0"
                           />
                         </div>
+                        <div className="space-y-1">
+                          <label className="text-xs text-muted-foreground">Original Price (INR)</label>
+                          <Input
+                            type="number"
+                            min="1"
+                            step="1"
+                            value={plan.compareAtPriceInr == null ? '' : String(plan.compareAtPriceInr)}
+                            onChange={(event) => {
+                              const value = event.target.value.trim();
+                              updateDesktopPlan(plan.id, { compareAtPriceInr: value ? Number(value) || 0 : null });
+                            }}
+                            placeholder="1999"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
                         <div className="space-y-1">
                           <label className="text-xs text-muted-foreground">Billing Label</label>
                           <Input
@@ -537,6 +593,15 @@ function AdminConfigPageContent() {
                       onCheckedChange={(checked) => togglePlanRecommendation(plan.id, Boolean(checked))}
                     />
                     <label htmlFor={`recommended-${plan.id}`} className="text-sm text-foreground">Recommended plan</label>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
+                    <Checkbox
+                      id={`visible-${plan.id}`}
+                      checked={plan.visible !== false}
+                      onCheckedChange={(checked) => updateDesktopPlan(plan.id, { visible: Boolean(checked) })}
+                    />
+                    <label htmlFor={`visible-${plan.id}`} className="text-sm text-foreground">Visible in UI</label>
                   </div>
 
                   <div className="mt-4 space-y-2">

@@ -43,10 +43,19 @@ export async function GET() {
         ...stored,
         source: "db",
         storageConfigured: true,
+        readError: null,
       });
     }
   } catch (error) {
     console.error("GET /api/app-config failed to read DB:", error);
+    const message = error instanceof Error ? error.message : 'Failed to read app config from database.';
+    return NextResponse.json({
+      ...fallback,
+      source: "env",
+      updatedAt: null,
+      storageConfigured,
+      readError: process.env.NODE_ENV === 'production' ? 'Failed to read app config from database.' : message,
+    });
   }
 
   return NextResponse.json({
@@ -54,6 +63,7 @@ export async function GET() {
     source: "env",
     updatedAt: null,
     storageConfigured,
+    readError: null,
   });
 }
 
@@ -84,8 +94,8 @@ export async function POST(request: Request) {
   if (!supabaseUrl || !supabaseAnonKey) {
     return NextResponse.json({ error: "Supabase URL and anon key are required." }, { status: 400 });
   }
-  if (!Number.isFinite(desktopPlanPriceInr) || desktopPlanPriceInr <= 0) {
-    return NextResponse.json({ error: 'Desktop yearly price must be a positive whole-number INR amount.' }, { status: 400 });
+  if (!Number.isFinite(desktopPlanPriceInr) || desktopPlanPriceInr < 0) {
+    return NextResponse.json({ error: 'Desktop featured plan price must be a zero-or-higher whole-number INR amount.' }, { status: 400 });
   }
 
   try {
@@ -104,6 +114,10 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("POST /api/app-config error:", error);
-    return NextResponse.json({ error: "Failed to save app config." }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Failed to save app config.';
+    return NextResponse.json(
+      { error: process.env.NODE_ENV === 'production' ? 'Failed to save app config.' : message },
+      { status: 500 }
+    );
   }
 }

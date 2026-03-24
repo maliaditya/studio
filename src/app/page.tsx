@@ -14,11 +14,12 @@ import { Label } from '@/components/ui/label';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 import { LoadingScreen } from '@/components/LoadingScreen';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { fetchAppConfig } from '@/lib/appConfigClient';
 import { DESKTOP_PAYMENT_METHODS, DESKTOP_PLAN_DISPLAY_PRICE, formatDesktopPlanPrice, type DesktopPaymentProvider } from '@/lib/desktopAccess';
-import { createDefaultDesktopPlanCatalog, DESKTOP_PLAN_TAX_MODE_LABELS, DESKTOP_PLAN_VALIDITY_LABELS, getDesktopPlanById, getDesktopPlanFinalPriceInr, getFeaturedDesktopPlan, normalizeDesktopPlanCatalog, type DesktopPlanCatalog } from '@/lib/desktopPlans';
+import { createDefaultDesktopPlanCatalog, DESKTOP_PLAN_TAX_MODE_LABELS, DESKTOP_PLAN_VALIDITY_LABELS, getDesktopPlanById, getDesktopPlanFinalPriceInr, getDesktopPlanValidityRank, getFeaturedDesktopPlan, getVisibleDesktopPlans, normalizeDesktopPlanCatalog, type DesktopPlanCatalog, type DesktopPlanDefinition } from '@/lib/desktopPlans';
 import { createDefaultSetupSupportPlanCatalog, normalizeSetupSupportPlanCatalog, type SetupSupportPlanCatalog } from '@/lib/setupSupportPlans';
 
 const featureCards = [
@@ -105,6 +106,12 @@ const FlowCard = ({ icon, title, description, children }: { icon: React.ReactNod
   </div>
 );
 
+const hasCompareAtPrice = (priceInr?: number | null, currentPriceInr?: number | null) =>
+        typeof priceInr === 'number' && typeof currentPriceInr === 'number' && priceInr > currentPriceInr;
+
+const isPlanUpgradeLocked = (hasAccess: boolean, currentValidity: DesktopPlanDefinition['validity'], candidateValidity: DesktopPlanDefinition['validity']) =>
+    hasAccess && getDesktopPlanValidityRank(candidateValidity) <= getDesktopPlanValidityRank(currentValidity);
+
 const FeatureList = ({ features }: { features: string[] }) => (
     <div className="mt-3 pt-3 border-t w-full">
         <ul className="text-left text-xs list-disc list-inside space-y-1 text-muted-foreground">
@@ -184,6 +191,7 @@ export default function LandingPage() {
         const [isPlansDialogOpen, setIsPlansDialogOpen] = useState(false);
     const [isSetupSupportDialogOpen, setIsSetupSupportDialogOpen] = useState(false);
     const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+    const [isFreePlanConfirmOpen, setIsFreePlanConfirmOpen] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<DesktopPaymentProvider>('razorpay');
     const [isProcessingDesktopAction, setIsProcessingDesktopAction] = useState(false);
     const [processingSetupSupportPlanId, setProcessingSetupSupportPlanId] = useState<string | null>(null);
@@ -197,14 +205,28 @@ export default function LandingPage() {
     const [downloadCount, setDownloadCount] = useState<number | null>(null);
   const isDesktopRuntime = typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
     const landingPreferenceKey = 'dock_hide_landing_page';
+        const visibleDesktopPlans = useMemo(() => getVisibleDesktopPlans(desktopPlanCatalog), [desktopPlanCatalog]);
         const featuredDesktopPlan = useMemo(() => getFeaturedDesktopPlan(desktopPlanCatalog), [desktopPlanCatalog]);
         const selectedDesktopPlan = useMemo(() => getDesktopPlanById(desktopPlanCatalog, selectedPlanId) || featuredDesktopPlan, [desktopPlanCatalog, featuredDesktopPlan, selectedPlanId]);
+        const selectableDesktopPlans = useMemo(
+            () => visibleDesktopPlans.filter((plan) => !isPlanUpgradeLocked(desktopAccess.hasAccess, desktopAccess.planValidity, plan.validity)),
+            [desktopAccess.hasAccess, desktopAccess.planValidity, visibleDesktopPlans]
+        );
+        const selectedDesktopPlanLocked = useMemo(
+            () => isPlanUpgradeLocked(desktopAccess.hasAccess, desktopAccess.planValidity, selectedDesktopPlan.validity),
+            [desktopAccess.hasAccess, desktopAccess.planValidity, selectedDesktopPlan.validity]
+        );
+        const isSelectedDesktopPlanUpgrade = useMemo(
+            () => desktopAccess.hasAccess && !selectedDesktopPlanLocked,
+            [desktopAccess.hasAccess, selectedDesktopPlanLocked]
+        );
     const selectedSetupSupportPlan = useMemo(() => {
         const recommendedPlan = setupSupportPlanCatalog.plans.find((plan) => plan.recommended) || setupSupportPlanCatalog.plans[0] || null;
         return setupSupportPlanCatalog.plans.find((plan) => plan.id === selectedSetupSupportPlanId) || recommendedPlan;
     }, [selectedSetupSupportPlanId, setupSupportPlanCatalog.plans]);
                 const selectedDesktopPlanFinalPrice = useMemo(() => getDesktopPlanFinalPriceInr(selectedDesktopPlan), [selectedDesktopPlan]);
                 const selectedDesktopPlanBasePrice = useMemo(() => selectedDesktopPlan.priceInr, [selectedDesktopPlan]);
+                const isSelectedDesktopPlanFree = selectedDesktopPlanFinalPrice === 0;
                 const selectedDesktopPlanGstAmount = useMemo(
                     () => Math.max(0, selectedDesktopPlanFinalPrice - selectedDesktopPlanBasePrice),
                     [selectedDesktopPlanBasePrice, selectedDesktopPlanFinalPrice]
@@ -323,6 +345,16 @@ export default function LandingPage() {
         }
     }, [desktopAccess.currentSession?.planId, desktopAccess.currentSession?.provider]);
 
+    useEffect(() => {
+        if (!desktopAccess.hasAccess) return;
+        if (visibleDesktopPlans.length === 0) return;
+        if (!selectedDesktopPlanLocked) return;
+        const firstSelectableUpgrade = visibleDesktopPlans.find((plan) => !isPlanUpgradeLocked(true, desktopAccess.planValidity, plan.validity));
+        if (firstSelectableUpgrade) {
+            setSelectedPlanId(firstSelectableUpgrade.id);
+        }
+    }, [desktopAccess.hasAccess, desktopAccess.planValidity, selectedDesktopPlanLocked, visibleDesktopPlans]);
+
   const handleProceed = () => {
         if (currentUser) {
             if (dontShowAgain) {
@@ -416,11 +448,30 @@ export default function LandingPage() {
     };
 
     const handleDesktopPricingClick = async () => {
+        if (visibleDesktopPlans.length === 0) {
+            toast({
+                title: 'Plans unavailable',
+                description: 'Desktop plans are hidden right now. Make a plan visible from admin config to show it here.',
+                variant: 'destructive',
+            });
+            return;
+        }
+        if (desktopAccess.hasAccess && selectableDesktopPlans.length === 0) {
+            toast({
+                title: 'No higher plans available',
+                description: 'Your current desktop plan is already the highest active validity. A higher plan will become selectable only if one exists or after expiry.',
+                variant: 'destructive',
+            });
+            return;
+        }
+        openPlansDialog();
+    };
+    const handleDesktopDownloadButtonClick = async () => {
         if (desktopAccess.hasAccess) {
             await handleDesktopDownload();
             return;
         }
-        openPlansDialog();
+        await handleDesktopPricingClick();
     };
 
     const handleSetupSupportCheckout = async (plan: SetupSupportPlanCatalog['plans'][number]) => {
@@ -536,6 +587,14 @@ export default function LandingPage() {
     };
 
     const handleContinueFromPlans = () => {
+        if (selectedDesktopPlanLocked) {
+            toast({
+                title: 'Plan unavailable',
+                description: 'Choose a higher-validity plan while your current desktop access is still active.',
+                variant: 'destructive',
+            });
+            return;
+        }
         if (currentUser) {
             openPaymentMethodsDialog();
             return;
@@ -543,6 +602,64 @@ export default function LandingPage() {
         setNeedsDesktopReauth(false);
         setIsPlansDialogOpen(false);
         setIsDesktopAccessDialogOpen(true);
+    };
+
+    const handleFreePlanProceed = async () => {
+        if (!currentUser) {
+            setIsFreePlanConfirmOpen(false);
+            setIsDesktopAccessDialogOpen(true);
+            return;
+        }
+
+        setIsProcessingDesktopAction(true);
+        try {
+            const pendingSession =
+                desktopAccess.currentSession?.status === 'pending' && desktopAccess.currentSession.provider === 'free' && desktopAccess.currentSession.planId === selectedDesktopPlan.id
+                    ? desktopAccess.currentSession
+                    : null;
+
+            let sessionId = pendingSession?.id || null;
+            if (!sessionId) {
+                const started = await startDesktopCheckout('free', selectedDesktopPlan.id);
+                if (!started.success) {
+                    if (isDesktopReauthError(started.message)) {
+                        openDesktopReauthDialog();
+                        return;
+                    }
+                    throw new Error(started.message);
+                }
+                sessionId = started.sessionId || null;
+            }
+
+            if (!sessionId) {
+                throw new Error('Free access session could not be created.');
+            }
+
+            const confirmed = await confirmDesktopCheckout(sessionId, 'free');
+            if (!confirmed.success) {
+                if (isDesktopReauthError(confirmed.message)) {
+                    openDesktopReauthDialog();
+                    return;
+                }
+                throw new Error(confirmed.message);
+            }
+
+            setIsFreePlanConfirmOpen(false);
+            setIsPaymentDialogOpen(false);
+            await refreshDesktopAccess();
+            toast({
+                title: 'Desktop Access Unlocked',
+                description: confirmed.message,
+            });
+        } catch (error) {
+            toast({
+                title: 'Unable to unlock desktop access',
+                description: error instanceof Error ? error.message : 'Unable to continue with the selected free plan.',
+                variant: 'destructive',
+            });
+        } finally {
+            setIsProcessingDesktopAction(false);
+        }
     };
 
     const handleDesktopCheckoutAction = async () => {
@@ -714,8 +831,24 @@ export default function LandingPage() {
         desktopAccess.currentSession?.status === 'pending' && desktopAccess.currentSession.provider === selectedPaymentMethod && desktopAccess.currentSession.planId === selectedDesktopPlan.id
             ? desktopAccess.currentSession
             : null;
+    const pendingFreeSession =
+        desktopAccess.currentSession?.status === 'pending' && desktopAccess.currentSession.provider === 'free' && desktopAccess.currentSession.planId === selectedDesktopPlan.id
+            ? desktopAccess.currentSession
+            : null;
     const paymentActionLabel = desktopAccess.hasAccess
-        ? 'Download Desktop'
+        ? isSelectedDesktopPlanUpgrade
+        ? isSelectedDesktopPlanFree
+            ? 'Proceed'
+            : selectedPaymentMethod === 'razorpay'
+            ? 'Upgrade With Razorpay'
+            : selectedPaymentMethod === 'upi'
+            ? 'Upgrade With UPI'
+            : pendingSelectedSession
+            ? 'Confirm Upgrade'
+            : 'Create Upgrade Session'
+        : 'Download Desktop'
+        : isSelectedDesktopPlanFree
+        ? 'Proceed'
         : selectedPaymentMethod === 'razorpay'
         ? 'Pay With Razorpay'
         : selectedPaymentMethod === 'upi'
@@ -809,7 +942,7 @@ export default function LandingPage() {
                                 variant="outline"
                                 size="lg"
                                 className="text-base font-semibold"
-                                onClick={() => void handleDesktopPricingClick()}
+                                onClick={() => void handleDesktopDownloadButtonClick()}
                             >
                                 <Download className="mr-2 h-4 w-4" />
                                 Download for Windows
@@ -831,17 +964,31 @@ export default function LandingPage() {
                                                                 className="rounded-2xl border border-primary/20 bg-primary/10 p-4 text-left backdrop-blur-sm transition-colors hover:border-primary/40 hover:bg-primary/15"
                                                             >
                                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Desktop</p>
-                                <p className="mt-2 text-2xl font-bold text-foreground">{desktopPlanDisplayPrice} yearly</p>
-                                                                <p className="mt-1 text-sm text-muted-foreground">{featuredDesktopPlan.heading} plan with {DESKTOP_PLAN_VALIDITY_LABELS[featuredDesktopPlan.validity]} validity.</p>
-                                                                <p className="mt-2 text-xs text-muted-foreground">{featuredDesktopPlan.taxMode === 'inclusive' ? 'Includes GST' : `${featuredDesktopPlan.gstPercent}% GST extra at checkout`}</p>
+                                {visibleDesktopPlans.length > 0 ? (
+                                    <>
+                                        <div className="mt-2 flex items-end gap-2">
+                                            {hasCompareAtPrice(featuredDesktopPlan.compareAtPriceInr, featuredDesktopPlan.priceInr) ? (
+                                                <span className="text-sm font-semibold text-muted-foreground line-through decoration-muted-foreground/80">
+                                                    {formatDesktopPlanPrice(featuredDesktopPlan.compareAtPriceInr as number)}
+                                                </span>
+                                            ) : null}
+                                            <p className="text-2xl font-bold text-foreground">{desktopPlanDisplayPrice} yearly</p>
+                                        </div>
+                                        <p className="mt-1 text-sm text-muted-foreground">{featuredDesktopPlan.heading} plan with {DESKTOP_PLAN_VALIDITY_LABELS[featuredDesktopPlan.validity]} validity.</p>
+                                        <p className="mt-2 text-xs text-muted-foreground">{featuredDesktopPlan.taxMode === 'inclusive' ? 'Includes GST' : `${featuredDesktopPlan.gstPercent}% GST extra at checkout`}</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="mt-2 text-2xl font-bold text-foreground">Plans hidden</p>
+                                        <p className="mt-1 text-sm text-muted-foreground">Desktop pricing is temporarily unavailable.</p>
+                                    </>
+                                )}
                                                                 {downloadCount !== null && (
                                                                     <p className="mt-2 text-xs text-muted-foreground">Downloads: {downloadCount.toLocaleString()}</p>
                                                                 )}
                                                                 <p className="mt-3 text-xs font-medium text-primary">
                                                                     {desktopAccess.hasAccess
-                                                                        ? isDownloadingDesktop
-                                                                            ? 'Preparing your download...'
-                                                                            : 'Access unlocked. Click to download.'
+                                                                        ? 'Access unlocked. Click to view plans or continue to download.'
                                                                         : desktopAccess.status === 'pending'
                                                                         ? 'Payment session pending. Click to continue.'
                                                                         : 'Click to compare plans'}
@@ -1052,7 +1199,14 @@ export default function LandingPage() {
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0 flex-1">
                                             <div className="text-2xl font-bold text-foreground">{plan.heading}</div>
-                                            <div className="mt-2 text-3xl font-bold text-foreground">{formatDesktopPlanPrice(plan.priceInr)}</div>
+                                            <div className="mt-2 flex items-end gap-2">
+                                                {hasCompareAtPrice(plan.compareAtPriceInr, plan.priceInr) ? (
+                                                    <span className="text-sm font-semibold text-muted-foreground line-through decoration-muted-foreground/80">
+                                                        {formatDesktopPlanPrice(plan.compareAtPriceInr as number)}
+                                                    </span>
+                                                ) : null}
+                                                <div className="text-3xl font-bold text-foreground">{formatDesktopPlanPrice(plan.priceInr)}</div>
+                                            </div>
                                             <div className="mt-1 text-xs uppercase tracking-[0.16em] text-muted-foreground">INR / session</div>
                                             <div className="mt-2 text-xs font-medium text-muted-foreground">Duration: {plan.durationLabel}</div>
                                         </div>
@@ -1118,45 +1272,61 @@ export default function LandingPage() {
                         )}
                         <div className="grid items-start gap-6 lg:grid-cols-[minmax(320px,0.95fr)_minmax(420px,1.05fr)]">
                             <div className="space-y-4 rounded-3xl border border-border/60 bg-background/60 p-5">
-                                <div>
-                                    <div className="text-lg font-semibold text-foreground">Choose payment method</div>
-                                    <div className="mt-1 text-sm text-muted-foreground">
-                                        Select how you want to pay for desktop access.
-                                    </div>
-                                </div>
-                                <div className="space-y-3">
-                                    {DESKTOP_PAYMENT_METHODS.map((method) => (
-                                        <button
-                                            key={method.id}
-                                            type="button"
-                                            onClick={() => setSelectedPaymentMethod(method.id)}
-                                            className={cn(
-                                                'w-full rounded-2xl border px-4 py-4 text-left transition-colors',
-                                                selectedPaymentMethod === method.id
-                                                    ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_rgba(255,255,255,0.05)]'
-                                                    : 'border-border/60 bg-background/40 hover:border-primary/30 hover:bg-background/70'
-                                            )}
-                                        >
-                                            <div className="flex items-start justify-between gap-4">
-                                                <div>
-                                                    <p className="text-base font-semibold text-foreground">{method.title}</p>
-                                                    <p className="mt-1 text-sm text-muted-foreground">{method.description}</p>
-                                                </div>
-                                                <div
-                                                    className={cn(
-                                                        'mt-1 h-3 w-3 shrink-0 rounded-full border',
-                                                        selectedPaymentMethod === method.id
-                                                            ? 'border-primary bg-primary'
-                                                            : 'border-border/70 bg-transparent'
-                                                    )}
-                                                />
+                                {isSelectedDesktopPlanFree ? (
+                                    <>
+                                        <div>
+                                            <div className="text-lg font-semibold text-foreground">Free desktop access</div>
+                                            <div className="mt-1 text-sm text-muted-foreground">
+                                                No payment method is required for this plan. Continue to review and confirm access.
                                             </div>
-                                        </button>
-                                    ))}
-                                </div>
-                                <div className="rounded-2xl border border-border/50 bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
-                                    Secure checkout is created only after you continue. Your selected plan and entitlement stay verified server-side.
-                                </div>
+                                        </div>
+                                        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-4 text-sm text-muted-foreground">
+                                            This plan grants desktop access immediately after confirmation and uses the selected plan validity to set access duration.
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div>
+                                            <div className="text-lg font-semibold text-foreground">Choose payment method</div>
+                                            <div className="mt-1 text-sm text-muted-foreground">
+                                                Select how you want to pay for desktop access.
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            {DESKTOP_PAYMENT_METHODS.map((method) => (
+                                                <button
+                                                    key={method.id}
+                                                    type="button"
+                                                    onClick={() => setSelectedPaymentMethod(method.id)}
+                                                    className={cn(
+                                                        'w-full rounded-2xl border px-4 py-4 text-left transition-colors',
+                                                        selectedPaymentMethod === method.id
+                                                            ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_rgba(255,255,255,0.05)]'
+                                                            : 'border-border/60 bg-background/40 hover:border-primary/30 hover:bg-background/70'
+                                                    )}
+                                                >
+                                                    <div className="flex items-start justify-between gap-4">
+                                                        <div>
+                                                            <p className="text-base font-semibold text-foreground">{method.title}</p>
+                                                            <p className="mt-1 text-sm text-muted-foreground">{method.description}</p>
+                                                        </div>
+                                                        <div
+                                                            className={cn(
+                                                                'mt-1 h-3 w-3 shrink-0 rounded-full border',
+                                                                selectedPaymentMethod === method.id
+                                                                    ? 'border-primary bg-primary'
+                                                                    : 'border-border/70 bg-transparent'
+                                                            )}
+                                                        />
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="rounded-2xl border border-border/50 bg-muted/15 px-4 py-3 text-sm text-muted-foreground">
+                                            Secure checkout is created only after you continue. Your selected plan and entitlement stay verified server-side.
+                                        </div>
+                                    </>
+                                )}
                             </div>
                             <div className="rounded-3xl border border-border/60 bg-background/90 p-6">
                                 <div className="flex items-center justify-between gap-4">
@@ -1187,7 +1357,7 @@ export default function LandingPage() {
                                                 <div className="mt-1 text-xs text-muted-foreground">Selected for this checkout</div>
                                             </div>
                                             <div className="text-right text-base font-semibold text-foreground">
-                                                {DESKTOP_PAYMENT_METHODS.find((method) => method.id === selectedPaymentMethod)?.title || 'Unknown'}
+                                                {isSelectedDesktopPlanFree ? 'No payment required' : DESKTOP_PAYMENT_METHODS.find((method) => method.id === selectedPaymentMethod)?.title || 'Unknown'}
                                             </div>
                                         </div>
                                         <div className="flex items-start justify-between gap-6">
@@ -1230,8 +1400,14 @@ export default function LandingPage() {
                                         Validity: <span className="font-semibold text-foreground">{formatDesktopPlanValidity(selectedDesktopPlan.validity)}</span>{selectedDesktopPlan.validity === 'lifetime' ? ' • Privileged access will be enabled' : ''}
                                     </div>
                                     <div className="mt-2">
-                                        {desktopAccess.hasAccess
-                                            ? 'This account already has desktop access.'
+                                        {desktopAccess.hasAccess && !isSelectedDesktopPlanUpgrade
+                                            ? 'This account already has desktop access for this validity or higher. Choose a higher-validity plan to upgrade.'
+                                            : desktopAccess.hasAccess && isSelectedDesktopPlanUpgrade
+                                            ? `This will upgrade your active access from ${desktopAccess.billingLabel} to ${selectedDesktopPlan.billingLabel}.`
+                                            : isSelectedDesktopPlanFree && pendingFreeSession
+                                            ? 'A free access session is ready. Proceed to confirm and unlock this plan.'
+                                            : isSelectedDesktopPlanFree
+                                            ? `This free ${selectedDesktopPlan.heading} plan will unlock desktop access immediately after confirmation and apply ${selectedDesktopPlan.validity === 'lifetime' ? 'lifetime access' : `one ${selectedDesktopPlan.billingLabel} term`}.`
                                             : pendingSelectedSession
                                             ? 'A pending checkout session exists for this provider. Confirm it to unlock the download.'
                                             : selectedDesktopPlan.validity === 'lifetime'
@@ -1254,13 +1430,17 @@ export default function LandingPage() {
                                     <Button
                                         type="button"
                                         onClick={() => {
-                                            if (desktopAccess.hasAccess) {
+                                            if (desktopAccess.hasAccess && !isSelectedDesktopPlanUpgrade) {
                                                 void handleDesktopDownload();
+                                                return;
+                                            }
+                                            if (isSelectedDesktopPlanFree) {
+                                                setIsFreePlanConfirmOpen(true);
                                                 return;
                                             }
                                             void handleDesktopCheckoutAction();
                                         }}
-                                        disabled={desktopAccessLoading || isProcessingDesktopAction || isDownloadingDesktop}
+                                        disabled={selectedDesktopPlanLocked || desktopAccessLoading || isProcessingDesktopAction || isDownloadingDesktop}
                                     >
                                         {desktopAccessLoading || isProcessingDesktopAction || isDownloadingDesktop ? 'Please wait...' : paymentActionLabel}
                                     </Button>
@@ -1269,6 +1449,31 @@ export default function LandingPage() {
                         </div>
                     </DialogContent>
                 </Dialog>
+
+                <AlertDialog open={isFreePlanConfirmOpen} onOpenChange={setIsFreePlanConfirmOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Confirm free desktop access</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                {selectedDesktopPlan.validity === 'lifetime'
+                                    ? `Proceeding will unlock the ${selectedDesktopPlan.heading} plan immediately and mark this account for lifetime desktop access.`
+                                    : `Proceeding will unlock the ${selectedDesktopPlan.heading} plan immediately for one ${selectedDesktopPlan.billingLabel} term.`}
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isProcessingDesktopAction}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={(event) => {
+                                    event.preventDefault();
+                                    void handleFreePlanProceed();
+                                }}
+                                disabled={isProcessingDesktopAction}
+                            >
+                                {isProcessingDesktopAction ? 'Please wait...' : 'Confirm and Proceed'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
 
                 <Dialog open={isPlansDialogOpen} onOpenChange={setIsPlansDialogOpen}>
                     <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-5xl">
@@ -1279,15 +1484,21 @@ export default function LandingPage() {
                             </DialogDescription>
                         </DialogHeader>
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                            {desktopPlanCatalog.plans.map((plan) => {
+                            {visibleDesktopPlans.map((plan) => {
                                 const isSelected = selectedDesktopPlan.id === plan.id;
+                                const isLocked = isPlanUpgradeLocked(desktopAccess.hasAccess, desktopAccess.planValidity, plan.validity);
                                 return (
                                     <button
                                         key={plan.id}
                                         type="button"
-                                        onClick={() => setSelectedPlanId(plan.id)}
+                                        onClick={() => {
+                                            if (isLocked) return;
+                                            setSelectedPlanId(plan.id);
+                                        }}
+                                        disabled={isLocked}
                                         className={cn(
                                             'rounded-2xl border p-5 text-left transition-colors',
+                                            isLocked && 'cursor-not-allowed opacity-55',
                                             isSelected
                                                 ? 'border-primary bg-primary/10 shadow-[0_0_0_1px_rgba(255,255,255,0.04)]'
                                                 : 'border-border/60 bg-background/60 hover:border-primary/30 hover:bg-background'
@@ -1296,7 +1507,14 @@ export default function LandingPage() {
                                         <div className="flex flex-wrap items-start justify-between gap-3">
                                             <div className="min-w-0 flex-1">
                                                 <div className="text-2xl font-bold text-foreground">{plan.heading}</div>
-                                                <div className="mt-2 text-4xl font-bold text-foreground">{formatDesktopPlanPrice(plan.priceInr)}</div>
+                                                <div className="mt-2 flex items-end gap-2">
+                                                    {hasCompareAtPrice(plan.compareAtPriceInr, plan.priceInr) ? (
+                                                        <span className="text-base font-semibold text-muted-foreground line-through decoration-muted-foreground/80">
+                                                            {formatDesktopPlanPrice(plan.compareAtPriceInr as number)}
+                                                        </span>
+                                                    ) : null}
+                                                    <div className="text-4xl font-bold text-foreground">{formatDesktopPlanPrice(plan.priceInr)}</div>
+                                                </div>
                                                 <div className="mt-1 flex items-center gap-1 whitespace-nowrap text-xs uppercase tracking-[0.16em] text-muted-foreground">
                                                     <span>INR / {plan.billingLabel}</span>
                                                     <span className="normal-case tracking-normal text-[10px] text-muted-foreground/90">
@@ -1310,9 +1528,18 @@ export default function LandingPage() {
                                                 <span className="shrink-0 rounded-full bg-primary/20 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
                                                     Recommended
                                                 </span>
+                                            ) : isLocked ? (
+                                                <span className="shrink-0 rounded-full bg-muted px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                                                    Locked
+                                                </span>
                                             ) : null}
                                         </div>
                                         <p className="mt-4 text-sm font-medium text-foreground">{plan.description}</p>
+                                        {isLocked ? (
+                                            <p className="mt-3 text-xs text-muted-foreground">
+                                                Unavailable while your current {desktopAccess.billingLabel} access is still active.
+                                            </p>
+                                        ) : null}
                                         <div className="mt-5 space-y-2">
                                             {desktopPlanCatalog.features.map((feature) => {
                                                 const included = plan.featureIds.includes(feature.id);
@@ -1338,7 +1565,7 @@ export default function LandingPage() {
                             <Button type="button" variant="outline" onClick={() => setIsPlansDialogOpen(false)}>
                                 Cancel
                             </Button>
-                            <Button type="button" onClick={handleContinueFromPlans}>
+                            <Button type="button" onClick={handleContinueFromPlans} disabled={selectedDesktopPlanLocked}>
                                 {currentUser ? 'Continue To Payment' : 'Sign In To Continue'}
                             </Button>
                         </DialogFooter>
