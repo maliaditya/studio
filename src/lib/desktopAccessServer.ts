@@ -9,6 +9,7 @@ import {
   type DesktopAccessState,
   type DesktopPaymentProvider,
 } from '@/lib/desktopAccess';
+import { verifyAccessToken } from '@/lib/authTokens';
 import { type DesktopPlanValidity } from '@/lib/desktopPlans';
 import { isDesktopUserStatusActive, readDesktopUserStatus } from '@/lib/desktopStatusServer';
 import { isSupabaseStorageConfigured, readJsonFromStorage, writeJsonToStorage } from '@/lib/supabaseStorageServer';
@@ -49,6 +50,12 @@ const readLocalUsernameHint = (request: Request): string | null => {
 export const resolveDesktopAccessUser = (request: Request, explicitUsername?: string | null): string | null => {
   const sessionUser = getSessionUserFromRequest(request);
   if (sessionUser) return sessionUser;
+
+  const authHeader = request.headers.get('authorization') || '';
+  const bearerToken = authHeader.toLowerCase().startsWith('bearer ') ? authHeader.slice(7).trim() : '';
+  const tokenPayload = bearerToken ? verifyAccessToken(bearerToken) : null;
+  const tokenUser = tokenPayload?.sub?.trim().toLowerCase() || null;
+  if (tokenUser) return tokenUser;
 
   if (!isSupabaseStorageConfigured() || allowLocalUserFallback) {
     const explicit = typeof explicitUsername === 'string' && explicitUsername.trim()

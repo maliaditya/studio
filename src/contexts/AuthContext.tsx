@@ -11,6 +11,7 @@ import {
   loginUser as localLoginUser, 
   logoutUser as localLogoutUser, 
   getCurrentLocalUser,
+  getAccessToken,
   hasValidCachedDesktopEntitlement,
   isCurrentSessionOwner,
   persistDesktopEntitlementSnapshot,
@@ -93,6 +94,15 @@ const getCachedDesktopAccessState = (username: string): DesktopAccessState | nul
     expiresAt: snapshot?.expiresAt ?? null,
     updatedAt: snapshot ? new Date(snapshot.updatedAt).toISOString() : null,
   };
+};
+
+const createDesktopAuthHeaders = (username: string): Record<string, string> => {
+  const headers: Record<string, string> = { 'x-local-username': username };
+  const accessToken = getAccessToken(username);
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+  return headers;
 };
 
 interface AuthContextType {
@@ -2945,7 +2955,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       let response = await fetch('/api/desktop-access', {
         credentials: 'include',
         cache: 'no-store',
-        headers: { 'x-local-username': currentUser.username },
+        headers: createDesktopAuthHeaders(currentUser.username),
       });
       if (response.status === 401) {
         const refreshed = await ensureCloudSession();
@@ -2955,7 +2965,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         response = await fetch('/api/desktop-access', {
           credentials: 'include',
           cache: 'no-store',
-          headers: { 'x-local-username': currentUser.username },
+          headers: createDesktopAuthHeaders(currentUser.username),
         });
       }
       const result = await response.json().catch(() => null);
@@ -2971,7 +2981,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         isPriviledge: false,
       });
     } catch (error) {
-      console.error('Failed to refresh desktop access:', error);
+      const message = error instanceof Error ? error.message : '';
+      if (!/cloud sign-in expired|sign in again|session expired/i.test(message)) {
+        console.error('Failed to refresh desktop access:', error);
+      }
       const cachedAccess = getCachedDesktopAccessState(currentUser.username);
       setDesktopAccess(cachedAccess || createEmptyDesktopAccessState());
     } finally {
@@ -2995,7 +3008,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       let response = await fetch('/api/desktop-access/start', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...createDesktopAuthHeaders(currentUser.username),
+        },
         credentials: 'include',
         body: JSON.stringify({ provider, username: currentUser.username, planId: planId || undefined }),
       });
@@ -3006,7 +3022,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         response = await fetch('/api/desktop-access/start', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...createDesktopAuthHeaders(currentUser.username),
+          },
           credentials: 'include',
           body: JSON.stringify({ provider, username: currentUser.username, planId: planId || undefined }),
         });
@@ -3053,7 +3072,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       let response = await fetch('/api/desktop-access/confirm', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...createDesktopAuthHeaders(currentUser.username),
+        },
         credentials: 'include',
         body: JSON.stringify({
           sessionId,
@@ -3071,7 +3093,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         response = await fetch('/api/desktop-access/confirm', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...createDesktopAuthHeaders(currentUser.username),
+          },
           credentials: 'include',
           body: JSON.stringify({
             sessionId,

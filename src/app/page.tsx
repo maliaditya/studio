@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { fetchAppConfig } from '@/lib/appConfigClient';
 import { DESKTOP_PAYMENT_METHODS, DESKTOP_PLAN_DISPLAY_PRICE, formatDesktopPlanPrice, type DesktopPaymentProvider } from '@/lib/desktopAccess';
+import { getAccessToken } from '@/lib/localAuth';
 import { createDefaultDesktopPlanCatalog, DESKTOP_PLAN_TAX_MODE_LABELS, DESKTOP_PLAN_VALIDITY_LABELS, getDesktopPlanById, getDesktopPlanFinalPriceInr, getDesktopPlanValidityRank, getFeaturedDesktopPlan, getVisibleDesktopPlans, normalizeDesktopPlanCatalog, type DesktopPlanCatalog, type DesktopPlanDefinition } from '@/lib/desktopPlans';
 import { createDefaultSetupSupportPlanCatalog, normalizeSetupSupportPlanCatalog, type SetupSupportPlanCatalog } from '@/lib/setupSupportPlans';
 
@@ -393,10 +394,21 @@ export default function LandingPage() {
     const handleDesktopDownload = async () => {
         setIsDownloadingDesktop(true);
         try {
+            const createDownloadHeaders = () => {
+                const headers: Record<string, string> = {};
+                if (currentUser?.username) {
+                    headers['x-local-username'] = currentUser.username;
+                    const accessToken = getAccessToken(currentUser.username);
+                    if (accessToken) {
+                        headers.Authorization = `Bearer ${accessToken}`;
+                    }
+                }
+                return headers;
+            };
             let response = await fetch('/api/latest-windows-release', {
                 credentials: 'include',
                 cache: 'no-store',
-                headers: currentUser?.username ? { 'x-local-username': currentUser.username } : undefined,
+                headers: currentUser?.username ? createDownloadHeaders() : undefined,
             });
             if (response.status === 401) {
                 const refreshed = await ensureCloudSession();
@@ -407,7 +419,7 @@ export default function LandingPage() {
                 response = await fetch('/api/latest-windows-release', {
                     credentials: 'include',
                     cache: 'no-store',
-                    headers: currentUser?.username ? { 'x-local-username': currentUser.username } : undefined,
+                    headers: currentUser?.username ? createDownloadHeaders() : undefined,
                 });
             }
             const result = await response.json().catch(() => null);
@@ -430,8 +442,8 @@ export default function LandingPage() {
                 // Download access should continue even if the counter update fails.
             }
 
-            window.open(result.url, '_blank', 'noopener,noreferrer');
-            toast({ title: 'Desktop Download Ready', description: 'Your installer link has been opened.' });
+            window.location.assign(result.url);
+            toast({ title: 'Desktop Download Ready', description: 'Your installer download is starting.' });
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to fetch the desktop installer.';
             if (isDesktopReauthError(message)) {
@@ -943,9 +955,10 @@ export default function LandingPage() {
                                 size="lg"
                                 className="text-base font-semibold"
                                 onClick={() => void handleDesktopDownloadButtonClick()}
+                                disabled={isDownloadingDesktop}
                             >
                                 <Download className="mr-2 h-4 w-4" />
-                                Download for Windows
+                                {isDownloadingDesktop ? 'Preparing download...' : 'Download for Windows'}
                             </Button>
                             <Button type="button" variant="outline" size="lg" className="text-base font-semibold" onClick={() => setIsSetupSupportDialogOpen(true)}>
                                 <PhoneCall className="mr-2 h-4 w-4" />
