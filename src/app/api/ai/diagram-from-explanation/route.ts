@@ -19,16 +19,172 @@ const extractJsonPayload = (raw: string) => {
   return candidate;
 };
 
+const buildJsonRepairPrompt = (raw: string) =>
+  [
+    "You are a JSON repair assistant.",
+    "Fix the following content into valid JSON that matches this schema exactly:",
+    "{",
+    '  "type": "hierarchy",',
+    '  "root": {',
+    '    "label": "string",',
+    '    "children": [',
+    '      {',
+    '        "label": "string",',
+    '        "children": [ ... ]',
+    "      }",
+    "    ]",
+    "  }",
+    "}",
+    "",
+    "Rules:",
+    "- Output JSON only (no markdown, no commentary).",
+    "- Use double quotes for all keys and string values.",
+    "- Remove trailing commas.",
+    "- If the content is incomplete, best-effort repair it into the schema above.",
+    "",
+    "Content to repair:",
+    raw,
+  ].join("\n");
+
+const ALLOWED_SECTION_LABELS = new Set([
+  "Purpose",
+  "Contains",
+  "Uses",
+  "Produces",
+  "Linked To",
+  "Depends On",
+  "Flow",
+  "Properties",
+  "Behavior",
+  "Examples",
+]);
+
+const GENERIC_WRAPPER_LABELS = new Set([
+  "description",
+  "details",
+  "detail",
+  "overview",
+  "general info",
+  "general information",
+  "summary",
+  "aspects",
+  "aspect",
+  "features",
+  "feature",
+  "notes",
+  "misc",
+  "categories",
+  "category",
+  "groups",
+  "group",
+  "items",
+  "item",
+  "types",
+  "type",
+  "parts",
+  "role",
+  "relations",
+]);
+
+const RELATION_BRANCH_LABELS = new Set([
+  "Contains",
+  "Uses",
+  "Produces",
+  "Linked To",
+  "Depends On",
+]);
+
+const normalizeFlowStepLabel = (label: string, index: number) => {
+  if (/^step\s+\d+\s*:/i.test(label)) {
+    return label;
+  }
+  return `Step ${index + 1}: ${label}`;
+};
+
+const dedupeByLabel = (nodes: NonNullable<DiagramBlueprint["root"]["children"]>) => {
+  const seen = new Set<string>();
+  return nodes.filter((node) => {
+    const key = node.label.trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const refineNode = (node: DiagramBlueprint["root"], depth = 0): DiagramBlueprint["root"] | null => {
+  const label = node.label.trim();
+  if (!label) return null;
+
+  const rawChildren = Array.isArray(node.children) ? node.children : [];
+  const refinedChildren = dedupeByLabel(
+    rawChildren
+      .map((child) => refineNode(child, depth + 1))
+      .filter(Boolean) as NonNullable<DiagramBlueprint["root"]["children"]>
+  );
+
+  if (depth > 0 && GENERIC_WRAPPER_LABELS.has(label.toLowerCase())) {
+    if (refinedChildren.length === 1) {
+      return refinedChildren[0];
+    }
+    if (refinedChildren.length > 1) {
+      return {
+        label,
+        children: refinedChildren,
+      };
+    }
+    return null;
+  }
+
+  if (ALLOWED_SECTION_LABELS.has(label) && refinedChildren.length === 0) {
+    return null;
+  }
+
+  if (label === "Flow") {
+    const flowChildren = refinedChildren.map((child, index) => ({
+      ...child,
+      label: normalizeFlowStepLabel(child.label, index),
+    }));
+    return flowChildren.length > 0 ? { label, children: flowChildren } : null;
+  }
+
+  if (RELATION_BRANCH_LABELS.has(label) && refinedChildren.length === 0) {
+    return null;
+  }
+
+  if (refinedChildren.length === 1 && !ALLOWED_SECTION_LABELS.has(label) && depth > 0) {
+    const onlyChild = refinedChildren[0];
+    if (!ALLOWED_SECTION_LABELS.has(onlyChild.label)) {
+      return {
+        label,
+        children: [onlyChild],
+      };
+    }
+  }
+
+  return refinedChildren.length > 0 ? { label, children: refinedChildren } : { label };
+};
+
+const refineMeaningTree = (blueprint: DiagramBlueprint): DiagramBlueprint | null => {
+  const root = refineNode(blueprint.root);
+  if (!root) return null;
+  return {
+    type: "hierarchy",
+    root,
+  };
+};
+
 export async function POST(request: Request) {
   try {
     const desktopHeader = request.headers.get("x-studio-desktop");
     const isDesktopRuntime = desktopHeader === "1";
     const body = await request.json().catch(() => ({}));
     const text = typeof body?.text === "string" ? body.text.trim() : "";
+    const blocks = Array.isArray(body?.blocks) ? body.blocks : null;
     const context = typeof body?.context === "string" ? body.context.trim() : "";
+    const structuredDiagram = Boolean(body?.structuredDiagram);
     const aiConfigInput = (body?.aiConfig || {}) as Partial<AiRequestConfig>;
 
-    if (!text) {
+    if (!text && !blocks?.length) {
       return NextResponse.json({ error: "Explanation text is required." }, { status: 400 });
     }
 
@@ -89,7 +245,89 @@ export async function POST(request: Request) {
 
     const plannerPrompt =
       "You are a diagram planner.\n\n" +
-      "Extract the following content into a strict JSON blueprint.\n\n" +
+      "Convert the following content into a compact console-friendly meaning tree.\n\n" +
+      "Return this schema exactly:\n" +
+      "{\n" +
+      "  \"type\": \"hierarchy\",\n" +
+      "  \"root\": {\n" +
+      "    \"label\": \"string\",\n" +
+      "    \"children\": [\n" +
+      "      {\n" +
+      "        \"label\": \"string\",\n" +
+      "        \"children\": [ ... ]\n" +
+      "      }\n" +
+      "    ]\n" +
+      "  }\n" +
+      "}\n\n" +
+      "Goal:\n" +
+      "- Build a meaning tree, not just a category tree\n" +
+      "- Categories are for organization\n" +
+      "- Relations are for understanding\n" +
+      "- Flow is for process\n\n" +
+      "Allowed optional sub-branches for a concept node:\n" +
+      "- Purpose\n" +
+      "- Contains\n" +
+      "- Uses\n" +
+      "- Produces\n" +
+      "- Linked To\n" +
+      "- Depends On\n" +
+      "- Flow\n" +
+      "- Properties\n" +
+      "- Behavior\n" +
+      "- Examples\n\n" +
+      "Rules:\n" +
+      "- Do not explain\n" +
+      "- Do not summarize in paragraphs\n" +
+      "- Infer the main technical concept as the root\n" +
+      "- Preserve specific technical terms from the source whenever possible\n" +
+      "- Prefer source-grounded relations over generic grouping\n" +
+      "- Do not only group nouns into categories\n" +
+      "- Only add optional sub-branches when they clearly fit the node\n" +
+      "- Do not force the same labels under every node\n" +
+      "- Keep each leaf to one short line\n" +
+      "- No paragraphs\n" +
+      "- If the source describes a workflow, create a separate Flow branch with ordered steps\n" +
+      "- Prefer direct relation leaves such as contains → X, uses → X, produces → X, linked to → X, depends on → X\n" +
+      "- Avoid vague umbrella nodes unless clearly justified by the source\n" +
+      "- Avoid filler nodes such as Description, Details, Aspects, Overview, Misc, Parts, Role, Relations\n" +
+      "- Preserve hierarchy without erasing source meaning\n" +
+      "- Keep the tree shallow, compact, and readable in console form\n" +
+      "- Every node should add distinct meaning\n" +
+      "- Output valid JSON only\n\n" +
+      "Content:\n" +
+      (context ? `Context: ${context}\n\n` : "") +
+      trimmedText;
+
+    const structuredDiagramPrompt =
+      "You are a console-diagram planner.\n\n" +
+      "Convert the provided processed explanation into a compact, console-friendly meaning tree.\n" +
+      "Preserve source terminology. Prefer meaningful relationships over generic grouping.\n\n" +
+      "Return JSON only with this schema:\n" +
+      "{\n" +
+      "  \"type\": \"hierarchy\",\n" +
+      "  \"root\": {\n" +
+      "    \"label\": \"string\",\n" +
+      "    \"children\": [\n" +
+      "      { \"label\": \"string\", \"children\": [ ... ] }\n" +
+      "    ]\n" +
+      "  }\n" +
+      "}\n\n" +
+      "Strict rules:\n" +
+      "- Prefer relations over grouping using: uses ->, produces ->, compares ->, transforms ->, applies ->, smooths ->, defines ->, stores ->, samples ->.\n" +
+      "- Use \"contains\" only for true structural ownership.\n" +
+      "- Always extract the core rule if present (comparison/condition/equation/test) as its own leaf.\n" +
+      "- Detect stages/passes and represent as \"Pass 1\", \"Pass 2\" when present.\n" +
+      "- Flow must be a single flat \"Flow\" node with Step 1, Step 2… and never nested.\n" +
+      "- Preserve source-specific terms.\n" +
+      "- Keep the diagram compact and avoid redundant repetition.\n" +
+      "- Output valid JSON only.\n\n" +
+      "Content:\n" +
+      (context ? `Context: ${context}\n\n` : "") +
+      trimmedText;
+
+    const blocksPlannerPrompt =
+      "You are a diagram planner.\n\n" +
+      "Convert the following structured building blocks into a compact console-friendly meaning tree.\n\n" +
       "Return this schema exactly:\n" +
       "{\n" +
       "  \"type\": \"hierarchy\",\n" +
@@ -104,24 +342,27 @@ export async function POST(request: Request) {
       "  }\n" +
       "}\n\n" +
       "Rules:\n" +
-      "- Do not explain\n" +
-      "- Do not summarize in paragraphs\n" +
-      "- Keep labels short\n" +
-      "- Preserve hierarchy\n" +
-      "- Infer the central concept as the root\n" +
-      "- Group semantically (not in paragraph order)\n" +
-      "- Avoid filler wrapper nodes like Description, Purpose, Process, Phase, Value, Impact\n" +
-      "- Avoid one-child wrapper chains; use direct semantic phrases\n" +
-      "- Keep the tree shallow and readable\n" +
-      "- Every node should be meaningful on its own\n" +
-      "- Output valid JSON only\n\n" +
-      "Content:\n" +
-      (context ? `Context: ${context}\n\n` : "") +
-      trimmedText;
+      "- Use the blocks as the only source of truth.\n" +
+      "- Prefer concrete entities as nodes.\n" +
+      "- Render attributes as leaf labels prefixed with \"attr: \".\n" +
+      "- Render relations as \"verb -> target\".\n" +
+      "- Render actions/transformations as \"transforms -> X into Y\" or \"action -> target\".\n" +
+      "- Only add a Flow branch if blocks explicitly include flow steps.\n" +
+      "- Keep the tree compact and readable.\n" +
+      "- Output valid JSON only.\n\n" +
+      "Blocks JSON:\n" +
+      JSON.stringify(blocks || [], null, 2);
 
     const plannerMessages: ChatMessage[] = [
       { role: "system", content: "You output valid JSON only." },
-      { role: "user", content: plannerPrompt },
+      {
+        role: "user",
+        content: blocks?.length
+          ? blocksPlannerPrompt
+          : structuredDiagram
+          ? structuredDiagramPrompt
+          : plannerPrompt,
+      },
     ];
 
     const plannerResponse = await runChatWithProvider(aiConfigWithTimeout, plannerMessages, { temperature: 0.1 });
@@ -141,16 +382,37 @@ export async function POST(request: Request) {
     }
 
     let blueprint: DiagramBlueprint | null = null;
+    let parseError: string | null = null;
     try {
       const extracted = extractJsonPayload(plannerRaw);
       const parsed = parseJsonWithRecovery(extracted);
       blueprint = sanitizeBlueprint(parsed);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
+      parseError = error instanceof Error ? error.message : "Unknown error";
+    }
+
+    if (!blueprint) {
+      const repairMessages: ChatMessage[] = [
+        { role: "system", content: "You output valid JSON only." },
+        { role: "user", content: buildJsonRepairPrompt(plannerRaw || "") },
+      ];
+      const repairResponse = await runChatWithProvider(aiConfigWithTimeout, repairMessages, { temperature: 0 });
+      if (repairResponse.ok && repairResponse.content) {
+        try {
+          const extracted = extractJsonPayload(repairResponse.content.trim());
+          const parsed = parseJsonWithRecovery(extracted);
+          blueprint = sanitizeBlueprint(parsed);
+        } catch (error) {
+          parseError = error instanceof Error ? error.message : "Unknown error";
+        }
+      }
+    }
+
+    if (!blueprint) {
       return NextResponse.json(
         {
           error: "Failed to parse diagram blueprint JSON.",
-          details: message,
+          details: parseError || "Provider returned invalid JSON.",
         },
         { status: 502 }
       );
@@ -168,7 +430,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const normalizedBlueprint = normalizeDiagramLabels(blueprint);
+    const refinedBlueprint = refineMeaningTree(blueprint) || blueprint;
+    const normalizedBlueprint = normalizeDiagramLabels(refinedBlueprint);
     const diagramText = renderAsciiTree(normalizedBlueprint);
     return NextResponse.json({
       diagramText,

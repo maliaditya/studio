@@ -1997,7 +1997,7 @@ export default function PdfViewerPopup() {
                 provider: "kokoro",
                 voice: kokoroVoice.id,
                 speed: 1,
-                kokoroBaseUrl: settings.kokoroTtsBaseUrl,
+                kokoroBaseUrl: (settings.kokoroTtsBaseUrl || "http://127.0.0.1:8880").trim(),
                 aiConfig,
             }),
             signal: controller.signal,
@@ -2246,7 +2246,7 @@ export default function PdfViewerPopup() {
                             provider: cloudVoice.provider,
                             voice: cloudVoice.id,
                             speed: ttsRate,
-                            kokoroBaseUrl: settings.kokoroTtsBaseUrl,
+                            kokoroBaseUrl: (settings.kokoroTtsBaseUrl || "http://127.0.0.1:8880").trim(),
                             aiConfig,
                         }),
                     });

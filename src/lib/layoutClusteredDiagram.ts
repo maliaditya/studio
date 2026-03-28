@@ -82,12 +82,21 @@ const cloneTree = (node: VisualNode, opts: Required<LayoutOptions>): PositionedV
   };
 };
 
+const countDescendants = (node: PositionedVisualNode): number => {
+  const children = node.children || [];
+  return children.reduce((sum, child) => sum + 1 + countDescendants(child), 0);
+};
+
 const shouldUseRadialLayout = (
   parent: PositionedVisualNode,
   opts: Required<LayoutOptions>
 ) => {
   const children = parent.children || [];
-  if (children.length <= 4) return false;
+  const hasGrandchildren = children.some(
+    (child) => Array.isArray(child.children) && child.children.length > 0
+  );
+  if (hasGrandchildren) return true;
+  if (children.length >= 4) return true;
 
   const totalWidth = children.reduce((sum, child) => sum + child.width, 0);
   const totalHeight = children.reduce((sum, child) => sum + child.height, 0);
@@ -115,20 +124,25 @@ const placeClusterChildren = (
   if (shouldUseRadialLayout(parent, opts)) {
     const centerX = parent.x + parent.width / 2;
     const centerY = parent.y + parent.height / 2;
+    const childWeights = children.map((child) => countDescendants(child));
+    const maxWeight = Math.max(0, ...childWeights);
     const avgSize =
       children.reduce((sum, child) => sum + Math.max(child.width, child.height), 0) /
       Math.max(1, children.length);
     const circumferenceTarget = children.reduce((sum, child) => sum + child.width, 0);
     const minRadius =
       Math.max(parent.width, parent.height) / 2 + opts.clusterGap + avgSize * 0.2;
-    const radius = Math.max(minRadius, circumferenceTarget / (2 * Math.PI) + avgSize * 0.2);
+    const weightBoost = Math.min(180, Math.max(0, maxWeight - 2) * 14);
+    const radiusBase = Math.max(minRadius, circumferenceTarget / (2 * Math.PI) + avgSize * 0.2) + weightBoost;
     const baseAngle = Math.atan2(dir.y, dir.x) - Math.PI / 2;
     const angleStep = (Math.PI * 2) / children.length;
 
     children.forEach((child, index) => {
       const angle = baseAngle + angleStep * index;
-      const childCenterX = centerX + Math.cos(angle) * radius;
-      const childCenterY = centerY + Math.sin(angle) * radius;
+      const childWeight = childWeights[index] || 0;
+      const childRadius = radiusBase + Math.min(160, childWeight * 10);
+      const childCenterX = centerX + Math.cos(angle) * childRadius;
+      const childCenterY = centerY + Math.sin(angle) * childRadius;
       child.x = childCenterX - child.width / 2;
       child.y = childCenterY - child.height / 2;
     });
@@ -249,7 +263,11 @@ export const layoutClusteredDiagram = (
   const baseAngle = -Math.PI / 2;
 
   const branchAngles = firstLevel.map((_, index) => baseAngle + angleStep * index);
-  const branchRadii = firstLevel.map(() => baseRadius);
+  const branchRadii = firstLevel.map((child) => {
+    const weight = countDescendants(child);
+    const boost = Math.min(220, Math.max(0, weight - 2) * 16);
+    return baseRadius + boost;
+  });
 
   const positionBranches = () => {
     firstLevel.forEach((child, index) => {

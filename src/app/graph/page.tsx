@@ -1364,7 +1364,7 @@ export default function GraphPage() {
             provider: cloudVoice.provider,
             voice: cloudVoice.id,
             speed: ttsRate,
-            kokoroBaseUrl: settings.kokoroTtsBaseUrl,
+            kokoroBaseUrl: (settings.kokoroTtsBaseUrl || "http://127.0.0.1:8880").trim(),
             aiConfig,
           }),
         });

@@ -5,7 +5,10 @@ import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Save, X, GripVertical, Eraser, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush, Plus, Library, ArrowUpRight, Copy, Edit3, Sparkles, Loader2, Volume2, VolumeX, RefreshCw, Circle, Square, Play, List, Trash2, FastForward } from 'lucide-react';
+import { Textarea } from './ui/textarea';
+import { Switch } from './ui/switch';
+import { Label } from './ui/label';
+import { Save, X, GripVertical, Eraser, Upload, Pin, PinOff, Search, Link as LinkIcon, Paintbrush, Plus, Library, ArrowUpRight, Copy, Edit3, Sparkles, Loader2, Volume2, VolumeX, RefreshCw, Circle, Square, Play, List, Trash2, FastForward, Type, Eye } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ExcalidrawElement, NonDeleted, AppState, PointerDownState, OnLinkOpen } from "@excalidraw/excalidraw";
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,7 +22,8 @@ import { loadExcalidrawFiles, saveExcalidrawFiles, type ExcalidrawFilesMetaMap }
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 import { parseJsonWithRecovery } from '@/lib/jsonRecovery';
 import { getAiConfigFromSettings, normalizeAiSettings } from '@/lib/ai/config';
-import { cleanSpeechText, getKokoroLocalVoices, getOpenAiCloudVoices, loadSpeechPrefs, parseCloudVoiceURI, pickBestVoice, saveSpeechPrefs } from '@/lib/tts';
+import { consoleDiagramToExcalidraw } from '@/lib/consoleToExcalidraw';
+import { cleanSpeechText, getKokoroLocalVoices, getOpenAiCloudVoices, loadAstraVoicePrefs, loadSpeechPrefs, parseCloudVoiceURI, pickBestVoice, saveSpeechPrefs } from '@/lib/tts';
 import { useCanvasRecording } from '@/hooks/useCanvasRecording';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -37,7 +41,19 @@ const Excalidraw = dynamic(
 const randomId = () => Math.random().toString(36).slice(2, 11);
 const DEFAULT_KOKORO_BASE_URL = 'http://127.0.0.1:8880';
 const DIAGRAM_EXPLANATION_STORAGE_KEY_PREFIX = 'dock-diagram-explanation:';
+const TEXT_EXPLAINER_INPUT_STORAGE_KEY_PREFIX = 'dock-text-explainer-input:';
+const TEXT_EXPLAINER_OUTPUT_STORAGE_KEY_PREFIX = 'dock-text-explainer-output:';
+const TEXT_EXPLAINER_DIAGRAM_STORAGE_KEY_PREFIX = 'dock-text-explainer-diagram:';
+const TEXT_EXPLAINER_STRUCTURED_PROMPT_KEY_PREFIX = 'dock-text-explainer-structured-prompt:';
+const GROUP_INSIGHTS_STORAGE_KEY_PREFIX = 'dock-group-insights:';
 type DiagramLaserLine = { id: number; left: number; top: number; width: number; height: number; startChar?: number; endChar?: number };
+type GroupInsightRecord = {
+  groupId: string;
+  label: string;
+  explanation: string;
+  consoleDiagram: string;
+  updatedAt: number;
+};
 
 const normalizeDiagramText = (value: string) => value.replace(/\s+/g, ' ').trim();
 
@@ -105,7 +121,85 @@ const buildCanvasDiagramSummary = (elements: readonly ExcalidrawElement[]) => {
   return sections.join('\n\n');
 };
 
+const getGroupInsightsStorageKey = (canvasId: string) => `${GROUP_INSIGHTS_STORAGE_KEY_PREFIX}${canvasId}`;
+
+const getSelectedGroupId = (elements: readonly ExcalidrawElement[], appState: AppState | null | undefined) => {
+  const selectedIds = Object.entries((appState as any)?.selectedElementIds || {})
+    .filter(([, isSelected]) => Boolean(isSelected))
+    .map(([id]) => id);
+  if (selectedIds.length === 0) return null;
+
+  const selectedElements = elements.filter(
+    (element) => !element.isDeleted && selectedIds.includes(element.id) && Array.isArray((element as any).groupIds) && (element as any).groupIds.length > 0
+  );
+  if (selectedElements.length === 0) return null;
+
+  const firstGroupIds = ((selectedElements[0] as any).groupIds || []).filter(Boolean) as string[];
+  const shared = firstGroupIds.filter((groupId) =>
+    selectedElements.every((element) => Array.isArray((element as any).groupIds) && (element as any).groupIds.includes(groupId))
+  );
+  if (shared.length > 0) {
+    return shared[shared.length - 1] || null;
+  }
+
+  if (selectedElements.length === 1) {
+    const groupIds = (((selectedElements[0] as any).groupIds || []).filter(Boolean) as string[]);
+    return groupIds[groupIds.length - 1] || null;
+  }
+
+  return null;
+};
+
+const getGroupElements = (elements: readonly ExcalidrawElement[], groupId: string) =>
+  elements.filter((element) => !element.isDeleted && Array.isArray((element as any).groupIds) && (element as any).groupIds.includes(groupId));
+
+const getGroupReadableLabel = (elements: readonly ExcalidrawElement[], groupId: string) => {
+  const groupElements = getGroupElements(elements, groupId);
+  const textElements = groupElements
+    .filter((element) => element.type === 'text' && typeof (element as any).text === 'string')
+    .map((element) => normalizeDiagramText(String((element as any).text || '')))
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+  if (textElements.length > 0) {
+    return textElements[0];
+  }
+  return `Group ${groupId.slice(0, 6)}`;
+};
+
+const parseGroupInsightStore = (raw: string | null): Record<string, GroupInsightRecord> => {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw) as Record<string, Partial<GroupInsightRecord>>;
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .map(([groupId, record]) => {
+          const explanation = typeof record?.explanation === 'string' ? record.explanation : '';
+          const consoleDiagram = typeof record?.consoleDiagram === 'string' ? record.consoleDiagram : '';
+          if (!explanation.trim() && !consoleDiagram.trim()) return null;
+          return [
+            groupId,
+            {
+              groupId,
+              label: typeof record?.label === 'string' && record.label.trim() ? record.label.trim() : `Group ${groupId.slice(0, 6)}`,
+              explanation,
+              consoleDiagram,
+              updatedAt: typeof record?.updatedAt === 'number' ? record.updatedAt : Date.now(),
+            } satisfies GroupInsightRecord,
+          ] as const;
+        })
+        .filter(Boolean) as Array<readonly [string, GroupInsightRecord]>
+    );
+  } catch {
+    return {};
+  }
+};
+
 const getDiagramExplanationStorageKey = (canvasId: string) => `${DIAGRAM_EXPLANATION_STORAGE_KEY_PREFIX}${canvasId}`;
+const getTextExplainerInputStorageKey = (canvasId: string) => `${TEXT_EXPLAINER_INPUT_STORAGE_KEY_PREFIX}${canvasId}`;
+const getTextExplainerOutputStorageKey = (canvasId: string) => `${TEXT_EXPLAINER_OUTPUT_STORAGE_KEY_PREFIX}${canvasId}`;
+const getTextExplainerDiagramStorageKey = (canvasId: string) => `${TEXT_EXPLAINER_DIAGRAM_STORAGE_KEY_PREFIX}${canvasId}`;
+const getTextExplainerStructuredPromptStorageKey = (canvasId: string) =>
+  `${TEXT_EXPLAINER_STRUCTURED_PROMPT_KEY_PREFIX}${canvasId}`;
 
 const buildDiagramLaserLines = (container: HTMLElement | null): DiagramLaserLine[] => {
   if (!container) return [];
@@ -704,6 +798,24 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   const [diagramExplanation, setDiagramExplanation] = useState('');
   const [diagramExplainError, setDiagramExplainError] = useState('');
   const [isReadingDiagram, setIsReadingDiagram] = useState(false);
+  const [showTextDiagramPopup, setShowTextDiagramPopup] = useState(false);
+  const [textDiagramInput, setTextDiagramInput] = useState('');
+  const [textDiagramExplanation, setTextDiagramExplanation] = useState('');
+  const [textDiagramBlocks, setTextDiagramBlocks] = useState<any[] | null>(null);
+  const [textDiagramError, setTextDiagramError] = useState('');
+  const [textDiagramConsole, setTextDiagramConsole] = useState('');
+  const [useStructuredExplainPrompt, setUseStructuredExplainPrompt] = useState(false);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [dismissedGroupId, setDismissedGroupId] = useState<string | null>(null);
+  const [groupInsights, setGroupInsights] = useState<Record<string, GroupInsightRecord>>({});
+  const [groupInsightExplanationDraft, setGroupInsightExplanationDraft] = useState('');
+  const [groupInsightConsoleDraft, setGroupInsightConsoleDraft] = useState('');
+  const [groupInsightView, setGroupInsightView] = useState<'explanation' | 'diagram'>('explanation');
+  const [isReadingGroupInsight, setIsReadingGroupInsight] = useState(false);
+  const [isCopyingGroupInsightExcalidraw, setIsCopyingGroupInsightExcalidraw] = useState(false);
+  const [isExplainingTextDiagram, setIsExplainingTextDiagram] = useState(false);
+  const [isCreatingTextDiagram, setIsCreatingTextDiagram] = useState(false);
+  const [isCopyingTextDiagramExcalidraw, setIsCopyingTextDiagramExcalidraw] = useState(false);
   const [ttsVoices, setTtsVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [ttsVoiceURI, setTtsVoiceURI] = useState<string | undefined>(undefined);
   const [isKokoroHealthy, setIsKokoroHealthy] = useState(false);
@@ -882,6 +994,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   }, []);
   
   const activeCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === drawingCanvasState.activeCanvasId);
+  const selectedGroupInsight = selectedGroupId ? groupInsights[selectedGroupId] || null : null;
   const {
     recording,
     recordings,
@@ -916,6 +1029,11 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
         setShowDiagramExplainPanel(false);
       }
     }, [isAiEnabled, showDiagramExplainPanel]);
+    useEffect(() => {
+      if (!isAiEnabled && showTextDiagramPopup) {
+        setShowTextDiagramPopup(false);
+      }
+    }, [isAiEnabled, showTextDiagramPopup]);
 
   const kokoroBaseUrl = (settings.kokoroTtsBaseUrl || DEFAULT_KOKORO_BASE_URL).trim();
   const kokoroEnabled = isDesktopRuntime && (isKokoroHealthy || Boolean(kokoroBaseUrl));
@@ -935,6 +1053,16 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     isUserChange.current = false;
     setIsDirty(false);
   }, [drawingCanvasState?.activeCanvasId]);
+
+  useEffect(() => {
+    setSelectedGroupId(null);
+    setDismissedGroupId(null);
+    setGroupInsightExplanationDraft('');
+    setGroupInsightConsoleDraft('');
+    setGroupInsightView('explanation');
+    setIsReadingGroupInsight(false);
+    setIsCopyingGroupInsightExcalidraw(false);
+  }, [activeCanvas?.id]);
 
   useEffect(() => {
     setShowRecordingEditor(false);
@@ -961,16 +1089,39 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     setIsExplainingDiagram(false);
     setDiagramExplainError('');
     setIsReadingDiagram(false);
+    setShowTextDiagramPopup(false);
+    setTextDiagramError('');
+    setTextDiagramConsole('');
+    setIsExplainingTextDiagram(false);
+    setIsCreatingTextDiagram(false);
+    setIsCopyingTextDiagramExcalidraw(false);
+    setUseStructuredExplainPrompt(false);
     const canvasId = activeCanvas?.id;
     if (!canvasId || typeof window === 'undefined') {
       setDiagramExplanation('');
+      setTextDiagramInput('');
+      setTextDiagramExplanation('');
+      setUseStructuredExplainPrompt(false);
+      setGroupInsights({});
       return;
     }
     try {
       const saved = localStorage.getItem(getDiagramExplanationStorageKey(canvasId));
       setDiagramExplanation(saved || '');
+      setTextDiagramInput(localStorage.getItem(getTextExplainerInputStorageKey(canvasId)) || '');
+      setTextDiagramExplanation(localStorage.getItem(getTextExplainerOutputStorageKey(canvasId)) || '');
+      setTextDiagramConsole(localStorage.getItem(getTextExplainerDiagramStorageKey(canvasId)) || '');
+      setUseStructuredExplainPrompt(
+        localStorage.getItem(getTextExplainerStructuredPromptStorageKey(canvasId)) === '1'
+      );
+      setGroupInsights(parseGroupInsightStore(localStorage.getItem(getGroupInsightsStorageKey(canvasId))));
     } catch {
       setDiagramExplanation('');
+      setTextDiagramInput('');
+      setTextDiagramExplanation('');
+      setTextDiagramConsole('');
+      setUseStructuredExplainPrompt(false);
+      setGroupInsights({});
     }
   }, [activeCanvas?.id]);
 
@@ -988,6 +1139,96 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
       // ignore
     }
   }, [activeCanvas?.id, diagramExplanation]);
+
+  useEffect(() => {
+    const canvasId = activeCanvas?.id;
+    if (!canvasId || typeof window === 'undefined') return;
+    safeSetLocalStorageItem(getTextExplainerInputStorageKey(canvasId), textDiagramInput);
+  }, [activeCanvas?.id, textDiagramInput]);
+
+  useEffect(() => {
+    const canvasId = activeCanvas?.id;
+    if (!canvasId || typeof window === 'undefined') return;
+    try {
+      const storageKey = getTextExplainerOutputStorageKey(canvasId);
+      if (textDiagramExplanation.trim()) {
+        safeSetLocalStorageItem(storageKey, textDiagramExplanation);
+      } else {
+        localStorage.removeItem(storageKey);
+      }
+    } catch {
+      // ignore
+    }
+  }, [activeCanvas?.id, textDiagramExplanation]);
+
+  useEffect(() => {
+    const canvasId = activeCanvas?.id;
+    if (!canvasId || typeof window === 'undefined') return;
+    try {
+      const storageKey = getTextExplainerDiagramStorageKey(canvasId);
+      if (textDiagramConsole.trim()) {
+        safeSetLocalStorageItem(storageKey, textDiagramConsole);
+      } else {
+        localStorage.removeItem(storageKey);
+      }
+    } catch {
+      // ignore
+    }
+  }, [activeCanvas?.id, textDiagramConsole]);
+
+  useEffect(() => {
+    const canvasId = activeCanvas?.id;
+    if (!canvasId || typeof window === 'undefined') return;
+    try {
+      const storageKey = getTextExplainerStructuredPromptStorageKey(canvasId);
+      safeSetLocalStorageItem(storageKey, useStructuredExplainPrompt ? '1' : '0');
+    } catch {
+      // ignore storage errors
+    }
+  }, [activeCanvas?.id, useStructuredExplainPrompt]);
+
+  useEffect(() => {
+    const canvasId = activeCanvas?.id;
+    if (!canvasId || typeof window === 'undefined') return;
+    try {
+      const storageKey = getGroupInsightsStorageKey(canvasId);
+      if (Object.keys(groupInsights).length > 0) {
+        safeSetLocalStorageItem(storageKey, JSON.stringify(groupInsights));
+      } else {
+        localStorage.removeItem(storageKey);
+      }
+    } catch {
+      // ignore
+    }
+  }, [activeCanvas?.id, groupInsights]);
+
+  useEffect(() => {
+    if (!selectedGroupId) {
+      setGroupInsightExplanationDraft('');
+      setGroupInsightConsoleDraft('');
+      setGroupInsightView('explanation');
+      return;
+    }
+    const insight = groupInsights[selectedGroupId];
+    setGroupInsightExplanationDraft(insight?.explanation || '');
+    setGroupInsightConsoleDraft(insight?.consoleDiagram || '');
+    setGroupInsightView((current) => {
+      if (current === 'diagram' && !(insight?.consoleDiagram || '').trim()) {
+        return 'explanation';
+      }
+      return current;
+    });
+  }, [groupInsights, selectedGroupId]);
+
+  useEffect(() => {
+    if (!selectedGroupId) {
+      setDismissedGroupId(null);
+      return;
+    }
+    if (dismissedGroupId && dismissedGroupId !== selectedGroupId) {
+      setDismissedGroupId(null);
+    }
+  }, [dismissedGroupId, selectedGroupId]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
@@ -1183,6 +1424,14 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     stopDiagramSpeech();
   }, [showDiagramExplainPanel, stopDiagramSpeech]);
 
+  useEffect(() => {
+    if (selectedGroupId && dismissedGroupId !== selectedGroupId) return;
+    if (typeof window !== 'undefined' && window.speechSynthesis && isReadingGroupInsight) {
+      window.speechSynthesis.cancel();
+    }
+    setIsReadingGroupInsight(false);
+  }, [dismissedGroupId, isReadingGroupInsight, selectedGroupId]);
+
   const checkKokoroServerHealth = useCallback(async () => {
     if (!isDesktopRuntime) {
       setIsKokoroHealthy(false);
@@ -1299,6 +1548,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   }, [isOpen, isDirty, settings.drawingCanvasAutoSaveInterval, handleSaveClick]);
 
   const handleCanvasChange = useCallback((elements: readonly ExcalidrawElement[], appState: AppState) => {
+    setSelectedGroupId(getSelectedGroupId(elements, appState));
     if (isUserChange.current) {
         setIsDirty(true);
     }
@@ -1322,6 +1572,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     if (isDirty) {
       void handleSaveClick();
     }
+    handleSaveSelectedGroupInsight({ silent: true });
     setDrawingCanvasState(prev => prev ? { ...prev, activeCanvasId: canvasId } : null);
   };
   
@@ -1330,6 +1581,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     if (isDirty) {
       void handleSaveClick();
     }
+    handleSaveSelectedGroupInsight({ silent: true });
     setDrawingCanvasState(prev => {
         if (!prev) return null;
         const newOpenCanvases = (prev.openCanvases || []).filter(c => c.id !== canvasId);
@@ -1563,6 +1815,349 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
     };
     void run();
   }, [aiConfig, diagramExplanation, isDesktopRuntime, isReadingDiagram, kokoroBaseUrl, startDiagramLaserGuide, stopDiagramLaserGuide, stopDiagramSpeech, syncDiagramLaserProgress, toast, ttsVoiceURI, ttsVoices]);
+
+  const structuredExplainPrompt =
+    "You are an expert technical explainer.\n\n" +
+    "Explain the selected text in a structured, concept-first way using exactly these sections:\n\n" +
+    "1. Main Idea\n" +
+    "- State the core purpose and intuition clearly.\n\n" +
+    "2. Key Concepts\n" +
+    "- Define the important terms with light contextual grounding.\n\n" +
+    "3. Hierarchy & Relationships\n" +
+    "- Show how the main ideas connect across abstraction levels.\n\n" +
+    "4. Implied Process/Flow\n" +
+    "- Describe the high-level conceptual flow without turning it into implementation steps.\n\n" +
+    "5. Ambiguities & Clarifications\n" +
+    "- Point out unclear or incomplete parts and clarify them.\n\n" +
+    "6. Summary\n" +
+    "- Give a concise wrap-up of the full idea.\n\n" +
+    "Rules:\n" +
+    "- Write like clean lecture notes.\n" +
+    "- Stay conceptual first.\n" +
+    "- You may mention practical context or tools when relevant.\n" +
+    "- Do not include code, API details, or implementation instructions unless explicitly requested.\n" +
+    "- Do not become overly abstract or overly tutorial-like.";
+
+  const handleExplainPastedText = useCallback(async () => {
+    const text = textDiagramInput.trim();
+    if (!text || isExplainingTextDiagram) return;
+    if (!isAiEnabled) {
+      toast({
+        title: 'AI not configured',
+        description: 'Choose a provider in Settings > AI Settings first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setIsExplainingTextDiagram(true);
+    setTextDiagramError('');
+    try {
+      const response = await fetch('/api/ai/explain', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+        },
+          body: JSON.stringify({
+            text,
+            context: `Canvas text source: ${activeCanvas?.name || 'Untitled Canvas'}`,
+            question: useStructuredExplainPrompt
+              ? structuredExplainPrompt
+              : 'Explain this text clearly. Identify the main idea, key concepts, hierarchy, relationships, and implied process or flow. If anything is ambiguous, say that clearly.',
+            aiConfig,
+          }),
+        });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(String(result?.details || result?.error || 'Failed to explain text.'));
+      }
+      setTextDiagramExplanation(String(result?.explanation || '').trim());
+      setTextDiagramBlocks(Array.isArray(result?.blocks) ? result.blocks : null);
+      setTextDiagramConsole(String(result?.diagramText || '').trim());
+    } catch (error) {
+      setTextDiagramExplanation('');
+      setTextDiagramBlocks(null);
+      setTextDiagramConsole('');
+      setTextDiagramError(error instanceof Error ? error.message : 'Failed to explain text.');
+    } finally {
+      setIsExplainingTextDiagram(false);
+    }
+  }, [
+    activeCanvas?.name,
+    aiConfig,
+    isAiEnabled,
+    isDesktopRuntime,
+    isExplainingTextDiagram,
+    structuredExplainPrompt,
+    textDiagramInput,
+    toast,
+    useStructuredExplainPrompt,
+  ]);
+
+  const handleCreateDiagramFromTextExplanation = useCallback(async () => {
+    const content = textDiagramExplanation.trim();
+    if ((!content && !textDiagramBlocks?.length) || isCreatingTextDiagram) return;
+    setIsCreatingTextDiagram(true);
+    try {
+      const response = await fetch('/api/ai/diagram-from-explanation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+        },
+        body: JSON.stringify({
+          text: content,
+          blocks: textDiagramBlocks || undefined,
+          structuredDiagram: useStructuredExplainPrompt,
+          context: `Canvas text explanation: ${activeCanvas?.name || 'Untitled Canvas'}`,
+          aiConfig,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(String(result?.details || result?.error || 'Failed to create diagram.'));
+      }
+      const nextDiagramText = String(result?.diagramText || '').trim();
+      if (!nextDiagramText) {
+        throw new Error('Diagram was empty.');
+      }
+      setTextDiagramConsole(nextDiagramText);
+      toast({ title: 'Diagram generated', description: 'Console diagram is ready below the explanation.' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to create diagram.';
+      toast({ title: 'Diagram failed', description: message, variant: 'destructive' });
+    } finally {
+      setIsCreatingTextDiagram(false);
+    }
+  }, [activeCanvas?.name, aiConfig, isCreatingTextDiagram, isDesktopRuntime, textDiagramBlocks, textDiagramExplanation, toast]);
+
+  const handleCopyTextDiagram = useCallback(async () => {
+    if (!textDiagramConsole.trim()) return;
+    try {
+      await navigator.clipboard.writeText(textDiagramConsole);
+      toast({ title: 'Copied diagram' });
+    } catch {
+      toast({ title: 'Copy failed', description: 'Could not copy to clipboard.', variant: 'destructive' });
+    }
+  }, [textDiagramConsole, toast]);
+
+  const handleCopyTextDiagramExcalidraw = useCallback(async () => {
+    if (!textDiagramConsole.trim()) {
+      toast({ title: 'No diagram found', description: 'Generate a diagram first.' });
+      return;
+    }
+    if (isCopyingTextDiagramExcalidraw) return;
+    setIsCopyingTextDiagramExcalidraw(true);
+    try {
+      const scene = consoleDiagramToExcalidraw(textDiagramConsole);
+      const payload = JSON.stringify(scene, null, 2);
+      await navigator.clipboard.writeText(payload);
+      toast({ title: 'Copied Excalidraw JSON', description: 'Paste it into Excalidraw.' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to generate Excalidraw JSON.';
+      toast({ title: 'Excalidraw export failed', description: message, variant: 'destructive' });
+    } finally {
+      setIsCopyingTextDiagramExcalidraw(false);
+    }
+  }, [isCopyingTextDiagramExcalidraw, textDiagramConsole, toast]);
+
+  const handleReadGroupInsight = useCallback(() => {
+    const text = cleanSpeechText(groupInsightExplanationDraft);
+    if (!text) return;
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const astraVoicePrefs = loadAstraVoicePrefs();
+    const kokoroVoice = parseCloudVoiceURI(astraVoicePrefs.kokoroVoiceUri);
+    const canUseKokoro = Boolean(kokoroVoice && (isKokoroHealthy || Boolean(kokoroBaseUrl)));
+
+    if (!window.speechSynthesis && !canUseKokoro) {
+      toast({
+        title: 'Read aloud unavailable',
+        description: 'Speech synthesis is not supported in this browser.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (isReadingGroupInsight) {
+      window.speechSynthesis?.cancel?.();
+      if (speechAudioRef.current) {
+        speechAudioRef.current.pause();
+        speechAudioRef.current.src = '';
+        speechAudioRef.current = null;
+      }
+      if (speechAudioUrlRef.current) {
+        URL.revokeObjectURL(speechAudioUrlRef.current);
+        speechAudioUrlRef.current = null;
+      }
+      speechUtteranceRef.current = null;
+      setIsReadingGroupInsight(false);
+      return;
+    }
+
+    const run = async () => {
+      if (canUseKokoro && kokoroVoice) {
+        try {
+          const response = await fetch('/api/ai/tts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(isDesktopRuntime ? { 'x-studio-desktop': '1' } : {}),
+            },
+            body: JSON.stringify({
+              text,
+              voice: kokoroVoice.id,
+              provider: kokoroVoice.provider,
+              baseUrl: kokoroBaseUrl || undefined,
+              aiConfig,
+            }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(String(result?.details || result?.error || 'Failed to generate speech.'));
+          }
+          const audioBase64 = String(result?.audio || '');
+          if (!audioBase64) {
+            throw new Error('Speech synthesis returned empty audio.');
+          }
+          const audio = new Audio(`data:audio/mp3;base64,${audioBase64}`);
+          speechAudioRef.current = audio;
+          audio.onended = () => {
+            setIsReadingGroupInsight(false);
+          };
+          audio.onerror = () => {
+            setIsReadingGroupInsight(false);
+          };
+          setIsReadingGroupInsight(true);
+          await audio.play();
+          return;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Could not generate speech.';
+          toast({ title: 'Read aloud failed', description: message, variant: 'destructive' });
+          setIsReadingGroupInsight(false);
+        }
+      }
+
+      if (!window.speechSynthesis) return;
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = Math.max(0.6, Math.min(1.6, astraVoicePrefs.rate || 0.96));
+      const availableVoices = window.speechSynthesis.getVoices();
+      const selectedVoice = pickBestVoice(availableVoices, astraVoicePrefs.systemVoiceUri);
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        utterance.lang = selectedVoice.lang;
+      }
+      utterance.onend = () => {
+        setIsReadingGroupInsight(false);
+      };
+      utterance.onerror = () => {
+        setIsReadingGroupInsight(false);
+      };
+      window.speechSynthesis.cancel();
+      setIsReadingGroupInsight(true);
+      window.speechSynthesis.speak(utterance);
+    };
+
+    void run();
+  }, [
+    aiConfig,
+    groupInsightExplanationDraft,
+    isDesktopRuntime,
+    isKokoroHealthy,
+    isReadingGroupInsight,
+    kokoroBaseUrl,
+    toast,
+  ]);
+
+  const handleCopyGroupInsightExcalidraw = useCallback(async () => {
+    if (!groupInsightConsoleDraft.trim()) {
+      toast({ title: 'No diagram found', description: 'Generate or save a console diagram first.' });
+      return;
+    }
+    if (isCopyingGroupInsightExcalidraw) return;
+    setIsCopyingGroupInsightExcalidraw(true);
+    try {
+      const scene = consoleDiagramToExcalidraw(groupInsightConsoleDraft);
+      const payload = JSON.stringify(scene, null, 2);
+      await navigator.clipboard.writeText(payload);
+      toast({ title: 'Copied Excalidraw JSON', description: 'Paste it into Excalidraw.' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to generate Excalidraw JSON.';
+      toast({ title: 'Excalidraw export failed', description: message, variant: 'destructive' });
+    } finally {
+      setIsCopyingGroupInsightExcalidraw(false);
+    }
+  }, [groupInsightConsoleDraft, isCopyingGroupInsightExcalidraw, toast]);
+
+  const handleSaveTextDiagramToSelectedGroup = useCallback(() => {
+    if (!selectedGroupId || !excalidrawAPIRef.current) {
+      toast({ title: 'No group selected', description: 'Select a grouped element set first.', variant: 'destructive' });
+      return;
+    }
+
+    const explanation = textDiagramExplanation.trim();
+    const consoleDiagram = textDiagramConsole.trim();
+    if (!explanation) {
+      toast({ title: 'No explanation found', description: 'Generate the processed explanation first.', variant: 'destructive' });
+      return;
+    }
+    if (!consoleDiagram) {
+      toast({ title: 'No console diagram found', description: 'Generate the console diagram first.', variant: 'destructive' });
+      return;
+    }
+
+    const sceneElements = excalidrawAPIRef.current.getSceneElements?.() || [];
+    const groupLabel = getGroupReadableLabel(sceneElements, selectedGroupId);
+    const nextInsight: GroupInsightRecord = {
+      groupId: selectedGroupId,
+      label: groupLabel,
+      explanation,
+      consoleDiagram,
+      updatedAt: Date.now(),
+    };
+
+    setGroupInsights((prev) => ({ ...prev, [selectedGroupId]: nextInsight }));
+    setGroupInsightExplanationDraft(explanation);
+    setGroupInsightConsoleDraft(consoleDiagram);
+    setDismissedGroupId(null);
+    toast({ title: 'Saved to selected group', description: `${groupLabel} now uses the current text-to-diagram output.` });
+  }, [selectedGroupId, textDiagramConsole, textDiagramExplanation, toast]);
+
+  const handleSaveSelectedGroupInsight = useCallback((options?: { silent?: boolean }) => {
+    if (!selectedGroupId || !excalidrawAPIRef.current) return;
+    const sceneElements = excalidrawAPIRef.current.getSceneElements?.() || [];
+    const groupLabel = getGroupReadableLabel(sceneElements, selectedGroupId);
+    const explanation = groupInsightExplanationDraft.trim();
+    const consoleDiagram = groupInsightConsoleDraft.trim();
+    if (!explanation && !consoleDiagram) {
+      setGroupInsights((prev) => {
+        const next = { ...prev };
+        delete next[selectedGroupId];
+        return next;
+      });
+      if (!options?.silent) {
+        toast({ title: 'Group insight cleared', description: `${groupLabel} no longer has saved insight.` });
+      }
+      return;
+    }
+    setGroupInsights((prev) => ({
+      ...prev,
+      [selectedGroupId]: {
+        groupId: selectedGroupId,
+        label: groupLabel,
+        explanation,
+        consoleDiagram,
+        updatedAt: Date.now(),
+      },
+    }));
+    setDismissedGroupId(null);
+    if (!options?.silent) {
+      toast({ title: 'Group insight saved', description: `${groupLabel} will reopen this popup when selected.` });
+    }
+  }, [groupInsightConsoleDraft, groupInsightExplanationDraft, selectedGroupId, toast]);
 
   const handleCreateSubCanvas = useCallback((canvasId: string) => {
     const targetCanvas = drawingCanvasState?.openCanvases?.find(c => c.id === canvasId);
@@ -1968,6 +2563,17 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                         {isExplainingDiagram ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Sparkles className="h-2.5 w-2.5" />}
                       </Button>
                     ) : null}
+                    {isDesktopRuntime && isAiEnabled ? (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5"
+                        onClick={() => setShowTextDiagramPopup(true)}
+                        title="Text to diagram"
+                      >
+                        <Type className="h-2.5 w-2.5" />
+                      </Button>
+                    ) : null}
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={openCanvasResourceCard}><Plus className="h-2.5 w-2.5"/></Button>
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsSearchOpen(prev => !prev)}><Search className="h-2.5 w-2.5"/></Button>
                     <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setIsLinkingSearchOpen(prev => !prev)}><LinkIcon className="h-2.5 w-2.5"/></Button>
@@ -2329,6 +2935,251 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                               Click the AI icon to generate an explanation for this diagram.
                             </div>
                           )}
+                        </div>
+                      </div>
+                    )}
+                    {selectedGroupId && dismissedGroupId !== selectedGroupId ? (
+                      <div className="absolute bottom-3 right-3 z-20 h-[min(78vh,820px)] w-[640px] max-w-[calc(100%-1.5rem)] overflow-hidden rounded-2xl border bg-background/95 shadow-2xl backdrop-blur">
+                        <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 text-sm font-semibold">
+                              <List className="h-4 w-4 text-primary" />
+                              Group Insight
+                            </div>
+                            <p className="mt-1 truncate text-xs text-muted-foreground">
+                              {selectedGroupInsight?.label || 'Selected Group'}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0"
+                              onClick={() => setGroupInsightView((current) => (current === 'explanation' ? 'diagram' : 'explanation'))}
+                              title={groupInsightView === 'explanation' ? 'Show console diagram' : 'Show explanation'}
+                              disabled={groupInsightView === 'explanation' ? !groupInsightConsoleDraft.trim() : !groupInsightExplanationDraft.trim()}
+                            >
+                              {groupInsightView === 'explanation' ? <Paintbrush className="h-4 w-4" /> : <Type className="h-4 w-4" />}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0"
+                              onClick={handleReadGroupInsight}
+                              disabled={groupInsightView !== 'explanation' || !groupInsightExplanationDraft.trim()}
+                              title={isReadingGroupInsight ? 'Stop read aloud' : 'Read aloud'}
+                            >
+                              {isReadingGroupInsight ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0"
+                              onClick={handleSaveSelectedGroupInsight}
+                              title="Save group insight"
+                            >
+                              <Save className="h-4 w-4" />
+                            </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 shrink-0"
+                                onClick={() => {
+                                  handleSaveSelectedGroupInsight({ silent: true });
+                                  setDismissedGroupId(selectedGroupId);
+                                }}
+                                title="Close group insight popup"
+                              >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex h-[calc(100%-61px)] flex-col overflow-y-auto px-4 py-3 space-y-3">
+                          {groupInsightView === 'explanation' ? (
+                            <div className="flex min-h-0 flex-1 flex-col space-y-2 rounded-xl border bg-muted/20 p-3">
+                              <div className="text-xs font-medium text-foreground">Explanation</div>
+                              <div className="flex-1 overflow-y-auto rounded-lg border bg-background/60 p-3">
+                                {groupInsightExplanationDraft.trim() ? (
+                                  <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed">
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                      {groupInsightExplanationDraft}
+                                    </ReactMarkdown>
+                                  </div>
+                                ) : (
+                                  <div className="text-sm text-muted-foreground">
+                                    Generate or save a group explanation to view it here.
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex min-h-0 flex-1 flex-col space-y-2 rounded-xl border bg-muted/20 p-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-xs font-medium text-foreground">Console Diagram</div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => void handleCopyGroupInsightExcalidraw()}
+                                  title="Copy Excalidraw JSON"
+                                  disabled={isCopyingGroupInsightExcalidraw || !groupInsightConsoleDraft.trim()}
+                                >
+                                  {isCopyingGroupInsightExcalidraw ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Eye className="h-3.5 w-3.5" />}
+                                </Button>
+                              </div>
+                              <Textarea
+                                value={groupInsightConsoleDraft}
+                                onChange={(event) => setGroupInsightConsoleDraft(event.target.value)}
+                                className="min-h-[260px] flex-1 resize-none font-mono text-[12px] leading-relaxed"
+                                placeholder="Generate or paste a console diagram for the selected group."
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                    {isDesktopRuntime && isAiEnabled && showTextDiagramPopup && (
+                      <div className="absolute right-3 top-3 z-20 w-[430px] max-w-[calc(100%-1.5rem)] max-h-[calc(100%-1.5rem)] overflow-hidden rounded-2xl border bg-background/95 shadow-2xl backdrop-blur">
+                        <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 text-sm font-semibold">
+                              <Type className="h-4 w-4 text-primary" />
+                              Text To Diagram
+                            </div>
+                            <p className="mt-1 truncate text-xs text-muted-foreground">
+                              {activeCanvas.name || 'Untitled Canvas'}
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 shrink-0"
+                            onClick={() => setShowTextDiagramPopup(false)}
+                            title="Close text-to-diagram popup"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="max-h-[calc(100vh-13rem)] overflow-y-auto px-4 py-3 space-y-3">
+                          <div className="space-y-2 rounded-xl border bg-muted/20 p-3">
+                            <label className="text-xs font-medium text-foreground">Paste Text</label>
+                            <Textarea
+                              value={textDiagramInput}
+                              onChange={(event) => setTextDiagramInput(event.target.value)}
+                              placeholder="Paste notes, explanation, or raw text here..."
+                              className="min-h-[120px] resize-y"
+                            />
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2">
+                                <Switch
+                                  id="text-diagram-structured-explain"
+                                  checked={useStructuredExplainPrompt}
+                                  onCheckedChange={setUseStructuredExplainPrompt}
+                                />
+                                <Label htmlFor="text-diagram-structured-explain" className="text-xs text-muted-foreground">
+                                  Structured explainer format
+                                </Label>
+                              </div>
+                            </div>
+                            <div className="flex justify-end">
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="h-8"
+                                onClick={() => void handleExplainPastedText()}
+                                disabled={!textDiagramInput.trim() || isExplainingTextDiagram}
+                                title="Explain pasted text with AI"
+                              >
+                                {isExplainingTextDiagram ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                                Explain
+                              </Button>
+                            </div>
+                          </div>
+
+                          {textDiagramError ? (
+                            <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                              {textDiagramError}
+                            </div>
+                          ) : null}
+
+                          {textDiagramExplanation ? (
+                            <div className="space-y-2 rounded-xl border bg-muted/20 p-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-xs font-medium text-foreground">Processed Explanation</div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7"
+                                    onClick={() => void handleCreateDiagramFromTextExplanation()}
+                                    disabled={isCreatingTextDiagram}
+                                    title="Generate a console diagram from this explanation"
+                                  >
+                                    {isCreatingTextDiagram ? <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1 h-3.5 w-3.5" />}
+                                    Diagram
+                                  </Button>
+                                  {selectedGroupId ? (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7"
+                                      onClick={handleSaveTextDiagramToSelectedGroup}
+                                      disabled={!textDiagramExplanation.trim() || !textDiagramConsole.trim()}
+                                      title="Save this explanation and console diagram to the selected group"
+                                    >
+                                      <Save className="mr-1 h-3.5 w-3.5" />
+                                      Save To Group
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              </div>
+                              <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground prose prose-sm dark:prose-invert max-w-none">
+                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                  {textDiagramExplanation}
+                                </ReactMarkdown>
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {textDiagramConsole ? (
+                            <div className="space-y-2 rounded-xl border bg-muted/20 p-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-xs font-medium text-foreground">Console Diagram</div>
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => void handleCopyTextDiagram()}
+                                    title="Copy diagram"
+                                  >
+                                    <Copy className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => void handleCopyTextDiagramExcalidraw()}
+                                    title="Copy Excalidraw JSON"
+                                    disabled={isCopyingTextDiagramExcalidraw}
+                                  >
+                                    {isCopyingTextDiagramExcalidraw ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Paintbrush className="h-3.5 w-3.5" />}
+                                  </Button>
+                                </div>
+                              </div>
+                              <Textarea
+                                value={textDiagramConsole}
+                                onChange={(event) => setTextDiagramConsole(event.target.value)}
+                                className="min-h-[320px] resize-y font-mono text-[12px] leading-relaxed"
+                                placeholder="Console diagram will appear here. You can edit and extend it before copying or exporting to Excalidraw."
+                              />
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     )}
