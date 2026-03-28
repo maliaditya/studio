@@ -9,13 +9,14 @@ import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Shar
 import type { Activity, ActivityType, RecurrenceRule } from '@/types/workout';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuPortal, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHighlightedTasks } from '@/hooks/useHighlightedTasks';
 import { addDays, addMonths, differenceInDays, differenceInMonths, isAfter, isBefore, isToday, parseISO, startOfDay } from 'date-fns';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { EditableActivityText } from './EditableActivityText';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
-import { getAiConfigFromSettings } from '@/lib/ai/config';
+import { getAiConfigFromSettings, normalizeAiSettings } from '@/lib/ai/config';
 import type { TaskBciContext, TaskBciLinkedBothering } from '@/lib/taskBci';
 import { getEffectiveConstraintTasks } from '@/lib/botheringUtils';
 import { buildFlashcardTaskKey, getFlashcardSessionsForTask } from '@/lib/flashcards';
@@ -87,7 +88,6 @@ export const AgendaWidgetItem = React.memo(({
         setSelectedDeepWorkTask, 
         setSelectedUpskillTask,
         findRootTask,
-        highlightedTaskIds,
         currentSlot,
         coreSkills,
         projects,
@@ -103,10 +103,13 @@ export const AgendaWidgetItem = React.memo(({
         mindsetCards,
         settings,
     } = useAuth();
+    const { highlightedTaskIds } = useHighlightedTasks();
     const router = useRouter();
     const { toast } = useToast();
     const [isOpeningAstraScript, setIsOpeningAstraScript] = useState(false);
     const [isFlashcardReviewOpen, setIsFlashcardReviewOpen] = useState(false);
+    const isDesktopRuntime = typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop);
+    const isAiEnabled = normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== 'none';
 
     const isInlineEditable = !['upskill', 'deepwork', 'workout', 'branding', 'lead-generation', 'mindset', 'nutrition', 'spaced-repetition'].includes(activity.type);
     const isAgendaContext = context === 'agenda';
@@ -606,7 +609,7 @@ export const AgendaWidgetItem = React.memo(({
         };
     }, [activity.details, activity.slot, activity.type, learningPlanContext, linkedBotherings, linkedResourceNames, projectPlanContext, rootTask, taskInfo]);
 
-    const canOpenTaskContext = Boolean(activity.id);
+    const canOpenTaskContext = isDesktopRuntime && isAiEnabled && Boolean(activity.id);
 
     const slotOrder = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
     const isPastSlot =

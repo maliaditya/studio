@@ -7,6 +7,7 @@ export type AppConfigPayload = {
   supabaseUrl: string | null;
   supabaseAnonKey: string | null;
   supabaseStorageBucket: string | null;
+  desktopDownloadUrl?: string | null;
   desktopPlanPriceInr: number | null;
   desktopPlans?: DesktopPlanCatalog | null;
   setupSupportPlans?: SetupSupportPlanCatalog | null;
@@ -80,6 +81,7 @@ export async function saveAppConfig(
     supabaseUrl: string;
     supabaseAnonKey: string;
     supabaseStorageBucket?: string | null;
+    desktopDownloadUrl?: string | null;
     desktopPlanPriceInr: number;
     desktopPlans?: DesktopPlanCatalog | null;
     setupSupportPlans?: SetupSupportPlanCatalog | null;

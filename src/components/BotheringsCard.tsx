@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import React, { useMemo, useState, useCallback } from "react";
+import React, { startTransition, useMemo, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useAuth } from "@/contexts/AuthContext";
 import { Brain, ExternalLink, LineChart as LineChartIcon, Sparkles, Loader2 } from "lucide-react";
@@ -22,6 +22,7 @@ import { getAiConfigFromSettings, normalizeAiSettings } from "@/lib/ai/config";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { getEffectiveConstraintTasks } from "@/lib/botheringUtils";
+import { useHighlightedTasks } from "@/hooks/useHighlightedTasks";
 
 type BotheringSourceType = "External" | "Mismatch" | "Constraint";
 type BotheringTask = NonNullable<MindsetPoint["tasks"]>[number];
@@ -39,7 +40,8 @@ const SOURCE_CONFIG: Array<{ id: string; label: BotheringSourceType }> = [
 ];
 
 export function BotheringsCard() {
-  const { mindsetCards, highlightedTaskIds, setHighlightedTaskIds, schedule, settings, setMindsetCards } = useAuth();
+  const { mindsetCards, schedule, settings, setMindsetCards } = useAuth();
+  const { setHighlightedTaskIds } = useHighlightedTasks();
   const isDesktopRuntime = typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
   const isAiEnabled = normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== "none";
 
@@ -58,32 +60,6 @@ export function BotheringsCard() {
         .replace(/[^\w\s]/g, " ")
         .replace(/\s+/g, " "),
     []
-  );
-
-  const tokenSet = useCallback(
-    (value?: string) =>
-      new Set(
-        normalizeText(value)
-          .split(" ")
-          .map((t) => t.trim())
-          .filter((t) => t.length > 2)
-      ),
-    [normalizeText]
-  );
-
-  const hasTokenOverlap = useCallback(
-    (left?: string, right?: string) => {
-      const a = tokenSet(left);
-      const b = tokenSet(right);
-      if (a.size === 0 || b.size === 0) return false;
-      let common = 0;
-      a.forEach((t) => {
-        if (b.has(t)) common += 1;
-      });
-      const minNeeded = Math.max(2, Math.ceil(Math.min(a.size, b.size) * 0.6));
-      return common >= minNeeded;
-    },
-    [tokenSet]
   );
 
   const isMalformedBotheringText = useCallback((value?: string) => {
@@ -108,16 +84,6 @@ export function BotheringsCard() {
     return new Map(externalPoints.map((point) => [point.id, point] as const));
   }, [mindsetCards]);
 
-  const routineDetailById = useMemo(() => {
-    const map = new Map<string, string>();
-    (settings.routines || []).forEach((routine) => {
-      const rid = String(routine?.id || "").trim();
-      const details = normalizeText(routine?.details);
-      if (rid && details) map.set(rid, details);
-    });
-    return map;
-  }, [settings.routines, normalizeText]);
-
   const sourceTypeToCardId = useCallback((sourceType: BotheringSourceType) => {
     if (sourceType === "External") return "mindset_botherings_external";
     if (sourceType === "Mismatch") return "mindset_botherings_mismatch";
@@ -137,11 +103,13 @@ export function BotheringsCard() {
     const idSet = new Set<string>();
     const detailSet = new Set<string>();
     const activityMap = new Map<string, { completed?: boolean }>();
+    const activities: any[] = [];
 
     const day = schedule?.[todayKey] || {};
     Object.values(day).forEach((value: any) => {
       if (!Array.isArray(value)) return;
       value.forEach((act: any) => {
+        activities.push(act);
         const actId = String(act?.id || "");
         if (actId) {
           idSet.add(actId);
@@ -166,8 +134,58 @@ export function BotheringsCard() {
       });
     });
 
-    return { idSet, detailSet, activityMap };
+    return { idSet, detailSet, activityMap, activities };
   }, [schedule, todayKey, normalizeText]);
+
+  const getHighlightIdsForTaskInTodaySlots = useCallback(
+    (task: BotheringTask) => {
+      const ids = new Set<string>();
+      const activityId = String(task.activityId || "");
+      const taskId = String(task.id || "");
+      const taskDetail = normalizeText(task.details);
+
+      todayScheduleContext.activities.forEach((activity: any) => {
+        const scheduledActivityId = String(activity?.id || "");
+        const baseMatch = scheduledActivityId.match(/_(\d{4}-\d{2}-\d{2})$/);
+        const scheduledBaseId = baseMatch ? scheduledActivityId.slice(0, -11) : scheduledActivityId;
+        const scheduledTaskIds = (activity?.taskIds || []).map((id: string) => String(id || "")).filter(Boolean);
+        const scheduledDetail = normalizeText(activity?.details);
+
+        const matchesById =
+          (!!activityId && (activityId === scheduledActivityId || activityId === scheduledBaseId || scheduledTaskIds.includes(activityId))) ||
+          (!!taskId && (taskId === scheduledActivityId || taskId === scheduledBaseId || scheduledTaskIds.includes(taskId)));
+        const matchesByDetail = !!taskDetail && !!scheduledDetail && taskDetail === scheduledDetail;
+
+        if (!matchesById && !matchesByDetail) return;
+
+        if (scheduledActivityId) ids.add(scheduledActivityId);
+        if (scheduledBaseId) ids.add(scheduledBaseId);
+        scheduledTaskIds.forEach((id: string) => ids.add(id));
+      });
+
+      return ids;
+    },
+    [normalizeText, todayScheduleContext.activities]
+  );
+
+  const getHighlightIdsForPoint = useCallback(
+    (point: MindsetPoint, sourceType: BotheringSourceType) => {
+      const ids = new Set<string>();
+      getEffectiveTasks(point, sourceType).forEach((task) => {
+        getHighlightIdsForTaskInTodaySlots(task).forEach((id) => ids.add(id));
+      });
+
+      if (ids.size === 0) {
+        getEffectiveTasks(point, sourceType).forEach((task) => {
+          if (task.id) ids.add(task.id);
+          if (task.activityId) ids.add(task.activityId);
+        });
+      }
+
+      return ids;
+    },
+    [getEffectiveTasks, getHighlightIdsForTaskInTodaySlots]
+  );
 
   const isTaskPresentInTodaySlots = useCallback(
     (task: BotheringTask) => {
@@ -178,31 +196,11 @@ export function BotheringsCard() {
       if (activityId && todayScheduleContext.idSet.has(activityId)) return true;
       if (taskId && todayScheduleContext.idSet.has(taskId)) return true;
 
-      const routineDetail =
-        (activityId ? routineDetailById.get(activityId) : undefined) ||
-        (taskId ? routineDetailById.get(taskId) : undefined) ||
-        "";
-
       if (taskDetail && todayScheduleContext.detailSet.has(taskDetail)) return true;
-      if (routineDetail && todayScheduleContext.detailSet.has(routineDetail)) return true;
-
-      if (taskDetail) {
-        const fuzzyTask = Array.from(todayScheduleContext.detailSet).some(
-          (d) => (d.length >= 6 && d.includes(taskDetail)) || (taskDetail.length >= 6 && taskDetail.includes(d)) || hasTokenOverlap(d, taskDetail)
-        );
-        if (fuzzyTask) return true;
-      }
-
-      if (routineDetail) {
-        const fuzzyRoutine = Array.from(todayScheduleContext.detailSet).some(
-          (d) => (d.length >= 6 && d.includes(routineDetail)) || (routineDetail.length >= 6 && routineDetail.includes(d)) || hasTokenOverlap(d, routineDetail)
-        );
-        if (fuzzyRoutine) return true;
-      }
 
       return false;
     },
-    [hasTokenOverlap, normalizeText, routineDetailById, todayScheduleContext]
+    [normalizeText, todayScheduleContext]
   );
 
   const isTaskCompletedToday = useCallback(
@@ -279,6 +277,14 @@ export function BotheringsCard() {
     return acc;
   }, {});
 
+  const highlightIdsByPointKey = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    uniqueAllPoints.forEach((item) => {
+      map.set(`${item.sourceType}:${item.point.id}`, getHighlightIdsForPoint(item.point, item.sourceType));
+    });
+    return map;
+  }, [getHighlightIdsForPoint, uniqueAllPoints]);
+
   const getTodayStats = useCallback(
     (point: MindsetPoint, sourceType: BotheringSourceType) => {
       const tasks = getEffectiveTasks(point, sourceType);
@@ -306,14 +312,14 @@ export function BotheringsCard() {
   }, []);
 
   const setHighlightForPoint = useCallback((point: MindsetPoint, sourceType: BotheringSourceType) => {
-    const ids = new Set<string>();
-    getEffectiveTasks(point, sourceType).forEach((t) => {
-      if (t.id) ids.add(t.id);
-      if (t.activityId) ids.add(t.activityId);
+    const ids = highlightIdsByPointKey.get(`${sourceType}:${point.id}`) || new Set<string>();
+    startTransition(() => {
+      setHighlightedTaskIds((prev) => {
+        const same = ids.size === prev.size && Array.from(ids).every((id) => prev.has(id));
+        return same ? new Set() : new Set(ids);
+      });
     });
-    const same = ids.size === highlightedTaskIds.size && Array.from(ids).every((id) => highlightedTaskIds.has(id));
-    setHighlightedTaskIds(same ? new Set() : ids);
-  }, [getEffectiveTasks, highlightedTaskIds, setHighlightedTaskIds]);
+  }, [highlightIdsByPointKey, setHighlightedTaskIds]);
 
   const buildBotheringConsistency = useCallback((point: MindsetPoint, sourceType: BotheringSourceType) => {
     const today = startOfDay(new Date());
@@ -489,7 +495,7 @@ export function BotheringsCard() {
               return (
                 <li
                   key={`${item.sourceType}:${b.id}`}
-                  className={`rounded-lg border p-3 cursor-pointer transition ${
+                  className={`rounded-lg border p-3 cursor-pointer select-none transition ${
                     isDoneToday
                       ? "bothering-item-done"
                       : "bothering-item-open"
@@ -497,7 +503,7 @@ export function BotheringsCard() {
                   onClick={() => setHighlightForPoint(b, item.sourceType)}
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <div className={`text-sm font-semibold ${isDoneToday ? "line-through text-muted-foreground" : ""}`}>
+                    <div className={`pointer-events-none select-none text-sm font-semibold ${isDoneToday ? "line-through text-muted-foreground" : ""}`}>
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={{
@@ -554,7 +560,7 @@ export function BotheringsCard() {
                     </div>
                   </div>
 
-                  <div className="mt-2 text-xs text-muted-foreground inline-flex items-center gap-2">
+                  <div className="mt-2 inline-flex items-center gap-2 text-xs text-muted-foreground select-none pointer-events-none">
                     <span className="bothering-deadline-pill px-2 py-0.5 rounded-full border">
                       {getDaysLeftLabel(b.endDate)}
                     </span>

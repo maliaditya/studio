@@ -334,6 +334,13 @@ export default function PdfViewerPopup() {
         typeof window !== "undefined" && Boolean((window as any)?.studioDesktop?.isDesktop);
     const isAiEnabled = normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== "none";
 
+    useEffect(() => {
+        if (!isAiEnabled) {
+            setShowExplainPanel(false);
+            setIsFlashcardPanelOpen(false);
+        }
+    }, [isAiEnabled]);
+
     const [resizeMode, setResizeMode] = useState<null | "x" | "y" | "xy">(null);
     const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0, mode: "x" as "x" | "y" | "xy" });
     const pdfUploadInputRef = useRef<HTMLInputElement>(null);
@@ -1012,11 +1019,12 @@ export default function PdfViewerPopup() {
     }, [resourceFolders]);
 
     const handleOpenFlashcardPanel = useCallback((scope: FlashcardGenerationScope = "target") => {
+        if (!isAiEnabled) return;
         setFlashcardGenerationScope(scope);
         setIsFlashcardPanelOpen(true);
         setFlashcardError("");
         setFlashcardPreviewCandidates([]);
-    }, []);
+    }, [isAiEnabled]);
 
     const handleLoadFlashcardPreview = useCallback(async () => {
         if (!resourceId || !pdfViewerState?.resource) return;
@@ -3641,7 +3649,7 @@ export default function PdfViewerPopup() {
                         </div>
                     </div>
                 )}
-                {isFlashcardPanelOpen && (
+                {isAiEnabled && isFlashcardPanelOpen && (
                     <div className="absolute inset-0 z-50 bg-zinc-950/80 p-4 backdrop-blur-sm">
                         <div className="mx-auto flex h-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-100 shadow-2xl">
                             <div className="flex items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-900 px-4 py-3">
@@ -3907,14 +3915,16 @@ export default function PdfViewerPopup() {
                                     Today&apos;s target completed
                                 </div>
                                 <div className="mt-3 flex items-center justify-center">
-                                    <Button
-                                        size="sm"
-                                        className="bg-emerald-400 text-emerald-950 hover:bg-emerald-300"
-                                        onClick={() => handleOpenFlashcardPanel("target")}
-                                    >
-                                        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                                        Generate Flashcards
-                                    </Button>
+                                    {isAiEnabled && (
+                                        <Button
+                                            size="sm"
+                                            className="bg-emerald-400 text-emerald-950 hover:bg-emerald-300"
+                                            onClick={() => handleOpenFlashcardPanel("target")}
+                                        >
+                                            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                                            Generate Flashcards
+                                        </Button>
+                                    )}
                                 </div>
                                 {eligibleFlashcardHighlights.length === 0 && (
                                     <div className="mt-2 max-w-64 text-center text-xs text-emerald-200/80">
@@ -4009,16 +4019,17 @@ export default function PdfViewerPopup() {
                         >
                             <Highlighter className="h-4 w-4" />
                         </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 shadow-lg"
-                            onClick={() => setShowExplainPanel(true)}
-                            disabled={!isAiEnabled || !isDesktopRuntime}
-                            title="Open AI explanation"
-                        >
-                            <Sparkles className="h-4 w-4" />
-                        </Button>
+                        {isDesktopRuntime && isAiEnabled && (
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-9 w-9 shadow-lg"
+                                onClick={() => setShowExplainPanel(true)}
+                                title="Open AI explanation"
+                            >
+                                <Sparkles className="h-4 w-4" />
+                            </Button>
+                        )}
                         <Button
                             variant="outline"
                             size="icon"
@@ -4029,20 +4040,22 @@ export default function PdfViewerPopup() {
                         >
                             <Eraser className="h-4 w-4" />
                         </Button>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 shadow-lg"
-                            onClick={() => handleOpenFlashcardPanel("page")}
-                            disabled={!hasCurrentPageFlashcardHighlights}
-                            title={
-                                hasCurrentPageFlashcardHighlights
-                                    ? "Generate flashcards from this page's highlights"
-                                    : "Add text highlights on this page to generate flashcards"
-                            }
-                        >
-                            <Sparkles className="h-4 w-4" />
-                        </Button>
+                        {isAiEnabled && (
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-9 w-9 shadow-lg"
+                                onClick={() => handleOpenFlashcardPanel("page")}
+                                disabled={!hasCurrentPageFlashcardHighlights}
+                                title={
+                                    hasCurrentPageFlashcardHighlights
+                                        ? "Generate flashcards from this page's highlights"
+                                        : "Add text highlights on this page to generate flashcards"
+                                }
+                            >
+                                <Sparkles className="h-4 w-4" />
+                            </Button>
+                        )}
                     </div>
                 )}
                 {isReaderOnly && (

@@ -5,16 +5,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { Button } from './ui/button';
-import { Play, Pause, Volume1, Volume2, VolumeX, Eye, EyeOff, Bot, X, Check, Settings2, Filter, RefreshCw, Loader2, Mic, MicOff, Phone, Lock, Unlock, Square, Save, Library, Target, Plus } from 'lucide-react';
+import { Play, Pause, Volume1, Volume2, VolumeX, Eye, EyeOff, Bot, X, Check, Settings2, Filter, RefreshCw, Loader2, Mic, MicOff, Phone, Lock, Unlock, Square, Save, Library, Target, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Slider } from './ui/slider';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ScrollArea } from './ui/scroll-area';
 import { Textarea } from './ui/textarea';
-import { getAiConfigFromSettings } from '@/lib/ai/config';
+import { getAiConfigFromSettings, normalizeAiSettings } from '@/lib/ai/config';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { getStaticTaskAliasMap, mergeTaskAliasMaps } from '@/lib/shiv/taskAliases';
@@ -299,6 +300,13 @@ const formatGoalTrayDateLabel = (dateKey?: string, pattern = 'MMM d') => {
   const date = new Date(`${dateKey}T00:00:00`);
   if (Number.isNaN(date.getTime())) return dateKey;
   return format(date, pattern);
+};
+const getGoalTrayDateKey = (date: Date) => format(date, 'yyyy-MM-dd');
+const shiftGoalTrayDateKey = (dateKey: string, days: number) => {
+  const baseDate = parseGoalTrayDate(dateKey) || new Date();
+  baseDate.setDate(baseDate.getDate() + days);
+  baseDate.setHours(0, 0, 0, 0);
+  return getGoalTrayDateKey(baseDate);
 };
 
 const getDefaultXttsSpeakerPath = (voiceName?: string) => {
@@ -1091,6 +1099,7 @@ export function BackgroundAudioPlayer() {
   const isMobile = useIsMobile();
   const [isShivOpen, setIsShivOpen] = useState(false);
   const [isGoalTasksOpen, setIsGoalTasksOpen] = useState(false);
+  const [goalTasksDateKey, setGoalTasksDateKey] = useState(() => getGoalTrayDateKey(new Date()));
   const [activeGoalContributionId, setActiveGoalContributionId] = useState<string | null>(null);
   const [isClientMounted, setIsClientMounted] = useState(false);
   const [shivInput, setShivInput] = useState('');
@@ -1209,13 +1218,13 @@ export function BackgroundAudioPlayer() {
     setActiveGoalContributionId((current) => current === goalId ? null : current);
   }, []);
   const handleAssignScheduledTaskToGoal = useCallback((goalId: string, goalTitle: string, activityId: string) => {
-    const todayKey = format(new Date(), 'yyyy-MM-dd');
+    const selectedDateLabel = formatGoalTrayDateLabel(goalTasksDateKey, 'MMM d');
     let assignedTaskTitle = '';
     let reassignedFromGoalId = '';
     let updated = false;
 
     auth?.setSchedule?.((prev: Record<string, any>) => {
-      const daySchedule = prev?.[todayKey];
+      const daySchedule = prev?.[goalTasksDateKey];
       if (!daySchedule || typeof daySchedule !== 'object') return prev;
 
       const nextDaySchedule = { ...daySchedule };
@@ -1240,7 +1249,7 @@ export function BackgroundAudioPlayer() {
       if (!updated) return prev;
       return {
         ...prev,
-        [todayKey]: nextDaySchedule,
+        [goalTasksDateKey]: nextDaySchedule,
       };
     });
 
@@ -1256,15 +1265,16 @@ export function BackgroundAudioPlayer() {
     toast({
       title: 'Task added to goal',
       description: reassignedFromGoalId && reassignedFromGoalId !== goalId
-        ? `${assignedTaskTitle} now contributes to ${goalTitle} for today.`
-        : `${assignedTaskTitle} now contributes to ${goalTitle} for today.`,
+        ? `${assignedTaskTitle} now contributes to ${goalTitle} for ${selectedDateLabel}.`
+        : `${assignedTaskTitle} now contributes to ${goalTitle} for ${selectedDateLabel}.`,
     });
     closeGoalContributionComposer(goalId);
-  }, [auth, closeGoalContributionComposer, toast]);
+  }, [auth, closeGoalContributionComposer, goalTasksDateKey, toast]);
   const todayGoalPopupData = useMemo(() => {
     const now = new Date();
-    const todayKey = format(now, 'yyyy-MM-dd');
-    const todayDate = parseGoalTrayDate(todayKey) || now;
+    const dateKey = goalTasksDateKey || getGoalTrayDateKey(now);
+    const selectedDate = parseGoalTrayDate(dateKey) || now;
+    const todayKey = getGoalTrayDateKey(now);
     const goals = Array.isArray(auth?.goals) ? auth.goals : [];
     const activeGoals = goals.filter((goal: any) => {
       const status = String(goal?.status || '').trim().toLowerCase();
@@ -1281,11 +1291,21 @@ export function BackgroundAudioPlayer() {
         .filter(Boolean) as Array<[string, any]>
     );
     const schedule = auth?.schedule && typeof auth.schedule === 'object' ? auth.schedule : {};
-    const todaySchedule = schedule?.[todayKey] && typeof schedule[todayKey] === 'object' ? schedule[todayKey] : {};
+    const selectedSchedule = schedule?.[dateKey] && typeof schedule[dateKey] === 'object' ? schedule[dateKey] : {};
     const nowHour = now.getHours() + now.getMinutes() / 60;
+    const dayOffset = diffGoalTrayDays(selectedDate, parseGoalTrayDate(todayKey) || now);
+
+    const getTaskStatus = (slotName: string, completed: boolean): GoalTrayTaskStatus => {
+      if (completed) return 'completed';
+      if (dayOffset < 0) return 'due';
+      if (dayOffset > 0) return 'upcoming';
+
+      const slotStart = GOAL_TRAY_SLOT_START_HOURS[slotName] ?? 0;
+      return nowHour >= slotStart ? 'due' : 'upcoming';
+    };
 
     const scheduledActivities = GOAL_TRAY_SLOT_ORDER.flatMap((slotName) => {
-      const slotActivities = Array.isArray(todaySchedule?.[slotName]) ? todaySchedule[slotName] : [];
+      const slotActivities = Array.isArray(selectedSchedule?.[slotName]) ? selectedSchedule[slotName] : [];
       return slotActivities.map((activity: any) => ({ slotName, activity }));
     });
 
@@ -1316,8 +1336,7 @@ export function BackgroundAudioPlayer() {
           const matchesByDetails = Boolean(linkedRoutineDetailsKey) && activityDetailsKey === linkedRoutineDetailsKey;
           if (!matchesById && !matchesByDetails) return [];
 
-          const slotStart = GOAL_TRAY_SLOT_START_HOURS[slotName] ?? 0;
-          const status: GoalTrayTaskStatus = activity?.completed ? 'completed' : nowHour >= slotStart ? 'due' : 'upcoming';
+          const status = getTaskStatus(slotName, Boolean(activity?.completed));
           const loggedMinutes = getGoalTrayLoggedMinutes(activity);
           const loggedDurationLabel = formatGoalTrayLoggedDuration(loggedMinutes);
 
@@ -1335,12 +1354,12 @@ export function BackgroundAudioPlayer() {
 
         if (matchedScheduledTasks.length > 0) return matchedScheduledTasks;
 
-        const skippedToday = (skipByDate[todayKey] || []).includes(linkedTaskId);
-        const dueToday = Boolean(linkedRoutine && !skippedToday && isGoalTrayRoutineDueOnDate(linkedRoutine, todayDate));
-        if (!linkedRoutine || !dueToday) return [];
+        const skippedOnSelectedDate = (skipByDate[dateKey] || []).includes(linkedTaskId);
+        const dueOnSelectedDate = Boolean(linkedRoutine && !skippedOnSelectedDate && isGoalTrayRoutineDueOnDate(linkedRoutine, selectedDate));
+        if (!linkedRoutine || !dueOnSelectedDate) return [];
 
         const fallbackSlotName = String(linkedRoutine.slot || '').trim() || 'Unscheduled';
-        const fallbackStatus: GoalTrayTaskStatus = (GOAL_TRAY_SLOT_START_HOURS[fallbackSlotName] ?? 24) <= nowHour ? 'due' : 'upcoming';
+        const fallbackStatus = getTaskStatus(fallbackSlotName, false);
         return [{
           id: `${goal.id}:routine:${linkedTaskId}`,
           linkedTaskId,
@@ -1355,8 +1374,7 @@ export function BackgroundAudioPlayer() {
 
       const contributionTasks = scheduledActivities.flatMap(({ slotName, activity }: { slotName: string; activity: any }) => {
         if (String(activity?.contributedGoalId || '') !== String(goal?.id || '')) return [];
-        const slotStart = GOAL_TRAY_SLOT_START_HOURS[slotName] ?? 0;
-        const status: GoalTrayTaskStatus = activity?.completed ? 'completed' : nowHour >= slotStart ? 'due' : 'upcoming';
+        const status = getTaskStatus(slotName, Boolean(activity?.completed));
         const loggedMinutes = getGoalTrayLoggedMinutes(activity);
         const loggedDurationLabel = formatGoalTrayLoggedDuration(loggedMinutes);
 
@@ -1401,7 +1419,7 @@ export function BackgroundAudioPlayer() {
       : null;
 
     return {
-      todayKey,
+      dateKey,
       entries,
       scheduledNonRoutineTasks: scheduledActivities
         .filter(({ activity }: { activity: any }) => {
@@ -1431,7 +1449,7 @@ export function BackgroundAudioPlayer() {
       goalWeight,
       weightDifference,
     };
-  }, [auth?.goalWeight, auth?.goals, auth?.schedule, auth?.weightLogs, settings?.routines]);
+  }, [auth?.goalWeight, auth?.goals, auth?.schedule, auth?.weightLogs, goalTasksDateKey, settings?.routines, settings?.routineSkipByDate]);
   const pdfResources = useMemo(
     () => (Array.isArray(auth?.resources) ? auth.resources : []).filter((resource: any) => resource?.type === 'pdf'),
     [auth?.resources]
@@ -1503,6 +1521,7 @@ export function BackgroundAudioPlayer() {
 
   const isDesktopRuntime =
     isClientMounted && typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop);
+  const isAiEnabled = normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== 'none';
   const kokoroChatEnabled =
     isDesktopRuntime ||
     Boolean(settings?.kokoroTtsBaseUrl?.trim()) ||
@@ -5188,16 +5207,17 @@ export function BackgroundAudioPlayer() {
   }, [chatKokoroVoiceUri, kokoroChatVoices]);
 
   useEffect(() => {
-    if (!isDesktopRuntime && isShivOpen) {
+    if ((!isDesktopRuntime || !isAiEnabled) && isShivOpen) {
       setIsShivOpen(false);
     }
-  }, [isDesktopRuntime, isShivOpen]);
+  }, [isAiEnabled, isDesktopRuntime, isShivOpen]);
 
   const handleOpenAstraPanel = useCallback(() => {
+    if (!isAiEnabled) return;
     setResourceAstraContext(null);
     setShivPanelMode(shivDefaultMode);
     setIsShivOpen(true);
-  }, [shivDefaultMode]);
+  }, [isAiEnabled, shivDefaultMode]);
 
   const getResourceAiNoteTitle = useCallback((content: string, fallback = 'AI Note') => {
     const firstLine = String(content || '')
@@ -5346,36 +5366,68 @@ export function BackgroundAudioPlayer() {
   return (
     <>
       <audio ref={audioRef} src="/40 Hz Study Music.mp3" loop />
+      <TooltipProvider delayDuration={150}>
       <div className="fixed bottom-4 right-4 z-50 flex items-center gap-2 rounded-full border bg-background/80 p-2 shadow-lg backdrop-blur-sm">
-        <Button onClick={handleToggleAllWidgets} variant="ghost" size="icon" className="h-10 w-10 rounded-full">
-            {settings.allWidgetsVisible ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
-            <span className="sr-only">Toggle all widgets</span>
-        </Button>
-        <Button onClick={togglePlayPause} variant="ghost" size="icon" className="h-10 w-10 rounded-full">
-          {isAudioPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
-        </Button>
-        {isDesktopRuntime ? (
-          <Button
-            onClick={handleOpenAstraPanel}
-            variant="ghost"
-            size="icon"
-            className="h-10 w-10 rounded-full"
-            title="Ask Astra"
-          >
-            <Bot className="h-5 w-5" />
-            <span className="sr-only">Ask Astra</span>
-          </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button onClick={handleToggleAllWidgets} variant="ghost" size="icon" className="h-10 w-10 rounded-full">
+                {settings.allWidgetsVisible ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                <span className="sr-only">Toggle all widgets</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p>{settings.allWidgetsVisible ? 'Hide all widgets' : 'Show all widgets'}</p>
+          </TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button onClick={togglePlayPause} variant="ghost" size="icon" className="h-10 w-10 rounded-full">
+              {isAudioPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+              <span className="sr-only">{isAudioPlaying ? 'Pause binaural beats' : 'Play binaural beats'}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p>{isAudioPlaying ? 'Pause binaural beats' : 'Play binaural beats'}</p>
+          </TooltipContent>
+        </Tooltip>
+        {isDesktopRuntime && isAiEnabled ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                onClick={handleOpenAstraPanel}
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full"
+              >
+                <Bot className="h-5 w-5" />
+                <span className="sr-only">Ask Astra</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              <p>Ask Astra</p>
+            </TooltipContent>
+          </Tooltip>
         ) : null}
-        <Button
-          onClick={() => setIsGoalTasksOpen(true)}
-          variant="ghost"
-          size="icon"
-          className="h-10 w-10 rounded-full"
-          title="Show today's goal-linked tasks"
-        >
-          <Target className="h-5 w-5" />
-          <span className="sr-only">Show today's goal-linked tasks</span>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              onClick={() => {
+                setGoalTasksDateKey(getGoalTrayDateKey(new Date()));
+                setActiveGoalContributionId(null);
+                setIsGoalTasksOpen(true);
+              }}
+              variant="ghost"
+              size="icon"
+              className="h-10 w-10 rounded-full"
+            >
+              <Target className="h-5 w-5" />
+              <span className="sr-only">Show today's goal-linked tasks</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            <p>Show today's goal-linked tasks</p>
+          </TooltipContent>
+        </Tooltip>
         {isAudioPlaying && (
           <div className="flex h-5 w-5 items-end justify-between gap-0.5">
             <div className="h-full w-1 origin-bottom animate-audio-wave-1 rounded-full bg-primary"></div>
@@ -5384,11 +5436,19 @@ export function BackgroundAudioPlayer() {
           </div>
         )}
         <Popover>
-            <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
-                    {getVolumeIcon()}
-                </Button>
-            </PopoverTrigger>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full">
+                        {getVolumeIcon()}
+                        <span className="sr-only">Adjust volume</span>
+                    </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent side="top">
+                <p>Adjust volume</p>
+              </TooltipContent>
+            </Tooltip>
             <PopoverContent side="top" align="end" className="w-auto p-2">
                 <Slider
                     defaultValue={[globalVolume]}
@@ -5400,6 +5460,7 @@ export function BackgroundAudioPlayer() {
             </PopoverContent>
         </Popover>
       </div>
+      </TooltipProvider>
       {isGoalTasksOpen && (
         <div
           className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-[2px]"
@@ -5409,35 +5470,80 @@ export function BackgroundAudioPlayer() {
             className="flex h-[90vh] w-[95vw] max-w-[95vw] flex-col overflow-hidden rounded-3xl border border-border/70 bg-background/95 shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-4 border-b border-border/60 px-6 py-4">
-              <div>
-                <div className="text-lg font-semibold">Today's Goal Tasks</div>
-                <div className="mt-1 text-sm text-muted-foreground">
-                  {formatGoalTrayDateLabel(todayGoalPopupData.todayKey, 'EEEE, MMM d')}
+            {(() => {
+              const currentTodayKey = getGoalTrayDateKey(new Date());
+              const isViewingToday = todayGoalPopupData.dateKey === currentTodayKey;
+
+              return (
+            <div className="border-b border-border/60 px-6 py-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-lg font-semibold">Goal Tasks</div>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    {formatGoalTrayDateLabel(todayGoalPopupData.dateKey, 'EEEE, MMM d')}
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-full"
+                  onClick={() => setIsGoalTasksOpen(false)}
+                  title="Close goal tasks popup"
+                >
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Close goal tasks popup</span>
+                </Button>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-border/60 bg-muted/30 px-3 py-1">
+                    {todayGoalPopupData.activeGoalCount} active goal{todayGoalPopupData.activeGoalCount === 1 ? '' : 's'}
+                  </span>
+                  <span className="rounded-full border border-border/60 bg-muted/30 px-3 py-1">
+                    {todayGoalPopupData.goalsWithScheduledTasks} goal{todayGoalPopupData.goalsWithScheduledTasks === 1 ? '' : 's'} with tasks on this day
+                  </span>
+                  <span className="rounded-full border border-border/60 bg-muted/30 px-3 py-1">
+                    {todayGoalPopupData.scheduledTaskCount} linked task{todayGoalPopupData.scheduledTaskCount === 1 ? '' : 's'} scheduled on this day
+                  </span>
+                </div>
+                <div className="ml-auto flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10 rounded-lg"
+                    onClick={() => {
+                      setGoalTasksDateKey((current) => shiftGoalTrayDateKey(current, -1));
+                      setActiveGoalContributionId(null);
+                    }}
+                    title="View previous day"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span className="sr-only">View previous day</span>
+                  </Button>
+                  <div className="min-w-[92px] rounded-lg border border-border/60 bg-muted/20 px-4 py-2 text-center text-sm font-medium text-foreground">
+                    {isViewingToday ? 'Today' : formatGoalTrayDateLabel(todayGoalPopupData.dateKey, 'MMM d')}
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-10 w-10 rounded-lg"
+                    onClick={() => {
+                      setGoalTasksDateKey((current) => shiftGoalTrayDateKey(current, 1));
+                      setActiveGoalContributionId(null);
+                    }}
+                    title="View next day"
+                    disabled={isViewingToday}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                    <span className="sr-only">View next day</span>
+                  </Button>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 rounded-full"
-                onClick={() => setIsGoalTasksOpen(false)}
-                title="Close goal tasks popup"
-              >
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close goal tasks popup</span>
-              </Button>
             </div>
-            <div className="flex flex-wrap gap-2 border-b border-border/60 px-6 py-3 text-xs text-muted-foreground">
-              <span className="rounded-full border border-border/60 bg-muted/30 px-3 py-1">
-                {todayGoalPopupData.activeGoalCount} active goal{todayGoalPopupData.activeGoalCount === 1 ? '' : 's'}
-              </span>
-              <span className="rounded-full border border-border/60 bg-muted/30 px-3 py-1">
-                {todayGoalPopupData.goalsWithScheduledTasks} goal{todayGoalPopupData.goalsWithScheduledTasks === 1 ? '' : 's'} with tasks today
-              </span>
-              <span className="rounded-full border border-border/60 bg-muted/30 px-3 py-1">
-                {todayGoalPopupData.scheduledTaskCount} linked task{todayGoalPopupData.scheduledTaskCount === 1 ? '' : 's'} scheduled today
-              </span>
-            </div>
+              );
+            })()}
             <ScrollArea className="flex-1 px-6 py-5">
               <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -5447,7 +5553,7 @@ export function BackgroundAudioPlayer() {
                       {formatGoalTrayLoggedDuration(todayGoalPopupData.totalLoggedMinutes) || '0m logged'}
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      Across today&apos;s linked goal tasks
+                      Across this day&apos;s linked goal tasks
                     </div>
                   </div>
                   <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
@@ -5456,7 +5562,7 @@ export function BackgroundAudioPlayer() {
                       {todayGoalPopupData.completedTaskCount}/{todayGoalPopupData.scheduledTaskCount}
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {todayGoalPopupData.pendingTaskCount} pending today
+                      {todayGoalPopupData.pendingTaskCount} remaining on this day
                     </div>
                   </div>
                   <div className="rounded-2xl border border-border/60 bg-muted/20 p-4">
@@ -5508,7 +5614,7 @@ export function BackgroundAudioPlayer() {
                               {goal.priority} priority
                             </span>
                             <span className="rounded-full border border-border/60 bg-background/70 px-2.5 py-1">
-                              {goal.tasks.length} scheduled today
+                              {goal.tasks.length} scheduled on this day
                             </span>
                             {goal.dueDate ? (
                               <span className="rounded-full border border-border/60 bg-background/70 px-2.5 py-1">
@@ -5523,7 +5629,7 @@ export function BackgroundAudioPlayer() {
                           size="icon"
                           className="h-8 w-8 rounded-full border border-border/60 bg-background/70 text-muted-foreground hover:text-foreground"
                           onClick={() => activeGoalContributionId === goal.id ? closeGoalContributionComposer(goal.id) : openGoalContributionComposer(goal.id)}
-                          title="Add a one-off task that contributed to this goal today"
+                          title="Add a one-off task that contributed to this goal on this day"
                         >
                           <Plus className="h-4 w-4" />
                           <span className="sr-only">Add one-off contribution task</span>
@@ -5532,14 +5638,14 @@ export function BackgroundAudioPlayer() {
                       {activeGoalContributionId === goal.id ? (
                         <div className="mt-3 rounded-xl border border-border/60 bg-background/50 p-3">
                           <div className="flex items-center justify-between gap-3">
-                            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Pick from today&apos;s scheduled tasks</div>
+                            <div className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted-foreground">Pick from this day&apos;s scheduled tasks</div>
                             <Button type="button" variant="ghost" size="sm" onClick={() => closeGoalContributionComposer(goal.id)}>
                               Close
                             </Button>
                           </div>
                           {todayGoalPopupData.scheduledNonRoutineTasks.length === 0 ? (
                             <div className="mt-3 rounded-lg border border-dashed border-border/60 bg-background/40 px-3 py-3 text-sm text-muted-foreground">
-                              No non-routine tasks are scheduled today.
+                              No non-routine tasks are scheduled on this day.
                             </div>
                           ) : (
                             <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
@@ -5575,7 +5681,7 @@ export function BackgroundAudioPlayer() {
                       ) : null}
                       {goal.tasks.length === 0 ? (
                         <div className="mt-3 rounded-xl border border-dashed border-border/60 bg-background/50 px-3 py-3 text-sm text-muted-foreground">
-                          No linked tasks from this goal are scheduled in today's time slots.
+                          No linked tasks from this goal are scheduled in this day&apos;s time slots.
                         </div>
                       ) : (
                         <div className="mt-3 overflow-hidden rounded-xl border border-border/50 bg-background/40">
@@ -5631,7 +5737,7 @@ export function BackgroundAudioPlayer() {
           </div>
         </div>
       )}
-      {isDesktopRuntime && isShivOpen && (
+      {isDesktopRuntime && isAiEnabled && isShivOpen && (
         <div className="fixed bottom-20 right-4 z-[70] flex h-[40rem] max-h-[calc(100vh-6rem)] w-[32rem] max-w-[calc(100vw-1rem)] flex-col rounded-xl border bg-background/95 shadow-2xl backdrop-blur-sm">
           <div className="flex items-center justify-between border-b px-3 py-2">
             <div className="flex min-w-0 items-center gap-2">

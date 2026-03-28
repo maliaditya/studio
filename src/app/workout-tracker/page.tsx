@@ -691,7 +691,7 @@ function WorkoutPageContent() {
                                         {dobInput ? format(dobInput, "PPP") : <span>Pick a date</span>}
                                     </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0">
+                                  <PopoverContent portalled={false} className="w-auto p-0">
                                     <Calendar
                                         mode="single"
                                         selected={dobInput}

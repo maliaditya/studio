@@ -10,6 +10,7 @@ import { createDefaultSetupSupportPlanCatalog, normalizeSetupSupportPlanCatalog 
 export const dynamic = "force-dynamic";
 
 const readEnvFallback = () => {
+  const desktopDownloadUrl = (process.env.DESKTOP_DOWNLOAD_URL || process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || '').trim() || null;
   const desktopPlanPriceInr = normalizeDesktopPlanPriceInr(process.env.NEXT_PUBLIC_DESKTOP_PLAN_PRICE_INR, DESKTOP_PLAN_PRICE_INR);
   const desktopPlans = createDefaultDesktopPlanCatalog(desktopPlanPriceInr);
   const setupSupportPlans = createDefaultSetupSupportPlanCatalog();
@@ -17,6 +18,7 @@ const readEnvFallback = () => {
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || null,
     supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || null,
     supabaseStorageBucket: process.env.SUPABASE_STORAGE_BUCKET || null,
+    desktopDownloadUrl,
     desktopPlanPriceInr,
     desktopPlans,
     setupSupportPlans,
@@ -87,6 +89,7 @@ export async function POST(request: Request) {
   const supabaseUrl = String(payload?.supabaseUrl || "").trim();
   const supabaseAnonKey = String(payload?.supabaseAnonKey || "").trim();
   const supabaseStorageBucket = String(payload?.supabaseStorageBucket || "").trim() || null;
+  const desktopDownloadUrl = String(payload?.desktopDownloadUrl || '').trim() || null;
   const desktopPlans = normalizeDesktopPlanCatalog(payload?.desktopPlans, normalizeDesktopPlanPriceInr(payload?.desktopPlanPriceInr, DESKTOP_PLAN_PRICE_INR));
   const setupSupportPlans = normalizeSetupSupportPlanCatalog(payload?.setupSupportPlans);
   const desktopPlanPriceInr = getDesktopPlanFinalPriceInr(getFeaturedDesktopPlan(desktopPlans));
@@ -97,12 +100,23 @@ export async function POST(request: Request) {
   if (!Number.isFinite(desktopPlanPriceInr) || desktopPlanPriceInr < 0) {
     return NextResponse.json({ error: 'Desktop featured plan price must be a zero-or-higher whole-number INR amount.' }, { status: 400 });
   }
+  if (desktopDownloadUrl) {
+    try {
+      const parsed = new URL(desktopDownloadUrl);
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return NextResponse.json({ error: 'Desktop download URL must start with http:// or https://.' }, { status: 400 });
+      }
+    } catch {
+      return NextResponse.json({ error: 'Desktop download URL must be a valid absolute URL.' }, { status: 400 });
+    }
+  }
 
   try {
     const saved = await upsertAppConfig({
       supabaseUrl,
       supabaseAnonKey,
       supabaseStorageBucket,
+      desktopDownloadUrl,
       desktopPlanPriceInr,
       desktopPlans,
       setupSupportPlans,

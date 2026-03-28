@@ -22,7 +22,15 @@ interface UserProfileProps {
 
 export function UserProfile({ onSettingsClick }: UserProfileProps) {
   const { currentUser, signOut: localSignOut, loading, pushDataToCloud, pullDataFromCloud, exportData, importData } = useAuth();
+  const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const [isProfileOpen, setIsProfileOpen] = React.useState(false);
+
+  const handleOpenProfile = React.useCallback(() => {
+    setIsMenuOpen(false);
+    window.setTimeout(() => {
+      setIsProfileOpen(true);
+    }, 0);
+  }, []);
 
   if (loading) {
     return <div className="h-8 w-20 animate-pulse bg-muted rounded-md"></div>;
@@ -38,7 +46,8 @@ export function UserProfile({ onSettingsClick }: UserProfileProps) {
   };
 
   return (
-    <DropdownMenu>
+    <>
+    <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
@@ -48,7 +57,7 @@ export function UserProfile({ onSettingsClick }: UserProfileProps) {
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
+      <DropdownMenuContent className="w-56" align="end">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">Logged in as</p>
@@ -63,7 +72,7 @@ export function UserProfile({ onSettingsClick }: UserProfileProps) {
           <span>Settings</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => setIsProfileOpen(true)} className="cursor-pointer">
+        <DropdownMenuItem onClick={handleOpenProfile} className="cursor-pointer">
           <UserIcon className="mr-2 h-4 w-4" />
           <span>Profile</span>
         </DropdownMenuItem>
@@ -91,7 +100,8 @@ export function UserProfile({ onSettingsClick }: UserProfileProps) {
           <span>Log out</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
-      <ProfileModal isOpen={isProfileOpen} onOpenChange={setIsProfileOpen} />
     </DropdownMenu>
+      <ProfileModal isOpen={isProfileOpen} onOpenChange={setIsProfileOpen} />
+    </>
   );
 }

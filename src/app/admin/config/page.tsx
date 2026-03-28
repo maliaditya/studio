@@ -41,6 +41,7 @@ function AdminConfigPageContent() {
   const [supabaseUrl, setSupabaseUrl] = useState("");
   const [supabaseAnonKey, setSupabaseAnonKey] = useState("");
   const [supabaseStorageBucket, setSupabaseStorageBucket] = useState("");
+  const [desktopDownloadUrl, setDesktopDownloadUrl] = useState("");
   const [desktopPlanFeatures, setDesktopPlanFeatures] = useState<DesktopPlanFeature[]>(createDefaultDesktopPlanCatalog().features);
   const [desktopPlans, setDesktopPlans] = useState<DesktopPlanDefinition[]>(createDefaultDesktopPlanCatalog().plans);
   const [setupSupportFeatures, setSetupSupportFeatures] = useState<SetupSupportFeature[]>(createDefaultSetupSupportPlanCatalog().features);
@@ -67,6 +68,7 @@ function AdminConfigPageContent() {
       setSupabaseUrl(data.supabaseUrl || "");
       setSupabaseAnonKey(data.supabaseAnonKey || "");
       setSupabaseStorageBucket(data.supabaseStorageBucket || "");
+      setDesktopDownloadUrl(data.desktopDownloadUrl || "");
       const catalog = normalizeDesktopPlanCatalog(data.desktopPlans, data.desktopPlanPriceInr || 799);
       const setupSupportCatalog = normalizeSetupSupportPlanCatalog(data.setupSupportPlans);
       setDesktopPlanFeatures(catalog.features);
@@ -247,6 +249,7 @@ function AdminConfigPageContent() {
           supabaseUrl: supabaseUrl.trim(),
           supabaseAnonKey: supabaseAnonKey.trim(),
           supabaseStorageBucket: supabaseStorageBucket.trim() || null,
+          desktopDownloadUrl: desktopDownloadUrl.trim() || null,
           desktopPlanPriceInr: featuredPlan.priceInr,
           desktopPlans: {
             features: desktopPlanFeatures,
@@ -283,7 +286,7 @@ function AdminConfigPageContent() {
         });
         return;
       }
-      toast({ title: "Saved", description: "Supabase config, desktop plans, and setup/support plans updated for all apps." });
+      toast({ title: "Saved", description: "Supabase config, desktop download URL, desktop plans, and setup/support plans updated for all apps." });
     } catch (err) {
       const message = describeUnknownError(err, "Failed to save config.");
       setError(message);
@@ -366,7 +369,7 @@ function AdminConfigPageContent() {
       <Card>
         <CardHeader>
           <CardTitle>Supabase Public Config</CardTitle>
-          <CardDescription>Only public keys are stored here. Service role keys stay server-only.</CardDescription>
+          <CardDescription>Only public keys and landing-page app config are stored here. Service role keys stay server-only.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1">
@@ -393,6 +396,17 @@ function AdminConfigPageContent() {
               onChange={(event) => setSupabaseStorageBucket(event.target.value)}
               placeholder="dock-data"
             />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">Desktop Download URL</label>
+            <Input
+              value={desktopDownloadUrl}
+              onChange={(event) => setDesktopDownloadUrl(event.target.value)}
+              placeholder="https://example.com/Studio-Setup.exe"
+            />
+            <p className="text-xs text-muted-foreground">
+              Optional. When set, desktop download buttons use this URL after access checks pass. Leave blank to keep using the latest GitHub release automatically.
+            </p>
           </div>
         </CardContent>
       </Card>

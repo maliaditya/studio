@@ -554,8 +554,6 @@ interface AuthContextType {
   setSelectedDeepWorkTask: React.Dispatch<React.SetStateAction<ExerciseDefinition | null>>;
   selectedMicroSkill: MicroSkill | null;
   setSelectedMicroSkill: React.Dispatch<React.SetStateAction<MicroSkill | null>>;
-  highlightedTaskIds: Set<string>;
-  setHighlightedTaskIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   logSubTaskTime: (taskInstanceId: string, durationMinutes: number) => { definitionId?: string } | undefined;
   findRootTask: (activity: Activity) => ExerciseDefinition | null;
 }
@@ -1159,7 +1157,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [selectedUpskillTask, setSelectedUpskillTask] = useState<ExerciseDefinition | null>(null);
   const [selectedDeepWorkTask, setSelectedDeepWorkTask] = useState<ExerciseDefinition | null>(null);
   const [selectedMicroSkill, setSelectedMicroSkill] = useState<MicroSkill | null>(null);
-  const [highlightedTaskIds, setHighlightedTaskIds] = useState<Set<string>>(new Set());
 
   // Auto Suggestion State
   const [autoSuggestions, setAutoSuggestions] = useState<Record<string, AutoSuggestionEntry[]>>({});
@@ -8610,7 +8607,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     selectedUpskillTask, setSelectedUpskillTask,
     selectedDeepWorkTask, setSelectedDeepWorkTask,
     selectedMicroSkill, setSelectedMicroSkill,
-    highlightedTaskIds, setHighlightedTaskIds,
     selectedFormalizationSpecId, setSelectedFormalizationSpecId,
     microSkillMap,
     permanentlyLoggedTaskIds,

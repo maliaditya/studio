@@ -2598,7 +2598,7 @@ export function TimesheetPageContent({
                                                 {tab.label}
                                             </button>
                                         ))}
-                                        {isDesktopRuntime ? (
+                                        {isDesktopRuntime && isAiEnabled ? (
                                             <Button
                                                 type="button"
                                                 size="sm"

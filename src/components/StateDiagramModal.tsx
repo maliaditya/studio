@@ -232,45 +232,203 @@ const getNodeTextColors = (fill: string) => {
 };
 
 const createDefaultNodes = (): StateNode[] => [
-  { id: "S9", title: "Mind", subtitle: "Simulation Engine MAYA", note: "Action Producer", x: 470, y: 90, fill: "#425a80" },
-  { id: "S5", title: "Avoidance", subtitle: "Leakage", note: "Fragmented attention", x: 1270, y: 90, fill: "#7a4523" },
-  { id: "S12", title: "Awareness", subtitle: "Which state am I in right now?", note: "No \"why\", no \"how\", no \"should\"", x: 1710, y: 210, fill: "#4c5478" },
+  { id: "S18", title: "Only one Goal", subtitle: "Only one Goal", note: "Free from fear", x: 1248, y: 12, fill: "#6c4863" },
+  {
+    id: "S13",
+    title: "Refine the Simulation Interpretations",
+    subtitle: "See clearly that you are not your body, mind or feelings",
+    note: "Observe the map without becoming it",
+    x: 1248,
+    y: 140,
+    fill: "#5b7643",
+    width: 360,
+  },
+  { id: "S1", title: "Experience", subtitle: "Ekdhara", note: "Add your skill", x: 1776, y: 302, fill: "#66754a" },
+  {
+    id: "S12",
+    title: "I am the One",
+    subtitle: "Awareness = Absolute Reality",
+    note: "Self-knowledge reveals who is experiencing that reality.",
+    x: 1728,
+    y: 610,
+    fill: "#66698c",
+    width: 320,
+  },
+  { id: "S11", title: "Dhyan", subtitle: "Attention", note: "Raja Yoga", x: 1728, y: 770, fill: "#84734d" },
 
-  { id: "S8", title: "Prediction & Control", subtitle: "Expected Image", note: "now trying to match reality", x: 220, y: 360, fill: "#5c7389" },
-  { id: "S10", title: "Analysis", subtitle: "understanding", note: "What is the current mismatch in reality", x: 710, y: 360, fill: "#4e5a7a" },
-  { id: "S13", title: "Exit Expectation simulation", subtitle: "Ask", note: "Which bothering is currently being solved?", x: 980, y: 330, fill: "#4a5f36" },
+  {
+    id: "S5",
+    title: "Avoidance - Entertainment",
+    subtitle: "You are looking for entertainment because you are deeply bored.",
+    note: "Find out what is void",
+    x: 24,
+    y: 290,
+    fill: "#8c5428",
+    width: 380,
+  },
+  {
+    id: "S9",
+    title: "Imagined Reality",
+    subtitle: "Imagination + uncertainty = anxiety",
+    note: "Simulation = absolute = certainty",
+    x: 696,
+    y: 290,
+    fill: "#62779a",
+  },
+  {
+    id: "S8",
+    title: "Mode 1",
+    subtitle: "Prediction & Control",
+    note: '"What will happen?"',
+    x: 208,
+    y: 486,
+    fill: "#7085a0",
+  },
+  {
+    id: "S10",
+    title: "Mode 2 Structure Creation",
+    subtitle: 'Analysis = "What structure would solve this?"',
+    note: '"What system should I build?"',
+    x: 840,
+    y: 486,
+    fill: "#697697",
+    width: 360,
+  },
 
-  { id: "S0", title: "Reality", subtitle: "Where Your instance is", note: "Running", x: 210, y: 610, fill: "#1b2b4a", kind: "start" },
-  { id: "S1", title: "Bothering's", subtitle: "Where is the mismatch?", note: "External or mental model", x: 710, y: 620, fill: "#45566e" },
-  { id: "S2", title: "Ghutan", subtitle: "Inner Pressure", note: "Energy blocked", x: 1270, y: 620, fill: "#4a2238" },
-  { id: "S11", title: "Dhyan", subtitle: "Attention", note: "The inner vision the Map", x: 1790, y: 630, fill: "#6b5a3a" },
-
-  { id: "S6", title: "Aligned Action", subtitle: "Action from majburi", note: "because situation demands", x: 500, y: 940, fill: "#334a9a", kind: "end" },
-  { id: "S4", title: "Observation", subtitle: "Meta Mode", note: "Stable attention", x: 980, y: 950, fill: "#2d5968" },
-  { id: "S3", title: "Curiosity", subtitle: "Exploration", note: "Energy accessible", x: 1270, y: 940, fill: "#2e5a41" },
+  {
+    id: "S0",
+    title: "Observe",
+    subtitle: "Transactional Reality",
+    note: "Use your senses wisely.",
+    x: 248,
+    y: 720,
+    fill: "#273653",
+    kind: "start",
+  },
+  {
+    id: "S1-B",
+    title: "Bondages",
+    subtitle: "Bothering's / Suffering's / pain",
+    note: "Where is the mismatch?",
+    x: 744,
+    y: 702,
+    fill: "#5d687c",
+    width: 310,
+  },
+  { id: "S2", title: "Ghutan", subtitle: "Inner Pressure", note: "Energy blocked", x: 1344, y: 720, fill: "#5b3047" },
+  { id: "S3", title: "Curiosity", subtitle: "Exploration", note: "Energy accessible", x: 1344, y: 1060, fill: "#446b59" },
+  { id: "S4", title: "Observation", subtitle: "Meta Mode", note: "Observe clearly", x: 744, y: 1060, fill: "#4b7180" },
+  { id: "S6", title: "Aligned Action", subtitle: "Action from majburi", note: "Situation demands", x: 240, y: 1060, fill: "#485ad0", kind: "end" },
 ];
 
 const createDefaultEdges = (): StateEdge[] => [
-  { id: "e1", from: "S9", to: "S8", label: "wants to keep you safe", color: "#94a3b8" },
-  { id: "e2", from: "S9", to: "S10", label: "Ready to face the problems", color: "#94a3b8" },
-  { id: "e3", from: "S9", to: "S5", label: "Fear and doubt Created", color: "#94a3b8" },
-  { id: "e14", from: "S9", to: "S13", label: "want to", color: "#94a3b8" },
-
-  { id: "e4", from: "S8", to: "S0", label: "Urge Pulls and you keep flowing\nlater try to control it but\nCreates Anxiety and that void feeling between\nreality and expected image", color: "#94a3b8" },
-  { id: "e5", from: "S10", to: "S1", label: "I dont know and I want to know", color: "#94a3b8" },
-
-  { id: "e6", from: "S0", to: "S1", label: "mismatch", color: "#94a3b8" },
-  { id: "e7", from: "S1", to: "S2", label: "Feel what's unresolved\nand ask\nHow can i solve it?\nno expectation, no distortion\nAction from reality", color: "#94a3b8" },
-  { id: "e15", from: "S1", to: "S13", label: "new transition", color: "#94a3b8" },
-
-  { id: "e8", from: "S2", to: "S5", label: "fear", color: "#f97316" },
-  { id: "e9", from: "S2", to: "S3", label: "curiosity", color: "#22c55e" },
-  { id: "e10", from: "S3", to: "S4", label: "observe", color: "#94a3b8" },
-  { id: "e11", from: "S4", to: "S6", label: "understanding", color: "#94a3b8" },
-  { id: "e12", from: "S6", to: "S0", label: "updated baseline", color: "#60a5fa" },
-
-  { id: "e13", from: "S2", to: "S11", label: "updates the Map\nAccordingly and\nAttention follows", color: "#94a3b8" },
+  {
+    id: "e1",
+    from: "S5",
+    to: "S9",
+    label: "Realize fear, doubts and urges\nare just your interpretation.\nThese are the lies produced\nby your simulation engine.",
+    color: "#94a3b8",
+    curve: -0.45,
+  },
+  {
+    id: "e2",
+    from: "S5",
+    to: "S8",
+    label: "Prediction error in\nexpected reality = dukh + fear and doubt.\nYou do not want dukh so action halts.",
+    color: "#94a3b8",
+    curve: 0.25,
+  },
+  { id: "e3", from: "S8", to: "S9", label: '"What will happen?"', color: "#94a3b8", curve: -0.12 },
+  { id: "e4", from: "S9", to: "S10", label: '"What can I build?"', color: "#94a3b8", curve: 0.12 },
+  {
+    id: "e5",
+    from: "S9",
+    to: "S13",
+    label: "Remove ignorance.\nIgnorance acts without seeing.\nJnana Yoga",
+    color: "#94a3b8",
+    curve: 0.34,
+  },
+  {
+    id: "e6",
+    from: "S10",
+    to: "S2",
+    label: "Activates\nKarma Yoga",
+    color: "#94a3b8",
+    curve: -0.48,
+  },
+  {
+    id: "e7",
+    from: "S1-B",
+    to: "S13",
+    label: "Remove negligence.\nIgnoring what you already know.\nIgnoring your bothering's\n(external / mismatch / constraint)",
+    color: "#94a3b8",
+    curve: 0.42,
+  },
+  {
+    id: "e8",
+    from: "S13",
+    to: "S18",
+    label: "Realization of\nartificial feelings",
+    color: "#94a3b8",
+    curve: -0.24,
+  },
+  { id: "e9", from: "S13", to: "S1", label: "Experience", color: "#94a3b8", curve: -0.28 },
+  { id: "e10", from: "S1", to: "S12", label: "brahma satyam jagat mithya", color: "#94a3b8", curve: 0.22 },
+  { id: "e11", from: "S12", to: "S11", label: "", color: "#94a3b8", curve: 0 },
+  {
+    id: "e12",
+    from: "S0",
+    to: "S1-B",
+    label: "Input: Reality as-is\nProcess: clear perception\nOutput: Required action\nSide-effect: Reduced noise",
+    color: "#94a3b8",
+    curve: -0.08,
+  },
+  {
+    id: "e13",
+    from: "S8",
+    to: "S0",
+    label: "Input: Psychological lack\nProcess: Simulation of future reward\nOutput: Compulsive action\nSide-effect: More loops",
+    color: "#94a3b8",
+    curve: 0.08,
+  },
+  {
+    id: "e14",
+    from: "S1-B",
+    to: "S2",
+    label: "Feel what's unresolved\nand ask\nHow can I solve it?\nNo expectation, no distortion.\nAction from reality",
+    color: "#94a3b8",
+    curve: 0,
+  },
+  {
+    id: "e15",
+    from: "S2",
+    to: "S11",
+    label: "updates the map\nAccordingly and\nattention follows",
+    color: "#94a3b8",
+    curve: 0,
+  },
+  { id: "e16", from: "S2", to: "S3", label: "curiosity", color: "#22c55e", curve: 0 },
+  { id: "e17", from: "S3", to: "S4", label: "observe", color: "#94a3b8", curve: 0 },
+  { id: "e18", from: "S4", to: "S6", label: "understanding", color: "#94a3b8", curve: 0 },
+  { id: "e19", from: "S6", to: "S0", label: "updated baseline", color: "#60a5fa", curve: 0 },
 ];
+
+const isLegacyDefaultDiagram = (doc: DiagramDoc) =>
+  doc.name === "Default Example Diagram" &&
+  doc.nodes.length === 13 &&
+  doc.edges.length === 15 &&
+  doc.nodes.some((node) => node.id === "S9" && node.title === "Mind") &&
+  doc.nodes.some((node) => node.id === "S12" && node.title === "Awareness");
+
+const migrateDefaultDiagram = (doc: DiagramDoc): DiagramDoc => {
+  if (!isLegacyDefaultDiagram(doc)) return doc;
+  return {
+    ...doc,
+    nodes: createDefaultNodes(),
+    edges: createDefaultEdges(),
+    camera: { x: 0, y: 0, zoom: 1 },
+  };
+};
 
 const createDiagram = (index: number): DiagramDoc => ({
   id: createId("diagram"),
@@ -440,7 +598,7 @@ const readPersistedState = (): PersistedState | null => {
 
 const sanitizeStore = (value: any): PersistedState | null => {
   if (!value || !Array.isArray(value.diagrams) || typeof value.activeDiagramId !== "string") return null;
-  const diagrams = value.diagrams.filter(isDiagramDoc);
+  const diagrams = value.diagrams.filter(isDiagramDoc).map(migrateDefaultDiagram);
   if (diagrams.length === 0) return null;
   const activeDiagramId = diagrams.some((d) => d.id === value.activeDiagramId) ? value.activeDiagramId : diagrams[0].id;
   const allIds = new Set(diagrams.map((d) => d.id));

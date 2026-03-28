@@ -1615,22 +1615,24 @@ function OfferizationContent() {
   }, [activeDraftOffer, aiConfig, buildOfferAiContext, editingOffer, handleUpdateEditingOffer, isDesktopRuntime, toast]);
 
   const renderOfferFieldAction = useCallback((field: OfferFieldKey) => (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      className="h-7 px-2 text-xs"
-      onClick={() => void handleGenerateOfferField(field)}
-      disabled={offerAiLoadingField !== null || aiConfig.provider === 'none'}
-      title={aiConfig.provider === 'none' ? 'Configure AI in Settings to enable this.' : `Generate ${field} with AI`}
-    >
-      {offerAiLoadingField === field ? (
-        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-      ) : (
-        <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-      )}
-      AI
-    </Button>
+    aiConfig.provider === 'none' ? null : (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-7 px-2 text-xs"
+        onClick={() => void handleGenerateOfferField(field)}
+        disabled={offerAiLoadingField !== null}
+        title={`Generate ${field} with AI`}
+      >
+        {offerAiLoadingField === field ? (
+          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+        )}
+        AI
+      </Button>
+    )
   ), [aiConfig.provider, handleGenerateOfferField, offerAiLoadingField]);
 
   const handleGenerateOffersFromTypes = useCallback(async () => {
@@ -3135,20 +3137,22 @@ const ProjectForm = ({ specialization, release, handleUpdateEditingRelease }: {
                                 <h4 className="text-base font-semibold text-foreground">Technical Details</h4>
                                 <p className="text-sm text-muted-foreground">Generate concise technical notes from the inferred skills used in this project.</p>
                             </div>
-                            <Button
+                            {aiConfig.provider !== 'none' ? (
+                              <Button
                                 type="button"
                                 variant="outline"
                                 size="sm"
                                 onClick={() => void handleGenerateTechnicalDetails()}
-                                disabled={isGeneratingTechnicalDetails || aiConfig.provider === 'none'}
-                            >
+                                disabled={isGeneratingTechnicalDetails}
+                              >
                                 {isGeneratingTechnicalDetails ? (
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 ) : (
-                                    <Sparkles className="mr-2 h-4 w-4" />
+                                  <Sparkles className="mr-2 h-4 w-4" />
                                 )}
                                 Generate
-                            </Button>
+                              </Button>
+                            ) : null}
                         </div>
                         <div className="rounded-xl border border-border/60 bg-background/30 p-3">
                             <div className="space-y-5">

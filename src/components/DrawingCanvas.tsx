@@ -18,7 +18,7 @@ import dynamic from 'next/dynamic';
 import { loadExcalidrawFiles, saveExcalidrawFiles, type ExcalidrawFilesMetaMap } from '@/lib/excalidrawFileStore';
 import { safeSetLocalStorageItem } from '@/lib/safeStorage';
 import { parseJsonWithRecovery } from '@/lib/jsonRecovery';
-import { getAiConfigFromSettings } from '@/lib/ai/config';
+import { getAiConfigFromSettings, normalizeAiSettings } from '@/lib/ai/config';
 import { cleanSpeechText, getKokoroLocalVoices, getOpenAiCloudVoices, loadSpeechPrefs, parseCloudVoiceURI, pickBestVoice, saveSpeechPrefs } from '@/lib/tts';
 import { useCanvasRecording } from '@/hooks/useCanvasRecording';
 import ReactMarkdown from 'react-markdown';
@@ -910,7 +910,13 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
   });
   const isDesktopRuntime = typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop);
   const aiConfig = useMemo(() => getAiConfigFromSettings(settings, isDesktopRuntime), [settings, isDesktopRuntime]);
-  const isAiEnabled = aiConfig.provider !== 'none';
+  const isAiEnabled = normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== 'none';
+    useEffect(() => {
+      if (!isAiEnabled && showDiagramExplainPanel) {
+        setShowDiagramExplainPanel(false);
+      }
+    }, [isAiEnabled, showDiagramExplainPanel]);
+
   const kokoroBaseUrl = (settings.kokoroTtsBaseUrl || DEFAULT_KOKORO_BASE_URL).trim();
   const kokoroEnabled = isDesktopRuntime && (isKokoroHealthy || Boolean(kokoroBaseUrl));
   const cloudVoices = useMemo(
@@ -1951,13 +1957,13 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                       </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    {isDesktopRuntime ? (
+                    {isDesktopRuntime && isAiEnabled ? (
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-5 w-5"
                         onClick={() => void handleExplainDiagram()}
-                        title={isAiEnabled ? "Explain this diagram with AI" : "Configure AI provider first"}
+                        title="Explain this diagram with AI"
                       >
                         {isExplainingDiagram ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Sparkles className="h-2.5 w-2.5" />}
                       </Button>
@@ -2192,7 +2198,7 @@ export function DrawingCanvas({ isOpen, onClose }: { isOpen: boolean; onClose: (
                         </div>
                       </div>
                     )}
-                    {isDesktopRuntime && showDiagramExplainPanel && (
+                    {isDesktopRuntime && isAiEnabled && showDiagramExplainPanel && (
                       <div className="absolute right-3 top-3 z-20 w-[380px] max-w-[calc(100%-1.5rem)] max-h-[calc(100%-1.5rem)] overflow-hidden rounded-2xl border bg-background/95 shadow-2xl backdrop-blur">
                         <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
                           <div className="min-w-0">

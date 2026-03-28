@@ -13,6 +13,7 @@ export type AppConfigRecord = {
   supabaseUrl: string | null;
   supabaseAnonKey: string | null;
   supabaseStorageBucket: string | null;
+  desktopDownloadUrl: string | null;
   desktopPlanPriceInr: number;
   desktopPlans: DesktopPlanCatalog;
   setupSupportPlans: SetupSupportPlanCatalog;
@@ -21,7 +22,7 @@ export type AppConfigRecord = {
 
 const CONFIG_TABLE = "app_config";
 const CONFIG_ID = "default";
-const CONFIG_SELECT = 'id, supabase_url, supabase_anon_key, supabase_storage_bucket, desktop_price_inr, desktop_plans, setup_support_plans, updated_at';
+const CONFIG_SELECT = 'id, supabase_url, supabase_anon_key, supabase_storage_bucket, desktop_download_url, desktop_price_inr, desktop_plans, setup_support_plans, updated_at';
 const CONFIG_SELECT_LEGACY = 'id, supabase_url, supabase_anon_key, supabase_storage_bucket, updated_at';
 
 const getSupabaseUrl = () => process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -70,6 +71,7 @@ const toRecord = (row: any): AppConfigRecord => ({
   supabaseUrl: row?.supabase_url ?? null,
   supabaseAnonKey: row?.supabase_anon_key ?? null,
   supabaseStorageBucket: row?.supabase_storage_bucket ?? null,
+  desktopDownloadUrl: row?.desktop_download_url ?? null,
   desktopPlanPriceInr: normalizeDesktopPlanPriceInr(row?.desktop_price_inr, DESKTOP_PLAN_PRICE_INR),
   desktopPlans: normalizeDesktopPlanCatalog(row?.desktop_plans, normalizeDesktopPlanPriceInr(row?.desktop_price_inr, DESKTOP_PLAN_PRICE_INR)),
   setupSupportPlans: normalizeSetupSupportPlanCatalog(row?.setup_support_plans),
@@ -80,7 +82,7 @@ export async function readAppConfigFromDb(): Promise<AppConfigRecord | null> {
   const client = getAdminClient();
   let result = await client.from(CONFIG_TABLE).select(CONFIG_SELECT).eq('id', CONFIG_ID).maybeSingle();
 
-  if (result.error && (isMissingConfigColumnError(result.error, 'desktop_price_inr') || isMissingConfigColumnError(result.error, 'desktop_plans') || isMissingConfigColumnError(result.error, 'setup_support_plans'))) {
+  if (result.error && (isMissingConfigColumnError(result.error, 'desktop_download_url') || isMissingConfigColumnError(result.error, 'desktop_price_inr') || isMissingConfigColumnError(result.error, 'desktop_plans') || isMissingConfigColumnError(result.error, 'setup_support_plans'))) {
     result = await client.from(CONFIG_TABLE).select(CONFIG_SELECT_LEGACY).eq('id', CONFIG_ID).maybeSingle();
   }
 
@@ -95,6 +97,7 @@ export async function upsertAppConfig(payload: {
   supabaseUrl: string;
   supabaseAnonKey: string;
   supabaseStorageBucket?: string | null;
+  desktopDownloadUrl?: string | null;
   desktopPlanPriceInr: number;
   desktopPlans?: DesktopPlanCatalog | null;
   setupSupportPlans?: SetupSupportPlanCatalog | null;
@@ -112,6 +115,7 @@ export async function upsertAppConfig(payload: {
         supabase_url: payload.supabaseUrl,
         supabase_anon_key: payload.supabaseAnonKey,
         supabase_storage_bucket: payload.supabaseStorageBucket ?? null,
+        desktop_download_url: payload.desktopDownloadUrl ?? null,
         desktop_price_inr: getDesktopPlanFinalPriceInr(featuredPlan),
         desktop_plans: desktopPlans,
         setup_support_plans: setupSupportPlans,
@@ -123,12 +127,23 @@ export async function upsertAppConfig(payload: {
     .single();
 
   if (error) {
-    if (isMissingConfigColumnError(error, 'desktop_price_inr') || isMissingConfigColumnError(error, 'desktop_plans') || isMissingConfigColumnError(error, 'setup_support_plans')) {
-      throw new Error('App config table is missing pricing config columns. Run docs/app-config.sql in Supabase SQL Editor before saving plans from admin.');
+    if (isMissingConfigColumnError(error, 'desktop_download_url') || isMissingConfigColumnError(error, 'desktop_price_inr') || isMissingConfigColumnError(error, 'desktop_plans') || isMissingConfigColumnError(error, 'setup_support_plans')) {
+      throw new Error('App config table is missing config columns. Run docs/app-config.sql in Supabase SQL Editor before saving admin config.');
     }
     throw new Error(describeDbError(error) || "Failed to save app config.");
   }
   return toRecord(data);
+}
+
+export async function readConfiguredDesktopDownloadUrl(): Promise<string | null> {
+  const envUrl = (process.env.DESKTOP_DOWNLOAD_URL || process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || '').trim();
+  if (!isAppConfigStorageConfigured()) return envUrl || null;
+  try {
+    const config = await readAppConfigFromDb();
+    return String(config?.desktopDownloadUrl || '').trim() || envUrl || null;
+  } catch {
+    return envUrl || null;
+  }
 }
 
 export async function readConfiguredDesktopPlanPriceInr(): Promise<number> {

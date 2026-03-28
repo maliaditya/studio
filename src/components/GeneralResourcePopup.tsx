@@ -34,7 +34,7 @@ import { FlashcardMcqPanel } from './FlashcardMcqPanel';
 import { buildReadableTextFromResource } from '@/lib/resourceSpeech';
 import { useBufferedResource } from '@/hooks/useBufferedResource';
 import { loadAstraVoicePrefs, pickBestVoice } from '@/lib/tts';
-import { getAiConfigFromSettings } from '@/lib/ai/config';
+import { getAiConfigFromSettings, normalizeAiSettings } from '@/lib/ai/config';
 import { useToast } from '@/hooks/use-toast';
 
 const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
@@ -897,12 +897,15 @@ export function GeneralResourcePopup({ popupState, onClose, onNavigatePath, onUp
         window.speechSynthesis.speak(utterance);
     };
 
+    const isDesktopRuntime = typeof window !== 'undefined' && Boolean((window as any)?.studioDesktop?.isDesktop);
+    const isAiEnabled = normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== 'none';
+
     const handleToggleFavorite = () => {
       queueUpdate((current) => ({ ...current, isFavorite: !current.isFavorite }));
     };
 
     const handleOpenResourceAstra = useCallback(() => {
-        if (typeof window === 'undefined') return;
+        if (typeof window === 'undefined' || !isAiEnabled) return;
         window.dispatchEvent(
             new CustomEvent('open-astra-resource-chat', {
                 detail: {
@@ -911,7 +914,7 @@ export function GeneralResourcePopup({ popupState, onClose, onNavigatePath, onUp
                 },
             })
         );
-    }, [resource.id, resource.name]);
+    }, [isAiEnabled, resource.id, resource.name]);
 
     const handleToggleFullscreen = () => {
       if (!isFullscreen) {
@@ -1472,14 +1475,16 @@ export function GeneralResourcePopup({ popupState, onClose, onNavigatePath, onUp
                                                             <TooltipContent><p>Delete Local Audio</p></TooltipContent>
                                                         </Tooltip>
                                                     )}
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleOpenResourceAstra}>
-                                                                <Bot className="h-4 w-4 text-sky-400" />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent><p>Open in Astra</p></TooltipContent>
-                                                    </Tooltip>
+                                                    {isAiEnabled && (
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleOpenResourceAstra}>
+                                                                    <Bot className="h-4 w-4 text-sky-400" />
+                                                                </Button>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent><p>Open in Astra</p></TooltipContent>
+                                                        </Tooltip>
+                                                    )}
                                                     <Popover open={isAddBlockMenuOpen} onOpenChange={setIsAddBlockMenuOpen}>
                                                         <PopoverTrigger asChild>
                                                             <Button variant="ghost" size="icon" className="h-7 w-7">

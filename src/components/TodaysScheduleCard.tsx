@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import React, { startTransition, useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -9,6 +9,7 @@ import { Dumbbell, BookOpenCheck, Briefcase, ClipboardList, ClipboardCheck, Shar
 import type { Activity, ActivityType, RecurrenceRule, MetaRule, Pattern, DailySchedule, FullSchedule, Resource, Stopper, MindsetPoint, CoreDomainId, SlotName, Project } from '@/types/workout';
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuPortal, DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSeparator, DropdownMenuSubContent, DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
+import { useHighlightedTasks } from '@/hooks/useHighlightedTasks';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { EditableActivityText } from './EditableActivityText';
@@ -16,7 +17,6 @@ import { useRouter } from 'next/navigation';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from './ui/card';
 import { ScrollArea } from './ui/scroll-area';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { motion, useDragControls } from 'framer-motion';
 import { format, isToday, getISODay, getDay, parseISO, differenceInDays, differenceInMonths, startOfDay, addDays, addMonths, isAfter, isBefore } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { getExercisesForDay } from '@/lib/workoutUtils';
@@ -25,7 +25,6 @@ import { TimeAllocationChart } from './ProductivitySnapshot';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { useIsMobile } from '@/hooks/use-is-mobile';
-import { useDraggable } from '@dnd-kit/core';
 import { getEffectiveConstraintTasks } from '@/lib/botheringUtils';
 import { buildFlashcardTaskKey, getFlashcardSessionsForTask } from '@/lib/flashcards';
 import { FlashcardReviewModal } from './FlashcardReviewModal';
@@ -51,6 +50,32 @@ const activityIcons: Record<ActivityType, React.ReactNode> = {
 };
 
 const slotOrder: (keyof DailySchedule)[] = ['Late Night', 'Dawn', 'Morning', 'Afternoon', 'Evening', 'Night'];
+const AGENDA_WIDGET_MARGIN = 16;
+const AGENDA_WIDGET_WIDTH = 420;
+const AGENDA_WIDGET_HEIGHT = 700;
+
+const getDefaultAgendaWidgetPosition = () => {
+  if (typeof window === 'undefined') {
+    return { x: 20, y: 80 };
+  }
+
+  return {
+    x: Math.max(AGENDA_WIDGET_MARGIN, window.innerWidth - AGENDA_WIDGET_WIDTH - AGENDA_WIDGET_MARGIN),
+    y: Math.max(AGENDA_WIDGET_MARGIN, Math.round((window.innerHeight - AGENDA_WIDGET_HEIGHT) / 2)),
+  };
+};
+
+const clampAgendaWidgetPosition = (value: { x: number; y: number }) => {
+  if (typeof window === 'undefined') return value;
+
+  const maxX = Math.max(AGENDA_WIDGET_MARGIN, window.innerWidth - AGENDA_WIDGET_WIDTH - AGENDA_WIDGET_MARGIN);
+  const maxY = Math.max(AGENDA_WIDGET_MARGIN, window.innerHeight - 120);
+
+  return {
+    x: Math.min(Math.max(AGENDA_WIDGET_MARGIN, Math.round(value.x)), maxX),
+    y: Math.min(Math.max(AGENDA_WIDGET_MARGIN, Math.round(value.y)), maxY),
+  };
+};
 
 const AddActivityMenu = ({
     onAddActivity,
@@ -842,9 +867,8 @@ export function TodaysScheduleCard({
     openMindsetWidget,
     openDrawingCanvasFromHeader,
     dateOfBirth,
-    highlightedTaskIds,
-    setHighlightedTaskIds,
   } = useAuth();
+  const { highlightedTaskIds, setHighlightedTaskIds } = useHighlightedTasks();
   
   const toggleCurrentSlotOnly = () => {
     setSettings(prev => ({ ...prev, agendaShowCurrentSlotOnly: !prev.agendaShowCurrentSlotOnly }));
@@ -857,7 +881,6 @@ export function TodaysScheduleCard({
   const [activeBotheringTab, setActiveBotheringTab] = useState<'All' | 'External' | 'Mismatch' | 'Constraint' | 'Parked' | 'Current'>('All');
   const [newEntryText, setNewEntryText] = useState('');
   
-  const dragControls = useDragControls()
   const listRef = useRef<HTMLUListElement>(null);
   const isMobile = useIsMobile();
 
@@ -1104,12 +1127,16 @@ export function TodaysScheduleCard({
 
   const selectBotheringInTodo = useCallback((point: MindsetPoint, sourceType: BotheringSourceType) => {
     const ids = getBotheringHighlightIds(point, sourceType);
-    const same =
-      ids.size === highlightedTaskIds.size &&
-      Array.from(ids).every((id) => highlightedTaskIds.has(id));
-    setHighlightedTaskIds(same ? new Set() : ids);
+    startTransition(() => {
+      setHighlightedTaskIds((prev) => {
+        const same =
+          ids.size === prev.size &&
+          Array.from(ids).every((id) => prev.has(id));
+        return same ? new Set() : new Set(ids);
+      });
+    });
     setView('list');
-  }, [getBotheringHighlightIds, highlightedTaskIds, setHighlightedTaskIds]);
+  }, [getBotheringHighlightIds, setHighlightedTaskIds]);
 
   const getDaysLeftLabel = useCallback((endDate?: string) => {
     if (!endDate) return "No end date";
@@ -1502,13 +1529,9 @@ export function TodaysScheduleCard({
   }, [todaysSchedule, activityDurations]);
 
 
-  const [position, setPosition] = useState({ x: 20, y: 80 });
+  const [position, setPosition] = useState(() => getDefaultAgendaWidgetPosition());
   const [isDragging, setIsDragging] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const { setNodeRef, transform } = useDraggable({
-    id: 'agenda-widget',
-    disabled: isAgendaDocked,
-  });
+  const [dragStartOffset, setDragStartOffset] = useState({ x: 0, y: 0 });
 
 
   const positionKey = currentUser ? `lifeos_agenda_widget_position_${currentUser.username}` : null;
@@ -1519,20 +1542,56 @@ export function TodaysScheduleCard({
         if (savedPosition) {
             try {
                 const parsed = JSON.parse(savedPosition);
-                setPosition(parsed);
+          setPosition(clampAgendaWidgetPosition(parsed));
             } catch (e) {
                  console.error("Failed to parse widget position from localStorage", e);
-                 const initialY = window.innerHeight - Math.min(window.innerHeight - 80, 450);
-                 const initialX = window.innerWidth - Math.min(window.innerWidth - 20, 340);
-                 setPosition({ x: initialX, y: initialY });
+           setPosition(getDefaultAgendaWidgetPosition());
             }
         } else {
-            const initialY = window.innerHeight - Math.min(window.innerHeight - 80, 450);
-            const initialX = window.innerWidth - Math.min(window.innerWidth - 20, 340);
-            setPosition({ x: initialX, y: initialY });
+        setPosition(getDefaultAgendaWidgetPosition());
         }
     }
   }, [isAgendaDocked, positionKey]);
+
+  const handleFloatingCardMouseDown = useCallback((event: React.MouseEvent) => {
+    if (isAgendaDocked) return;
+    const target = event.target as HTMLElement;
+    if (target.closest('button, input, textarea, select, a, [role="button"], [role="checkbox"], [data-radix-popover-trigger]')) {
+      return;
+    }
+    setIsDragging(true);
+    setDragStartOffset({ x: event.clientX - position.x, y: event.clientY - position.y });
+  }, [isAgendaDocked, position.x, position.y]);
+
+  const handleFloatingCardMouseMove = useCallback((event: MouseEvent) => {
+    setPosition((prev) => {
+      if (!isDragging) return prev;
+      return clampAgendaWidgetPosition({
+        x: event.clientX - dragStartOffset.x,
+        y: event.clientY - dragStartOffset.y,
+      });
+    });
+  }, [dragStartOffset.x, dragStartOffset.y, isDragging]);
+
+  const handleFloatingCardMouseUp = useCallback(() => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    if (positionKey) {
+      safeSetLocalStorageItem(positionKey, JSON.stringify(position));
+    }
+  }, [isDragging, position, positionKey]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    window.addEventListener('mousemove', handleFloatingCardMouseMove);
+    window.addEventListener('mouseup', handleFloatingCardMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleFloatingCardMouseMove);
+      window.removeEventListener('mouseup', handleFloatingCardMouseUp);
+    };
+  }, [handleFloatingCardMouseMove, handleFloatingCardMouseUp, isDragging]);
 
   const onRemoveActivity = useCallback((slotName: string, activityId: string) => {
     removeActivityFromSchedule(slotName, activityId, date);
@@ -1832,7 +1891,8 @@ export function TodaysScheduleCard({
   const cardContent = (
     <Card className={cn("shadow-2xl bg-background/80 backdrop-blur-sm", cardHeightClass, "flex flex-col")}>
         <CardHeader
-            className={cn("p-3", !isAgendaDocked && "cursor-grab active:cursor-grabbing")}
+        className={cn("p-3", !isAgendaDocked && "cursor-grab active:cursor-grabbing")}
+        onMouseDown={handleFloatingCardMouseDown}
         >
             <div className="flex items-center justify-between gap-2">
                 <CardTitle className="flex items-center gap-2 text-base text-primary">Todo</CardTitle>
@@ -2064,23 +2124,16 @@ export function TodaysScheduleCard({
   if (!isAgendaDocked) {
     return (
       <>
-        <motion.div
-          drag
-          dragControls={dragControls}
+        <div
           className="fixed z-50 w-full max-w-sm"
           style={{
             left: `${position.x}px`,
             top: `${position.y}px`,
+            userSelect: isDragging ? 'none' : 'auto',
           }}
-          onDragEnd={() => {
-              if (positionKey) {
-                  safeSetLocalStorageItem(positionKey, JSON.stringify(position));
-              }
-          }}
-          dragMomentum={false}
         >
           {cardContent}
-        </motion.div>
+        </div>
         {gitHubPopup}
       </>
     );

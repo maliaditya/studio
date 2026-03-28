@@ -12,7 +12,7 @@ import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
 import { useDraggable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
-import { getAiConfigFromSettings } from '@/lib/ai/config';
+import { getAiConfigFromSettings, normalizeAiSettings } from '@/lib/ai/config';
 import type { TaskBciContext, TaskBciLinkedBothering, TaskBciModel } from '@/lib/taskBci';
 import { getEffectiveConstraintTasks } from '@/lib/botheringUtils';
 
@@ -379,10 +379,11 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
         () => getAiConfigFromSettings(settings, isDesktopRuntime),
         [isDesktopRuntime, settings]
     );
+    const isAiEnabled = normalizeAiSettings(settings.ai, isDesktopRuntime).provider !== 'none';
 
     const generateBci = useCallback(
         async (signal?: AbortSignal) => {
-            if (!bciContext) return;
+            if (!bciContext || !isAiEnabled) return;
             setScriptState({
                 loading: false,
                 data: '',
@@ -431,12 +432,12 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                 });
             }
         },
-        [aiConfig, bciContext, isDesktopRuntime]
+        [aiConfig, bciContext, isAiEnabled, isDesktopRuntime]
     );
 
     const generateScript = useCallback(
         async (signal?: AbortSignal) => {
-            if (!bciContext) return '';
+            if (!bciContext || !isAiEnabled) return '';
             setScriptState((prev) => ({
                 ...prev,
                 loading: true,
@@ -482,7 +483,7 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                 return '';
             }
         },
-        [aiConfig, bciContext, bciState.data, isDesktopRuntime]
+        [aiConfig, bciContext, bciState.data, isAiEnabled, isDesktopRuntime]
     );
 
     useEffect(() => {
@@ -503,11 +504,11 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
     }, [popupState.activityId]);
 
     useEffect(() => {
-        if (!bciContext) return;
+        if (!bciContext || !isAiEnabled) return;
         const controller = new AbortController();
         void generateBci(controller.signal);
         return () => controller.abort();
-    }, [bciContext, generateBci, popupState.activityId]);
+    }, [bciContext, generateBci, isAiEnabled, popupState.activityId]);
 
     const handleClose = (e: React.PointerEvent<HTMLButtonElement>) => {
         e.stopPropagation();
@@ -595,14 +596,16 @@ export function TaskContextPopup({ popupState }: TaskContextPopupProps) {
                                 Task Context
                             </CardTitle>
                             <div className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" className="h-8" onPointerDown={handleOpenInAstraPointerDown}>
-                                    {scriptState.loading ? (
-                                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                        <Bot className="mr-1.5 h-3.5 w-3.5" />
-                                    )}
-                                    {scriptState.loading ? 'Preparing...' : 'Open in Astra'}
-                                </Button>
+                                {isAiEnabled && (
+                                    <Button variant="outline" size="sm" className="h-8" onPointerDown={handleOpenInAstraPointerDown}>
+                                        {scriptState.loading ? (
+                                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                            <Bot className="mr-1.5 h-3.5 w-3.5" />
+                                        )}
+                                        {scriptState.loading ? 'Preparing...' : 'Open in Astra'}
+                                    </Button>
+                                )}
                                 <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onPointerDown={handleClose}>
                                     <X className="h-4 w-4" />
                                 </Button>
