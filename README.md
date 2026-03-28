@@ -90,6 +90,28 @@ Run desktop app with Next.js + Electron:
 npm run desktop:dev
 ```
 
+### Ubuntu install (desktop)
+
+Build from source and run:
+
+```bash
+npm install
+npm run desktop:dev
+```
+
+Build installables (AppImage + .deb):
+
+```bash
+npm install
+npm run desktop:dist
+```
+
+Install the .deb:
+
+```bash
+sudo dpkg -i dist-electron/*.deb
+```
+
 ## AI System
 
 AI provider settings support:
